@@ -3,10 +3,13 @@
   "compilerOptions": {
     "lib": ["esnext"],
     "types": ["node", "express"],
-    "rootDir": "./src",
+    "rootDir": ".",
     "outDir": "./dist",
     "noEmit": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "#test/*": ["./test/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }
