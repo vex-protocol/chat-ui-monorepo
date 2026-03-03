@@ -1,13 +1,12 @@
 {
   "name": "vex-chat",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": "true",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "pnpm -r --parallel dev"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.30.3"
+  "packageManager": "pnpm@10.30.3",
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }

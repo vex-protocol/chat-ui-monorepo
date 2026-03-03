@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    // Module
+    "module": "nodenext",
+    "target": "esnext",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // Output
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+
+    // Strictness
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedSideEffectImports": true,
+
+    "skipLibCheck": true
+  }
+}
