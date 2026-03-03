@@ -1,13 +1,21 @@
 import { onTestFinished } from 'vitest'
 import SQLiteDatabase from 'better-sqlite3'
-import { Kysely, SqliteDialect } from 'kysely'
+import { CompiledQuery, Kysely, SqliteDialect } from 'kysely'
 import type { Database } from '../../src/db/types.js'
 import { migrateToLatest } from '../../src/db/migrate.js'
 
 /** Bare in-memory Kysely instance — no schema applied. */
 export function createTestDb(): Kysely<Database> {
   return new Kysely<Database>({
-    dialect: new SqliteDialect({ database: new SQLiteDatabase(':memory:') }),
+    dialect: new SqliteDialect({
+      database: new SQLiteDatabase(':memory:'),
+      // SQLite only enforces FK constraints when this PRAGMA is set per-connection.
+      // Without it, .references() in migrations generates valid DDL but inserts
+      // referencing non-existent rows are silently accepted.
+      onCreateConnection: async conn => {
+        await conn.executeQuery(CompiledQuery.raw('PRAGMA foreign_keys = ON'))
+      },
+    }),
   })
 }
 
