@@ -3,6 +3,7 @@ node_modules
 # Agents
 .claude
 .cursor
+.agents
 
 AGENTS.md
 

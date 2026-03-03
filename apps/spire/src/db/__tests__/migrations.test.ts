@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { Kysely } from 'kysely'
 import { sql } from 'kysely'
 import { createTestDb, useDb } from '#test/helpers/db.js'
@@ -47,6 +47,7 @@ async function columnNames(db: Kysely<Database>, table: TableName): Promise<stri
 }
 
 async function indexInfo(db: Kysely<Database>, table: TableName): Promise<PragmaIndexRow[]> {
+  // sql.raw() is safe here: `table` is the TableName union literal, not user input.
   const result = await sql<PragmaIndexRow>`
     PRAGMA index_list(${sql.raw(`'${table}'`)})
   `.execute(db)
@@ -191,6 +192,22 @@ describe('DB migrations', () => {
         const indexes = await indexInfo(db, table)
         expect(indexes.length, `${table} should have at least one index`).toBeGreaterThan(0)
       }
+    })
+
+    it('enforces NOT NULL — inserting a null required column throws', async () => {
+      const db = await useDb()
+      await expect(
+        // username is NOT NULL; omitting it via raw SQL triggers the constraint
+        sql`INSERT INTO users (userID, passwordHash, passwordSalt, lastSeen) VALUES ('u1', 'h', 's', 't')`.execute(db),
+      ).rejects.toThrow()
+    })
+
+    it('enforces UNIQUE — inserting duplicate username throws', async () => {
+      const db = await useDb()
+      await sql`INSERT INTO users (userID, username, passwordHash, passwordSalt, lastSeen) VALUES ('u1', 'alice', 'h', 's', 't')`.execute(db)
+      await expect(
+        sql`INSERT INTO users (userID, username, passwordHash, passwordSalt, lastSeen) VALUES ('u2', 'alice', 'h', 's', 't')`.execute(db),
+      ).rejects.toThrow()
     })
 
     it('is idempotent — running migrateToLatest twice does not throw', async () => {
