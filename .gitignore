@@ -2,3 +2,10 @@ node_modules
 
 # Agents
 .claude
+.cursor
+
+AGENTS.md
+
+# Dolt database files
+.dolt/
+*.db
