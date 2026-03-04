@@ -17,8 +17,8 @@ import {
   type ITokenStore,
   type TokenType,
 } from '#auth/auth.service.js'
-import { validateBody } from '../middleware/validate.js'
-import { checkAuth } from '../middleware/checkAuth.js'
+import { validateBody } from '#middleware/validate.js'
+import { checkAuth } from '#middleware/checkAuth.js'
 import { AuthError, ValidationError } from '#errors'
 
 const VALID_TOKEN_TYPES = new Set<TokenType>(ALL_TOKEN_TYPES)

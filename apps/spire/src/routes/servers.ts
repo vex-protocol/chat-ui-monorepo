@@ -18,8 +18,8 @@ import {
   hasPermission,
 } from '#permissions/permissions.service.js'
 import { createInvite, getServerInvites } from '#invites/invites.service.js'
-import { checkAuth } from '../middleware/checkAuth.js'
-import { validateBody } from '../middleware/validate.js'
+import { checkAuth } from '#middleware/checkAuth.js'
+import { validateBody } from '#middleware/validate.js'
 import { NotFoundError, ForbiddenError } from '#errors'
 
 const DELETE_POWER = 50
