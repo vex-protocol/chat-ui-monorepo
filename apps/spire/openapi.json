@@ -25,6 +25,825 @@
     "schemas": {},
     "parameters": {}
   },
-  "paths": {},
+  "paths": {
+    "/register": {
+      "post": {
+        "operationId": "register",
+        "responses": {
+          "200": {
+            "description": "User created"
+          },
+          "409": {
+            "description": "Username taken"
+          }
+        }
+      }
+    },
+    "/auth": {
+      "post": {
+        "operationId": "login",
+        "responses": {
+          "200": {
+            "description": "JWT issued"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/whoami": {
+      "post": {
+        "operationId": "whoami",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authenticated user"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/goodbye": {
+      "post": {
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "Cookie cleared"
+          }
+        }
+      }
+    },
+    "/token/{tokenType}": {
+      "get": {
+        "operationId": "getToken",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "tokenType",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Action token"
+          },
+          "400": {
+            "description": "Invalid type"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/user/{id}": {
+      "get": {
+        "operationId": "getUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/user/{id}/devices": {
+      "get": {
+        "operationId": "getUserDevices",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device list"
+          }
+        }
+      },
+      "post": {
+        "operationId": "addDevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device created"
+          }
+        }
+      }
+    },
+    "/user/{userID}/devices/{deviceID}": {
+      "delete": {
+        "operationId": "deleteDevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "userID",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "deviceID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/user/{id}/permissions": {
+      "get": {
+        "operationId": "getUserPerms",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Permissions"
+          }
+        }
+      }
+    },
+    "/user/{id}/servers": {
+      "get": {
+        "operationId": "getUserServers",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servers"
+          }
+        }
+      }
+    },
+    "/device/{id}": {
+      "get": {
+        "operationId": "getDevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/device/{id}/keyBundle": {
+      "post": {
+        "operationId": "getKeyBundle",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Key bundle"
+          }
+        }
+      }
+    },
+    "/device/{id}/mail": {
+      "post": {
+        "operationId": "sendMail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mail sent"
+          }
+        }
+      }
+    },
+    "/device/{id}/connect": {
+      "post": {
+        "operationId": "wsConnect",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket upgrade"
+          }
+        }
+      }
+    },
+    "/device/{id}/otk/count": {
+      "get": {
+        "operationId": "getOtkCount",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTK count"
+          }
+        }
+      }
+    },
+    "/device/{id}/otk": {
+      "post": {
+        "operationId": "uploadOtks",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTKs saved"
+          }
+        }
+      }
+    },
+    "/server": {
+      "post": {
+        "operationId": "createServer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/server/{id}": {
+      "get": {
+        "operationId": "getServer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteServer",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/server/{id}/channels": {
+      "post": {
+        "operationId": "createChannel",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel created"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listChannels",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Channel list"
+          }
+        }
+      }
+    },
+    "/channel/{id}": {
+      "delete": {
+        "operationId": "deleteChannel",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/server/{serverID}/permissions": {
+      "get": {
+        "operationId": "listPermissions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "serverID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Permissions"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/permission/{id}": {
+      "delete": {
+        "operationId": "deletePermission",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          }
+        }
+      }
+    },
+    "/server/{serverID}/invites": {
+      "post": {
+        "operationId": "createInvite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "serverID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "get": {
+        "operationId": "listInvites",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "serverID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite list"
+          }
+        }
+      }
+    },
+    "/file/{id}": {
+      "get": {
+        "operationId": "getFile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/file": {
+      "post": {
+        "operationId": "uploadFile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File uploaded"
+          }
+        }
+      }
+    },
+    "/avatar/{userID}": {
+      "get": {
+        "operationId": "getAvatar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "userID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avatar"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      },
+      "post": {
+        "operationId": "uploadAvatar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "userID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avatar set"
+          }
+        }
+      }
+    },
+    "/emoji/{emojiID}": {
+      "get": {
+        "operationId": "getEmoji",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "emojiID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Emoji"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/server/{serverID}/emoji": {
+      "post": {
+        "operationId": "uploadEmoji",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "serverID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Emoji created"
+          }
+        }
+      }
+    },
+    "/userList/{channelID}": {
+      "post": {
+        "operationId": "getUserList",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "channelID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User list"
+          }
+        }
+      }
+    }
+  },
   "webhooks": {}
 }

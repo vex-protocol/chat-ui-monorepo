@@ -1,3 +1,4 @@
+import { registry } from '#openapi'
 import { Router } from 'express'
 import { z } from 'zod'
 import type { Kysely } from 'kysely'
@@ -124,3 +125,22 @@ export function createServerRouter(db: Kysely<Database>): Router {
 
   return router
 }
+
+
+// ---------------------------------------------------------------------------
+// OpenAPI registrations
+// ---------------------------------------------------------------------------
+
+const auth = [{ bearerAuth: [] }]
+const pid = (names: string[]) => z.object(Object.fromEntries(names.map(n => [n, z.string()])))
+
+registry.registerPath({ method: 'post',   path: '/server',                          operationId: 'createServer',     security: auth,                                                    responses: { 200: { description: 'Server created' }, 401: { description: 'Unauthorized' } } })
+registry.registerPath({ method: 'get',    path: '/server/{id}',                     operationId: 'getServer',        security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Server' },         404: { description: 'Not found' } } })
+registry.registerPath({ method: 'delete', path: '/server/{id}',                     operationId: 'deleteServer',     security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Deleted' },        403: { description: 'Forbidden' } } })
+registry.registerPath({ method: 'post',   path: '/server/{id}/channels',            operationId: 'createChannel',    security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Channel created' } } })
+registry.registerPath({ method: 'get',    path: '/server/{id}/channels',            operationId: 'listChannels',     security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Channel list' } } })
+registry.registerPath({ method: 'delete', path: '/channel/{id}',                    operationId: 'deleteChannel',    security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Deleted' } } })
+registry.registerPath({ method: 'get',    path: '/server/{serverID}/permissions',   operationId: 'listPermissions',  security: auth, request: { params: pid(['serverID']) },            responses: { 200: { description: 'Permissions' },   401: { description: 'Unauthorized' } } })
+registry.registerPath({ method: 'delete', path: '/permission/{id}',                 operationId: 'deletePermission', security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Deleted' } } })
+registry.registerPath({ method: 'post',   path: '/server/{serverID}/invites',       operationId: 'createInvite',     security: auth, request: { params: pid(['serverID']) },            responses: { 200: { description: 'Invite created' }, 401: { description: 'Unauthorized' } } })
+registry.registerPath({ method: 'get',    path: '/server/{serverID}/invites',       operationId: 'listInvites',      security: auth, request: { params: pid(['serverID']) },            responses: { 200: { description: 'Invite list' } } })
