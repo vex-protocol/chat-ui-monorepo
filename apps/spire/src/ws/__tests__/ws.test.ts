@@ -40,6 +40,16 @@ function makeDeviceSetup() {
   return { kp, payload }
 }
 
+/**
+ * Drain the microtask queue so async event handlers (which do DB lookups)
+ * complete before the test resumes. 10 hops covers Kysely's internal
+ * Promise chain over better-sqlite3's synchronous driver.
+ * Promise.resolve() is a microtask — unaffected by vi.useFakeTimers().
+ */
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 15; i++) await Promise.resolve()
+}
+
 /** Connects a MockWebSocket and completes the full auth handshake. */
 async function connectAndAuth(
   manager: ConnectionManager,
@@ -66,6 +76,9 @@ async function connectAndAuth(
       }),
     ),
   )
+
+  // Wait for the async message handler (DB lookup + signature verify) to settle
+  await flushMicrotasks()
 
   return { ws, deviceID: device.deviceID }
 }
@@ -126,6 +139,7 @@ describe('authentication', () => {
         }),
       ),
     )
+    await flushMicrotasks()
 
     expect(ws.close).toHaveBeenCalled()
   })
@@ -147,6 +161,7 @@ describe('authentication', () => {
         }),
       ),
     )
+    await flushMicrotasks()
 
     expect(ws.close).toHaveBeenCalled()
   })
