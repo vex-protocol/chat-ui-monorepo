@@ -6,12 +6,12 @@ extendZodWithOpenApi(z)
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 import { parseConfig } from '#config'
-import { createDb } from '#db/index.js'
-import { migrateToLatest } from '#db/migrate.js'
-import { createTokenStore } from '#auth/auth.service.js'
-import { createConnectionManager } from '#ws/ws.service.js'
-import { createApp } from './app.js'
-import { rootLogger as logger } from './utils/logger.js'
+import { createDb } from '#db/index.ts'
+import { migrateToLatest } from '#db/migrate.ts'
+import { createTokenStore } from '#auth/auth.service.ts'
+import { createConnectionManager } from '#ws/ws.service.ts'
+import { createApp } from './app.ts'
+import { rootLogger as logger } from './utils/logger.ts'
 
 let config: ReturnType<typeof parseConfig>
 try {

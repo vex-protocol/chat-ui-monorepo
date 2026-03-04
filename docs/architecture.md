@@ -100,8 +100,9 @@ Current aliases:
 ```
 
 **Rules:**
-- Use `#alias/file.js` for any import that crosses domain boundaries or goes from `test/` into `src/`.
-- Keep relative imports (`./auth.schemas.js`) within the same domain folder.
+- Use `#alias/file.ts` for any import that crosses domain boundaries or goes from `test/` into `src/`.
+- Keep relative imports (`./auth.schemas.ts`) within the same domain folder.
+- All imports use `.ts` extensions — never `.js`. Node 24 resolves `.ts` directly; `tsc` rewrites them to `.js` in the production build via `rewriteRelativeImportExtensions`.
 - When adding a new domain (`src/mail/`, `src/servers/`, etc.), add its alias to all three files.
 
 ---
@@ -414,12 +415,14 @@ The full model is in `AGENTS.md`. In brief:
 ### Understanding this codebase specifically
 
 Read in this order:
-1. `docs/vex-overview.md` — what Vex is and why
-2. `docs/auth-comparison.md` — how auth works, our design decisions
-3. `AGENTS.md` — implementation rules all contributors must follow
-4. `docs/testing-strategy.md` — how tests are structured
-5. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
-6. `docs/config.md` — env validation, secret hygiene, singleton pattern
-7. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
-7. `src/db/types.ts` — all 11 database tables
-8. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
+1. `docs/vex-overview.md` — what Vex is, components, and cryptographic protocol
+2. `docs/platform-strategy.md` — cross-platform architecture (Tauri+Svelte desktop, React Native mobile, shared packages)
+3. `docs/design-system.md` — Figma ↔ Storybook pipeline, Mitosis component strategy, designer/developer workflow
+4. `docs/auth-comparison.md` — how auth works, our design decisions
+5. `AGENTS.md` — implementation rules all contributors must follow
+6. `docs/testing-strategy.md` — how tests are structured
+7. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
+8. `docs/config.md` — env validation, secret hygiene, singleton pattern
+9. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
+10. `src/db/types.ts` — all 11 database tables
+11. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference

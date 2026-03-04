@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import { useDb } from '#test/helpers/db.js'
-import { createServer } from '#servers/servers.service.js'
+import { useDb } from '#test/helpers/db.ts'
+import { createServer } from '#servers/servers.service.ts'
 import {
   createInvite,
   getInvite,
   getServerInvites,
   deleteInvite,
   isInviteValid,
-} from '../invites.service.js'
+} from '../invites.service.ts'
 
 // ---------------------------------------------------------------------------
 // createInvite

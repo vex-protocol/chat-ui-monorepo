@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database, InvitesTable } from '#db/types.js'
+import type { Database, InvitesTable } from '#db/types.ts'
 
 export async function createInvite(
   db: Kysely<Database>,

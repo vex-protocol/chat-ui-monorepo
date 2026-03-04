@@ -2,23 +2,23 @@ import { registry, pid } from '#openapi'
 import { Router } from 'express'
 import { z } from 'zod'
 import type { Kysely } from 'kysely'
-import type { Database } from '#db/types.js'
+import type { Database } from '#db/types.ts'
 import {
   createServer,
   getServer,
   deleteServer,
   createChannel,
   getChannels,
-} from '#servers/servers.service.js'
-import { CreateServerSchema, CreateChannelSchema } from '#servers/servers.schemas.js'
+} from '#servers/servers.service.ts'
+import { CreateServerSchema, CreateChannelSchema } from '#servers/servers.schemas.ts'
 import {
   createPermission,
   getPermissionsByResource,
   deletePermission,
   hasPermission,
-} from '#permissions/permissions.service.js'
-import { createInvite, getServerInvites } from '#invites/invites.service.js'
-import { validateBody } from '#middleware/validate.js'
+} from '#permissions/permissions.service.ts'
+import { createInvite, getServerInvites } from '#invites/invites.service.ts'
+import { validateBody } from '#middleware/validate.ts'
 import type { RequestHandler } from 'express'
 import { NotFoundError, ForbiddenError } from '#errors'
 

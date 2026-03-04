@@ -1,0 +1,172 @@
+# Design System
+
+The Vex design system bridges Figma and code. Designers own the visual truth in Figma; developers implement primitives in code and publish to Storybook. The two stay linked bidirectionally.
+
+---
+
+## Architecture
+
+```
+Figma (design source of truth)
+    ↓  designer hands off via Dev Mode
+Developers implement in packages/ui/
+    ↓  Mitosis compiles .lite.tsx → Svelte + React
+Storybook (published, browsable by everyone)
+    ↓  Storybook Connect embeds stories back in Figma
+Figma (designer sees live implementation)
+```
+
+---
+
+## Mitosis: Write Once, Compile to Both
+
+[Mitosis](https://github.com/BuilderIO/mitosis) (by Builder.io) compiles a restricted JSX dialect to multiple frameworks.
+
+```tsx
+// packages/ui/src/message-bubble.lite.tsx
+import { useStore } from "@builder.io/mitosis";
+
+export default function MessageBubble(props) {
+  const state = useStore({
+    expanded: false,
+  });
+
+  return (
+    <div css={{ padding: "8px", borderRadius: "12px" }}>
+      <span>{props.author}</span>
+      <p>{props.content}</p>
+      <button onClick={() => (state.expanded = !state.expanded)}>
+        {state.expanded ? "Less" : "More"}
+      </button>
+    </div>
+  );
+}
+```
+
+Building generates `output/svelte/` and `output/react/` directories with idiomatic components.
+
+### What Mitosis handles well
+
+Stateless or lightly stateful **presentational components** — the 20-30 design primitives:
+- Button, Avatar, Badge, Icon
+- TextInput, SearchBar, MessageInput
+- ChannelListItem, MessageBubble, ServerListItem
+- Modal, Tooltip, Popover
+
+### What Mitosis does NOT handle
+
+- Framework-specific animations, transitions, gestures
+- Complex state management or lifecycle hooks
+- Navigation, routing, platform-specific APIs
+
+Screen-level components are written natively in each framework, composing the shared Mitosis primitives.
+
+---
+
+## Figma Structure (for designers)
+
+### File organization
+
+| File | Purpose |
+|---|---|
+| **Design System Library** | All primitive components, tokens, styles. Published as a Figma library. |
+| **Desktop App** | Screens composed from library components. Tauri-specific layouts. |
+| **Mobile App** | Screens composed from library components. React Native-specific layouts. |
+| **Archive** | Old explorations, deprecated screens. Keeps other files clean. |
+
+### Page structure inside each file
+
+Use emoji prefixes for scanability:
+- `📐 Cover` — file name, version, last updated, owners
+- `🧱 Atoms` — smallest primitives (Button, Icon, Avatar, Badge)
+- `🔗 Molecules` — composed atoms (SearchBar, MessageInput, ChannelListItem)
+- `🏗 Organisms` — composed molecules (Sidebar, MessageList, ServerNav)
+- `📄 Pages/Screens` — full screen layouts
+- `🗑 Deprecated` — old versions, hidden from library
+
+### Component requirements
+
+1. **Auto Layout on everything.** Auto Layout mirrors CSS flexbox — padding, alignment, spacing translate directly to code. Components without auto layout are nearly useless for handoff.
+
+2. **Variants using Figma's variant system.** Variant properties map 1:1 to code props. A Button should have:
+   - Size: small / medium / large
+   - Variant: primary / secondary / ghost
+   - State: default / hover / active / disabled
+
+3. **Match naming to code.** If the developer calls it `variant="primary"`, the Figma property should be "Variant" with value "Primary". Use slash grouping for component organization: `Button/Primary`, `Button/Secondary`.
+
+4. **Design tokens via Figma Variables.** Three layers:
+   - **Primitive tokens** — raw values: `blue-500: #3B82F6`, `spacing-4: 16px`
+   - **Semantic tokens** — meaning: `color-primary: blue-500`, `color-error: red-500`
+   - **Component tokens** — usage: `button-bg-primary: color-primary`
+
+5. **Tokens Studio plugin** (optional but recommended). Provides a no-code interface to manage tokens and sync token JSON to GitHub. Developers transform the JSON into CSS variables or Tailwind config using Style Dictionary.
+
+---
+
+## Figma ↔ Storybook Linking
+
+Three tools create the bidirectional connection:
+
+### 1. Storybook Connect (Figma plugin by Chromatic)
+
+Embeds live, interactive Storybook stories inside Figma. Designer selects a component in Figma → pastes the Storybook URL → every instance shows a "View story" link. Chromatic auto-updates links when Storybook is redeployed.
+
+### 2. Storybook Designs addon (in Storybook)
+
+The reverse direction. Developers add a `design` parameter to stories that embeds the Figma component inside Storybook:
+
+```ts
+export const Primary = {
+  args: { variant: 'primary', children: 'Click me' },
+  parameters: {
+    design: {
+      type: 'figma',
+      url: 'https://www.figma.com/file/xxx/Design-System?node-id=123:456',
+    },
+  },
+};
+```
+
+### 3. story.to.design (Figma plugin)
+
+Generates and syncs Figma components from Storybook. After developers publish a component, this plugin imports it into Figma as a real component with proper variants. Code updates can be pulled back into Figma.
+
+---
+
+## Workflow
+
+### Day-to-day
+
+1. **Designer** creates or updates a primitive in Figma — auto layout, variants, semantic tokens.
+2. **Designer** hands off via Figma Dev Mode. Developers see exact tokens, spacing, and variant properties.
+3. **Developers** implement the component as a Mitosis `.lite.tsx` file. Write Storybook stories for every variant.
+4. **Developers** publish Storybook to Chromatic. Storybook Connect links update automatically in Figma.
+5. **Designer** reviews in Figma — opens Storybook Connect, compares live component to design.
+6. **Designer** uses published primitives to design full screens for desktop and mobile.
+
+### Roles
+
+| Responsibility | Owner |
+|---|---|
+| Figma components, tokens, variants | Designer |
+| Figma file organization and library publishing | Designer |
+| Screen layouts and prototyping | Designer |
+| Mitosis `.lite.tsx` implementation | Developers |
+| Storybook stories and publishing | Developers |
+| Linking Storybook ↔ Figma | Developers (initial setup), both maintain |
+| Reviewing implementation matches design | Both |
+
+---
+
+## Figma → Code Pipeline (with Builder.io Visual Copilot)
+
+For faster handoff, Builder.io's **Visual Copilot** Figma plugin can convert designs into Mitosis code directly. The flow:
+
+1. Design in Figma
+2. Generate Mitosis components via Visual Copilot
+3. Review and clean up generated `.lite.tsx` files
+4. Compile to Svelte + React
+5. Publish to Storybook
+
+This accelerates the initial implementation but generated code always needs review — treat it as a starting point, not final output.

@@ -8,7 +8,7 @@
 import { writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { generateOpenAPIDocument } from '../src/openapi-register.js'
+import { generateOpenAPIDocument } from '../src/openapi-register.ts'
 
 const doc = generateOpenAPIDocument()
 const outPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'openapi.json')

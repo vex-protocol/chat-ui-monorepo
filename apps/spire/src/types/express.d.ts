@@ -1,4 +1,4 @@
-import type { CensoredUser } from '../auth/auth.schemas.js'
+import type { CensoredUser } from '../auth/auth.schemas.ts'
 
 declare global {
   namespace Express {

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { decodeJwt } from 'jose'
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database } from '#db/types.js'
+import type { Database } from '#db/types.ts'
 import {
   registerUser,
   loginUser,
@@ -16,10 +16,10 @@ import {
   ALL_TOKEN_TYPES,
   type ITokenStore,
   type TokenType,
-} from '#auth/auth.service.js'
-import { issueJWT } from '#auth/auth.jwt.js'
-import { validateBody } from '#middleware/validate.js'
-import { createCheckAuth } from '#middleware/checkAuth.js'
+} from '#auth/auth.service.ts'
+import { issueJWT } from '#auth/auth.jwt.ts'
+import { validateBody } from '#middleware/validate.ts'
+import { createCheckAuth } from '#middleware/checkAuth.ts'
 import type { RequestHandler } from 'express'
 import { AuthError, ValidationError } from '#errors'
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import { useDb } from '#test/helpers/db.js'
+import { useDb } from '#test/helpers/db.ts'
 import {
   createFile,
   getFile,
@@ -13,7 +13,7 @@ import {
   getEmojiPath,
   validateImageMime,
   assertUnderLimit,
-} from '../files.service.js'
+} from '../files.service.ts'
 
 // ---------------------------------------------------------------------------
 // createFile / getFile

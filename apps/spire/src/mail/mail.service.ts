@@ -1,7 +1,7 @@
 import type { Kysely } from 'kysely'
-import type { Database, MailTable } from '#db/types.js'
-import type { MailPayload } from './mail.schemas.js'
-export type { MailPayload } from './mail.schemas.js'
+import type { Database, MailTable } from '#db/types.ts'
+import type { MailPayload } from './mail.schemas.ts'
+export type { MailPayload } from './mail.schemas.ts'
 
 /**
  * Inserts a mail row. All fields are required; missing NOT NULL fields will

@@ -1,8 +1,8 @@
 import { onTestFinished } from 'vitest'
 import SQLiteDatabase from 'better-sqlite3'
 import { CompiledQuery, Kysely, SqliteDialect } from 'kysely'
-import type { Database } from '#db/types.js'
-import { migrateToLatest } from '#db/migrate.js'
+import type { Database } from '#db/types.ts'
+import { migrateToLatest } from '#db/migrate.ts'
 
 /** Bare in-memory Kysely instance — no schema applied. */
 export function createTestDb(): Kysely<Database> {

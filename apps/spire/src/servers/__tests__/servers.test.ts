@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import { useDb } from '#test/helpers/db.js'
+import { useDb } from '#test/helpers/db.ts'
 import {
   createServer,
   getServer,
@@ -11,7 +11,7 @@ import {
   getChannels,
   deleteChannel,
   getUserServers,
-} from '../servers.service.js'
+} from '../servers.service.ts'
 
 // ---------------------------------------------------------------------------
 // createServer / getServer / getServers / deleteServer

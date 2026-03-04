@@ -18,6 +18,8 @@ A self-hosted, open-source alternative to Discord or Slack where:
 
 ## Components
 
+### Original repos (upstream reference)
+
 | Repo | Description | Language |
 |---|---|---|
 | `spire` | Server — HTTP API + WebSocket | TypeScript (Node.js) |
@@ -26,6 +28,22 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `vex-web` | Web client | TypeScript |
 | `types-js` | Shared protocol types (`IUser`, `IMail`, `IDevice`, etc.) | TypeScript |
 | `crypto-js` | NaCl crypto utilities (`XUtils`, `xMakeNonce`, key encoding) | TypeScript |
+
+### New monorepo structure (this repo)
+
+| Package | Replaces | Description |
+|---|---|---|
+| `apps/spire` | `spire` | Server reimplementation (Kysely, Zod, Vitest, ESM) |
+| `apps/desktop` | `vex-desktop` | Tauri 2.0 + Svelte (replaces Electron+React) |
+| `apps/mobile` | — | React Native mobile client (new) |
+| `packages/types` | `types-js` | Shared TypeScript interfaces and enums |
+| `packages/core` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
+| `packages/crypto` | `crypto-js` | NaCl encryption, key management |
+| `packages/validation` | — | Input validation, message formatting |
+| `packages/store` | — | Framework-agnostic state containers (event emitter pattern) |
+| `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
+
+See `docs/platform-strategy.md` for architecture details and `docs/design-system.md` for the Figma ↔ Storybook pipeline.
 
 ---
 
