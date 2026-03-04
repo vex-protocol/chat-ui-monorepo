@@ -20,7 +20,7 @@ try {
   if (err instanceof z.ZodError) {
     console.error('Fatal: missing or invalid environment variables\n\n' + z.prettifyError(err))
     console.error('\nCopy apps/spire/.env.example to apps/spire/.env and fill in the values.')
-    console.error('Or run: pnpm --filter spire setup\n')
+    console.error('Or run: pnpm --filter @vex-chat/spire env:init\n')
   } else {
     console.error(err)
   }

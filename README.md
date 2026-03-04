@@ -50,7 +50,7 @@ pnpm install
 
 ```bash
 # Generates apps/spire/.env with a random SPK and JWT_SECRET
-pnpm --filter spire setup
+pnpm --filter @vex-chat/spire env:init
 ```
 
 This copies `.env.example` → `.env` and fills in cryptographically generated values. Open `apps/spire/.env` to review or adjust settings (port, log level, database path).
@@ -69,7 +69,7 @@ cp apps/spire/.env.example apps/spire/.env
 pnpm dev
 
 # Or just the server
-pnpm --filter spire dev
+pnpm --filter @vex-chat/spire dev
 ```
 
 Spire starts on `http://localhost:16777` by default.
@@ -77,7 +77,7 @@ Spire starts on `http://localhost:16777` by default.
 ### 4. Run the tests
 
 ```bash
-pnpm --filter spire test
+pnpm --filter @vex-chat/spire test
 ```
 
 255 tests, no external services required — everything runs against an in-memory SQLite database.
@@ -93,8 +93,8 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | `DB_TYPE` | yes | — | `sqlite` or `postgres` |
 | `DATABASE_URL` | if postgres | — | Postgres connection string |
 | `SQLITE_PATH` | no | `spire.db` | Path to SQLite file |
-| `SPK` | yes | — | NaCl Ed25519 server signing key (hex). `pnpm setup` generates this. |
-| `JWT_SECRET` | yes | — | HMAC secret for JWTs, ≥ 32 chars. `pnpm setup` generates this. |
+| `SPK` | yes | — | NaCl Ed25519 server signing key (hex). `env:init` generates this. |
+| `JWT_SECRET` | yes | — | HMAC secret for JWTs, ≥ 32 chars. `env:init` generates this. |
 | `API_PORT` | no | `16777` | HTTP port |
 | `LOG_LEVEL` | no | `info` | `trace` · `debug` · `info` · `warn` · `error` |
 | `NODE_ENV` | no | `development` | `development` · `production` · `test` |
@@ -131,6 +131,6 @@ All variables are validated at startup. Missing or invalid values print a clear 
 ## Contributing
 
 1. Check available work: `bd ready`
-2. Create a branch, make changes, run `pnpm --filter spire test`
+2. Create a branch, make changes, run `pnpm --filter @vex-chat/spire test`
 3. All 255 tests must pass before committing
 4. Follow the layer rules in `docs/architecture.md` — route handlers call service functions, service functions call the database, never the other way around
