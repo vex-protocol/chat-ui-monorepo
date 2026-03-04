@@ -35,18 +35,17 @@ Svelte components use DOM elements + CSS. React Native uses `View` + `StyleSheet
 ```
 packages/
   types/          — shared TypeScript interfaces, enums, constants (@vex-chat/types)
-  libvex/         — client SDK, WebSocket, auth, message handling (framework-agnostic) (@vex-chat/libvex)
   crypto/         — NaCl encryption logic (@vex-chat/crypto)
-  validation/     — input validation, message formatting
-  store/          — framework-agnostic state containers (event emitter pattern)
-  ui/             — Mitosis design primitives (.lite.tsx)
-    output/svelte/ — generated Svelte components
-    output/react/  — generated React/React Native components
+  libvex/         — client SDK: WebSocket, auth, mail, devices, servers (@vex-chat/libvex)
+  store/          — nanostores atoms: state slices + bootstrap + VexClient event wiring (@vex-chat/store)
+  ui/             — Mitosis design primitives (.lite.tsx) (@vex-chat/ui)
+    output/svelte/ — compiled Svelte components (used by desktop)
+    output/react/  — compiled React components (used by mobile)
     stories/       — Storybook stories for all primitives
 apps/
   spire/          — server (Node.js, Express, Kysely)
-  desktop/        — Tauri + Svelte, imports packages/libvex + packages/ui/output/svelte
-  mobile/         — React Native, imports packages/libvex + packages/ui/output/react
+  desktop/        — Tauri + Svelte; @vex-chat/store atoms + @nanostores/svelte + packages/ui/output/svelte
+  mobile/         — React Native (Expo); @vex-chat/store atoms + @nanostores/react + packages/ui/output/react
 ```
 
 Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching, task pipelines).
@@ -58,10 +57,9 @@ Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching,
 ### 100% shared (framework-agnostic TypeScript)
 
 - **types** — all interfaces, enums, API payload shapes
-- **libvex** — client SDK (WebSocket, auth, message protocol) — the equivalent of the original `libvex-js`
 - **crypto** — NaCl encryption, key management, session establishment
-- **validation** — input validation, message formatting, mention detection
-- **store** — state containers as plain TypeScript classes with event emitters
+- **libvex** — client SDK (WebSocket, auth, message protocol) — returns typed discriminated union results; no client-side pre-validation needed
+- **store** — nanostores atoms per state slice; wraps VexClient events via `onMount`, runs the bootstrap sequence. Apps install `@nanostores/svelte` or `@nanostores/react` for framework binding — no custom adapter code
 
 ### Shared via Mitosis compilation
 
@@ -81,67 +79,76 @@ Expected shared code: **~70% by line count**.
 
 ## State Management Pattern
 
-State lives in framework-agnostic TypeScript classes that emit events. Each platform writes a thin adapter (~10-15 lines) to subscribe.
+`packages/store` defines nanostores atoms per state slice. Each atom wires to `VexClient` events via nanostores' `onMount` hook. Apps install `@nanostores/svelte` or `@nanostores/react` — no custom adapter code needed.
+
+```
+VexClient (@vex-chat/libvex)
+    └── event source for
+nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
+    │   wired via onMount() subscriptions to VexClient events
+    ├── @nanostores/svelte           ← apps/desktop: useStore($messages)
+    └── @nanostores/react            ← apps/mobile:  useStore($messages)
+```
+
+**State atoms** in `packages/store`:
+
+| Atom | nanostores type | Updated when |
+|---|---|---|
+| `$user` | `atom<IUser \| null>` | login / whoami |
+| `$familiars` | `map<Record<string, IUser>>` | connect, new session |
+| `$messages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming mail |
+| `$groupMessages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming mail |
+| `$sessions` | `map<Record<string, ISession[]>>` | connect, new session event |
+| `$servers` | `map<Record<string, IServer>>` | bootstrap, permission event |
+| `$channels` | `map<Record<string, IChannel[]>>` | bootstrap, permission event |
+| `$permissions` | `map<Record<string, IPermission>>` | bootstrap, permission event |
+| `$devices` | `map<Record<string, IDevice[]>>` | bootstrap, session event |
+| `$onlineLists` | `map<Record<string, IUser[]>>` | server channel presence |
+
+**`packages/store`** — atom definition with VexClient event wiring:
 
 ```ts
-// packages/store/src/chat-store.ts
-import { EventEmitter } from 'eventemitter3';
+// packages/store/src/messages.ts
+import { map, onMount } from 'nanostores'
+import { $client } from './client'
 
-export class ChatStore extends EventEmitter {
-  private messages: Map<string, Message[]> = new Map();
+export const $messages = map<Record<string, IMessage[]>>({})
 
-  addMessage(channelId: string, message: Message) {
-    const msgs = this.messages.get(channelId) ?? [];
-    msgs.push(message);
-    this.messages.set(channelId, msgs);
-    this.emit('messages:changed', channelId);
-  }
-
-  getMessages(channelId: string): Message[] {
-    return this.messages.get(channelId) ?? [];
-  }
-}
+onMount($messages, () => {
+  const client = $client.get()
+  const off = client.on('mail', (mail) => {
+    const thread = $messages.get()[mail.senderID] ?? []
+    $messages.setKey(mail.senderID, [...thread, mail])
+  })
+  return off   // nanostores calls this when last subscriber detaches
+})
 ```
 
-**Svelte adapter:**
-
-```svelte
-<script>
-  import { chatStore } from '@vex-chat/store';
-  import { readable } from 'svelte/store';
-
-  export function useMessages(channelId) {
-    return readable(chatStore.getMessages(channelId), (set) => {
-      const handler = (id) => {
-        if (id === channelId) set(chatStore.getMessages(id));
-      };
-      chatStore.on('messages:changed', handler);
-      return () => chatStore.off('messages:changed', handler);
-    });
-  }
-</script>
-```
-
-**React Native adapter:**
+**`apps/desktop`** — `@nanostores/svelte`:
 
 ```ts
-import { chatStore } from '@vex-chat/store';
-import { useState, useEffect } from 'react';
+import { useStore } from '@nanostores/svelte'
+import { $messages } from '@vex-chat/store'
 
-export function useMessages(channelId: string) {
-  const [messages, setMessages] = useState(chatStore.getMessages(channelId));
-  useEffect(() => {
-    const handler = (id: string) => {
-      if (id === channelId) setMessages(chatStore.getMessages(id));
-    };
-    chatStore.on('messages:changed', handler);
-    return () => { chatStore.off('messages:changed', handler); };
-  }, [channelId]);
-  return messages;
-}
+// In .svelte component
+const messages = useStore($messages)
+// $messages['senderID'] is reactive — Svelte auto-subscribes
 ```
 
-This pattern extends to routing (plain state machine in core, wired to svelte-routing / React Navigation), notification logic, media handling, and rich text parsing.
+**`apps/mobile`** — `@nanostores/react`:
+
+```ts
+import { useStore } from '@nanostores/react'
+import { $messages } from '@vex-chat/store'
+
+// In React Native component
+const messages = useStore($messages)
+// Re-renders only when atom changes — no Context, no Redux
+```
+
+> **Why nanostores?** 265–800 bytes. Zero dependencies. Official `@nanostores/svelte` and `@nanostores/react` adapters maintained by the nanostores team. `onMount` cleanly wires external event emitters (VexClient) with automatic cleanup on last-subscriber-detach. Used by Astro for cross-framework state. Eliminates the custom EventEmitter VexStore class and hand-rolled adapter boilerplate entirely.
+
+> **No client-side pre-validation.** `VexClient` methods return typed discriminated union results (`{ ok: false, code: 'USERNAME_TAKEN' }`). The UI renders these directly. Duplicating server rules client-side creates drift — avoided by design.
 
 ---
 
