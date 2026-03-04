@@ -2,6 +2,8 @@
 
 A guide for contributors — especially backend newcomers — to understand how the pieces fit together.
 
+> **Packages layer:** For `packages/types`, `packages/crypto`, and `packages/libvex` see [`docs/packages.md`](./packages.md).
+
 ---
 
 ## The Big Picture
