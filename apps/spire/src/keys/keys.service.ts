@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
 import type { KeyBundle, OTKPayload } from './keys.schemas.js'
@@ -11,36 +12,51 @@ export type { KeyBundle, OTKPayload } from './keys.schemas.js'
  * and verifying the NaCl signature before calling this function.
  */
 export async function savePreKey(
-  _db: Kysely<Database>,
-  _userID: string,
-  _deviceID: string,
-  _publicKey: string,
-  _signature: string,
-  _index: number,
+  db: Kysely<Database>,
+  userID: string,
+  deviceID: string,
+  publicKey: string,
+  signature: string,
+  index: number,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db
+    .insertInto('preKeys')
+    .values({ keyID: uuidv4(), userID, deviceID, publicKey, signature, index })
+    .onConflict(oc => oc.column('deviceID').doUpdateSet({ publicKey, signature, index }))
+    .execute()
 }
 
 /**
  * Returns the pre-key for a device, or null if not found.
  */
 export async function getPreKey(
-  _db: Kysely<Database>,
-  _deviceID: string,
+  db: Kysely<Database>,
+  deviceID: string,
 ): Promise<{ keyID: string; publicKey: string; signature: string; index: number } | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('preKeys')
+    .where('deviceID', '=', deviceID)
+    .select(['keyID', 'publicKey', 'signature', 'index'])
+    .executeTakeFirst()
+
+  return row ?? null
 }
 
 /**
  * Batch-inserts one-time keys for a device.
  */
 export async function saveOTKs(
-  _db: Kysely<Database>,
-  _userID: string,
-  _deviceID: string,
-  _keys: OTKPayload[],
+  db: Kysely<Database>,
+  userID: string,
+  deviceID: string,
+  keys: OTKPayload[],
 ): Promise<void> {
-  throw new Error('not implemented')
+  if (keys.length === 0) return
+
+  await db
+    .insertInto('oneTimeKeys')
+    .values(keys.map(k => ({ keyID: uuidv4(), userID, deviceID, ...k })))
+    .execute()
 }
 
 /**
@@ -48,20 +64,40 @@ export async function saveOTKs(
  * deletes it, and returns it. Returns null if no OTKs remain.
  */
 export async function consumeOTK(
-  _db: Kysely<Database>,
-  _deviceID: string,
+  db: Kysely<Database>,
+  deviceID: string,
 ): Promise<{ publicKey: string; signature: string; index: number } | null> {
-  throw new Error('not implemented')
+  return db.transaction().execute(async trx => {
+    const row = await trx
+      .selectFrom('oneTimeKeys')
+      .where('deviceID', '=', deviceID)
+      .orderBy('index', 'asc')
+      .limit(1)
+      .select(['keyID', 'publicKey', 'signature', 'index'])
+      .executeTakeFirst()
+
+    if (!row) return null
+
+    await trx.deleteFrom('oneTimeKeys').where('keyID', '=', row.keyID).execute()
+
+    return { publicKey: row.publicKey, signature: row.signature, index: row.index }
+  })
 }
 
 /**
  * Returns the count of remaining one-time keys for a device.
  */
 export async function getOTKCount(
-  _db: Kysely<Database>,
-  _deviceID: string,
+  db: Kysely<Database>,
+  deviceID: string,
 ): Promise<number> {
-  throw new Error('not implemented')
+  const { count } = await db
+    .selectFrom('oneTimeKeys')
+    .where('deviceID', '=', deviceID)
+    .select(eb => eb.fn.countAll<number>().as('count'))
+    .executeTakeFirstOrThrow()
+
+  return Number(count)
 }
 
 /**
@@ -73,8 +109,21 @@ export async function getOTKCount(
  * Returns null if the device does not exist or has no pre-key.
  */
 export async function getKeyBundle(
-  _db: Kysely<Database>,
-  _deviceID: string,
+  db: Kysely<Database>,
+  deviceID: string,
 ): Promise<KeyBundle | null> {
-  throw new Error('not implemented')
+  const device = await db
+    .selectFrom('devices')
+    .where('deviceID', '=', deviceID)
+    .select('signKey')
+    .executeTakeFirst()
+
+  if (!device) return null
+
+  const preKey = await getPreKey(db, deviceID)
+  if (!preKey) return null
+
+  const otk = await consumeOTK(db, deviceID)
+
+  return { signKey: device.signKey, preKey, otk }
 }

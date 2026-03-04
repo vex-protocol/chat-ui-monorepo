@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import nacl from 'tweetnacl'
 import { useDb } from '#test/helpers/db.js'
-import { seedUser, makeDevicePayload } from '#test/helpers/factories.js'
+import { seedUser, seedDevice, makeDevicePayload } from '#test/helpers/factories.js'
 import { createDevice } from '#devices/devices.service.js'
 import {
   savePreKey,
@@ -74,7 +74,7 @@ describe('getPreKey', () => {
   it('returns null for a device with no pre-key', async () => {
     const db = await useDb()
     const owner = await seedUser(db)
-    const device = await createDevice(db, owner, makeDevicePayload())
+    const device = await seedDevice(db, owner)
 
     expect(await getPreKey(db, device.deviceID)).toBeNull()
   })
@@ -262,8 +262,7 @@ describe('getKeyBundle', () => {
   it('returns null if device exists but has no pre-key', async () => {
     const db = await useDb()
     const owner = await seedUser(db)
-    const device = await createDevice(db, owner, makeDevicePayload())
-    // No pre-key saved
+    const device = await seedDevice(db, owner)
 
     expect(await getKeyBundle(db, device.deviceID)).toBeNull()
   })

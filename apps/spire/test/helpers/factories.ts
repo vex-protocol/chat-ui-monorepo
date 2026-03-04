@@ -89,6 +89,24 @@ export function makeRegistrationPayload(
 // ---------------------------------------------------------------------------
 
 /**
+ * Inserts a bare device row via direct DB write — no preKey inserted.
+ * Use this when you need a device with no pre-key (e.g. to test null returns).
+ * Returns { deviceID, signKey }.
+ */
+export async function seedDevice(
+  db: Kysely<Database>,
+  userID: string,
+): Promise<{ deviceID: string; signKey: string }> {
+  const deviceID = uuidv4()
+  const signKey = hexEncode(nacl.sign.keyPair().publicKey)
+  await db
+    .insertInto('devices')
+    .values({ deviceID, signKey, owner: userID, name: 'test-device', lastLogin: null, deleted: 0 })
+    .execute()
+  return { deviceID, signKey }
+}
+
+/**
  * Builds a valid device payload with a fresh NaCl key pair.
  * Used when adding a device to an existing user.
  */
