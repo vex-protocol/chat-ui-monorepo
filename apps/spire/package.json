@@ -8,6 +8,7 @@
     "#devices/*": "./src/devices/*.js",
     "#keys/*": "./src/keys/*.js",
     "#ws/*": "./src/ws/*.js",
+    "#mail/*": "./src/mail/*.js",
     "#utils/*": "./src/utils/*.js",
     "#config": "./src/config.js",
     "#openapi": "./src/openapi.js",
