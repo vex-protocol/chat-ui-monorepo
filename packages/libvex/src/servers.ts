@@ -1,0 +1,28 @@
+import type { IServer, IChannel } from '@vex-chat/types'
+import type { HttpClient } from './http.ts'
+
+export async function createServer(
+  http: HttpClient,
+  name: string,
+  icon: string,
+): Promise<IServer> {
+  const result = await http.post<IServer>('/server', { name, icon })
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
+}
+
+export async function listServers(http: HttpClient): Promise<IServer[]> {
+  const result = await http.get<IServer[]>('/server')
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
+}
+
+export async function createChannel(
+  http: HttpClient,
+  serverID: string,
+  name: string,
+): Promise<IChannel> {
+  const result = await http.post<IChannel>('/channel', { serverID, name })
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
+}

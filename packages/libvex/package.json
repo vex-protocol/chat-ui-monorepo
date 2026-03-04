@@ -1,0 +1,19 @@
+{
+  "name": "@vex-chat/libvex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./bot": "./src/bot/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  },
+  "dependencies": {
+    "@vex-chat/types": "workspace:*",
+    "@vex-chat/crypto": "workspace:*",
+    "eventemitter3": "catalog:",
+    "reconnecting-websocket": "catalog:"
+  }
+}
