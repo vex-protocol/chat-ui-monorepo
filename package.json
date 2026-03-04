@@ -3,10 +3,13 @@
   "version": "1.0.0",
   "private": "true",
   "scripts": {
-    "dev": "pnpm -r --parallel dev"
+    "dev": "pnpm -r --parallel dev",
+    "prepare": "husky"
   },
   "packageManager": "pnpm@10.30.3",
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.2",
     "typescript": "catalog:"
   }
 }
