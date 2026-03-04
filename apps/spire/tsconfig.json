@@ -11,6 +11,8 @@
       "#db/*": ["./src/db/*"],
       "#auth/*": ["./src/auth/*"],
       "#devices/*": ["./src/devices/*"],
+      "#utils/*": ["./src/utils/*"],
+      "#config": ["./src/config.js"],
       "#errors": ["./src/errors.js"],
       "#test/*": ["./test/*"]
     }
