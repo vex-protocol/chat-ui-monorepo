@@ -9,6 +9,7 @@ export default defineConfig({
       '#db': new URL('./src/db', import.meta.url).pathname,
       '#auth': new URL('./src/auth', import.meta.url).pathname,
       '#devices': new URL('./src/devices', import.meta.url).pathname,
+      '#users': new URL('./src/users', import.meta.url).pathname,
       '#keys': new URL('./src/keys', import.meta.url).pathname,
       '#ws': new URL('./src/ws', import.meta.url).pathname,
       '#mail': new URL('./src/mail', import.meta.url).pathname,
