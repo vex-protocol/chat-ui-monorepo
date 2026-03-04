@@ -28,8 +28,10 @@ export async function bootstrap(
   serverUrl: string,
   deviceID: string,
   deviceKey: Uint8Array,
+  authToken?: string,
 ): Promise<void> {
   const client = VexClient.create(serverUrl, deviceID, deviceKey)
+  if (authToken) client.setAuthToken(authToken)
   $client.set(client)
 
   // Wire real-time events before connecting so nothing is missed

@@ -27,7 +27,10 @@ export class HttpClient {
 
   async get<T>(path: string): Promise<HttpResult<T>> {
     try {
-      const res = await fetch(`${this.baseUrl}${path}`, { headers: this.headers() })
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        headers: this.headers(),
+        credentials: 'include',
+      })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: (await res.json()) as T }
     } catch (err) {
@@ -40,6 +43,7 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: this.headers(),
+        credentials: 'include',
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
@@ -54,6 +58,7 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'DELETE',
         headers: this.headers(),
+        credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: (await res.json()) as T }

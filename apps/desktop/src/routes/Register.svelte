@@ -1,5 +1,10 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+  import { parse as uuidParse } from 'uuid'
+  import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
+  import { bootstrap, user as userAtom } from '../lib/store/index.js'
+
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:16777'
 
   let username = $state('')
   let password = $state('')
@@ -10,12 +15,79 @@
   async function handleRegister(e: SubmitEvent) {
     e.preventDefault()
     if (password !== confirm) { error = 'Passwords do not match'; return }
+
     loading = true
     error = ''
-    // TODO (vex-chat-vyp): generate key pair, call client.register(), save key file
-    console.log('Register:', username)
-    loading = false
-    error = 'Auth not yet wired (vex-chat-vyp)'
+
+    try {
+      // 1. Generate Ed25519 device signing key pair
+      const signKeyPair = generateSignKeyPair()
+      const preKeyPair = generateSignKeyPair()
+
+      // 2. Fetch an open registration token (requires OPEN_REGISTRATION=true on spire)
+      const tokenRes = await fetch(`${SERVER_URL}/token/open/register`)
+      if (!tokenRes.ok) {
+        error = tokenRes.status === 404
+          ? 'Registration is invite-only on this server.'
+          : `Failed to get registration token (${tokenRes.status})`
+        loading = false
+        return
+      }
+      const { key: tokenKey } = await tokenRes.json() as { key: string }
+
+      // 3. Sign the token UUID bytes with the device signing key (NaCl format: sig || msg)
+      const tokenBytes = uuidParse(tokenKey) as Uint8Array
+      const signed = signMessage(tokenBytes, signKeyPair.secretKey)
+
+      // 4. Sign the preKey public key with the signing key
+      const preKeySignature = signMessage(preKeyPair.publicKey, signKeyPair.secretKey)
+
+      // 5. POST /register
+      const regRes = await fetch(`${SERVER_URL}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username,
+          password,
+          signKey: encodeHex(signKeyPair.publicKey),
+          signed: encodeHex(signed),
+          preKey: encodeHex(preKeyPair.publicKey),
+          preKeySignature: encodeHex(preKeySignature),
+          preKeyIndex: 0,
+          deviceName: 'Desktop',
+        }),
+      })
+
+      if (!regRes.ok) {
+        const body = await regRes.json().catch(() => ({})) as { message?: string }
+        error = body.message ?? `Registration failed (${regRes.status})`
+        loading = false
+        return
+      }
+
+      const regData = await regRes.json() as { token: string; userID: string }
+
+      // 6. Save device credentials to localStorage (upgraded to Tauri FS in vex-chat-tyu)
+      const deviceID = encodeHex(signKeyPair.publicKey)
+      localStorage.setItem('vex-device-id', deviceID)
+      localStorage.setItem('vex-device-key', encodeHex(signKeyPair.secretKey))
+      localStorage.setItem('vex-username', username)
+
+      // 7. Bootstrap the store with the JWT from registration response
+      await bootstrap(SERVER_URL, deviceID, signKeyPair.secretKey, regData.token)
+
+      // Navigate into the app (no servers yet after fresh register)
+      if (userAtom.get()) {
+        push('/server/home/general')
+      } else {
+        error = 'Registration succeeded but could not connect to server'
+        loading = false
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unexpected error'
+      loading = false
+    }
   }
 </script>
 
@@ -31,7 +103,7 @@
     <form class="auth-form" onsubmit={handleRegister}>
       <div class="auth-form__field">
         <label for="username">Username</label>
-        <input id="username" type="text" placeholder="choose a username" bind:value={username} disabled={loading} required />
+        <input id="username" type="text" placeholder="choose a username" bind:value={username} disabled={loading} required minlength="3" maxlength="19" pattern="\w+" />
       </div>
 
       <div class="auth-form__field">

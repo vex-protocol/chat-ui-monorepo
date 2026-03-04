@@ -30,7 +30,10 @@ const db = createDb(config)
 await migrateToLatest(db)
 
 const tokenStore = createTokenStore()
-const app = createApp(db, tokenStore, config.JWT_SECRET)
+const app = createApp(db, tokenStore, config.JWT_SECRET, config.OPEN_REGISTRATION)
+if (config.OPEN_REGISTRATION) {
+  logger.warn('OPEN_REGISTRATION=true — unauthenticated /token/open/register is active. Disable in production.')
+}
 
 const httpServer = createServer(app)
 

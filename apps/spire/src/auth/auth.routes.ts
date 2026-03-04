@@ -28,7 +28,12 @@ function setAuthCookie(res: import('express').Response, token: string): void {
   res.cookie('token', token, { httpOnly: true, path: '/' })
 }
 
-export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore, jwtSecret: string): Router {
+export function createAuthRouter(
+  db: Kysely<Database>,
+  tokenStore: ITokenStore,
+  jwtSecret: string,
+  openRegistration = false,
+): Router {
   const checkAuth: RequestHandler = createCheckAuth(jwtSecret)
   const router = Router()
 
@@ -82,6 +87,16 @@ export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore, 
     const token = tokenStore.create(type as TokenType)
     res.json({ key: token.key, scope: token.scope })
   })
+
+  // Open registration token — no auth required when OPEN_REGISTRATION=true.
+  // Allows the first user to register without an existing account.
+  // Must be disabled in production (OPEN_REGISTRATION=false, the default).
+  if (openRegistration) {
+    router.get('/token/open/register', (req, res) => {
+      const token = tokenStore.create('register')
+      res.json({ key: token.key, scope: token.scope })
+    })
+  }
 
   return router
 }

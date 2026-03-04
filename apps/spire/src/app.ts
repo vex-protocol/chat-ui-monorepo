@@ -43,6 +43,7 @@ export function createApp(
   db: Kysely<Database>,
   tokenStore: ITokenStore,
   jwtSecret: string,
+  openRegistration = false,
 ): express.Application {
   const app = express()
   const checkAuth = createCheckAuth(jwtSecret)
@@ -54,7 +55,7 @@ export function createApp(
   app.use(globalRateLimit)
   app.use(httpLogger)
 
-  app.use(createAuthRouter(db, tokenStore, jwtSecret))
+  app.use(createAuthRouter(db, tokenStore, jwtSecret, openRegistration))
   app.use(createUserRouter(db, checkAuth))
   app.use(createDeviceRouter(db, checkAuth))
   app.use(createServerRouter(db, checkAuth))
