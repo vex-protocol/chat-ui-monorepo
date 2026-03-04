@@ -5,18 +5,7 @@ import { ConflictError, ValidationError } from '#errors'
 import { hashPassword, verifyPassword } from './auth.crypto.ts'
 import { issueJWT } from './auth.jwt.ts'
 import type { RegistrationPayload, CensoredUser } from './auth.schemas.ts'
-import { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema, JWTPayloadSchema } from './auth.schemas.ts'
 
-// Re-export schemas and types so callers can use a single #auth/auth.service.js import
-export type { RegistrationPayload, CensoredUser }
-export { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema, JWTPayloadSchema }
-
-// Re-export token store so index.ts and tests have a stable import path
-export type { TokenType, IActionToken, ITokenStore } from './auth.token-store.ts'
-export { ALL_TOKEN_TYPES, createTokenStore } from './auth.token-store.ts'
-
-// Re-export crypto utils used by route handlers
-export { decodeHex, encodeHex, verifyNaClSignature } from './auth.crypto.ts'
 
 export interface AuthUser {
   userID: string    // uuid.stringify(regKey) — derived from client NaCl signature, not server-assigned

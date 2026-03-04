@@ -17,11 +17,11 @@ import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
 import { useDb } from '#test/helpers/db.ts'
 import { makeRegistrationPayload, makeDevicePayload } from '#test/helpers/factories.ts'
-import { createTokenStore } from '#auth/auth.service.ts'
+import { createTokenStore } from '#auth/auth.token-store.ts'
 import { createApp } from '../app.ts'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.ts'
-import type { ITokenStore } from '#auth/auth.service.ts'
+import type { ITokenStore } from '#auth/auth.token-store.ts'
 
 // ---------------------------------------------------------------------------
 // Test environment and helpers

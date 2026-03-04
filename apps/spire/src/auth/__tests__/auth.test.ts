@@ -4,7 +4,8 @@ import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid'
 import { decodeJwt } from 'jose'
 import { useDb } from '#test/helpers/db.ts'
 import { makeRegistrationPayload } from '#test/helpers/factories.ts'
-import { createTokenStore, loginUser, registerUser } from '../auth.service.ts'
+import { loginUser, registerUser } from '../auth.service.ts'
+import { createTokenStore } from '../auth.token-store.ts'
 import { decodeHex, encodeHex, hashPassword, verifyNaClSignature, verifyPassword } from '../auth.crypto.ts'
 
 // ---------------------------------------------------------------------------

@@ -14,8 +14,8 @@ export { createDb } from '#db/index.ts'
 export { migrateToLatest } from '#db/migrate.ts'
 
 // Auth
-export type { CensoredUser, RegistrationPayload } from '#auth/auth.service.ts'
-export { createTokenStore } from '#auth/auth.service.ts'
+export type { CensoredUser, RegistrationPayload } from '#auth/auth.schemas.ts'
+export { createTokenStore } from '#auth/auth.token-store.ts'
 
 // Devices
 export type { Device, DevicePayload } from '#devices/devices.schemas.ts'
