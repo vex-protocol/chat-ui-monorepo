@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database, PermissionsTable } from '#db/types.js'
 
@@ -8,28 +9,33 @@ export async function createPermission(
   resourceID: string,
   powerLevel: number,
 ): Promise<PermissionsTable> {
-  throw new Error('not implemented')
+  const permissionID = uuidv4()
+  await db
+    .insertInto('permissions')
+    .values({ permissionID, userID, resourceType, resourceID, powerLevel })
+    .execute()
+  return { permissionID, userID, resourceType, resourceID, powerLevel }
 }
 
 export async function getPermissions(
   db: Kysely<Database>,
   userID: string,
 ): Promise<PermissionsTable[]> {
-  throw new Error('not implemented')
+  return db.selectFrom('permissions').where('userID', '=', userID).selectAll().execute()
 }
 
 export async function getPermissionsByResource(
   db: Kysely<Database>,
   resourceID: string,
 ): Promise<PermissionsTable[]> {
-  throw new Error('not implemented')
+  return db.selectFrom('permissions').where('resourceID', '=', resourceID).selectAll().execute()
 }
 
 export async function deletePermission(
   db: Kysely<Database>,
   permissionID: string,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db.deleteFrom('permissions').where('permissionID', '=', permissionID).execute()
 }
 
 /**
@@ -40,7 +46,19 @@ export async function getGroupMembers(
   db: Kysely<Database>,
   channelID: string,
 ): Promise<PermissionsTable[]> {
-  throw new Error('not implemented')
+  return db
+    .selectFrom('channels')
+    .innerJoin('permissions', 'permissions.resourceID', 'channels.serverID')
+    .where('channels.channelID', '=', channelID)
+    .where('permissions.resourceType', '=', 'server')
+    .select([
+      'permissions.permissionID',
+      'permissions.userID',
+      'permissions.resourceType',
+      'permissions.resourceID',
+      'permissions.powerLevel',
+    ])
+    .execute()
 }
 
 /**
@@ -53,5 +71,12 @@ export async function hasPermission(
   resourceID: string,
   minPowerLevel: number,
 ): Promise<boolean> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('permissions')
+    .where('userID', '=', userID)
+    .where('resourceID', '=', resourceID)
+    .where('powerLevel', '>=', minPowerLevel)
+    .select('permissionID')
+    .executeTakeFirst()
+  return row !== undefined
 }
