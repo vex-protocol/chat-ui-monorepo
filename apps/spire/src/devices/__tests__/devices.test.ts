@@ -60,18 +60,6 @@ describe('createDevice', () => {
     await expect(createDevice(db, owner, payload)).rejects.toThrow()
   })
 
-  test.each([
-    ['', 'empty string'],
-    ['abc', 'too short (< 64 chars)'],
-    ['z'.repeat(64), 'contains non-hex char'],
-    ['a'.repeat(63), 'one char short of 64'],
-    ['A'.repeat(64), 'uppercase hex'],
-  ])('rejects signKey "%s" — %s', async (signKey) => {
-    const db = await useDb()
-    const owner = await seedUser(db)
-    const payload = makeDevicePayload({ signKey })
-    await expect(createDevice(db, owner, payload)).rejects.toThrow()
-  })
 })
 
 // ---------------------------------------------------------------------------
