@@ -21,9 +21,15 @@ catalogs:
     ed2curve:
       specifier: ^0.3.0
       version: 0.3.0
+    eventemitter3:
+      specifier: ^5.0.4
+      version: 5.0.4
     futoin-hkdf:
       specifier: ^1.5.3
       version: 1.5.3
+    reconnecting-websocket:
+      specifier: ^4.4.0
+      version: 4.4.0
     tweetnacl:
       specifier: ^1.0.3
       version: 1.0.3
@@ -174,6 +180,25 @@ importers:
       tweetnacl:
         specifier: 'catalog:'
         version: 1.0.3
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.3.3
+
+  packages/libvex:
+    dependencies:
+      '@vex-chat/crypto':
+        specifier: workspace:*
+        version: link:../crypto
+      '@vex-chat/types':
+        specifier: workspace:*
+        version: link:../types
+      eventemitter3:
+        specifier: 'catalog:'
+        version: 5.0.4
+      reconnecting-websocket:
+        specifier: 'catalog:'
+        version: 4.4.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -2460,6 +2485,9 @@ packages:
   real-require@0.2.0:
     resolution: {integrity: sha512-57frrGM/OCTLqLOAh0mhVA9VBMHd+9U7Zb2THMGdBUoZVOtGbJzjxsYGDJ3A9AYYCP4hn6y1TVbaOfzWtm5GFg==}
     engines: {node: '>= 12.13.0'}
+
+  reconnecting-websocket@4.4.0:
+    resolution: {integrity: sha512-D2E33ceRPga0NvTDhJmphEgJ7FUYF0v4lr1ki0csq06OdlxKfugGzN0dSkxM/NfqCxYELK4KcaTOUOjTV6Dcng==}
 
   reflect.getprototypeof@1.0.10:
     resolution: {integrity: sha512-00o4I+DVrefhv+nX0ulyi3biSHCPDe+yLv5o/p6d/UVlirijB8E16FtfwSAi4g3tcqrQ4lRAqQSoFEZJehYEcw==}
@@ -5491,6 +5519,8 @@ snapshots:
       util-deprecate: 1.0.2
 
   real-require@0.2.0: {}
+
+  reconnecting-websocket@4.4.0: {}
 
   reflect.getprototypeof@1.0.10:
     dependencies:
