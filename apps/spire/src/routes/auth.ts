@@ -19,7 +19,8 @@ import {
   type TokenType,
 } from '#auth/auth.service.js'
 import { validateBody } from '#middleware/validate.js'
-import { checkAuth } from '#middleware/checkAuth.js'
+import { createCheckAuth } from '#middleware/checkAuth.js'
+import type { RequestHandler } from 'express'
 import { AuthError, ValidationError } from '#errors'
 
 const VALID_TOKEN_TYPES = new Set<TokenType>(ALL_TOKEN_TYPES)
@@ -29,7 +30,8 @@ function setAuthCookie(res: import('express').Response, token: string): void {
   res.cookie('token', token, { httpOnly: true, path: '/' })
 }
 
-export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore): Router {
+export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore, jwtSecret: string): Router {
+  const checkAuth: RequestHandler = createCheckAuth(jwtSecret)
   const router = Router()
 
   router.post('/register', validateBody(RegistrationPayloadSchema), async (req, res, next) => {
@@ -45,7 +47,7 @@ export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore):
       }
 
       const user = await registerUser(db, regKey as Uint8Array, req.body)
-      const jwt = await issueJWT(user)
+      const jwt = await issueJWT(user, jwtSecret)
       setAuthCookie(res, jwt)
       res.json({ token: jwt, ...user })
     } catch (err) {
@@ -55,7 +57,7 @@ export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore):
 
   router.post('/auth', validateBody(LoginBodySchema), async (req, res, next) => {
     try {
-      const jwt = await loginUser(db, req.body.username, req.body.password)
+      const jwt = await loginUser(db, req.body.username, req.body.password, jwtSecret)
       if (!jwt) return next(new AuthError('Invalid credentials'))
 
       setAuthCookie(res, jwt)

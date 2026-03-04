@@ -12,6 +12,7 @@ import { createUserRouter } from './routes/users.js'
 import { createDeviceRouter } from './routes/devices.js'
 import { createServerRouter } from './routes/servers.js'
 import { errorMiddleware } from './middleware/error.js'
+import { createCheckAuth } from './middleware/checkAuth.js'
 import { NotFoundError } from '#errors'
 
 const globalRateLimit = rateLimit({
@@ -41,8 +42,10 @@ const httpLogger = pinoHttp({
 export function createApp(
   db: Kysely<Database>,
   tokenStore: ITokenStore,
+  jwtSecret: string,
 ): express.Application {
   const app = express()
+  const checkAuth = createCheckAuth(jwtSecret)
 
   app.use(helmet())
   app.use(cors({ credentials: true }))
@@ -51,10 +54,10 @@ export function createApp(
   app.use(globalRateLimit)
   app.use(httpLogger)
 
-  app.use(createAuthRouter(db, tokenStore))
-  app.use(createUserRouter(db))
-  app.use(createDeviceRouter(db))
-  app.use(createServerRouter(db))
+  app.use(createAuthRouter(db, tokenStore, jwtSecret))
+  app.use(createUserRouter(db, checkAuth))
+  app.use(createDeviceRouter(db, checkAuth))
+  app.use(createServerRouter(db, checkAuth))
 
   app.use((_req, _res, next) => next(new NotFoundError()))
   app.use(errorMiddleware)

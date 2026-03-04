@@ -270,7 +270,7 @@ describe('loginUser', () => {
   it('returns a JWT string on correct credentials', async () => {
     const db = await useDb()
     await seedUser(db)
-    const token = await loginUser(db, 'alice', 'password123')
+    const token = await loginUser(db, 'alice', 'password123', process.env['JWT_SECRET']!)
     expect(token).toBeTypeOf('string')
     expect(token).not.toBeNull()
   })
@@ -278,7 +278,7 @@ describe('loginUser', () => {
   it('JWT payload is censoredUser — { user: { userID, username, lastSeen } } with no sensitive fields', async () => {
     const db = await useDb()
     const user = await seedUser(db)
-    const token = await loginUser(db, 'alice', 'password123')
+    const token = await loginUser(db, 'alice', 'password123', process.env['JWT_SECRET']!)
     const payload = decodeJwt(token!)
     const u = payload.user as Record<string, unknown>
     expect(u.userID).toBe(user.userID)
@@ -290,7 +290,7 @@ describe('loginUser', () => {
   it('JWT expiry is ~7 days from now', async () => {
     const db = await useDb()
     await seedUser(db)
-    const token = await loginUser(db, 'alice', 'password123')
+    const token = await loginUser(db, 'alice', 'password123', process.env['JWT_SECRET']!)
     const payload = decodeJwt(token!)
     const sevenDays = 7 * 24 * 60 * 60
     const now = Math.floor(Date.now() / 1000)
@@ -301,11 +301,11 @@ describe('loginUser', () => {
   it('returns null for wrong password', async () => {
     const db = await useDb()
     await seedUser(db)
-    expect(await loginUser(db, 'alice', 'wrongpass')).toBeNull()
+    expect(await loginUser(db, 'alice', 'wrongpass', process.env['JWT_SECRET']!)).toBeNull()
   })
 
   it('returns null for unknown username', async () => {
     const db = await useDb()
-    expect(await loginUser(db, 'nobody', 'password123')).toBeNull()
+    expect(await loginUser(db, 'nobody', 'password123', process.env['JWT_SECRET']!)).toBeNull()
   })
 })

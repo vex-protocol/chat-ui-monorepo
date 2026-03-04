@@ -18,7 +18,7 @@ const db = createDb(config)
 await migrateToLatest(db)
 
 const tokenStore = createTokenStore()
-const app = createApp(db, tokenStore)
+const app = createApp(db, tokenStore, config.JWT_SECRET)
 
 const httpServer = createServer(app)
 
