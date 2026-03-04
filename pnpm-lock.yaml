@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@nanostores/react':
+      specifier: ^0.8.0
+      version: 0.8.4
     '@noble/curves':
       specifier: ^1.8.1
       version: 1.9.7
@@ -87,6 +90,18 @@ importers:
       vite:
         specifier: ^7.3.1
         version: 7.3.1(@types/node@24.11.0)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  apps/mobile:
+    dependencies:
+      '@nanostores/react':
+        specifier: 'catalog:'
+        version: 0.8.4(nanostores@0.11.4)(react@19.2.4)
+      '@vex-chat/store':
+        specifier: workspace:*
+        version: link:../../packages/store
+      '@vex-chat/types':
+        specifier: workspace:*
+        version: link:../../packages/types
 
   apps/spire:
     dependencies:
@@ -543,6 +558,13 @@ packages:
     engines: {node: '>= 10.16.0'}
     peerDependencies:
       jsep: ^0.4.0||^1.0.0
+
+  '@nanostores/react@0.8.4':
+    resolution: {integrity: sha512-EciHSzDXg7GmGODjegGG1VldPEinbAK+12/Uz5+MAdHmxf082Rl6eXqKFxAAu4pZAcr5dNTpv6wMfEe7XacjkQ==}
+    engines: {node: ^18.0.0 || >=20.0.0}
+    peerDependencies:
+      nanostores: ^0.9.0 || ^0.10.0 || ^0.11.0
+      react: '>=18.0.0'
 
   '@nanostores/react@1.0.0':
     resolution: {integrity: sha512-eDduyNy+lbQJMg6XxZ/YssQqF6b4OXMFEZMYKPJCCmBevp1lg0g+4ZRi94qGHirMtsNfAWKNwsjOhC+q1gvC+A==}
@@ -3542,6 +3564,11 @@ snapshots:
   '@jsep-plugin/ternary@1.1.4(jsep@1.4.0)':
     dependencies:
       jsep: 1.4.0
+
+  '@nanostores/react@0.8.4(nanostores@0.11.4)(react@19.2.4)':
+    dependencies:
+      nanostores: 0.11.4
+      react: 19.2.4
 
   '@nanostores/react@1.0.0(nanostores@0.11.4)(react@19.2.4)':
     dependencies:

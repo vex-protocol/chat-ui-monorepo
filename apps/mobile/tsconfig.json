@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    // React Native / Expo Metro uses bundler-style resolution
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "jsx": "react-native",
+
+    // Do not inherit verbatimModuleSyntax/nodenext from root — Metro handles transforms
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // Strictness
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["src"]
+}
