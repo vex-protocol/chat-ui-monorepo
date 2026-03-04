@@ -1,0 +1,10 @@
+{
+  "name": "@vex-chat/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@vex-chat/store": "workspace:*",
+    "@vex-chat/types": "workspace:*",
+    "@nanostores/react": "catalog:"
+  }
+}
