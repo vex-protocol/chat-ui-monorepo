@@ -2,11 +2,9 @@
  * OpenAPI path registrations for routes not yet implemented as Express handlers.
  * Import this file alongside the route files to get full spec coverage.
  */
-import { z } from 'zod'
-import { registry } from '#openapi'
+import { registry, pid } from '#openapi'
 
 const auth = [{ bearerAuth: [] }]
-const pid = (names: string[]) => z.object(Object.fromEntries(names.map(n => [n, z.string()])))
 
 // Files
 registry.registerPath({ method: 'get',  path: '/file/{id}',              operationId: 'getFile',        security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'File' },          404: { description: 'Not found' } } })

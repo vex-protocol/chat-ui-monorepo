@@ -20,6 +20,11 @@ export const bearerAuth = registry.registerComponent(
   },
 )
 
+/** Builds a Zod params object for OpenAPI path parameters. */
+export function pid(names: string[]): ReturnType<typeof z.object> {
+  return z.object(Object.fromEntries(names.map(n => [n, z.string()])))
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function generateOpenAPIDocument(): any {
   const generator = new OpenApiGeneratorV31(registry.definitions)

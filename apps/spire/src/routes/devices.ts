@@ -1,4 +1,4 @@
-import { registry } from '#openapi'
+import { registry, pid } from '#openapi'
 import { Router } from 'express'
 import { z } from 'zod'
 import type { Kysely } from 'kysely'
@@ -39,11 +39,10 @@ export function createDeviceRouter(db: Kysely<Database>): Router {
 // ---------------------------------------------------------------------------
 
 const auth = [{ bearerAuth: [] }]
-const pid = z.object({ id: z.string() })
 
-registry.registerPath({ method: 'get',  path: '/device/{id}',            operationId: 'getDevice',     security: auth, request: { params: pid }, responses: { 200: { description: 'Device' },    404: { description: 'Not found' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/keyBundle',   operationId: 'getKeyBundle',  security: auth, request: { params: pid }, responses: { 200: { description: 'Key bundle' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/mail',        operationId: 'sendMail',      security: auth, request: { params: pid }, responses: { 200: { description: 'Mail sent' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/connect',     operationId: 'wsConnect',     security: auth, request: { params: pid }, responses: { 101: { description: 'WebSocket upgrade' } } })
-registry.registerPath({ method: 'get',  path: '/device/{id}/otk/count',   operationId: 'getOtkCount',   security: auth, request: { params: pid }, responses: { 200: { description: 'OTK count' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/otk',         operationId: 'uploadOtks',    security: auth, request: { params: pid }, responses: { 200: { description: 'OTKs saved' } } })
+registry.registerPath({ method: 'get',  path: '/device/{id}',            operationId: 'getDevice',     security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Device' },    404: { description: 'Not found' } } })
+registry.registerPath({ method: 'post', path: '/device/{id}/keyBundle',   operationId: 'getKeyBundle',  security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Key bundle' } } })
+registry.registerPath({ method: 'post', path: '/device/{id}/mail',        operationId: 'sendMail',      security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Mail sent' } } })
+registry.registerPath({ method: 'post', path: '/device/{id}/connect',     operationId: 'wsConnect',     security: auth, request: { params: pid(['id']) }, responses: { 101: { description: 'WebSocket upgrade' } } })
+registry.registerPath({ method: 'get',  path: '/device/{id}/otk/count',   operationId: 'getOtkCount',   security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'OTK count' } } })
+registry.registerPath({ method: 'post', path: '/device/{id}/otk',         operationId: 'uploadOtks',    security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'OTKs saved' } } })
