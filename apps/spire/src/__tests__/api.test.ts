@@ -44,7 +44,7 @@ type TestEnv = {
 async function makeEnv(): Promise<TestEnv> {
   const db = await useDb()
   const tokenStore = createTokenStore()
-  const app = createApp(db, tokenStore)
+  const app = createApp(db, tokenStore, process.env['JWT_SECRET']!)
 
   const env: TestEnv = {
     db,

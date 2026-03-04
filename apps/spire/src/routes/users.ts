@@ -5,11 +5,11 @@ import type { Database } from '#db/types.js'
 import { getUser } from '#users/users.service.js'
 import { createDevice, retrieveUserDeviceList } from '#devices/devices.service.js'
 import { DevicePayloadSchema } from '#devices/devices.schemas.js'
-import { checkAuth } from '#middleware/checkAuth.js'
 import { validateBody } from '#middleware/validate.js'
+import type { RequestHandler } from 'express'
 import { NotFoundError } from '#errors'
 
-export function createUserRouter(db: Kysely<Database>): Router {
+export function createUserRouter(db: Kysely<Database>, checkAuth: RequestHandler): Router {
   const router = Router()
 
   router.get('/user/:id', checkAuth, async (req, res, next) => {

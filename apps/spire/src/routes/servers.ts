@@ -18,8 +18,8 @@ import {
   hasPermission,
 } from '#permissions/permissions.service.js'
 import { createInvite, getServerInvites } from '#invites/invites.service.js'
-import { checkAuth } from '#middleware/checkAuth.js'
 import { validateBody } from '#middleware/validate.js'
+import type { RequestHandler } from 'express'
 import { NotFoundError, ForbiddenError } from '#errors'
 
 const DELETE_POWER = 50
@@ -33,7 +33,7 @@ const CreateChannelBodySchema = z.object({
   name: z.string().min(1),
 })
 
-export function createServerRouter(db: Kysely<Database>): Router {
+export function createServerRouter(db: Kysely<Database>, checkAuth: RequestHandler): Router {
   const router = Router()
 
   router.post('/server', checkAuth, validateBody(CreateServerSchema), async (req, res, next) => {

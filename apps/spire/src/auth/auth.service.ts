@@ -151,8 +151,8 @@ function censorUser(row: { userID: string; username: string; lastSeen: string })
   return { userID: row.userID, username: row.username, lastSeen: row.lastSeen }
 }
 
-function jwtSecret(): Uint8Array {
-  return new TextEncoder().encode(process.env['JWT_SECRET'] ?? 'dev-secret-change-in-production')
+function encodeSecret(jwtSecret: string): Uint8Array {
+  return new TextEncoder().encode(jwtSecret)
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +238,7 @@ export async function loginUser(
   db: Kysely<Database>,
   username: string,
   password: string,
+  jwtSecret: string,
 ): Promise<string | null> {
   const row = await db
     .selectFrom('users')
@@ -254,7 +255,7 @@ export async function loginUser(
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(jwtSecret())
+    .sign(encodeSecret(jwtSecret))
 
   return token
 }
@@ -267,12 +268,12 @@ export async function loginUser(
  * Issues a signed JWT (7-day expiry) directly from a CensoredUser object.
  * Use this after registration (user is already authenticated — no re-verify needed).
  */
-export async function issueJWT(user: CensoredUser): Promise<string> {
+export async function issueJWT(user: CensoredUser, jwtSecret: string): Promise<string> {
   return new SignJWT({ user })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(jwtSecret())
+    .sign(encodeSecret(jwtSecret))
 }
 
 // ---------------------------------------------------------------------------
@@ -282,9 +283,9 @@ export async function issueJWT(user: CensoredUser): Promise<string> {
 /**
  * Verifies a JWT and returns the censored user payload, or null if invalid.
  */
-export async function verifyJWT(token: string): Promise<CensoredUser | null> {
+export async function verifyJWT(token: string, jwtSecret: string): Promise<CensoredUser | null> {
   try {
-    const { payload } = await jwtVerify(token, jwtSecret())
+    const { payload } = await jwtVerify(token, encodeSecret(jwtSecret))
     const parsed = JWTPayloadSchema.safeParse(payload)
     return parsed.success ? parsed.data.user : null
   } catch {

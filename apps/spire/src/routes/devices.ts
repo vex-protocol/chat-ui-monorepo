@@ -5,12 +5,12 @@ import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
 import { getOTKCount, saveOTKs } from '#keys/keys.service.js'
 import { OTKPayloadSchema } from '#keys/keys.schemas.js'
-import { checkAuth } from '#middleware/checkAuth.js'
 import { validateBody } from '#middleware/validate.js'
+import type { RequestHandler } from 'express'
 
 const OTKListSchema = z.array(OTKPayloadSchema).min(1)
 
-export function createDeviceRouter(db: Kysely<Database>): Router {
+export function createDeviceRouter(db: Kysely<Database>, checkAuth: RequestHandler): Router {
   const router = Router()
 
   router.get('/device/:id/otk/count', checkAuth, async (req, res, next) => {
