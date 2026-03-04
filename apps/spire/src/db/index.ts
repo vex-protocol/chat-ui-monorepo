@@ -1,5 +1,28 @@
+import SQLiteDatabase from 'better-sqlite3'
+import { CompiledQuery, Kysely, SqliteDialect } from 'kysely'
+import type { Config } from '#config'
+import type { Database } from './types.js'
+
 export type { Database } from './types.js'
 
-// Production database factory — implemented in vex-chat-b5e alongside config module.
-// Will read DB_TYPE from parsed config and return a Kysely<Database> instance
-// backed by either SQLite (better-sqlite3) or PostgreSQL (pg).
+/**
+ * Creates a production Kysely instance from parsed config.
+ * Only SQLite is supported until the pg dialect is added (vex-chat-b5e).
+ */
+export function createDb(config: Config): Kysely<Database> {
+  if (config.DB_TYPE !== 'sqlite') {
+    throw new Error(
+      'Only SQLite is supported in this build. Install the pg package for PostgreSQL.',
+    )
+  }
+
+  const path = config.SQLITE_PATH ?? ':memory:'
+  return new Kysely<Database>({
+    dialect: new SqliteDialect({
+      database: new SQLiteDatabase(path),
+      onCreateConnection: async conn => {
+        await conn.executeQuery(CompiledQuery.raw('PRAGMA foreign_keys = ON'))
+      },
+    }),
+  })
+}
