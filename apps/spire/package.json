@@ -6,6 +6,7 @@
     "#db/*": "./src/db/*.js",
     "#auth/*": "./src/auth/*.js",
     "#devices/*": "./src/devices/*.js",
+    "#users/*": "./src/users/*.js",
     "#keys/*": "./src/keys/*.js",
     "#ws/*": "./src/ws/*.js",
     "#mail/*": "./src/mail/*.js",

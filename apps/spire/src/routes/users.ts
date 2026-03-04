@@ -2,6 +2,7 @@ import { registry, pid } from '#openapi'
 import { Router } from 'express'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
+import { getUser } from '#users/users.service.js'
 import { createDevice, retrieveUserDeviceList } from '#devices/devices.service.js'
 import { DevicePayloadSchema } from '#devices/devices.schemas.js'
 import { checkAuth } from '#middleware/checkAuth.js'
@@ -13,13 +14,9 @@ export function createUserRouter(db: Kysely<Database>): Router {
 
   router.get('/user/:id', checkAuth, async (req, res, next) => {
     try {
-      const row = await db
-        .selectFrom('users')
-        .where('userID', '=', req.params.id)
-        .select(['userID', 'username', 'lastSeen'])
-        .executeTakeFirst()
-      if (!row) return next(new NotFoundError('User not found'))
-      res.json(row)
+      const user = await getUser(db, req.params.id)
+      if (!user) return next(new NotFoundError('User not found'))
+      res.json(user)
     } catch (err) {
       next(err)
     }
