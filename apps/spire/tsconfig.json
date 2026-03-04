@@ -13,6 +13,7 @@
       "#devices/*": ["./src/devices/*"],
       "#utils/*": ["./src/utils/*"],
       "#config": ["./src/config.js"],
+      "#openapi": ["./src/openapi.js"],
       "#errors": ["./src/errors.js"],
       "#test/*": ["./test/*"]
     }

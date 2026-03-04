@@ -1,7 +1,9 @@
+import { parse as uuidParse } from 'uuid'
+
 export function createUUID(): string {
-  throw new Error('not implemented')
+  return crypto.randomUUID()
 }
 
-export function uuidToUint8(_uuid: string): Uint8Array {
-  throw new Error('not implemented')
+export function uuidToUint8(uuid: string): Uint8Array {
+  return uuidParse(uuid) as Uint8Array
 }
