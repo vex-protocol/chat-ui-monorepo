@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
 import nacl from 'tweetnacl'
 import { useDb } from '#test/helpers/db.ts'
