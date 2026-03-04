@@ -1,61 +1,78 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database, ServersTable, ChannelsTable } from '#db/types.js'
 
 export async function createServer(
-  _db: Kysely<Database>,
-  _name: string,
-  _icon: string,
+  db: Kysely<Database>,
+  name: string,
+  icon: string,
 ): Promise<ServersTable> {
-  throw new Error('not implemented')
+  const serverID = uuidv4()
+  await db.insertInto('servers').values({ serverID, name, icon }).execute()
+  return { serverID, name, icon }
 }
 
 export async function getServer(
-  _db: Kysely<Database>,
-  _serverID: string,
+  db: Kysely<Database>,
+  serverID: string,
 ): Promise<ServersTable | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('servers')
+    .where('serverID', '=', serverID)
+    .selectAll()
+    .executeTakeFirst()
+  return row ?? null
 }
 
-export async function getServers(
-  _db: Kysely<Database>,
-): Promise<ServersTable[]> {
-  throw new Error('not implemented')
+export async function getServers(db: Kysely<Database>): Promise<ServersTable[]> {
+  return db.selectFrom('servers').selectAll().execute()
 }
 
 export async function deleteServer(
-  _db: Kysely<Database>,
-  _serverID: string,
+  db: Kysely<Database>,
+  serverID: string,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db.deleteFrom('servers').where('serverID', '=', serverID).execute()
 }
 
 export async function createChannel(
-  _db: Kysely<Database>,
-  _serverID: string,
-  _name: string,
+  db: Kysely<Database>,
+  serverID: string,
+  name: string,
 ): Promise<ChannelsTable> {
-  throw new Error('not implemented')
+  const channelID = uuidv4()
+  await db.insertInto('channels').values({ channelID, serverID, name }).execute()
+  return { channelID, serverID, name }
 }
 
 export async function getChannel(
-  _db: Kysely<Database>,
-  _channelID: string,
+  db: Kysely<Database>,
+  channelID: string,
 ): Promise<ChannelsTable | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('channels')
+    .where('channelID', '=', channelID)
+    .selectAll()
+    .executeTakeFirst()
+  return row ?? null
 }
 
 export async function getChannels(
-  _db: Kysely<Database>,
-  _serverID: string,
+  db: Kysely<Database>,
+  serverID: string,
 ): Promise<ChannelsTable[]> {
-  throw new Error('not implemented')
+  return db
+    .selectFrom('channels')
+    .where('serverID', '=', serverID)
+    .selectAll()
+    .execute()
 }
 
 export async function deleteChannel(
-  _db: Kysely<Database>,
-  _channelID: string,
+  db: Kysely<Database>,
+  channelID: string,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db.deleteFrom('channels').where('channelID', '=', channelID).execute()
 }
 
 /**
@@ -63,8 +80,14 @@ export async function deleteChannel(
  * (resourceType = 'server').
  */
 export async function getUserServers(
-  _db: Kysely<Database>,
-  _userID: string,
+  db: Kysely<Database>,
+  userID: string,
 ): Promise<ServersTable[]> {
-  throw new Error('not implemented')
+  return db
+    .selectFrom('permissions')
+    .innerJoin('servers', 'servers.serverID', 'permissions.resourceID')
+    .where('permissions.userID', '=', userID)
+    .where('permissions.resourceType', '=', 'server')
+    .select(['servers.serverID', 'servers.name', 'servers.icon'])
+    .execute()
 }
