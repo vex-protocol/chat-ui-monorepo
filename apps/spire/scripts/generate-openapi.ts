@@ -8,11 +8,7 @@
 import { writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { generateOpenAPIDocument } from '../src/openapi.js'
-
-// Route files will be imported here as they are implemented, e.g.:
-// import '../src/routes/auth.js'
-// import '../src/routes/devices.js'
+import { generateOpenAPIDocument } from '../src/openapi-register.js'
 
 const doc = generateOpenAPIDocument()
 const outPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'openapi.json')

@@ -1,3 +1,4 @@
+import { registry } from '#openapi'
 import { Router } from 'express'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
@@ -44,3 +45,19 @@ export function createUserRouter(db: Kysely<Database>): Router {
 
   return router
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI registrations
+// ---------------------------------------------------------------------------
+
+import { z } from 'zod'
+
+const auth = [{ bearerAuth: [] }]
+const pid = (names: string[]) => z.object(Object.fromEntries(names.map(n => [n, z.string()])))
+
+registry.registerPath({ method: 'get',    path: '/user/{id}',                        operationId: 'getUser',          security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'User' },        404: { description: 'Not found' } } })
+registry.registerPath({ method: 'get',    path: '/user/{id}/devices',                operationId: 'getUserDevices',   security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Device list' } } })
+registry.registerPath({ method: 'post',   path: '/user/{id}/devices',                operationId: 'addDevice',        security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Device created' } } })
+registry.registerPath({ method: 'delete', path: '/user/{userID}/devices/{deviceID}', operationId: 'deleteDevice',     security: auth, request: { params: pid(['userID', 'deviceID']) },      responses: { 200: { description: 'Deleted' } } })
+registry.registerPath({ method: 'get',    path: '/user/{id}/permissions',            operationId: 'getUserPerms',     security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Permissions' } } })
+registry.registerPath({ method: 'get',    path: '/user/{id}/servers',                operationId: 'getUserServers',   security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Servers' } } })

@@ -6,8 +6,9 @@
  * intentionally RED until route OpenAPI registrations are added.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
-// openapi.ts must be the first import — it calls extendZodWithOpenApi(z)
-import { generateOpenAPIDocument } from '#openapi'
+// openapi-register.ts imports openapi.ts first (extendZodWithOpenApi), then
+// side-effect-imports all route files so their registerPath() calls execute.
+import { generateOpenAPIDocument } from '../openapi-register.js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let doc: any
@@ -85,9 +86,9 @@ const expectedPaths = [
   // Avatars
   ['get', '/avatar/{userID}'],
   ['post', '/avatar/{userID}'],
-  // Emojis
+  // Emojis — POST is under /server/{serverID}/emoji to avoid ambiguous path collision
   ['get', '/emoji/{emojiID}'],
-  ['post', '/emoji/{serverID}'],
+  ['post', '/server/{serverID}/emoji'],
   // User lists
   ['post', '/userList/{channelID}'],
 ] as const

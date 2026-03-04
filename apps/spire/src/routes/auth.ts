@@ -1,3 +1,4 @@
+import { registry } from '#openapi'
 import { Router } from 'express'
 import { decodeJwt } from 'jose'
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid'
@@ -84,3 +85,17 @@ export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore):
 
   return router
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI registrations
+// ---------------------------------------------------------------------------
+
+import { z } from 'zod'
+
+const auth = [{ bearerAuth: [] }]
+
+registry.registerPath({ method: 'post', path: '/register',    operationId: 'register',    responses: { 200: { description: 'User created' }, 409: { description: 'Username taken' } } })
+registry.registerPath({ method: 'post', path: '/auth',        operationId: 'login',       responses: { 200: { description: 'JWT issued' }, 401: { description: 'Invalid credentials' } } })
+registry.registerPath({ method: 'post', path: '/whoami',      operationId: 'whoami',      security: auth, responses: { 200: { description: 'Authenticated user' }, 401: { description: 'Unauthorized' } } })
+registry.registerPath({ method: 'post', path: '/goodbye',     operationId: 'logout',      responses: { 200: { description: 'Cookie cleared' } } })
+registry.registerPath({ method: 'get',  path: '/token/{tokenType}', operationId: 'getToken', security: auth, request: { params: z.object({ tokenType: z.string() }) }, responses: { 200: { description: 'Action token' }, 400: { description: 'Invalid type' }, 401: { description: 'Unauthorized' } } })
