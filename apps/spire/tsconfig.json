@@ -11,6 +11,8 @@
       "#db/*": ["./src/db/*"],
       "#auth/*": ["./src/auth/*"],
       "#devices/*": ["./src/devices/*"],
+      "#keys/*": ["./src/keys/*"],
+      "#ws/*": ["./src/ws/*"],
       "#utils/*": ["./src/utils/*"],
       "#config": ["./src/config.js"],
       "#openapi": ["./src/openapi.js"],
