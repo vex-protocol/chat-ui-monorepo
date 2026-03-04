@@ -9,6 +9,7 @@ export default defineConfig({
       '#db': new URL('./src/db', import.meta.url).pathname,
       '#auth': new URL('./src/auth', import.meta.url).pathname,
       '#devices': new URL('./src/devices', import.meta.url).pathname,
+      '#keys': new URL('./src/keys', import.meta.url).pathname,
       '#utils': new URL('./src/utils', import.meta.url).pathname,
       '#config': new URL('./src/config.js', import.meta.url).pathname,
       '#openapi': new URL('./src/openapi.js', import.meta.url).pathname,
