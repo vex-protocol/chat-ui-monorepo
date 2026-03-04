@@ -6,15 +6,17 @@ Canonical reference for `packages/*` — the shared TypeScript libraries that po
 
 ## Overview
 
-Three packages bridge the server protocol and all client platforms (desktop, mobile, third-party developers):
+Five packages form the shared layer consumed by all Vex clients (desktop, mobile, third-party developers):
 
 | Package | npm name | Purpose |
 |---|---|---|
 | `packages/types` | `@vex-chat/types` | Shared protocol interfaces — no runtime deps, no build step |
 | `packages/crypto` | `@vex-chat/crypto` | NaCl signing, hex encoding, X3DH session crypto |
-| `packages/libvex` | `@vex-chat/libvex` | Framework-agnostic client SDK |
+| `packages/libvex` | `@vex-chat/libvex` | Framework-agnostic client SDK (fetch + WebSocket) |
+| `packages/store` | `@vex-chat/store` | nanostores atoms: state slices + bootstrap + VexClient event wiring |
+| `packages/ui` | `@vex-chat/ui` | Mitosis design primitives compiled to Svelte + React |
 
-All three are `private: true` workspace packages. They are consumed by other packages and apps via `"workspace:*"` deps in `pnpm-workspace.yaml`.
+All are `private: true` workspace packages consumed via `"workspace:*"` deps in `pnpm-workspace.yaml`.
 
 ---
 
@@ -252,6 +254,284 @@ class VexClient extends EventEmitter<VexEvents> {
 
 ---
 
+---
+
+## `packages/store` — `@vex-chat/store`
+
+**Nanostores atoms per state slice.** Wraps `VexClient` from `@vex-chat/libvex` — wires real-time events via nanostores `onMount`, runs the bootstrap waterfall. Apps never import `VexClient` directly — they import atoms and install `@nanostores/svelte` or `@nanostores/react` for zero-boilerplate framework binding.
+
+### Responsibility split
+
+| Layer | Owns |
+|---|---|
+| `@vex-chat/libvex` (VexClient) | Network I/O: HTTP requests, WebSocket frames, NaCl handshake, discriminated union results |
+| `@vex-chat/store` (nanostores atoms) | Runtime state: nanostores atoms per slice, `onMount` wires VexClient events, bootstrap waterfall |
+| `@nanostores/svelte` | Framework binding for apps/desktop — `useStore($atom)` in `.svelte` files |
+| `@nanostores/react` | Framework binding for apps/mobile — `useStore($atom)` in React Native components |
+
+### Files
+
+```
+packages/store/src/
+  index.ts         — barrel: all atoms + bootstrap()
+  client.ts        — $client atom (singleton VexClient)
+  bootstrap.ts     — bootstrap(serverUrl, deviceKey): init $client, run waterfall fetch
+  user.ts          — $user atom + onMount wiring
+  familiars.ts     — $familiars atom + onMount wiring
+  messages.ts      — $messages, $groupMessages atoms + onMount wiring
+  sessions.ts      — $sessions atom + onMount wiring
+  servers.ts       — $servers atom + onMount wiring
+  channels.ts      — $channels atom + onMount wiring
+  permissions.ts   — $permissions atom + onMount wiring
+  devices.ts       — $devices atom + onMount wiring
+  onlineLists.ts   — $onlineLists atom + onMount wiring
+```
+
+### State atoms
+
+All state is nanostores `atom()` or `map()` — plain values, no framework reactivity baked in. Apps subscribe via `@nanostores/svelte` or `@nanostores/react`.
+
+| Atom | nanostores type | Keyed by |
+|---|---|---|
+| `$user` | `atom<IUser \| null>` | — |
+| `$familiars` | `map<Record<string, IUser>>` | userID |
+| `$messages` | `map<Record<string, IMessage[]>>` | recipientUserID |
+| `$groupMessages` | `map<Record<string, IMessage[]>>` | channelID |
+| `$sessions` | `map<Record<string, ISession[]>>` | userID |
+| `$servers` | `map<Record<string, IServer>>` | serverID |
+| `$channels` | `map<Record<string, IChannel[]>>` | serverID |
+| `$permissions` | `map<Record<string, IPermission>>` | permID |
+| `$devices` | `map<Record<string, IDevice[]>>` | userID |
+| `$onlineLists` | `map<Record<string, IUser[]>>` | channelID |
+
+### Wiring pattern
+
+```ts
+// packages/store/src/messages.ts
+import { map, onMount } from 'nanostores'
+import { $client } from './client'
+
+export const $messages = map<Record<string, IMessage[]>>({})
+
+onMount($messages, () => {
+  const client = $client.get()
+  const off = client.on('mail', (mail) => {
+    const thread = $messages.get()[mail.senderID] ?? []
+    $messages.setKey(mail.senderID, [...thread, mail])
+  })
+  return off   // nanostores calls this when last subscriber detaches
+})
+```
+
+### Bootstrap sequence
+
+`bootstrap(serverUrl, deviceKey)` in `bootstrap.ts` creates `$client`, connects, then runs a waterfall fetch on `VexClient` `'connected'`:
+
+1. `whoami()` → set `$user`
+2. `client.sessions.retrieve()` → populate `$sessions`
+3. `client.users.familiars()` → populate `$familiars`
+4. `POST /deviceList` (msgpack) → populate `$devices` for all familiars
+5. `client.messages.retrieve(userID)` for each familiar → populate `$messages`
+6. `client.servers.retrieve()` → populate `$servers`
+7. `client.channels.retrieve(serverID)` for each server → populate `$channels`
+8. `client.messages.retrieveGroup(channelID)` for each channel → populate `$groupMessages`
+9. `client.permissions.retrieve()` → populate `$permissions`
+
+Real-time event handlers wired via `onMount` per atom: `mail` → update `$messages`/`$groupMessages`; `session` → update `$sessions` + fetch devices; `permission` → refresh `$servers`/`$channels`; `disconnect` → handled by reconnecting-websocket.
+
+Error recovery: HTTP 470 (corrupt key file) → rename keyfile to `-bak`, generate new secret key, save, set `$keyReplaced` atom for the app to navigate to login.
+
+### `package.json` shape
+
+```json
+{
+  "name": "@vex-chat/store",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@vex-chat/libvex": "workspace:*",
+    "nanostores":       "catalog:"
+  },
+  "peerDependencies": {
+    "@nanostores/svelte": ">=0.10",
+    "@nanostores/react":  ">=0.8"
+  },
+  "peerDependenciesMeta": {
+    "@nanostores/svelte": { "optional": true },
+    "@nanostores/react":  { "optional": true }
+  }
+}
+```
+
+`@nanostores/svelte` and `@nanostores/react` are optional peer deps — each app installs only what it needs.
+
+---
+
+## `packages/ui` — `@vex-chat/ui`
+
+**Mitosis design primitives.** Written once as `.lite.tsx` files, compiled to idiomatic Svelte components (`output/svelte/`) and React components (`output/react/`). Desktop imports from `output/svelte/`; mobile imports from `output/react/`. See `docs/design-system.md` for the full Figma ↔ Storybook pipeline.
+
+### Files
+
+```
+packages/ui/
+  mitosis.config.ts           — targets: svelte + react
+  src/
+    Button/
+      Button.lite.tsx         — Button (size: sm/md/lg, variant: primary/secondary/ghost)
+      Button.stories-shared.ts — shared story metadata (args, argTypes) — no framework imports
+    Avatar/
+      Avatar.lite.tsx         — Avatar (src + vexAvatarFromUUID fallback)
+      Avatar.stories-shared.ts
+    Badge/…  TextInput/…  SearchBar/…  MessageInput/…
+    MessageBubble/…  ChannelListItem/…  ServerListItem/…  Modal/…  Loading/…
+  output/                     — generated by `pnpm build`, committed to repo
+    react/
+      Button/
+        Button.tsx            — compiled React component
+        Button.stories.tsx    — thin CSF wrapper (6 lines) — imports Button.stories-shared
+    svelte/
+      Button/
+        Button.svelte         — compiled Svelte component
+        Button.stories.ts     — thin CSF wrapper (6 lines) — imports Button.stories-shared
+  scripts/
+    gen-story-wrappers.ts     — generates output/*/ComponentName.stories.{tsx,ts} from src/**/*-shared.ts
+  .storybook-react/           — React Storybook config (port 6001)
+    main.ts                   — framework: @storybook/react-vite, stories: output/react/**
+    preview.ts
+  .storybook-svelte/          — Svelte Storybook config (port 6002)
+    main.ts                   — framework: @storybook/svelte-vite, stories: output/svelte/**
+    preview.ts
+  .storybook/                 — Composition host (port 6000)
+    main.ts                   — refs: { react: :6001, svelte: :6002 }, no local stories
+    preview.ts
+```
+
+### Story authoring pattern
+
+Mitosis compiles the same props to both React and Svelte — the component API is identical. Story metadata is written once in `*.stories-shared.ts` and thin per-framework wrappers (which `gen-story-wrappers.ts` can generate) add only the `component` import:
+
+```ts
+// src/Button/Button.stories-shared.ts  — written once, no framework imports
+export const meta = {
+  title: 'Components/Button',
+  argTypes: {
+    variant: { control: 'select', options: ['primary', 'secondary', 'ghost'] },
+    size:    { control: 'select', options: ['sm', 'md', 'lg'] },
+  },
+};
+export const Primary   = { args: { variant: 'primary',   label: 'Click me' } };
+export const Secondary = { args: { variant: 'secondary', label: 'Cancel'   } };
+```
+
+```tsx
+// output/react/Button/Button.stories.tsx  — thin wrapper
+import { Button } from './Button';
+import { meta, Primary, Secondary } from '../../src/Button/Button.stories-shared';
+export default { ...meta, component: Button };
+export { Primary, Secondary };
+```
+
+```ts
+// output/svelte/Button/Button.stories.ts  — identical shape
+import Button from './Button.svelte';
+import { meta, Primary, Secondary } from '../../src/Button/Button.stories-shared';
+export default { ...meta, component: Button };
+export { Primary, Secondary };
+```
+
+### Storybook architecture
+
+A single Storybook process cannot render two frameworks simultaneously (Storybook 8 architecture constraint — requested since 2019, not shipped). The solution is **Storybook Composition**: three processes, one URL.
+
+```
+port 6001  @storybook/react-vite    stories: output/react/**/*.stories.tsx
+port 6002  @storybook/svelte-vite   stories: output/svelte/**/*.stories.ts
+port 6000  composition host (refs)  ← this is what developers open in the browser
+```
+
+The host at `:6000` shows a unified sidebar with React and Svelte sections. Clicking a story renders the appropriate framework in an iframe. Addons (Controls, Docs, Viewport) work within each child iframe.
+
+Storybook Composition configs:
+
+```ts
+// .storybook-react/main.ts
+export default {
+  framework: '@storybook/react-vite',
+  stories: ['../output/react/**/*.stories.@(ts|tsx)'],
+  addons: ['@storybook/addon-essentials'],
+} satisfies StorybookConfig;
+
+// .storybook-svelte/main.ts
+export default {
+  framework: '@storybook/svelte-vite',
+  stories: ['../output/svelte/**/*.stories.ts'],
+  addons: ['@storybook/addon-essentials'],
+} satisfies StorybookConfig;
+
+// .storybook/main.ts  (host — no local stories)
+export default {
+  framework: '@storybook/react-vite',
+  stories: [],
+  refs: {
+    react:  { title: 'React',  url: 'http://localhost:6001' },
+    svelte: { title: 'Svelte', url: 'http://localhost:6002' },
+  },
+} satisfies StorybookConfig;
+```
+
+### Build
+
+```bash
+pnpm --filter @vex-chat/ui build           # mitosis compile → output/svelte/ + output/react/ + gen-story-wrappers
+pnpm --filter @vex-chat/ui storybook       # starts all 3 processes, opens :6000
+pnpm --filter @vex-chat/ui storybook:react # port 6001 only
+pnpm --filter @vex-chat/ui storybook:svelte # port 6002 only
+```
+
+Compiled output is committed to the repo so consuming apps don't need to run the Mitosis compiler themselves.
+
+### `package.json` shape
+
+```json
+{
+  "name": "@vex-chat/ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build":              "mitosis build && tsx scripts/gen-story-wrappers.ts",
+    "storybook:react":    "storybook dev --config-dir .storybook-react  --port 6001 --no-open",
+    "storybook:svelte":   "storybook dev --config-dir .storybook-svelte --port 6002 --no-open",
+    "storybook:host":     "storybook dev --config-dir .storybook        --port 6000",
+    "storybook":          "concurrently -k \"pnpm storybook:react\" \"pnpm storybook:svelte\" \"wait-on http://localhost:6001 http://localhost:6002 && pnpm storybook:host\"",
+    "build-storybook":    "pnpm build-storybook:react && pnpm build-storybook:svelte && storybook build --config-dir .storybook --output-dir storybook-static/host",
+    "build-storybook:react":  "storybook build --config-dir .storybook-react  --output-dir storybook-static/react",
+    "build-storybook:svelte": "storybook build --config-dir .storybook-svelte --output-dir storybook-static/svelte"
+  },
+  "exports": {
+    "./svelte/*": "./output/svelte/*",
+    "./react/*":  "./output/react/*"
+  },
+  "devDependencies": {
+    "@builder.io/mitosis-cli":  "catalog:",
+    "@builder.io/mitosis":      "catalog:",
+    "@storybook/react-vite":    "^8.0.0",
+    "@storybook/svelte-vite":   "^8.0.0",
+    "@storybook/addon-essentials": "^8.0.0",
+    "storybook":                "^8.0.0",
+    "concurrently":             "catalog:",
+    "wait-on":                  "^8.0.0",
+    "react":                    "^18.0.0",
+    "react-dom":                "^18.0.0",
+    "svelte":                   "^5.0.0",
+    "tsx":                      "catalog:"
+  }
+}
+```
+
+---
+
 ## TypeScript Resolution
 
 - **Root tsconfig:** `"module": "nodenext"` — reads `package.json#exports`
@@ -263,13 +543,31 @@ class VexClient extends EventEmitter<VexEvents> {
 ## Dependency Graph
 
 ```
-apps/spire ──────────────────────── @vex-chat/crypto
-                                          │
-packages/libvex ─┬── @vex-chat/types ◄───┘
-                 └── @vex-chat/crypto
+packages/types  ◄──────────────────────────────────────────────────┐
+packages/crypto ◄────────────────────────────────────────┐         │
+                                                          │         │
+packages/libvex ─────── @vex-chat/types ◄────────────────┘         │
+                └─────── @vex-chat/crypto                           │
+                                                                    │
+packages/store ──────── @vex-chat/libvex                            │
+                                                                    │
+packages/ui     ─────── (no runtime deps)                           │
+                                                                    │
+apps/spire ─────────────────────────────── @vex-chat/crypto         │
+                                                                    │
+apps/desktop ─┬── @vex-chat/store + @nanostores/svelte             │
+              └── @vex-chat/ui (/svelte/*)                          │
+                                                                    │
+apps/mobile  ─┬── @vex-chat/store + @nanostores/react              │
+              └── @vex-chat/ui (/react/*)              ◄────────────┘
 ```
 
-`packages/types` has zero runtime deps. `packages/crypto` depends only on `tweetnacl` (always) and `ed2curve` + `futoin-hkdf` (session crypto only). `packages/libvex` depends on both packages plus `eventemitter3` and `reconnecting-websocket`.
+- `packages/types` — zero runtime deps
+- `packages/crypto` — `@noble/curves` + `@noble/hashes` only
+- `packages/libvex` — types + crypto + `eventemitter3` + `reconnecting-websocket`
+- `packages/store` — libvex + `nanostores`; apps install `@nanostores/svelte` or `@nanostores/react` as direct deps
+- `packages/ui` — no runtime deps; Mitosis is a devDep only
+- `apps/spire` — imports `@vex-chat/crypto` only (server has no state management needs)
 
 ---
 
