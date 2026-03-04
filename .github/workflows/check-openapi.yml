@@ -1,0 +1,43 @@
+name: Check OpenAPI spec
+
+on:
+  push:
+    paths:
+      - 'apps/spire/src/**'
+      - 'apps/spire/openapi.json'
+  pull_request:
+    paths:
+      - 'apps/spire/src/**'
+      - 'apps/spire/openapi.json'
+
+jobs:
+  check-openapi:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/spire
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Regenerate OpenAPI spec
+        run: pnpm generate:openapi
+
+      - name: Assert spec is up to date
+        run: git diff --exit-code openapi.json
+
+      - name: Lint OpenAPI spec
+        run: pnpm lint:openapi --fail-severity=error
