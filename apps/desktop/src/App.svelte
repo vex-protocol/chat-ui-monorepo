@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openUrl } from '@tauri-apps/plugin-opener'
   import svelteLogo from './assets/svelte.svg'
   import viteLogo from '/vite.svg'
   import Counter from './lib/Counter.svelte'
@@ -6,12 +7,12 @@
 
 <main>
   <div>
-    <a href="https://vite.dev" target="_blank" rel="noreferrer">
+    <button class="logo-btn" onclick={() => openUrl('https://vite.dev')} aria-label="Open Vite docs">
       <img src={viteLogo} class="logo" alt="Vite Logo" />
-    </a>
-    <a href="https://svelte.dev" target="_blank" rel="noreferrer">
+    </button>
+    <button class="logo-btn" onclick={() => openUrl('https://svelte.dev')} aria-label="Open Svelte docs">
       <img src={svelteLogo} class="logo svelte" alt="Svelte Logo" />
-    </a>
+    </button>
   </div>
   <h1>Vite + Svelte</h1>
 
@@ -20,7 +21,7 @@
   </div>
 
   <p>
-    Check out <a href="https://github.com/sveltejs/kit#readme" target="_blank" rel="noreferrer">SvelteKit</a>, the official Svelte app framework powered by Vite!
+    Check out <button class="inline-link" onclick={() => openUrl('https://github.com/sveltejs/kit#readme')}>SvelteKit</button>, the official Svelte app framework powered by Vite!
   </p>
 
   <p class="read-the-docs">
@@ -43,5 +44,20 @@
   }
   .read-the-docs {
     color: #888;
+  }
+  .logo-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+  .inline-link {
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
   }
 </style>

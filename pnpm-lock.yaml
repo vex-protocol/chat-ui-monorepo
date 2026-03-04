@@ -56,6 +56,9 @@ importers:
       '@tauri-apps/api':
         specifier: ^2.10.1
         version: 2.10.1
+      '@tauri-apps/plugin-opener':
+        specifier: ^2.5.3
+        version: 2.5.3
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
@@ -905,6 +908,9 @@ packages:
     resolution: {integrity: sha512-jQNGF/5quwORdZSSLtTluyKQ+o6SMa/AUICfhf4egCGFdMHqWssApVgYSbg+jmrZoc8e1DscNvjTnXtlHLS11g==}
     engines: {node: '>= 10'}
     hasBin: true
+
+  '@tauri-apps/plugin-opener@2.5.3':
+    resolution: {integrity: sha512-CCcUltXMOfUEArbf3db3kCE7Ggy1ExBEBl51Ko2ODJ6GDYHRp1nSNlQm5uNCFY5k7/ufaK5Ib3Du/Zir19IYQQ==}
 
   '@tsconfig/svelte@5.0.8':
     resolution: {integrity: sha512-UkNnw1/oFEfecR8ypyHIQuWYdkPvHiwcQ78sh+ymIiYoF+uc5H1UBetbjyqT+vgGJ3qQN6nhucJviX6HesWtKQ==}
@@ -3956,6 +3962,10 @@ snapshots:
       '@tauri-apps/cli-win32-arm64-msvc': 2.10.1
       '@tauri-apps/cli-win32-ia32-msvc': 2.10.1
       '@tauri-apps/cli-win32-x64-msvc': 2.10.1
+
+  '@tauri-apps/plugin-opener@2.5.3':
+    dependencies:
+      '@tauri-apps/api': 2.10.1
 
   '@tsconfig/svelte@5.0.8': {}
 
