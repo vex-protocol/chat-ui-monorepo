@@ -9,7 +9,7 @@ import type { RegisterResult, LoginResult } from './auth.ts'
 import { sendMail, fetchInbox } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle } from './devices.ts'
-import { createServer, listServers, createChannel } from './servers.ts'
+import { createServer, listServers, listChannels, createChannel } from './servers.ts'
 
 export interface VexEvents {
   /** Emitted when the WebSocket connection is established (before auth handshake). */
@@ -175,6 +175,11 @@ export class VexClient extends EventEmitter<VexEvents> {
   /** Returns all servers the authenticated user is a member of. */
   async listServers(): Promise<IServer[]> {
     return listServers(this.http)
+  }
+
+  /** Returns all channels within a server. */
+  async listChannels(serverID: string): Promise<IChannel[]> {
+    return listChannels(this.http, serverID)
   }
 
   /** Creates a channel within a server. */

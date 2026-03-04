@@ -17,6 +17,12 @@ export async function listServers(http: HttpClient): Promise<IServer[]> {
   return result.data
 }
 
+export async function listChannels(http: HttpClient, serverID: string): Promise<IChannel[]> {
+  const result = await http.get<IChannel[]>(`/server/${serverID}/channels`)
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
+}
+
 export async function createChannel(
   http: HttpClient,
   serverID: string,
