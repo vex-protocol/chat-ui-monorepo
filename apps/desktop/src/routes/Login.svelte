@@ -1,7 +1,10 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+  import { decodeHex } from '@vex-chat/crypto'
+  import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
 
-  // Form state — wired to VexClient in vex-chat-vyp
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:16777'
+
   let username = $state('')
   let password = $state('')
   let error = $state('')
@@ -11,11 +14,62 @@
     e.preventDefault()
     loading = true
     error = ''
-    // TODO (vex-chat-vyp): load key file, call bootstrap(serverUrl, deviceID, deviceKey)
-    //   on success $user atom will be set → navigate to messaging
-    console.log('Login:', username)
-    loading = false
-    error = 'Auth not yet wired (vex-chat-vyp)'
+
+    try {
+      // 1. Load saved device credentials
+      const savedUsername = localStorage.getItem('vex-username')
+      const deviceKeyHex = localStorage.getItem('vex-device-key')
+      const deviceIDHex = localStorage.getItem('vex-device-id')
+
+      if (!deviceKeyHex || !deviceIDHex) {
+        error = 'No device key found. Please register first.'
+        loading = false
+        return
+      }
+
+      if (savedUsername && savedUsername !== username) {
+        error = 'Username does not match registered device.'
+        loading = false
+        return
+      }
+
+      // 2. POST /auth to get JWT (sets httpOnly cookie + returns token in body)
+      const authRes = await fetch(`${SERVER_URL}/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ username, password }),
+      })
+
+      if (!authRes.ok) {
+        const body = await authRes.json().catch(() => ({})) as { message?: string }
+        error = body.message ?? 'Invalid username or password'
+        loading = false
+        return
+      }
+
+      const { token } = await authRes.json() as { token: string }
+
+      // 3. Bootstrap store with device key + JWT
+      const deviceKey = decodeHex(deviceKeyHex)
+      await bootstrap(SERVER_URL, deviceIDHex, deviceKey, token)
+
+      // Navigate into the app
+      if (userAtom.get()) {
+        const serverList = Object.values(serversAtom.get())
+        if (serverList.length > 0) {
+          push(`/server/${serverList[0]!.serverID}/general`)
+        } else {
+          push('/server/home/general')
+        }
+      } else {
+        error = 'Could not verify credentials after login'
+        loading = false
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Unexpected error'
+      loading = false
+    }
   }
 </script>
 
@@ -87,17 +141,8 @@
     gap: 16px;
   }
 
-  .auth-card__title {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .auth-card__subtitle {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-top: -10px;
-  }
+  .auth-card__title { font-size: 22px; font-weight: 700; color: var(--text-primary); }
+  .auth-card__subtitle { font-size: 13px; color: var(--text-secondary); margin-top: -10px; }
 
   .auth-card__error {
     background: color-mix(in srgb, var(--danger) 15%, transparent);
@@ -138,15 +183,6 @@
   .auth-form__submit:hover:not(:disabled) { opacity: 0.9; }
   .auth-form__submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .auth-card__footer {
-    font-size: 13px;
-    color: var(--text-secondary);
-    text-align: center;
-  }
-
-  .auth-card__link {
-    color: var(--accent);
-    text-decoration: underline;
-    font-size: 13px;
-  }
+  .auth-card__footer { font-size: 13px; color: var(--text-secondary); text-align: center; }
+  .auth-card__link { color: var(--accent); text-decoration: underline; font-size: 13px; }
 </style>

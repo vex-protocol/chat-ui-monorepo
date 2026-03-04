@@ -63,6 +63,11 @@ export class VexClient extends EventEmitter<VexEvents> {
     return new VexClient(serverUrl, deviceID, deviceKey)
   }
 
+  /** Pre-seeds the Authorization Bearer token (e.g. from a login response). */
+  setAuthToken(token: string): void {
+    this.http.setToken(token)
+  }
+
   /**
    * Generates a new Ed25519 signing key pair for device registration.
    * Store the secretKey securely — it is never sent to the server.

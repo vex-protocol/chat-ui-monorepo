@@ -14,6 +14,10 @@ export const ConfigSchema = z
     NODE_ENV: z
       .enum(['development', 'production', 'test'])
       .default('development'),
+    OPEN_REGISTRATION: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
   })
   .refine(data => data.DB_TYPE !== 'postgres' || !!data.DATABASE_URL, {
     message: 'DATABASE_URL is required when DB_TYPE=postgres',

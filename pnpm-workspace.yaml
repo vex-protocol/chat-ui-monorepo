@@ -20,3 +20,5 @@ catalog:
   "vitest": "^3.0.0"
   nanostores: "^0.11.3"
   "@nanostores/react": "^0.8.0"
+  uuid: "^11.0.0"
+  "@types/uuid": "^10.0.0"
