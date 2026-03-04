@@ -39,7 +39,6 @@ export async function seedUser(
       userID,
       username,
       passwordHash: 'a'.repeat(64),
-      passwordSalt: 'a'.repeat(48),
       lastSeen: new Date().toISOString(),
     })
     .execute()

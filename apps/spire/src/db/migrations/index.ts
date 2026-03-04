@@ -10,6 +10,7 @@ import * as m008 from './008_permissions.js'
 import * as m009 from './009_files.js'
 import * as m010 from './010_emojis.js'
 import * as m011 from './011_invites.js'
+import * as m012 from './012_drop_password_salt.js'
 
 export const migrations: Record<string, Migration> = {
   '001_users': m001,
@@ -23,6 +24,7 @@ export const migrations: Record<string, Migration> = {
   '009_files': m009,
   '010_emojis': m010,
   '011_invites': m011,
+  '012_drop_password_salt': m012,
 }
 
 export const migrationProvider: MigrationProvider = {

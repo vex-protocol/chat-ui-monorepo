@@ -7,7 +7,6 @@ export interface UsersTable {
   userID: string        // UUID primary key
   username: string      // unique
   passwordHash: string
-  passwordSalt: string
   lastSeen: string      // ISO timestamp
 }
 

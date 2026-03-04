@@ -80,7 +80,6 @@ describe('DB migrations', () => {
       expect(cols).toContain('userID')
       expect(cols).toContain('username')
       expect(cols).toContain('passwordHash')
-      expect(cols).toContain('passwordSalt')
       expect(cols).toContain('lastSeen')
     })
 
@@ -198,15 +197,15 @@ describe('DB migrations', () => {
       const db = await useDb()
       await expect(
         // username is NOT NULL; omitting it via raw SQL triggers the constraint
-        sql`INSERT INTO users (userID, passwordHash, passwordSalt, lastSeen) VALUES ('u1', 'h', 's', 't')`.execute(db),
+        sql`INSERT INTO users (userID, passwordHash, lastSeen) VALUES ('u1', 'h', 't')`.execute(db),
       ).rejects.toThrow()
     })
 
     it('enforces UNIQUE — inserting duplicate username throws', async () => {
       const db = await useDb()
-      await sql`INSERT INTO users (userID, username, passwordHash, passwordSalt, lastSeen) VALUES ('u1', 'alice', 'h', 's', 't')`.execute(db)
+      await sql`INSERT INTO users (userID, username, passwordHash, lastSeen) VALUES ('u1', 'alice', 'h', 't')`.execute(db)
       await expect(
-        sql`INSERT INTO users (userID, username, passwordHash, passwordSalt, lastSeen) VALUES ('u2', 'alice', 'h', 's', 't')`.execute(db),
+        sql`INSERT INTO users (userID, username, passwordHash, lastSeen) VALUES ('u2', 'alice', 'h', 't')`.execute(db),
       ).rejects.toThrow()
     })
 

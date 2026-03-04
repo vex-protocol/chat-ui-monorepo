@@ -120,21 +120,12 @@ export function createTokenStore(): ITokenStore {
 // Password hashing
 // ---------------------------------------------------------------------------
 
-export interface PasswordHash {
-  hash: string  // argon2id PHC format string
-  salt: string  // 'argon2id' placeholder — salt is embedded in the hash string
-}
-
 /**
  * Hashes a password with argon2id (OWASP 2025 recommended: m=19MiB, t=2, p=1).
- * argon2 embeds the salt in the hash string — `salt` is returned separately
- * only for schema compatibility with the `passwordSalt` column.
+ * Returns the PHC format string, which embeds the salt, algorithm, and parameters.
  */
-export async function hashPassword(password: string): Promise<PasswordHash> {
-  const hash = await argon2.hash(password, ARGON2_OPTIONS)
-  // argon2 encodes the salt inside the hash string (PHC format).
-  // We store a placeholder salt so the DB column stays non-null.
-  return { hash, salt: 'argon2id' }
+export async function hashPassword(password: string): Promise<string> {
+  return argon2.hash(password, ARGON2_OPTIONS)
 }
 
 /** Returns true if the password matches the stored argon2id hash. */
@@ -188,7 +179,7 @@ export async function registerUser(
   }
 
   const userID = uuidStringify(regKey)
-  const { hash: passwordHash, salt: passwordSalt } = await hashPassword(payload.password)
+  const passwordHash = await hashPassword(payload.password)
   const deviceID = uuidv4()
   const now = new Date().toISOString()
 
@@ -196,7 +187,7 @@ export async function registerUser(
     await db.transaction().execute(async trx => {
       await trx
         .insertInto('users')
-        .values({ userID, username: payload.username, passwordHash, passwordSalt, lastSeen: now })
+        .values({ userID, username: payload.username, passwordHash, lastSeen: now })
         .execute()
 
       await trx
