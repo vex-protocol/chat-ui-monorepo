@@ -5,10 +5,14 @@
  * Depends on ed2curve (Ed25519→Curve25519 conversion) and futoin-hkdf (HKDF key derivation).
  */
 import nacl from 'tweetnacl'
-import { convertPublicKey, convertSecretKey, convertKeyPair } from 'ed2curve'
+import ed2curve from 'ed2curve'
 import hkdf from 'futoin-hkdf'
 
-export { convertPublicKey, convertSecretKey, convertKeyPair }
+// ed2curve is a CJS UMD module — only the default export is available in ESM at runtime.
+// Destructure from the default rather than using named imports.
+export const convertPublicKey = ed2curve.convertPublicKey.bind(ed2curve)
+export const convertSecretKey = ed2curve.convertSecretKey.bind(ed2curve)
+export const convertKeyPair = ed2curve.convertKeyPair.bind(ed2curve)
 
 /**
  * Generates a new Curve25519 DH key pair for ephemeral use in X3DH.
