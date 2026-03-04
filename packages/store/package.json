@@ -1,0 +1,20 @@
+{
+  "name": "@vex-chat/store",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@vex-chat/types": "workspace:*",
+    "@vex-chat/libvex": "workspace:*",
+    "nanostores": "catalog:"
+  },
+  "peerDependencies": {
+    "@nanostores/react": ">=0.8"
+  },
+  "peerDependenciesMeta": {
+    "@nanostores/react": { "optional": true }
+  }
+}

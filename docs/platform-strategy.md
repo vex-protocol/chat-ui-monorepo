@@ -79,15 +79,15 @@ Expected shared code: **~70% by line count**.
 
 ## State Management Pattern
 
-`packages/store` defines nanostores atoms per state slice. Each atom wires to `VexClient` events via nanostores' `onMount` hook. Apps install `@nanostores/svelte` or `@nanostores/react` — no custom adapter code needed.
+`packages/store` defines nanostores atoms per state slice. `bootstrap()` wires VexClient real-time events directly to atoms and populates initial state from HTTP. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
 
 ```
 VexClient (@vex-chat/libvex)
     └── event source for
 nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
-    │   wired via onMount() subscriptions to VexClient events
-    ├── @nanostores/svelte           ← apps/desktop: useStore($messages)
-    └── @nanostores/react            ← apps/mobile:  useStore($messages)
+    │   wired in bootstrap() — events update atoms directly
+    ├── apps/desktop (Svelte)        ← $messages native Svelte store — use $messages in templates
+    └── @nanostores/react            ← apps/mobile: useStore($messages)
 ```
 
 **State atoms** in `packages/store`:
@@ -95,44 +95,54 @@ nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
 | Atom | nanostores type | Updated when |
 |---|---|---|
 | `$user` | `atom<IUser \| null>` | login / whoami |
-| `$familiars` | `map<Record<string, IUser>>` | connect, new session |
-| `$messages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming mail |
-| `$groupMessages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming mail |
-| `$sessions` | `map<Record<string, ISession[]>>` | connect, new session event |
-| `$servers` | `map<Record<string, IServer>>` | bootstrap, permission event |
-| `$channels` | `map<Record<string, IChannel[]>>` | bootstrap, permission event |
-| `$permissions` | `map<Record<string, IPermission>>` | bootstrap, permission event |
-| `$devices` | `map<Record<string, IDevice[]>>` | bootstrap, session event |
-| `$onlineLists` | `map<Record<string, IUser[]>>` | server channel presence |
+| `$familiars` | `map<Record<string, IUser>>` | bootstrap (when familiars API exists) |
+| `$messages` | `map<Record<string, IMail[]>>` | bootstrap, incoming mail (DM) |
+| `$groupMessages` | `map<Record<string, IMail[]>>` | bootstrap, incoming mail (group) |
+| `$servers` | `map<Record<string, IServer>>` | bootstrap, serverChange event |
+| `$channels` | `map<Record<string, IChannel[]>>` | bootstrap per server |
+| `$permissions` | `map<Record<string, IPermission>>` | bootstrap per server |
+| `$devices` | `map<Record<string, IDevice[]>>` | bootstrap (when familiars API exists) |
+| `$onlineLists` | `map<Record<string, IUser[]>>` | server channel presence events |
 
-**`packages/store`** — atom definition with VexClient event wiring:
+**`packages/store`** — event wiring lives in `bootstrap()`:
 
 ```ts
-// packages/store/src/messages.ts
-import { map, onMount } from 'nanostores'
-import { $client } from './client'
+// packages/store/src/bootstrap.ts
+export async function bootstrap(serverUrl, deviceID, deviceKey) {
+  const client = VexClient.create(serverUrl, deviceID, deviceKey)
+  $client.set(client)
 
-export const $messages = map<Record<string, IMessage[]>>({})
-
-onMount($messages, () => {
-  const client = $client.get()
-  const off = client.on('mail', (mail) => {
-    const thread = $messages.get()[mail.senderID] ?? []
-    $messages.setKey(mail.senderID, [...thread, mail])
+  client.on('authed', (user) => $user.set(user))
+  client.on('mail', (mail) => {
+    if (mail.group) {
+      const prev = $groupMessages.get()[mail.group] ?? []
+      $groupMessages.setKey(mail.group, [...prev, mail])
+    } else {
+      const me = $user.get()
+      const key = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
+      const prev = $messages.get()[key] ?? []
+      $messages.setKey(key, [...prev, mail])
+    }
   })
-  return off   // nanostores calls this when last subscriber detaches
-})
+  client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
+
+  await client.connect()
+  // ... waterfall HTTP fetch populates $user, $servers, $channels
+}
 ```
 
-**`apps/desktop`** — `@nanostores/svelte`:
+**`apps/desktop`** — nanostores atoms are native Svelte stores (implement `.subscribe()`):
 
-```ts
-import { useStore } from '@nanostores/svelte'
-import { $messages } from '@vex-chat/store'
+```svelte
+<script>
+  // apps/desktop/src/lib/store/index.ts re-exports without $ prefix:
+  // export { $messages as messages, $user as user } from '@vex-chat/store'
+  import { messages, user } from '$lib/store'
+</script>
 
-// In .svelte component
-const messages = useStore($messages)
-// $messages['senderID'] is reactive — Svelte auto-subscribes
+{#each $messages[currentUserID] ?? [] as mail}
+  <!-- $messages = Svelte auto-subscribed value of the `messages` atom -->
+{/each}
 ```
 
 **`apps/mobile`** — `@nanostores/react`:
@@ -146,7 +156,7 @@ const messages = useStore($messages)
 // Re-renders only when atom changes — no Context, no Redux
 ```
 
-> **Why nanostores?** 265–800 bytes. Zero dependencies. Official `@nanostores/svelte` and `@nanostores/react` adapters maintained by the nanostores team. `onMount` cleanly wires external event emitters (VexClient) with automatic cleanup on last-subscriber-detach. Used by Astro for cross-framework state. Eliminates the custom EventEmitter VexStore class and hand-rolled adapter boilerplate entirely.
+> **Why nanostores?** 265–800 bytes. Zero dependencies. nanostores atoms implement the Svelte store contract (`.subscribe()`) so no adapter package is needed for Svelte — atoms work directly with the `$` reactive syntax. `@nanostores/react` provides `useStore()` backed by `useSyncExternalStore`. Used by Astro for cross-framework state. Eliminates the custom EventEmitter VexStore class and hand-rolled adapter boilerplate entirely.
 
 > **No client-side pre-validation.** `VexClient` methods return typed discriminated union results (`{ ok: false, code: 'USERNAME_TAKEN' }`). The UI renders these directly. Duplicating server rules client-side creates drift — avoided by design.
 
