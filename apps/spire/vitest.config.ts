@@ -11,6 +11,7 @@ export default defineConfig({
       '#devices': new URL('./src/devices', import.meta.url).pathname,
       '#utils': new URL('./src/utils', import.meta.url).pathname,
       '#config': new URL('./src/config.js', import.meta.url).pathname,
+      '#openapi': new URL('./src/openapi.js', import.meta.url).pathname,
       '#errors': new URL('./src/errors.js', import.meta.url).pathname,
       '#test': new URL('./test', import.meta.url).pathname,
     },
