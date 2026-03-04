@@ -1,11 +1,15 @@
 /**
  * Domain error classes for apps/spire.
  *
- * Service functions throw these; Express error middleware maps them to HTTP status codes.
- * Route handlers never inspect error.message strings — they use instanceof checks.
+ * Service functions throw these; Express error middleware reads statusCode from AppError
+ * to set the HTTP status without a parallel instanceof chain.
  */
 
-export class ConflictError extends Error {
+export abstract class AppError extends Error {
+  abstract readonly statusCode: number
+}
+
+export class ConflictError extends AppError {
   readonly statusCode = 409
   constructor(message = 'Conflict') {
     super(message)
@@ -13,7 +17,7 @@ export class ConflictError extends Error {
   }
 }
 
-export class ValidationError extends Error {
+export class ValidationError extends AppError {
   readonly statusCode = 400
   constructor(message = 'Validation failed') {
     super(message)
@@ -21,7 +25,7 @@ export class ValidationError extends Error {
   }
 }
 
-export class NotFoundError extends Error {
+export class NotFoundError extends AppError {
   readonly statusCode = 404
   constructor(message = 'Not found') {
     super(message)
@@ -29,7 +33,7 @@ export class NotFoundError extends Error {
   }
 }
 
-export class AuthError extends Error {
+export class AuthError extends AppError {
   readonly statusCode = 401
   constructor(message = 'Unauthorized') {
     super(message)
@@ -37,7 +41,7 @@ export class AuthError extends Error {
   }
 }
 
-export class ForbiddenError extends Error {
+export class ForbiddenError extends AppError {
   readonly statusCode = 403
   constructor(message = 'Forbidden') {
     super(message)
