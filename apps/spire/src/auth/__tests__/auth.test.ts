@@ -13,7 +13,7 @@ import {
   registerUser,
   verifyNaClSignature,
   verifyPassword,
-} from '../index.js'
+} from '../auth.service.js'
 
 // ---------------------------------------------------------------------------
 // decodeHex / encodeHex
@@ -117,22 +117,23 @@ describe('createTokenStore', () => {
 // ---------------------------------------------------------------------------
 
 describe('hashPassword / verifyPassword', () => {
-  it('returns hex-encoded hash and salt', async () => {
+  it('returns an argon2id PHC-format hash string', async () => {
     const result = await hashPassword('password')
-    expect(result.hash).toMatch(/^[0-9a-f]+$/)
-    expect(result.salt).toMatch(/^[0-9a-f]+$/)
+    // argon2id embeds salt+params inside the hash (PHC format): $argon2id$v=19$m=...$<salt>$<hash>
+    expect(result.hash).toMatch(/^\$argon2id\$/)
   })
 
-  it('hash is 32 bytes (64 hex chars) — matches upstream PBKDF2 output length', async () => {
+  it('hash contains OWASP-recommended parameters (m=19MiB, t=2, p=1)', async () => {
     const { hash } = await hashPassword('password')
-    expect(hash).toHaveLength(64)
+    expect(hash).toContain('m=19456')
+    expect(hash).toContain('t=2')
+    expect(hash).toContain('p=1')
   })
 
-  it('same password produces different hashes (random salt)', async () => {
+  it('same password produces different hashes (random salt embedded by argon2)', async () => {
     const a = await hashPassword('password')
     const b = await hashPassword('password')
-    expect(a.hash).not.toBe(b.hash)
-    expect(a.salt).not.toBe(b.salt)
+    expect(a.hash).not.toBe(b.hash) // different embedded salts → different outputs
   })
 
   it('verifyPassword returns true for the correct password', async () => {
@@ -185,7 +186,7 @@ describe('registerUser', () => {
     await registerUser(db, regKey, payload)
     const row = await db.selectFrom('users').where('username', '=', 'alice').selectAll().executeTakeFirst()
     expect(row?.passwordHash).not.toBe('password123')
-    expect(row?.passwordHash).toHaveLength(64) // 32 bytes hex
+    expect(row?.passwordHash).toMatch(/^\$argon2id\$/) // argon2id PHC format, never plaintext
     expect(row?.passwordSalt.length).toBeGreaterThan(0)
   })
 

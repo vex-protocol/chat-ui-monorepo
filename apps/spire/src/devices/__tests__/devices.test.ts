@@ -10,7 +10,7 @@ import {
   retrieveDevice,
   retrieveDeviceBySignKey,
   retrieveUserDeviceList,
-} from '../index.js'
+} from '../devices.service.js'
 
 // ---------------------------------------------------------------------------
 // createDevice

@@ -2,6 +2,13 @@
   "name": "@vex-chat/spire",
   "version": "1.0.0",
   "type": "module",
+  "imports": {
+    "#db/*": "./src/db/*.js",
+    "#auth/*": "./src/auth/*.js",
+    "#devices/*": "./src/devices/*.js",
+    "#errors": "./src/errors.js",
+    "#test/*": "./test/*.js"
+  },
   "scripts": {
     "dev": "node --watch src/index.ts",
     "test": "vitest run",
@@ -9,6 +16,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "argon2": "^0.44.0",
     "better-sqlite3": "catalog:",
     "express": "^5.2.1",
     "jose": "^5.0.0",

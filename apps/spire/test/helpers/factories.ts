@@ -9,9 +9,9 @@
 import type { Kysely } from 'kysely'
 import nacl from 'tweetnacl'
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid'
-import type { Database } from '../../src/db/types.js'
-import type { IActionToken, RegistrationPayload } from '../../src/auth/index.js'
-import type { DevicePayload } from '../../src/devices/index.js'
+import type { Database } from '#db/types.js'
+import type { IActionToken, RegistrationPayload } from '#auth/auth.service.js'
+import type { DevicePayload } from '#devices/devices.service.js'
 
 /** Lowercase hex encode — avoids depending on auth stubs. */
 function hexEncode(bytes: Uint8Array): string {
