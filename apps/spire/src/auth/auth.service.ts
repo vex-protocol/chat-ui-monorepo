@@ -1,17 +1,23 @@
-import crypto from 'node:crypto'
-import { promisify } from 'node:util'
+import argon2 from 'argon2'
 import nacl from 'tweetnacl'
 import { SignJWT } from 'jose'
 import { v4 as uuidv4, stringify as uuidStringify } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database } from '../db/types.js'
-import { ConflictError, ValidationError } from '../errors.js'
-import type { RegistrationPayload, CensoredUser } from './schemas.js'
-export type { RegistrationPayload, CensoredUser } from './schemas.js'
-export { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema } from './schemas.js'
+import type { Database } from '#db/types.js'
+import { ConflictError, ValidationError } from '#errors'
+import type { RegistrationPayload, CensoredUser } from './auth.schemas.js'
+export type { RegistrationPayload, CensoredUser } from './auth.schemas.js'
+export { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema } from './auth.schemas.js'
 
-const pbkdf2 = promisify(crypto.pbkdf2)
 const TOKEN_EXPIRY = 10 * 60 * 1000 // 10 minutes in ms
+
+// argon2id parameters per OWASP 2025 recommendation (m=19MiB, t=2, p=1)
+const ARGON2_OPTIONS: argon2.Options = {
+  type: argon2.argon2id,
+  memoryCost: 19 * 1024, // 19 MiB
+  timeCost: 2,
+  parallelism: 1,
+}
 
 // ---------------------------------------------------------------------------
 // Token types
@@ -113,31 +119,29 @@ export function createTokenStore(): ITokenStore {
 // ---------------------------------------------------------------------------
 
 export interface PasswordHash {
-  hash: string  // hex-encoded 32-byte PBKDF2-SHA512 output
-  salt: string  // hex-encoded random salt
+  hash: string  // argon2id PHC format string
+  salt: string  // 'argon2id' placeholder — salt is embedded in the hash string
 }
 
-/** PBKDF2-SHA512, 1000 iterations, 32-byte output. Generates a random salt per call. */
+/**
+ * Hashes a password with argon2id (OWASP 2025 recommended: m=19MiB, t=2, p=1).
+ * argon2 embeds the salt in the hash string — `salt` is returned separately
+ * only for schema compatibility with the `passwordSalt` column.
+ */
 export async function hashPassword(password: string): Promise<PasswordHash> {
-  const saltBytes = crypto.randomBytes(16)
-  const hashBytes = await pbkdf2(password, saltBytes, 1000, 32, 'sha512')
-  return {
-    hash: hashBytes.toString('hex'),
-    salt: saltBytes.toString('hex'),
-  }
+  const hash = await argon2.hash(password, ARGON2_OPTIONS)
+  // argon2 encodes the salt inside the hash string (PHC format).
+  // We store a placeholder salt so the DB column stays non-null.
+  return { hash, salt: 'argon2id' }
 }
 
-/** Returns true if the password matches the stored hash+salt. */
+/** Returns true if the password matches the stored argon2id hash. */
 export async function verifyPassword(
   password: string,
   hash: string,
-  salt: string,
+  _salt: string,
 ): Promise<boolean> {
-  const saltBytes = Buffer.from(salt, 'hex')
-  const hashBytes = await pbkdf2(password, saltBytes, 1000, 32, 'sha512')
-  const expected = Buffer.from(hash, 'hex')
-  if (hashBytes.length !== expected.length) return false
-  return crypto.timingSafeEqual(hashBytes, expected)
+  return argon2.verify(hash, password)
 }
 
 // ---------------------------------------------------------------------------
