@@ -33,7 +33,9 @@ packages/types/src/
   index.ts      — barrel export
   user.ts       — IUser, IRegistrationPayload, ILoginBody
   device.ts     — IDevice, IDevicePayload, IKeyBundle, IPreKey, IOneTimeKey
-  mail.ts       — IMail (wire format: nonce, cipher, header, mailType, …)
+  mail.ts       — IMail (wire format — internal to libvex, never exposed to apps)
+                  DecryptedMail (what apps see: mailID, authorID, readerID, group,
+                                 mailType, time, content: string, extra, forward)
   server.ts     — IServer, IChannel, IPermission, IInvite
   token.ts      — TokenType, ALL_TOKEN_TYPES, IActionToken, ITokenStore
 ```
@@ -59,9 +61,9 @@ packages/types/src/
 
 ## `packages/crypto` — `@vex-chat/crypto`
 
-**Dependency on `tweetnacl` always. `ed2curve` + `futoin-hkdf` only for `session.ts`.**
+**Dependency on `@noble/curves` + `@noble/hashes` always. `@noble/ciphers` only for `box.ts`.**
 
-Extracted from `apps/spire/src/auth/auth.crypto.ts` (hex encoding, NaCl signature verify) and extended with client-side primitives (signing, X3DH session setup).
+Extracted from `apps/spire/src/auth/auth.crypto.ts` (hex encoding, NaCl signature verify) and extended with client-side primitives (signing, X3DH session setup, authenticated encryption).
 
 ### Files
 
@@ -71,7 +73,10 @@ packages/crypto/src/
   encoding.ts    — decodeHex, encodeHex
   nacl.ts        — verifyNaClSignature, verifyDetached
                    signMessage, signDetached, generateSignKeyPair
-  session.ts     — ed2curve conversions, HKDF key derivation (X3DH)
+  session.ts     — ed25519↔x25519 conversions, generateDHKeyPair, dh(), deriveSessionKey (HKDF-SHA256)
+  box.ts         — encryptBox, decryptBox (X25519 + XSalsa20-Poly1305, NaCl box semantics)
+                   encryptSecretBox, decryptSecretBox (symmetric, NaCl secretbox semantics)
+                   generateNonce() — 24 random bytes
 ```
 
 ### What lives where
@@ -86,6 +91,9 @@ packages/crypto/src/
 | `convertPublicKey` / `convertSecretKey` / `convertKeyPair` | `session.ts` | libvex only |
 | `generateDHKeyPair` / `dh` | `session.ts` | libvex only |
 | `deriveSessionKey` (HKDF-SHA256) | `session.ts` | libvex only |
+| `encryptBox` / `decryptBox` | `box.ts` | libvex only |
+| `encryptSecretBox` / `decryptSecretBox` | `box.ts` | libvex only |
+| `generateNonce` | `box.ts` | libvex only |
 
 **Stays in spire only:** `hashPassword` / `verifyPassword` (argon2id, server-only).
 
@@ -126,15 +134,17 @@ packages/crypto/src/
 interface VexEvents {
   ready:        () => void
   authed:       (user: IUser) => void
-  mail:         (mail: IMail) => void
+  mail:         (mail: DecryptedMail) => void  // decrypted — apps never see raw IMail
   serverChange: (server: IServer) => void
   close:        () => void
   error:        (err: Error) => void
 }
 
 class VexClient extends EventEmitter<VexEvents> { ... }
-// client.on('mail', (mail) => ...)  — mail is typed IMail, no cast needed
+// client.on('mail', (mail) => ...)  — mail is typed DecryptedMail, content is plaintext
 ```
+
+> **Architecture decision:** Decryption happens inside the SDK, not the app. `VexClient` receives raw `IMail` frames from the WebSocket, decrypts via `SessionManager`, and emits `DecryptedMail`. Apps (desktop, mobile, bots) only ever see plaintext. Pattern follows Signal (libsignal), Matrix (matrix-js-sdk), and Keybase. Key *storage at rest* (Tauri FS, react-native-keychain) is app-specific and injected via `KeyStore` interface.
 
 #### 2. Async iterator API — alongside EventEmitter
 
@@ -182,11 +192,12 @@ For IntelliSense and generated API documentation.
 
 ```
 packages/libvex/src/
-  index.ts         — barrel: VexClient, VexEvents, error types, helpers
+  index.ts         — barrel: VexClient, VexEvents, DecryptedMail, error types, helpers
   client.ts        — VexClient class (extends EventEmitter<VexEvents>)
   connection.ts    — VexConnection: reconnecting-websocket + NaCl challenge handshake
+  session.ts       — SessionManager: in-memory session key cache, X3DH encrypt/decrypt
   auth.ts          — register(), login(), logout(), whoami(), getToken()
-  mail.ts          — sendMail(), fetchInbox(), mail() async iterator
+  mail.ts          — sendMail(content, recipientDeviceID), fetchInbox(), mail() async iterator
   devices.ts       — listDevices(), fetchKeyBundle()
   servers.ts       — createServer(), listServers(), createChannel()
   http.ts          — typed fetch wrapper: get/post/delete
@@ -213,10 +224,10 @@ class VexClient extends EventEmitter<VexEvents> {
   async whoami(): Promise<IUser>
   async getToken(type: TokenType): Promise<IActionToken>
 
-  // Mail
-  async sendMail(payload: IMail): Promise<SendResult>
-  async fetchInbox(deviceID: string): Promise<IMail[]>
-  mail(): AsyncIterable<IMail>         // real-time stream
+  // Mail — apps use DecryptedMail; IMail wire format is internal to libvex
+  async sendMail(content: string, recipientDeviceID: string): Promise<SendResult>
+  async fetchInbox(deviceID: string): Promise<DecryptedMail[]>
+  mail(): AsyncIterable<DecryptedMail>   // real-time stream, decrypted
 
   // Devices
   async listDevices(userID: string): Promise<IDevice[]>
@@ -294,8 +305,8 @@ All state is nanostores `atom()` or `map()` — plain values, no framework react
 |---|---|---|
 | `$user` | `atom<IUser \| null>` | — |
 | `$familiars` | `map<Record<string, IUser>>` | userID |
-| `$messages` | `map<Record<string, IMail[]>>` | other party's userID |
-| `$groupMessages` | `map<Record<string, IMail[]>>` | channelID |
+| `$messages` | `map<Record<string, DecryptedMail[]>>` | other party's userID |
+| `$groupMessages` | `map<Record<string, DecryptedMail[]>>` | channelID |
 | `$servers` | `map<Record<string, IServer>>` | serverID |
 | `$channels` | `map<Record<string, IChannel[]>>` | serverID |
 | `$permissions` | `map<Record<string, IPermission>>` | permissionID |
