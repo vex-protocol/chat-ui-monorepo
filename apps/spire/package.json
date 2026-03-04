@@ -6,6 +6,8 @@
     "#db/*": "./src/db/*.js",
     "#auth/*": "./src/auth/*.js",
     "#devices/*": "./src/devices/*.js",
+    "#keys/*": "./src/keys/*.js",
+    "#ws/*": "./src/ws/*.js",
     "#utils/*": "./src/utils/*.js",
     "#config": "./src/config.js",
     "#openapi": "./src/openapi.js",
