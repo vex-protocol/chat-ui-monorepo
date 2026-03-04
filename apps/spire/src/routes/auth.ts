@@ -8,7 +8,6 @@ import type { Database } from '#db/types.js'
 import {
   registerUser,
   loginUser,
-  issueJWT,
   verifyNaClSignature,
   decodeHex,
   RegistrationPayloadSchema,
@@ -18,6 +17,7 @@ import {
   type ITokenStore,
   type TokenType,
 } from '#auth/auth.service.js'
+import { issueJWT } from '#auth/auth.jwt.js'
 import { validateBody } from '#middleware/validate.js'
 import { createCheckAuth } from '#middleware/checkAuth.js'
 import type { RequestHandler } from 'express'

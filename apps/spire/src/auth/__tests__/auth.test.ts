@@ -4,16 +4,8 @@ import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid'
 import { decodeJwt } from 'jose'
 import { useDb } from '#test/helpers/db.js'
 import { makeRegistrationPayload } from '#test/helpers/factories.js'
-import {
-  createTokenStore,
-  decodeHex,
-  encodeHex,
-  hashPassword,
-  loginUser,
-  registerUser,
-  verifyNaClSignature,
-  verifyPassword,
-} from '../auth.service.js'
+import { createTokenStore, loginUser, registerUser } from '../auth.service.js'
+import { decodeHex, encodeHex, hashPassword, verifyNaClSignature, verifyPassword } from '../auth.crypto.js'
 
 // ---------------------------------------------------------------------------
 // decodeHex / encodeHex

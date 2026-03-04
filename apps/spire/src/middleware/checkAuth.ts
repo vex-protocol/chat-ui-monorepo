@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express'
-import { verifyJWT } from '#auth/auth.service.js'
+import { verifyJWT } from '#auth/auth.jwt.js'
 import { AuthError } from '#errors'
 
 /**
