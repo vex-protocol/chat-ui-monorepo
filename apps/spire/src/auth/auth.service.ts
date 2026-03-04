@@ -138,11 +138,7 @@ export async function hashPassword(password: string): Promise<PasswordHash> {
 }
 
 /** Returns true if the password matches the stored argon2id hash. */
-export async function verifyPassword(
-  password: string,
-  hash: string,
-  _salt: string,
-): Promise<boolean> {
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return argon2.verify(hash, password)
 }
 
@@ -260,7 +256,7 @@ export async function loginUser(
 
   if (!row) return null
 
-  const valid = await verifyPassword(password, row.passwordHash, row.passwordSalt)
+  const valid = await verifyPassword(password, row.passwordHash)
   if (!valid) return null
 
   const token = await new SignJWT({ user: censorUser(row) })
