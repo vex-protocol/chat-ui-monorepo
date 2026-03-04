@@ -9,7 +9,7 @@ import {
   createChannel,
   getChannels,
 } from '#servers/servers.service.ts'
-import { CreateServerSchema, CreateChannelSchema } from '#servers/servers.schemas.ts'
+import { CreateServerSchema } from '#servers/servers.schemas.ts'
 import {
   createPermission,
   getPermissionsByResource,

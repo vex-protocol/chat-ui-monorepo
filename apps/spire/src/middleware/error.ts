@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import { AppError } from '#errors'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function errorMiddleware(err: Error, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof AppError) {
     res.status(err.statusCode).json({ error: err.message })
