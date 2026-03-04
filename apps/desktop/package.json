@@ -24,6 +24,8 @@
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-opener": "^2.5.3",
+    "@vex-chat/store": "workspace:*",
+    "@vex-chat/types": "workspace:*",
     "svelte-spa-router": "^4.0.1"
   }
 }

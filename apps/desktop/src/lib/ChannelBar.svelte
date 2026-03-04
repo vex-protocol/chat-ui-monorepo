@@ -1,9 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+  import type { IChannel } from '@vex-chat/types'
 
-  interface Channel { id: string; name: string; unread?: number }
-
-  // Placeholder — replaced by $channels atom in vex-chat-6m0
   let {
     serverName = '',
     serverID = '',
@@ -12,7 +10,7 @@
   }: {
     serverName?: string
     serverID?: string
-    channels?: Channel[]
+    channels?: IChannel[]
     activeChannelID?: string
   } = $props()
 
@@ -28,17 +26,14 @@
 
   <ul class="channel-bar__list">
     <li class="channel-bar__section-label">Text Channels</li>
-    {#each channels as channel (channel.id)}
+    {#each channels as channel (channel.channelID)}
       <li>
         <button
-          class="channel-bar__item {activeChannelID === channel.id ? 'channel-bar__item--active' : ''}"
-          onclick={() => navToChannel(channel.id)}
+          class="channel-bar__item {activeChannelID === channel.channelID ? 'channel-bar__item--active' : ''}"
+          onclick={() => navToChannel(channel.channelID)}
         >
           <span class="channel-bar__prefix">#</span>
           <span class="channel-bar__name">{channel.name}</span>
-          {#if channel.unread && channel.unread > 0}
-            <span class="channel-bar__badge">{channel.unread}</span>
-          {/if}
         </button>
       </li>
     {/each}

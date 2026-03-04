@@ -1,10 +1,8 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+  import type { IServer } from '@vex-chat/types'
 
-  interface Server { id: string; name: string; initial: string }
-
-  // Placeholder — replaced by $servers atom in vex-chat-6m0
-  let { servers = [], activeServerID = '' }: { servers?: Server[]; activeServerID?: string } = $props()
+  let { serverList = [], activeServerID = '' }: { serverList?: IServer[]; activeServerID?: string } = $props()
 
   function navToServer(id: string) {
     push(`/server/${id}/text/general`)
@@ -13,15 +11,15 @@
 
 <nav class="server-bar" aria-label="Servers">
   <ul class="server-bar__list">
-    {#each servers as server (server.id)}
+    {#each serverList as server (server.serverID)}
       <li>
         <button
-          class="server-bar__item {activeServerID === server.id ? 'server-bar__item--active' : ''}"
-          onclick={() => navToServer(server.id)}
+          class="server-bar__item {activeServerID === server.serverID ? 'server-bar__item--active' : ''}"
+          onclick={() => navToServer(server.serverID)}
           title={server.name}
           aria-label={server.name}
         >
-          {server.initial}
+          {server.name[0]?.toUpperCase() ?? '?'}
         </button>
       </li>
     {/each}

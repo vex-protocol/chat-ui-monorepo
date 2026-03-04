@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Router, { location } from 'svelte-spa-router'
+  import Router, { location, push } from 'svelte-spa-router'
   import TitleBar from './lib/TitleBar.svelte'
   import ServerBar from './lib/ServerBar.svelte'
   import ChannelBar from './lib/ChannelBar.svelte'
@@ -10,6 +10,8 @@
   import Register from './routes/Register.svelte'
   import Messaging from './routes/Messaging.svelte'
   import ServerChannel from './routes/ServerChannel.svelte'
+
+  import { user, keyReplaced, servers, channels } from './lib/store/index.js'
 
   const routes = {
     '/':                            Launch,
@@ -28,6 +30,18 @@
   // Derive active server/channel from URL
   const activeServerID = $derived($location.startsWith('/server/') ? $location.split('/')[2] ?? '' : '')
   const activeChannelID = $derived($location.startsWith('/server/') ? $location.split('/')[3] ?? '' : '')
+
+  // Derive server list and channel list from atoms
+  const serverList = $derived(Object.values($servers))
+  const activeChannels = $derived(activeServerID ? ($channels[activeServerID] ?? []) : [])
+  const activeServerName = $derived($servers[activeServerID]?.name ?? 'Server')
+
+  // Handle key replaced — server rotated our key; force re-login
+  $effect(() => {
+    if ($keyReplaced) {
+      push('/login')
+    }
+  })
 </script>
 
 <div class="app">
@@ -36,12 +50,10 @@
   <div class="app__body">
     {#if !isAuthRoute}
       <div class="app__sidebar">
-        <!-- vex-chat-6m0: replace placeholder with $servers atom -->
-        <ServerBar activeServerID={activeServerID} />
+        <ServerBar {serverList} activeServerID={activeServerID} />
 
         {#if activeServerID}
-          <!-- vex-chat-6m0: replace with $channels[activeServerID] atom -->
-          <ChannelBar serverID={activeServerID} serverName="Server" activeChannelID={activeChannelID} />
+          <ChannelBar serverID={activeServerID} serverName={activeServerName} channels={activeChannels} activeChannelID={activeChannelID} />
         {/if}
       </div>
     {/if}
@@ -57,8 +69,7 @@
   </div>
 
   {#if !isAuthRoute}
-    <!-- vex-chat-6m0: replace with $user atom -->
-    <UserMenu />
+    <UserMenu username={$user?.username ?? ''} userID={$user?.userID ?? ''} />
   {/if}
 </div>
 
