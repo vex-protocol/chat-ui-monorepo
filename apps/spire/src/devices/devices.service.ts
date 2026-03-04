@@ -1,7 +1,6 @@
 import type { Kysely } from 'kysely'
 import { v4 as uuidv4 } from 'uuid'
 import type { Database } from '#db/types.js'
-import { DevicePayloadSchema } from './devices.schemas.js'
 import type { Device, DevicePayload } from './devices.schemas.js'
 export type { Device, DevicePayload } from './devices.schemas.js'
 
@@ -18,8 +17,6 @@ export async function createDevice(
   owner: string,
   payload: DevicePayload,
 ): Promise<Device> {
-  DevicePayloadSchema.parse(payload)
-
   const deviceID = uuidv4()
 
   await db.transaction().execute(async trx => {
