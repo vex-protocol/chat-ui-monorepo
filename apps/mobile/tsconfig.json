@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    // React Native / Expo Metro uses bundler-style resolution
+    // React Native / Metro uses bundler-style resolution (not nodenext — breaks .ios.ts/.android.ts)
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "esnext",
