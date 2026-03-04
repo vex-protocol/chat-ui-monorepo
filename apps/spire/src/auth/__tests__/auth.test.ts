@@ -53,7 +53,7 @@ describe('verifyNaClSignature', () => {
   it('returns null for a tampered signed message', () => {
     const kp = nacl.sign.keyPair()
     const signed = nacl.sign(new Uint8Array([1, 2, 3]), kp.secretKey)
-    signed[70]! ^= 0xff
+    signed[5]! ^= 0xff  // tamper within signature bytes (msg is 3 bytes so signed.length = 67; index 70 was out of bounds)
     expect(verifyNaClSignature(signed, kp.publicKey)).toBeNull()
   })
 })
