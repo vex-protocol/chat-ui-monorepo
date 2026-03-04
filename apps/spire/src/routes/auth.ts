@@ -1,5 +1,6 @@
 import { registry } from '#openapi'
 import { Router } from 'express'
+import { z } from 'zod'
 import { decodeJwt } from 'jose'
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid'
 import type { Kysely } from 'kysely'
@@ -88,8 +89,6 @@ export function createAuthRouter(db: Kysely<Database>, tokenStore: ITokenStore):
 // ---------------------------------------------------------------------------
 // OpenAPI registrations
 // ---------------------------------------------------------------------------
-
-import { z } from 'zod'
 
 const auth = [{ bearerAuth: [] }]
 
