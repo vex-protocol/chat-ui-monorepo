@@ -10,8 +10,7 @@
     "@types/node": "catalog:"
   },
   "dependencies": {
-    "tweetnacl": "catalog:",
-    "ed2curve": "catalog:",
-    "futoin-hkdf": "catalog:"
+    "@noble/curves": "catalog:",
+    "@noble/hashes": "catalog:"
   }
 }

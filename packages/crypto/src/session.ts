@@ -2,23 +2,49 @@
  * Session crypto for X3DH key exchange.
  * Used by libvex clients — not used by the spire server.
  *
- * Depends on ed2curve (Ed25519→Curve25519 conversion) and futoin-hkdf (HKDF key derivation).
+ * All functions use @noble/curves (Ed25519 + X25519) and @noble/hashes (HKDF-SHA256).
+ * Both packages are pure ESM with bundled TypeScript types.
  */
-import nacl from 'tweetnacl'
-import ed2curve from 'ed2curve'
-import hkdf from 'futoin-hkdf'
+import { ed25519, x25519 } from '@noble/curves/ed25519'
+import { hkdf } from '@noble/hashes/hkdf'
+import { sha256 } from '@noble/hashes/sha256'
 
-// ed2curve is a CJS UMD module — only the default export is available in ESM at runtime.
-// Destructure from the default rather than using named imports.
-export const convertPublicKey = ed2curve.convertPublicKey.bind(ed2curve)
-export const convertSecretKey = ed2curve.convertSecretKey.bind(ed2curve)
-export const convertKeyPair = ed2curve.convertKeyPair.bind(ed2curve)
+/** Converts an Ed25519 public key (32 bytes) to a Curve25519/X25519 public key. */
+export function convertPublicKey(ed25519PublicKey: Uint8Array): Uint8Array {
+  return ed25519.utils.toMontgomery(ed25519PublicKey)
+}
+
+/** Converts an Ed25519 private key seed (32 bytes) to a Curve25519/X25519 private key. */
+export function convertSecretKey(ed25519PrivateKey: Uint8Array): Uint8Array {
+  return ed25519.utils.toMontgomerySecret(ed25519PrivateKey)
+}
+
+/** Converts an Ed25519 key pair to a Curve25519/X25519 key pair. */
+export function convertKeyPair(edKeyPair: {
+  publicKey: Uint8Array
+  secretKey: Uint8Array
+}): { publicKey: Uint8Array; secretKey: Uint8Array } {
+  return {
+    publicKey: ed25519.utils.toMontgomery(edKeyPair.publicKey),
+    secretKey: ed25519.utils.toMontgomerySecret(edKeyPair.secretKey),
+  }
+}
 
 /**
- * Generates a new Curve25519 DH key pair for ephemeral use in X3DH.
+ * Generates a new X25519 DH key pair for ephemeral use in X3DH.
  */
-export function generateDHKeyPair(): nacl.BoxKeyPair {
-  return nacl.box.keyPair()
+export function generateDHKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array } {
+  const secretKey = x25519.utils.randomSecretKey()
+  const publicKey = x25519.getPublicKey(secretKey)
+  return { publicKey, secretKey }
+}
+
+/**
+ * Performs a Curve25519/X25519 Diffie-Hellman exchange.
+ * Returns the 32-byte shared secret.
+ */
+export function dh(mySecretKey: Uint8Array, theirPublicKey: Uint8Array): Uint8Array {
+  return x25519.getSharedSecret(mySecretKey, theirPublicKey)
 }
 
 /**
@@ -27,7 +53,7 @@ export function generateDHKeyPair(): nacl.BoxKeyPair {
  * @param ikm    - Input key material (e.g. concatenated DH outputs from X3DH)
  * @param length - Output key length in bytes (default 32)
  * @param info   - Application-specific context string
- * @param salt   - Optional salt; defaults to zero-filled buffer if omitted
+ * @param salt   - Optional salt; defaults to 32 zero bytes if omitted
  */
 export function deriveSessionKey(
   ikm: Uint8Array,
@@ -35,18 +61,7 @@ export function deriveSessionKey(
   info = 'vex-chat-session',
   salt?: Uint8Array,
 ): Uint8Array {
-  const result = hkdf(Buffer.from(ikm), length, {
-    hash: 'SHA-256',
-    info: Buffer.from(info),
-    salt: salt ? Buffer.from(salt) : Buffer.alloc(32, 0),
-  })
-  return new Uint8Array(result)
-}
-
-/**
- * Performs a Curve25519 Diffie-Hellman exchange.
- * Returns the 32-byte shared secret.
- */
-export function dh(mySecretKey: Uint8Array, theirPublicKey: Uint8Array): Uint8Array {
-  return nacl.scalarMult(mySecretKey, theirPublicKey)
+  const infoBytes = new TextEncoder().encode(info)
+  const saltBytes = salt ?? new Uint8Array(32)
+  return hkdf(sha256, ikm, saltBytes, infoBytes, length)
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair } from '@vex-chat/crypto'
 import { useDb } from '#test/helpers/db.ts'
 import { seedUser, seedDevice, makeDevicePayload } from '#test/helpers/factories.ts'
 import { createDevice } from '#devices/devices.service.ts'
@@ -14,7 +14,7 @@ import {
 
 /** Generates a 64 lowercase hex char string (32-byte NaCl public key). */
 function makeHexKey(): string {
-  return Buffer.from(nacl.sign.keyPair().publicKey).toString('hex')
+  return Buffer.from(generateSignKeyPair().publicKey).toString('hex')
 }
 
 /** Generates a valid OTK payload entry. */

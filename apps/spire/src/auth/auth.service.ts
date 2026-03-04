@@ -20,7 +20,7 @@ function censorUser(row: { userID: string; username: string; lastSeen: string })
 /**
  * Creates a user + device + preKey atomically.
  *
- * @param regKey  - Verified NaCl bytes: the result of nacl.sign.open(signed, signKey).
+ * @param regKey  - Verified NaCl bytes: the result of verifyNaClSignature(signed, signKey).
  *                  These are the UUID bytes of the registration token; userID = uuid.stringify(regKey).
  *                  NaCl signature verification is the caller's responsibility (route handler).
  * @param payload - Registration data. Username must match /^\w{3,19}$/.

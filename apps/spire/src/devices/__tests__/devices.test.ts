@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair } from '@vex-chat/crypto'
 import { useDb } from '#test/helpers/db.ts'
 import { makeDevicePayload, seedUser } from '#test/helpers/factories.ts'
 import {
@@ -111,7 +111,7 @@ describe('retrieveDeviceBySignKey', () => {
 
   it('returns null for unknown signKey', async () => {
     const db = await useDb()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     expect(await retrieveDeviceBySignKey(db, Buffer.from(kp.publicKey).toString('hex'))).toBeNull()
   })
 

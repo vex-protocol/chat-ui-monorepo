@@ -7,7 +7,7 @@
  * assertion level rather than the setup level.
  */
 import type { Kysely } from 'kysely'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair, signMessage, verifyNaClSignature } from '@vex-chat/crypto'
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid'
 import type { Database } from '#db/types.ts'
 import type { IActionToken } from '#auth/auth.token-store.ts'
@@ -52,21 +52,21 @@ export async function seedUser(
 
 /**
  * Builds a valid registration payload for a given token and device key pair.
- * regKey is the verified NaCl bytes (what the server gets after nacl.sign.open).
+ * regKey is the verified bytes (what the server gets after verifyNaClSignature).
  *
- * Uses nacl.sign.open directly rather than the verifyNaClSignature stub, so
+ * Uses verifyNaClSignature rather than service stubs, so
  * this helper works even before auth is implemented.
  */
 export function makeRegistrationPayload(
   token: IActionToken,
-  keyPair: nacl.SignKeyPair,
+  keyPair: { publicKey: Uint8Array; secretKey: Uint8Array },
   overrides?: Partial<RegistrationPayload>,
 ): { regKey: Uint8Array; payload: RegistrationPayload } {
   const tokenBytes = uuidParse(token.key) as Uint8Array
-  const signedMessage = nacl.sign(tokenBytes, keyPair.secretKey)
-  const preKeyPair = nacl.sign.keyPair()
-  const preKeySignature = nacl.sign(preKeyPair.publicKey, keyPair.secretKey)
-  const regKey = nacl.sign.open(signedMessage, keyPair.publicKey)!
+  const signedMessage = signMessage(tokenBytes, keyPair.secretKey)
+  const preKeyPair = generateSignKeyPair()
+  const preKeySignature = signMessage(preKeyPair.publicKey, keyPair.secretKey)
+  const regKey = verifyNaClSignature(signedMessage, keyPair.publicKey)!
 
   return {
     regKey,
@@ -98,7 +98,7 @@ export async function seedDevice(
   userID: string,
 ): Promise<{ deviceID: string; signKey: string }> {
   const deviceID = uuidv4()
-  const signKey = hexEncode(nacl.sign.keyPair().publicKey)
+  const signKey = hexEncode(generateSignKeyPair().publicKey)
   await db
     .insertInto('devices')
     .values({ deviceID, signKey, owner: userID, name: 'test-device', lastLogin: null, deleted: 0 })
@@ -111,9 +111,9 @@ export async function seedDevice(
  * Used when adding a device to an existing user.
  */
 export function makeDevicePayload(overrides?: Partial<DevicePayload>): DevicePayload {
-  const kp = nacl.sign.keyPair()
-  const preKeyPair = nacl.sign.keyPair()
-  const preKeySig = nacl.sign(preKeyPair.publicKey, kp.secretKey)
+  const kp = generateSignKeyPair()
+  const preKeyPair = generateSignKeyPair()
+  const preKeySig = signMessage(preKeyPair.publicKey, kp.secretKey)
   return {
     signKey: hexEncode(kp.publicKey),
     preKey: hexEncode(preKeyPair.publicKey),

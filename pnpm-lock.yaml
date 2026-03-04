@@ -6,6 +6,12 @@ settings:
 
 catalogs:
   default:
+    '@noble/curves':
+      specifier: ^1.8.1
+      version: 1.9.7
+    '@noble/hashes':
+      specifier: ^1.7.1
+      version: 1.8.0
     '@types/better-sqlite3':
       specifier: ^7.6.0
       version: 7.6.13
@@ -18,21 +24,12 @@ catalogs:
     better-sqlite3:
       specifier: ^11.0.0
       version: 11.10.0
-    ed2curve:
-      specifier: ^0.3.0
-      version: 0.3.0
     eventemitter3:
       specifier: ^5.0.4
       version: 5.0.4
-    futoin-hkdf:
-      specifier: ^1.5.3
-      version: 1.5.3
     reconnecting-websocket:
       specifier: ^4.4.0
       version: 4.4.0
-    tweetnacl:
-      specifier: ^1.0.3
-      version: 1.0.3
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
@@ -95,9 +92,6 @@ importers:
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
-      tweetnacl:
-        specifier: 'catalog:'
-        version: 1.0.3
       uuid:
         specifier: ^11.0.0
         version: 11.1.0
@@ -171,15 +165,12 @@ importers:
 
   packages/crypto:
     dependencies:
-      ed2curve:
+      '@noble/curves':
         specifier: 'catalog:'
-        version: 0.3.0
-      futoin-hkdf:
+        version: 1.9.7
+      '@noble/hashes':
         specifier: 'catalog:'
-        version: 1.5.3
-      tweetnacl:
-        specifier: 'catalog:'
-        version: 1.0.3
+        version: 1.8.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -500,6 +491,10 @@ packages:
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
+
+  '@noble/curves@1.9.7':
+    resolution: {integrity: sha512-gbKGcRUYIjA3/zCCNaWDciTMFI0dCkvou3TL8Zmy5Nc7sJ47a0jtOeZoTaMxkuqRo9cRhjOdZJXegxYE5FN/xw==}
+    engines: {node: ^14.21.3 || >=16}
 
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
@@ -1427,9 +1422,6 @@ packages:
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
 
-  ed2curve@0.3.0:
-    resolution: {integrity: sha512-8w2fmmq3hv9rCrcI7g9hms2pMunQr1JINfcjwR9tAyZqhtyaMN991lF/ZfHfr5tzZQ8c7y7aBgZbjfbd0fjFwQ==}
-
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
@@ -1756,10 +1748,6 @@ packages:
 
   functions-have-names@1.2.3:
     resolution: {integrity: sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ==}
-
-  futoin-hkdf@1.5.3:
-    resolution: {integrity: sha512-SewY5KdMpaoCeh7jachEWFsh1nNlaDjNHZXWqL5IGwtpEYHTgkr2+AMCgNwKWkcc0wpSYrZfR7he4WdmHFtDxQ==}
-    engines: {node: '>=8'}
 
   generator-function@2.0.1:
     resolution: {integrity: sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g==}
@@ -2835,9 +2823,6 @@ packages:
   tunnel-agent@0.6.0:
     resolution: {integrity: sha512-McnNiV1l8RYeY8tBgEpuodCC1mLUdbSN+CYBL7kJsJNInOP8UjDDEwdk6Mw60vdLLrr5NHKZhMAOSrR2NZuQ+w==}
 
-  tweetnacl@1.0.3:
-    resolution: {integrity: sha512-6rt+RN7aOi1nGMyC4Xa5DdYiukl2UWCbcJft7YhxReBGQD7OAM8Pbxw6YMo4r2diNEA8FEmu32YOn9rhaiE5yw==}
-
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -3302,6 +3287,10 @@ snapshots:
       '@emnapi/runtime': 1.8.1
       '@tybys/wasm-util': 0.10.1
     optional: true
+
+  '@noble/curves@1.9.7':
+    dependencies:
+      '@noble/hashes': 1.8.0
 
   '@noble/hashes@1.8.0': {}
 
@@ -4342,10 +4331,6 @@ snapshots:
 
   eastasianwidth@0.2.0: {}
 
-  ed2curve@0.3.0:
-    dependencies:
-      tweetnacl: 1.0.3
-
   ee-first@1.1.1: {}
 
   emoji-regex@10.6.0: {}
@@ -4798,8 +4783,6 @@ snapshots:
       is-callable: 1.2.7
 
   functions-have-names@1.2.3: {}
-
-  futoin-hkdf@1.5.3: {}
 
   generator-function@2.0.1: {}
 
@@ -5951,8 +5934,6 @@ snapshots:
   tunnel-agent@0.6.0:
     dependencies:
       safe-buffer: 5.2.1
-
-  tweetnacl@1.0.3: {}
 
   type-check@0.4.0:
     dependencies:
