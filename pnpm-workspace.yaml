@@ -8,11 +8,10 @@ onlyBuiltDependencies:
   - esbuild
 
 catalog:
-  tweetnacl: ^1.0.3
+  '@noble/curves': ^1.8.1
+  '@noble/hashes': ^1.7.1
   eventemitter3: ^5.0.4
   reconnecting-websocket: ^4.4.0
-  ed2curve: ^0.3.0
-  futoin-hkdf: ^1.5.3
   typescript: ^5.9.3
   '@types/node':  ^25.3.3
   better-sqlite3: "^11.0.0"

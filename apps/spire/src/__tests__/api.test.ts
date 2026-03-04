@@ -11,7 +11,7 @@
  * IP addresses (127.0.0.1) in test environments.
  */
 import supertest from 'supertest'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair, signMessage } from '@vex-chat/crypto'
 import express from 'express'
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
@@ -81,7 +81,7 @@ async function makeEnv(): Promise<TestEnv> {
  * requests, and returns identifying data.
  */
 async function registerUser(env: TestEnv, overrides?: { username?: string }) {
-  const kp = nacl.sign.keyPair()
+  const kp = generateSignKeyPair()
   const token = env.tokenStore.create('register')
   const { payload } = makeRegistrationPayload(token, kp, overrides)
 
@@ -112,7 +112,7 @@ describe('POST /register', () => {
     const env = await makeEnv()
     await registerUser(env, { username: 'alice' })
 
-    const kp2 = nacl.sign.keyPair()
+    const kp2 = generateSignKeyPair()
     const token2 = env.tokenStore.create('register')
     const { payload: payload2 } = makeRegistrationPayload(token2, kp2, { username: 'alice' })
     await supertest(env.app).post('/register').send(payload2).expect(409)
@@ -278,8 +278,8 @@ describe('POST /device/:id/otk', () => {
 
     // Generate 5 OTKs signed with the registration signing key
     const otks = Array.from({ length: 5 }, (_, i) => {
-      const otkPair = nacl.sign.keyPair()
-      const sig = nacl.sign(otkPair.publicKey, user.kp.secretKey)
+      const otkPair = generateSignKeyPair()
+      const sig = signMessage(otkPair.publicKey, user.kp.secretKey)
       return {
         publicKey: Buffer.from(otkPair.publicKey).toString('hex'),
         signature: Buffer.from(sig).toString('hex'),

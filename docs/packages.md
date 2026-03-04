@@ -81,10 +81,19 @@ packages/crypto/src/
 | `verifyDetached` | `nacl.ts` | spire (ws handshake) |
 | `signMessage` / `signDetached` | `nacl.ts` | libvex |
 | `generateSignKeyPair` | `nacl.ts` | libvex |
-| `deriveSessionKey` (HKDF) | `session.ts` | libvex only |
-| `ed25519ToCurve25519` | `session.ts` | libvex only |
+| `convertPublicKey` / `convertSecretKey` / `convertKeyPair` | `session.ts` | libvex only |
+| `generateDHKeyPair` / `dh` | `session.ts` | libvex only |
+| `deriveSessionKey` (HKDF-SHA256) | `session.ts` | libvex only |
 
 **Stays in spire only:** `hashPassword` / `verifyPassword` (argon2id, server-only).
+
+### Library rationale
+
+| Old | New | Why |
+|---|---|---|
+| `tweetnacl` (CJS, 6yr old) | `@noble/curves/ed25519` | ESM-native, Cure53 audited Sept 2024, 9.7M weekly downloads |
+| `ed2curve` (CJS UMD, broken named exports in ESM) | `ed25519.utils.toMontgomery` / `toMontgomerySecret` | Built into `@noble/curves` — no separate package |
+| `futoin-hkdf` (CJS) | `@noble/hashes/hkdf` | ESM-native, zero deps, 29.9M weekly downloads |
 
 ### `package.json` shape
 
@@ -95,9 +104,8 @@ packages/crypto/src/
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "tweetnacl": "catalog:",
-    "ed2curve": "catalog:",
-    "futoin-hkdf": "catalog:"
+    "@noble/curves": "catalog:",
+    "@noble/hashes": "catalog:"
   }
 }
 ```

@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from 'vitest'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair, signMessage, verifyNaClSignature } from '@vex-chat/crypto'
 import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid'
 import { decodeJwt } from 'jose'
 import { useDb } from '#test/helpers/db.ts'
@@ -30,22 +30,22 @@ describe('hex utilities', () => {
 
 describe('verifyNaClSignature', () => {
   it('returns the original message for a valid signature', () => {
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const msg = new Uint8Array([1, 2, 3, 4])
-    const signed = nacl.sign(msg, kp.secretKey)
+    const signed = signMessage(msg, kp.secretKey)
     expect(verifyNaClSignature(signed, kp.publicKey)).toEqual(msg)
   })
 
   it('returns null for a signature from the wrong key', () => {
-    const kp = nacl.sign.keyPair()
-    const wrong = nacl.sign.keyPair()
-    const signed = nacl.sign(new Uint8Array([1, 2, 3]), kp.secretKey)
+    const kp = generateSignKeyPair()
+    const wrong = generateSignKeyPair()
+    const signed = signMessage(new Uint8Array([1, 2, 3]), kp.secretKey)
     expect(verifyNaClSignature(signed, wrong.publicKey)).toBeNull()
   })
 
   it('returns null for a tampered signed message', () => {
-    const kp = nacl.sign.keyPair()
-    const signed = nacl.sign(new Uint8Array([1, 2, 3]), kp.secretKey)
+    const kp = generateSignKeyPair()
+    const signed = signMessage(new Uint8Array([1, 2, 3]), kp.secretKey)
     signed[5]! ^= 0xff  // tamper within signature bytes (msg is 3 bytes so signed.length = 67; index 70 was out of bounds)
     expect(verifyNaClSignature(signed, kp.publicKey)).toBeNull()
   })
@@ -148,7 +148,7 @@ describe('registerUser', () => {
   it('creates a user whose userID equals uuid.stringify(regKey)', async () => {
     const db = await useDb()
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const token = store.create('register')
     const { regKey, payload } = makeRegistrationPayload(token, kp)
 
@@ -160,7 +160,7 @@ describe('registerUser', () => {
   it('userID equals the original registration token UUID — derived from client crypto', async () => {
     const db = await useDb()
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const token = store.create('register')
     const { regKey, payload } = makeRegistrationPayload(token, kp)
 
@@ -172,7 +172,7 @@ describe('registerUser', () => {
   it('stores password as hash+salt — never plaintext', async () => {
     const db = await useDb()
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const token = store.create('register')
     const { regKey, payload } = makeRegistrationPayload(token, kp)
 
@@ -185,7 +185,7 @@ describe('registerUser', () => {
   it('creates a device and preKey atomically with the user', async () => {
     const db = await useDb()
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const token = store.create('register')
     const { regKey, payload } = makeRegistrationPayload(token, kp)
 
@@ -207,12 +207,12 @@ describe('registerUser', () => {
     const db = await useDb()
     const store = createTokenStore()
 
-    const kp1 = nacl.sign.keyPair()
+    const kp1 = generateSignKeyPair()
     const t1 = store.create('register')
     const { regKey: rk1, payload: p1 } = makeRegistrationPayload(t1, kp1)
     await registerUser(db, rk1, p1)
 
-    const kp2 = nacl.sign.keyPair()
+    const kp2 = generateSignKeyPair()
     const t2 = store.create('register')
     const { regKey: rk2, payload: p2 } = makeRegistrationPayload(t2, kp2, { username: 'alice' })
     await expect(registerUser(db, rk2, p2)).rejects.toThrow()
@@ -221,7 +221,7 @@ describe('registerUser', () => {
   it('rejects duplicate signKey', async () => {
     const db = await useDb()
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair() // same key pair used twice
+    const kp = generateSignKeyPair() // same key pair used twice
 
     const t1 = store.create('register')
     const { regKey: rk1, payload: p1 } = makeRegistrationPayload(t1, kp, { username: 'alice' })
@@ -242,7 +242,7 @@ describe('registerUser', () => {
     const db = await useDb()
     const store = createTokenStore()
     const t = store.create('register')
-    const { regKey, payload } = makeRegistrationPayload(t, nacl.sign.keyPair(), { username })
+    const { regKey, payload } = makeRegistrationPayload(t, generateSignKeyPair(), { username })
     await expect(registerUser(db, regKey, payload)).rejects.toThrow()
   })
 })
@@ -254,7 +254,7 @@ describe('registerUser', () => {
 describe('loginUser', () => {
   async function seedUser(db: Awaited<ReturnType<typeof useDb>>) {
     const store = createTokenStore()
-    const kp = nacl.sign.keyPair()
+    const kp = generateSignKeyPair()
     const token = store.create('register')
     const { regKey, payload } = makeRegistrationPayload(token, kp)
     return registerUser(db, regKey, payload)

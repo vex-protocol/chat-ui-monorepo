@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
-import nacl from 'tweetnacl'
+import { generateSignKeyPair, signMessage, signDetached } from '@vex-chat/crypto'
 import type { Kysely } from 'kysely'
 import { useDb } from '#test/helpers/db.ts'
 import { seedUser } from '#test/helpers/factories.ts'
@@ -27,9 +27,9 @@ class MockWebSocket extends EventEmitter implements WsLike {
 
 /** Generates a device payload while retaining the signing key pair. */
 function makeDeviceSetup() {
-  const kp = nacl.sign.keyPair()
-  const preKp = nacl.sign.keyPair()
-  const preKeySig = nacl.sign(preKp.publicKey, kp.secretKey)
+  const kp = generateSignKeyPair()
+  const preKp = generateSignKeyPair()
+  const preKeySig = signMessage(preKp.publicKey, kp.secretKey)
   const payload: DevicePayload = {
     signKey: Buffer.from(kp.publicKey).toString('hex'),
     preKey: Buffer.from(preKp.publicKey).toString('hex'),
@@ -64,7 +64,7 @@ async function connectAndAuth(
 
   // Capture challenge sent by server (first ws.send call)
   const challenge = ws.send.mock.calls[0]![0] as Buffer
-  const sig = nacl.sign.detached(challenge, kp.secretKey)
+  const sig = signDetached(challenge, kp.secretKey)
 
   ws.emit(
     'message',
@@ -178,7 +178,7 @@ describe('authentication', () => {
     manager.handleConnection(ws, db)
 
     const challenge = ws.send.mock.calls[0]![0] as Buffer
-    const sig = nacl.sign.detached(challenge, kp.secretKey)
+    const sig = signDetached(challenge, kp.secretKey)
 
     // Advance clock past the 30-second auth window
     vi.advanceTimersByTime(30_001)
