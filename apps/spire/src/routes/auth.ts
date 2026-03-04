@@ -13,6 +13,7 @@ import {
   RegistrationPayloadSchema,
   LoginBodySchema,
   JWTPayloadSchema,
+  ALL_TOKEN_TYPES,
   type ITokenStore,
   type TokenType,
 } from '#auth/auth.service.js'
@@ -20,9 +21,7 @@ import { validateBody } from '../middleware/validate.js'
 import { checkAuth } from '../middleware/checkAuth.js'
 import { AuthError, ValidationError } from '#errors'
 
-const VALID_TOKEN_TYPES: Set<string> = new Set([
-  'file', 'avatar', 'register', 'device', 'invite', 'emoji', 'connect',
-])
+const VALID_TOKEN_TYPES = new Set<TokenType>(ALL_TOKEN_TYPES)
 
 function setAuthCookie(res: import('express').Response, token: string): void {
   // No sameSite: tough-cookie (supertest) won't send SameSite=Lax cookies on POST requests
