@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, test } from 'vitest'
 import nacl from 'tweetnacl'
-import { parse as uuidParse, stringify as uuidStringify, v4 as uuidv4 } from 'uuid'
+import { stringify as uuidStringify, v4 as uuidv4 } from 'uuid'
 import { decodeJwt } from 'jose'
 import { useDb } from '#test/helpers/db.js'
+import { makeRegistrationPayload } from '#test/helpers/factories.js'
 import {
   createTokenStore,
   decodeHex,
@@ -13,45 +14,6 @@ import {
   verifyNaClSignature,
   verifyPassword,
 } from '../index.js'
-import type { IActionToken, RegistrationPayload } from '../index.js'
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Builds a valid registration payload for a given token and device key pair.
- * regKey is the verified NaCl bytes (what the server gets after nacl.sign.open).
- */
-function makeRegistrationPayload(
-  token: IActionToken,
-  keyPair: nacl.SignKeyPair,
-  overrides?: Partial<RegistrationPayload>,
-): { regKey: Uint8Array; payload: RegistrationPayload } {
-  const tokenBytes = uuidParse(token.key) as Uint8Array
-  const signedMessage = nacl.sign(tokenBytes, keyPair.secretKey)
-
-  // Medium-term preKey (separate key pair)
-  const preKeyPair = nacl.sign.keyPair()
-  const preKeySignature = nacl.sign(preKeyPair.publicKey, keyPair.secretKey)
-
-  const regKey = verifyNaClSignature(signedMessage, keyPair.publicKey)!
-
-  return {
-    regKey,
-    payload: {
-      username: 'alice',
-      password: 'password123',
-      signKey: encodeHex(keyPair.publicKey),
-      signed: encodeHex(signedMessage),
-      preKey: encodeHex(preKeyPair.publicKey),
-      preKeySignature: encodeHex(preKeySignature),
-      preKeyIndex: 0,
-      deviceName: 'test-device',
-      ...overrides,
-    },
-  }
-}
 
 // ---------------------------------------------------------------------------
 // decodeHex / encodeHex
@@ -91,7 +53,7 @@ describe('verifyNaClSignature', () => {
   it('returns null for a tampered signed message', () => {
     const kp = nacl.sign.keyPair()
     const signed = nacl.sign(new Uint8Array([1, 2, 3]), kp.secretKey)
-    signed[70] ^= 0xff
+    signed[70]! ^= 0xff
     expect(verifyNaClSignature(signed, kp.publicKey)).toBeNull()
   })
 })
@@ -277,30 +239,18 @@ describe('registerUser', () => {
     await expect(registerUser(db, rk2, p2)).rejects.toThrow()
   })
 
-  it('rejects username shorter than 3 chars', async () => {
+  test.each([
+    ['ab', 'too short (< 3 chars)'],
+    ['a'.repeat(20), 'too long (> 19 chars)'],
+    ['ali ce', 'contains space'],
+    ['ali-ce', 'contains hyphen'],
+    ['alice!', 'contains special char'],
+  ])('rejects invalid username "%s" — %s', async (username) => {
     const db = await useDb()
     const store = createTokenStore()
     const t = store.create('register')
-    const { regKey, payload } = makeRegistrationPayload(t, nacl.sign.keyPair(), { username: 'ab' })
+    const { regKey, payload } = makeRegistrationPayload(t, nacl.sign.keyPair(), { username })
     await expect(registerUser(db, regKey, payload)).rejects.toThrow()
-  })
-
-  it('rejects username longer than 19 chars', async () => {
-    const db = await useDb()
-    const store = createTokenStore()
-    const t = store.create('register')
-    const { regKey, payload } = makeRegistrationPayload(t, nacl.sign.keyPair(), { username: 'a'.repeat(20) })
-    await expect(registerUser(db, regKey, payload)).rejects.toThrow()
-  })
-
-  it('rejects usernames with special characters (not matching /^\\w{3,19}$/)', async () => {
-    const db = await useDb()
-    const store = createTokenStore()
-    for (const bad of ['ali ce', 'ali-ce', 'alice!']) {
-      const t = store.create('register')
-      const { regKey, payload } = makeRegistrationPayload(t, nacl.sign.keyPair(), { username: bad })
-      await expect(registerUser(db, regKey, payload), `"${bad}" should be rejected`).rejects.toThrow()
-    }
   })
 })
 
