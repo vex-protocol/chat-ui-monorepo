@@ -1,0 +1,17 @@
+{
+  "name": "@vex-chat/crypto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  },
+  "dependencies": {
+    "tweetnacl": "catalog:",
+    "ed2curve": "catalog:",
+    "futoin-hkdf": "catalog:"
+  }
+}
