@@ -29,7 +29,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "generate:openapi": "node --import tsx/esm scripts/generate-openapi.ts",
-    "lint:openapi": "spectral lint openapi.json"
+    "lint:openapi": "spectral lint openapi.json",
+    "setup": "node --import tsx/esm scripts/setup-env.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.3",

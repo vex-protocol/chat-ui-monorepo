@@ -13,7 +13,19 @@ import { createConnectionManager } from '#ws/ws.service.js'
 import { createApp } from './app.js'
 import { rootLogger as logger } from './utils/logger.js'
 
-const config = parseConfig()
+let config: ReturnType<typeof parseConfig>
+try {
+  config = parseConfig()
+} catch (err) {
+  if (err instanceof z.ZodError) {
+    console.error('Fatal: missing or invalid environment variables\n\n' + z.prettifyError(err))
+    console.error('\nCopy apps/spire/.env.example to apps/spire/.env and fill in the values.')
+    console.error('Or run: pnpm --filter spire setup\n')
+  } else {
+    console.error(err)
+  }
+  process.exit(1)
+}
 const db = createDb(config)
 await migrateToLatest(db)
 
