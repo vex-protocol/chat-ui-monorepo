@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database, FilesTable, EmojisTable } from '#db/types.js'
 
@@ -6,14 +7,21 @@ export async function createFile(
   owner: string,
   nonce: string,
 ): Promise<FilesTable> {
-  throw new Error('not implemented')
+  const fileID = uuidv4()
+  await db.insertInto('files').values({ fileID, owner, nonce }).execute()
+  return { fileID, owner, nonce }
 }
 
 export async function getFile(
   db: Kysely<Database>,
   fileID: string,
 ): Promise<FilesTable | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('files')
+    .where('fileID', '=', fileID)
+    .selectAll()
+    .executeTakeFirst()
+  return row ?? null
 }
 
 export async function createEmoji(
@@ -21,43 +29,50 @@ export async function createEmoji(
   owner: string,
   name: string,
 ): Promise<EmojisTable> {
-  throw new Error('not implemented')
+  const emojiID = uuidv4()
+  await db.insertInto('emojis').values({ emojiID, owner, name }).execute()
+  return { emojiID, owner, name }
 }
 
 export async function getEmoji(
   db: Kysely<Database>,
   emojiID: string,
 ): Promise<EmojisTable | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('emojis')
+    .where('emojiID', '=', emojiID)
+    .selectAll()
+    .executeTakeFirst()
+  return row ?? null
 }
 
 export async function getEmojiList(
   db: Kysely<Database>,
   serverID: string,
 ): Promise<EmojisTable[]> {
-  throw new Error('not implemented')
+  return db.selectFrom('emojis').where('owner', '=', serverID).selectAll().execute()
 }
 
 export async function deleteEmoji(
   db: Kysely<Database>,
   emojiID: string,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db.deleteFrom('emojis').where('emojiID', '=', emojiID).execute()
 }
 
 /** Filesystem path for a user-uploaded file. */
 export function getFilePath(fileID: string): string {
-  throw new Error('not implemented')
+  return `files/${fileID}`
 }
 
 /** Filesystem path for a user avatar. */
 export function getAvatarPath(userID: string): string {
-  throw new Error('not implemented')
+  return `avatars/${userID}`
 }
 
 /** Filesystem path for a server emoji image. */
 export function getEmojiPath(emojiID: string): string {
-  throw new Error('not implemented')
+  return `emojis/${emojiID}`
 }
 
 const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -66,12 +81,14 @@ const ALLOWED_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'ima
  * Returns true if the MIME type is an allowed image type, false otherwise.
  */
 export function validateImageMime(mime: string): boolean {
-  throw new Error('not implemented')
+  return ALLOWED_MIME_TYPES.has(mime)
 }
 
 /**
  * Throws if fileSizeBytes exceeds limit.
  */
 export function assertUnderLimit(fileSizeBytes: number, limit: number): void {
-  throw new Error('not implemented')
+  if (fileSizeBytes > limit) {
+    throw new Error(`File size ${fileSizeBytes} exceeds limit of ${limit} bytes`)
+  }
 }

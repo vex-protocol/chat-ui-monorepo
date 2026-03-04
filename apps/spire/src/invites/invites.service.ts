@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database, InvitesTable } from '#db/types.js'
 
@@ -7,28 +8,35 @@ export async function createInvite(
   owner: string,
   expiration: string | null,
 ): Promise<InvitesTable> {
-  throw new Error('not implemented')
+  const inviteID = uuidv4()
+  await db.insertInto('invites').values({ inviteID, serverID, owner, expiration }).execute()
+  return { inviteID, serverID, owner, expiration }
 }
 
 export async function getInvite(
   db: Kysely<Database>,
   inviteID: string,
 ): Promise<InvitesTable | null> {
-  throw new Error('not implemented')
+  const row = await db
+    .selectFrom('invites')
+    .where('inviteID', '=', inviteID)
+    .selectAll()
+    .executeTakeFirst()
+  return row ?? null
 }
 
 export async function getServerInvites(
   db: Kysely<Database>,
   serverID: string,
 ): Promise<InvitesTable[]> {
-  throw new Error('not implemented')
+  return db.selectFrom('invites').where('serverID', '=', serverID).selectAll().execute()
 }
 
 export async function deleteInvite(
   db: Kysely<Database>,
   inviteID: string,
 ): Promise<void> {
-  throw new Error('not implemented')
+  await db.deleteFrom('invites').where('inviteID', '=', inviteID).execute()
 }
 
 /**
@@ -39,5 +47,8 @@ export async function isInviteValid(
   db: Kysely<Database>,
   inviteID: string,
 ): Promise<boolean> {
-  throw new Error('not implemented')
+  const invite = await getInvite(db, inviteID)
+  if (!invite) return false
+  if (invite.expiration === null) return true
+  return new Date(invite.expiration) > new Date()
 }
