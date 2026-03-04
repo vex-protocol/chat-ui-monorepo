@@ -165,6 +165,38 @@ describe('authentication', () => {
 
     expect(ws.close).toHaveBeenCalled()
   })
+
+  it('closes the connection when the auth window has expired (>30s)', async () => {
+    vi.useFakeTimers()
+    const db = await useDb()
+    const manager = createConnectionManager()
+    const ws = new MockWebSocket()
+    const owner = await seedUser(db)
+    const { kp, payload } = makeDeviceSetup()
+    const device = await createDevice(db, owner, payload)
+
+    manager.handleConnection(ws, db)
+
+    const challenge = ws.send.mock.calls[0]![0] as Buffer
+    const sig = nacl.sign.detached(challenge, kp.secretKey)
+
+    // Advance clock past the 30-second auth window
+    vi.advanceTimersByTime(30_001)
+
+    ws.emit(
+      'message',
+      Buffer.from(
+        JSON.stringify({
+          type: 'auth',
+          deviceID: device.deviceID,
+          signature: Buffer.from(sig).toString('hex'),
+        }),
+      ),
+    )
+    await flushMicrotasks()
+
+    expect(ws.close).toHaveBeenCalled()
+  })
 })
 
 describe('message size limit', () => {

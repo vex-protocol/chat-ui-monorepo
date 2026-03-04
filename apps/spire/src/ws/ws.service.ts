@@ -35,14 +35,17 @@ export interface ConnectionManager {
 
 const PING_INTERVAL_MS = 5_000
 const MAX_MESSAGE_BYTES = 2048
+/** Challenge is only valid for this window. Prevents stale-connection auth. */
+const AUTH_TIMEOUT_MS = 30_000
 
 export function createConnectionManager(options?: ConnectionManagerOptions): ConnectionManager {
   const clients = new Map<string, WsLike>()
 
   return {
     handleConnection(ws: WsLike, db: Kysely<Database>): void {
-      // Send 32-byte challenge immediately
+      // Send 32-byte challenge immediately and record its expiry
       const challenge = crypto.getRandomValues(new Uint8Array(32))
+      const challengeExpiry = Date.now() + AUTH_TIMEOUT_MS
       ws.send(Buffer.from(challenge))
 
       let authenticatedDeviceID: string | null = null
@@ -73,9 +76,12 @@ export function createConnectionManager(options?: ConnectionManagerOptions): Con
         if (heartbeatInterval) clearInterval(heartbeatInterval)
       })
 
-      ws.on('message', async (...args: unknown[]) => {
-        const data = args[0] as Buffer
-
+      /**
+       * Core message handler — extracted so the EventEmitter listener can
+       * attach a .catch() boundary. Async listeners on EventEmitter swallow
+       * rejections silently; this pattern makes them explicit.
+       */
+      async function handleMessage(data: Buffer): Promise<void> {
         if (data.byteLength > MAX_MESSAGE_BYTES) {
           ws.close()
           return
@@ -90,7 +96,12 @@ export function createConnectionManager(options?: ConnectionManagerOptions): Con
         }
 
         if (authenticatedDeviceID === null) {
-          // Pre-auth: expect challenge response
+          // Pre-auth: reject expired challenges first
+          if (Date.now() > challengeExpiry) {
+            ws.close()
+            return
+          }
+
           const parsed = AuthMessageSchema.safeParse(msg)
           if (!parsed.success) {
             ws.close()
@@ -114,6 +125,7 @@ export function createConnectionManager(options?: ConnectionManagerOptions): Con
           const signKeyBytes = Buffer.from(device.signKey, 'hex')
           const sigBytes = Buffer.from(signature, 'hex')
 
+          // nacl.sign.detached.verify uses constant-time comparison — safe against timing attacks
           const valid = nacl.sign.detached.verify(challenge, sigBytes, signKeyBytes)
           if (!valid) {
             ws.close()
@@ -130,6 +142,11 @@ export function createConnectionManager(options?: ConnectionManagerOptions): Con
             options.onMail(authenticatedDeviceID, parsed.data)
           }
         }
+      }
+
+      // Attach with explicit error boundary — async listeners swallow rejections
+      ws.on('message', (...args: unknown[]) => {
+        handleMessage(args[0] as Buffer).catch(() => ws.close())
       })
     },
 
