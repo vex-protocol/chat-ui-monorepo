@@ -45,7 +45,7 @@ packages/
 apps/
   spire/          — server (Node.js, Express, Kysely)
   desktop/        — Tauri + Svelte; @vex-chat/store atoms + @nanostores/svelte + packages/ui/output/svelte
-  mobile/         — React Native (Expo); @vex-chat/store atoms + @nanostores/react + packages/ui/output/react
+  mobile/         — React Native (bare); @vex-chat/store atoms + @nanostores/react + packages/ui/output/react
 ```
 
 Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching, task pipelines).
