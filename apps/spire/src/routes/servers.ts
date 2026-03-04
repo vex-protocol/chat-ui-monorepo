@@ -1,4 +1,4 @@
-import { registry } from '#openapi'
+import { registry, pid } from '#openapi'
 import { Router } from 'express'
 import { z } from 'zod'
 import type { Kysely } from 'kysely'
@@ -132,7 +132,6 @@ export function createServerRouter(db: Kysely<Database>): Router {
 // ---------------------------------------------------------------------------
 
 const auth = [{ bearerAuth: [] }]
-const pid = (names: string[]) => z.object(Object.fromEntries(names.map(n => [n, z.string()])))
 
 registry.registerPath({ method: 'post',   path: '/server',                          operationId: 'createServer',     security: auth,                                                    responses: { 200: { description: 'Server created' }, 401: { description: 'Unauthorized' } } })
 registry.registerPath({ method: 'get',    path: '/server/{id}',                     operationId: 'getServer',        security: auth, request: { params: pid(['id']) },                  responses: { 200: { description: 'Server' },         404: { description: 'Not found' } } })

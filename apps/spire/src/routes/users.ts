@@ -1,4 +1,4 @@
-import { registry } from '#openapi'
+import { registry, pid } from '#openapi'
 import { Router } from 'express'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
@@ -50,10 +50,7 @@ export function createUserRouter(db: Kysely<Database>): Router {
 // OpenAPI registrations
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod'
-
 const auth = [{ bearerAuth: [] }]
-const pid = (names: string[]) => z.object(Object.fromEntries(names.map(n => [n, z.string()])))
 
 registry.registerPath({ method: 'get',    path: '/user/{id}',                        operationId: 'getUser',          security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'User' },        404: { description: 'Not found' } } })
 registry.registerPath({ method: 'get',    path: '/user/{id}/devices',                operationId: 'getUserDevices',   security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Device list' } } })
