@@ -118,13 +118,13 @@ describe('createTokenStore', () => {
 
 describe('hashPassword / verifyPassword', () => {
   it('returns an argon2id PHC-format hash string', async () => {
-    const result = await hashPassword('password')
+    const hash = await hashPassword('password')
     // argon2id embeds salt+params inside the hash (PHC format): $argon2id$v=19$m=...$<salt>$<hash>
-    expect(result.hash).toMatch(/^\$argon2id\$/)
+    expect(hash).toMatch(/^\$argon2id\$/)
   })
 
   it('hash contains OWASP-recommended parameters (m=19MiB, t=2, p=1)', async () => {
-    const { hash } = await hashPassword('password')
+    const hash = await hashPassword('password')
     expect(hash).toContain('m=19456')
     expect(hash).toContain('t=2')
     expect(hash).toContain('p=1')
@@ -133,17 +133,17 @@ describe('hashPassword / verifyPassword', () => {
   it('same password produces different hashes (random salt embedded by argon2)', async () => {
     const a = await hashPassword('password')
     const b = await hashPassword('password')
-    expect(a.hash).not.toBe(b.hash) // different embedded salts → different outputs
+    expect(a).not.toBe(b) // different embedded salts → different outputs
   })
 
   it('verifyPassword returns true for the correct password', async () => {
-    const { hash, salt } = await hashPassword('correct-horse')
-    expect(await verifyPassword('correct-horse', hash, salt)).toBe(true)
+    const hash = await hashPassword('correct-horse')
+    expect(await verifyPassword('correct-horse', hash)).toBe(true)
   })
 
   it('verifyPassword returns false for the wrong password', async () => {
-    const { hash, salt } = await hashPassword('correct-horse')
-    expect(await verifyPassword('wrong-horse', hash, salt)).toBe(false)
+    const hash = await hashPassword('correct-horse')
+    expect(await verifyPassword('wrong-horse', hash)).toBe(false)
   })
 })
 
@@ -187,7 +187,6 @@ describe('registerUser', () => {
     const row = await db.selectFrom('users').where('username', '=', 'alice').selectAll().executeTakeFirst()
     expect(row?.passwordHash).not.toBe('password123')
     expect(row?.passwordHash).toMatch(/^\$argon2id\$/) // argon2id PHC format, never plaintext
-    expect(row?.passwordSalt.length).toBeGreaterThan(0)
   })
 
   it('creates a device and preKey atomically with the user', async () => {
