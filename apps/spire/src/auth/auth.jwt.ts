@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
-import type { CensoredUser } from './auth.schemas.js'
-import { JWTPayloadSchema } from './auth.schemas.js'
+import type { CensoredUser } from './auth.schemas.ts'
+import { JWTPayloadSchema } from './auth.schemas.ts'
 
 function encodeSecret(jwtSecret: string): Uint8Array {
   return new TextEncoder().encode(jwtSecret)

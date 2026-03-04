@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import { useDb } from '#test/helpers/db.js'
-import { seedUser } from '#test/helpers/factories.js'
-import { createServer, createChannel } from '#servers/servers.service.js'
+import { useDb } from '#test/helpers/db.ts'
+import { seedUser } from '#test/helpers/factories.ts'
+import { createServer, createChannel } from '#servers/servers.service.ts'
 import {
   createPermission,
   getPermissions,
@@ -10,7 +10,7 @@ import {
   deletePermission,
   getGroupMembers,
   hasPermission,
-} from '../permissions.service.js'
+} from '../permissions.service.ts'
 
 // ---------------------------------------------------------------------------
 // createPermission

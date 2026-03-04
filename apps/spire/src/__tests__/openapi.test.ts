@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 // openapi-register.ts imports openapi.ts first (extendZodWithOpenApi), then
 // side-effect-imports all route files so their registerPath() calls execute.
-import { generateOpenAPIDocument } from '../openapi-register.js'
+import { generateOpenAPIDocument } from '../openapi-register.ts'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let doc: any

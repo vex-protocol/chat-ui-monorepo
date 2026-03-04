@@ -1,9 +1,9 @@
 import SQLiteDatabase from 'better-sqlite3'
 import { CompiledQuery, Kysely, SqliteDialect } from 'kysely'
 import type { Config } from '#config'
-import type { Database } from './types.js'
+import type { Database } from './types.ts'
 
-export type { Database } from './types.js'
+export type { Database } from './types.ts'
 
 /**
  * Creates a production Kysely instance from parsed config.

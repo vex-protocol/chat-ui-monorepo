@@ -1,8 +1,8 @@
 import type { Kysely } from 'kysely'
 import { v4 as uuidv4 } from 'uuid'
-import type { Database } from '#db/types.js'
-import type { Device, DevicePayload } from './devices.schemas.js'
-export type { Device, DevicePayload } from './devices.schemas.js'
+import type { Database } from '#db/types.ts'
+import type { Device, DevicePayload } from './devices.schemas.ts'
+export type { Device, DevicePayload } from './devices.schemas.ts'
 
 /**
  * Creates a device + preKey atomically for the given user.

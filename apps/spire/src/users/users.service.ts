@@ -1,5 +1,5 @@
 import type { Kysely } from 'kysely'
-import type { Database } from '#db/types.js'
+import type { Database } from '#db/types.ts'
 
 export interface PublicUser {
   userID: string

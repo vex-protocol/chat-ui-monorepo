@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Kysely } from 'kysely'
 import { sql } from 'kysely'
-import { createTestDb, useDb } from '#test/helpers/db.js'
-import type { Database } from '../types.js'
-import { migrateDown, migrateToLatest } from '../migrate.js'
+import { createTestDb, useDb } from '#test/helpers/db.ts'
+import type { Database } from '../types.ts'
+import { migrateDown, migrateToLatest } from '../migrate.ts'
 
 // ---------------------------------------------------------------------------
 // Helpers

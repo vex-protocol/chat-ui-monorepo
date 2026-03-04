@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database, FilesTable, EmojisTable } from '#db/types.js'
+import type { Database, FilesTable, EmojisTable } from '#db/types.ts'
 
 export async function createFile(
   db: Kysely<Database>,

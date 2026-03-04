@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { createLogger } from '../logger.js'
+import { createLogger } from '../logger.ts'
 
 describe('createLogger', () => {
   it('returns an object with standard pino logger methods', () => {

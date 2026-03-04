@@ -1,7 +1,7 @@
 import { Migrator } from 'kysely'
 import type { Kysely } from 'kysely'
-import type { Database } from './types.js'
-import { migrationProvider } from './migrations/index.js'
+import type { Database } from './types.ts'
+import { migrationProvider } from './migrations/index.ts'
 
 function createMigrator(db: Kysely<Database>): Migrator {
   return new Migrator({ db, provider: migrationProvider })

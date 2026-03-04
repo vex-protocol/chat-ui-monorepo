@@ -1,8 +1,8 @@
 import { describe, expect, it, test } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
 import nacl from 'tweetnacl'
-import { useDb } from '#test/helpers/db.js'
-import { makeDevicePayload, seedUser } from '#test/helpers/factories.js'
+import { useDb } from '#test/helpers/db.ts'
+import { makeDevicePayload, seedUser } from '#test/helpers/factories.ts'
 import {
   createDevice,
   deleteDevice,
@@ -10,7 +10,7 @@ import {
   retrieveDevice,
   retrieveDeviceBySignKey,
   retrieveUserDeviceList,
-} from '../devices.service.js'
+} from '../devices.service.ts'
 
 // ---------------------------------------------------------------------------
 // createDevice

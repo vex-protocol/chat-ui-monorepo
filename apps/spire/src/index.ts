@@ -6,34 +6,34 @@
  */
 
 // App factory
-export { createApp } from './app.js'
+export { createApp } from './app.ts'
 
 // Database
-export type { Database } from '#db/types.js'
-export { createDb } from '#db/index.js'
-export { migrateToLatest } from '#db/migrate.js'
+export type { Database } from '#db/types.ts'
+export { createDb } from '#db/index.ts'
+export { migrateToLatest } from '#db/migrate.ts'
 
 // Auth
-export type { CensoredUser, RegistrationPayload } from '#auth/auth.service.js'
-export { createTokenStore } from '#auth/auth.service.js'
+export type { CensoredUser, RegistrationPayload } from '#auth/auth.service.ts'
+export { createTokenStore } from '#auth/auth.service.ts'
 
 // Devices
-export type { Device, DevicePayload } from '#devices/devices.schemas.js'
+export type { Device, DevicePayload } from '#devices/devices.schemas.ts'
 
 // Servers / Channels
-export type { CreateServerPayload, CreateChannelPayload } from '#servers/servers.schemas.js'
+export type { CreateServerPayload, CreateChannelPayload } from '#servers/servers.schemas.ts'
 
 // Mail
-export type { MailPayload } from '#mail/mail.schemas.js'
+export type { MailPayload } from '#mail/mail.schemas.ts'
 
 // Permissions
-export type { CreatePermission } from '#permissions/permissions.schemas.js'
+export type { CreatePermission } from '#permissions/permissions.schemas.ts'
 
 // Invites
-export type { CreateInvite } from '#invites/invites.schemas.js'
+export type { CreateInvite } from '#invites/invites.schemas.ts'
 
 // Files / Emojis
-export type { CreateFile, CreateEmoji } from '#files/files.schemas.js'
+export type { CreateFile, CreateEmoji } from '#files/files.schemas.ts'
 
 // OpenAPI
 export { generateOpenAPIDocument, registry } from '#openapi'

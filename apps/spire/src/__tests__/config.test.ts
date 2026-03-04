@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import { parseConfig } from '../config.js'
+import { parseConfig } from '../config.ts'
 
 const VALID_BASE = {
   DB_TYPE: 'sqlite',

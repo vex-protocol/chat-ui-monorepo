@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database, PermissionsTable } from '#db/types.js'
+import type { Database, PermissionsTable } from '#db/types.ts'
 
 export async function createPermission(
   db: Kysely<Database>,

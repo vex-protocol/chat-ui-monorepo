@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
-import { useDb } from '#test/helpers/db.js'
-import type { MailPayload } from '../mail.service.js'
-import { saveMail, retrieveMail, deleteMail } from '../mail.service.js'
+import { useDb } from '#test/helpers/db.ts'
+import type { MailPayload } from '../mail.service.ts'
+import { saveMail, retrieveMail, deleteMail } from '../mail.service.ts'
 
 // ---------------------------------------------------------------------------
 // Factory

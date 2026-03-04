@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Kysely } from 'kysely'
-import type { Database } from '#db/types.js'
-import type { KeyBundle, OTKPayload } from './keys.schemas.js'
-export type { KeyBundle, OTKPayload } from './keys.schemas.js'
+import type { Database } from '#db/types.ts'
+import type { KeyBundle, OTKPayload } from './keys.schemas.ts'
+export type { KeyBundle, OTKPayload } from './keys.schemas.ts'
 
 /**
  * Upserts the pre-key for a device. Because deviceID is UNIQUE in the

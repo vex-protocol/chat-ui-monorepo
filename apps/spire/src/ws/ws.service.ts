@@ -1,7 +1,7 @@
 import nacl from 'tweetnacl'
 import type { Kysely } from 'kysely'
-import type { Database } from '#db/types.js'
-import { AuthMessageSchema, InboundMessageSchema } from './ws.schemas.js'
+import type { Database } from '#db/types.ts'
+import { AuthMessageSchema, InboundMessageSchema } from './ws.schemas.ts'
 
 /**
  * Minimal WebSocket-like interface the connection manager works against.

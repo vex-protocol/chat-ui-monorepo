@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import nacl from 'tweetnacl'
-import { useDb } from '#test/helpers/db.js'
-import { seedUser, seedDevice, makeDevicePayload } from '#test/helpers/factories.js'
-import { createDevice } from '#devices/devices.service.js'
+import { useDb } from '#test/helpers/db.ts'
+import { seedUser, seedDevice, makeDevicePayload } from '#test/helpers/factories.ts'
+import { createDevice } from '#devices/devices.service.ts'
 import {
   savePreKey,
   getPreKey,
@@ -10,7 +10,7 @@ import {
   consumeOTK,
   getOTKCount,
   getKeyBundle,
-} from '../keys.service.js'
+} from '../keys.service.ts'
 
 /** Generates a 64 lowercase hex char string (32-byte NaCl public key). */
 function makeHexKey(): string {
