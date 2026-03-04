@@ -24,7 +24,8 @@ const ARGON2_OPTIONS: argon2.Options = {
 // Token types
 // ---------------------------------------------------------------------------
 
-export type TokenType = 'file' | 'avatar' | 'register' | 'device' | 'invite' | 'emoji' | 'connect'
+export const ALL_TOKEN_TYPES = ['file', 'avatar', 'register', 'device', 'invite', 'emoji', 'connect'] as const
+export type TokenType = (typeof ALL_TOKEN_TYPES)[number]
 
 export interface IActionToken {
   key: string    // UUID v4 string
