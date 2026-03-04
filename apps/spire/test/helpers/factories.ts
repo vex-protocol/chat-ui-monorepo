@@ -10,7 +10,8 @@ import type { Kysely } from 'kysely'
 import nacl from 'tweetnacl'
 import { parse as uuidParse, v4 as uuidv4 } from 'uuid'
 import type { Database } from '#db/types.ts'
-import type { IActionToken, RegistrationPayload } from '#auth/auth.service.ts'
+import type { IActionToken } from '#auth/auth.token-store.ts'
+import type { RegistrationPayload } from '#auth/auth.schemas.ts'
 import type { DevicePayload } from '#devices/devices.service.ts'
 
 /** Lowercase hex encode — avoids depending on auth stubs. */
