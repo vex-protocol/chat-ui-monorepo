@@ -53,6 +53,9 @@ importers:
       '@asteasolutions/zod-to-openapi':
         specifier: ^8.4.3
         version: 8.4.3(zod@4.3.6)
+      '@vex-chat/crypto':
+        specifier: workspace:*
+        version: link:../../packages/crypto
       argon2:
         specifier: ^0.44.0
         version: 0.44.0

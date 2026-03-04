@@ -82,6 +82,7 @@
     "env:init": "node scripts/setup-env.ts"
   },
   "dependencies": {
+    "@vex-chat/crypto": "workspace:*",
     "@asteasolutions/zod-to-openapi": "^8.4.3",
     "argon2": "^0.44.0",
     "better-sqlite3": "catalog:",
