@@ -420,5 +420,6 @@ Read in this order:
 4. `docs/testing-strategy.md` — how tests are structured
 5. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
 6. `docs/config.md` — env validation, secret hygiene, singleton pattern
+7. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
 7. `src/db/types.ts` — all 11 database tables
 8. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
