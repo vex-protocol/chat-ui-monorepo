@@ -34,9 +34,9 @@ Svelte components use DOM elements + CSS. React Native uses `View` + `StyleSheet
 
 ```
 packages/
-  types/          — shared TypeScript interfaces, enums, constants
-  core/           — client SDK, WebSocket, auth, message handling (framework-agnostic)
-  crypto/         — NaCl encryption logic
+  types/          — shared TypeScript interfaces, enums, constants (@vex-chat/types)
+  libvex/         — client SDK, WebSocket, auth, message handling (framework-agnostic) (@vex-chat/libvex)
+  crypto/         — NaCl encryption logic (@vex-chat/crypto)
   validation/     — input validation, message formatting
   store/          — framework-agnostic state containers (event emitter pattern)
   ui/             — Mitosis design primitives (.lite.tsx)
@@ -45,8 +45,8 @@ packages/
     stories/       — Storybook stories for all primitives
 apps/
   spire/          — server (Node.js, Express, Kysely)
-  desktop/        — Tauri + Svelte, imports packages/core + packages/ui/output/svelte
-  mobile/         — React Native, imports packages/core + packages/ui/output/react
+  desktop/        — Tauri + Svelte, imports packages/libvex + packages/ui/output/svelte
+  mobile/         — React Native, imports packages/libvex + packages/ui/output/react
 ```
 
 Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching, task pipelines).
@@ -58,7 +58,7 @@ Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching,
 ### 100% shared (framework-agnostic TypeScript)
 
 - **types** — all interfaces, enums, API payload shapes
-- **core** — client SDK (WebSocket, auth, message protocol) — the equivalent of the original `libvex-js`
+- **libvex** — client SDK (WebSocket, auth, message protocol) — the equivalent of the original `libvex-js`
 - **crypto** — NaCl encryption, key management, session establishment
 - **validation** — input validation, message formatting, mention detection
 - **store** — state containers as plain TypeScript classes with event emitters
@@ -151,7 +151,7 @@ This pattern extends to routing (plain state machine in core, wired to svelte-ro
 |---|---|---|
 | `types-js` | `packages/types` | Same role, modernized |
 | `crypto-js` | `packages/crypto` | Same role |
-| `libvex-js` | `packages/core` | Client SDK, framework-agnostic |
+| `libvex-js` | `packages/libvex` | Client SDK, framework-agnostic |
 | `spire` | `apps/spire` | Clean reimplementation (Kysely, Zod, Vitest, ESM) |
 | `vex-desktop` (Electron+React) | `apps/desktop` (Tauri+Svelte) | New shell + framework |
 | — | `apps/mobile` (React Native) | New — mobile client |

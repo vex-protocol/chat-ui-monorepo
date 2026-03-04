@@ -18,6 +18,9 @@ catalogs:
     better-sqlite3:
       specifier: ^11.0.0
       version: 11.10.0
+    tweetnacl:
+      specifier: ^1.0.3
+      version: 1.0.3
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
@@ -78,7 +81,7 @@ importers:
         specifier: ^11.0.0
         version: 11.0.0
       tweetnacl:
-        specifier: ^1.0.3
+        specifier: 'catalog:'
         version: 1.0.3
       uuid:
         specifier: ^11.0.0

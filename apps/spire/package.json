@@ -94,7 +94,7 @@
     "kysely": "^0.27.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-    "tweetnacl": "^1.0.3",
+    "tweetnacl": "catalog:",
     "uuid": "^11.0.0",
     "ws": "^8.19.0",
     "zod": "^4.3.6"
