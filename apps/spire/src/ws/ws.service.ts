@@ -1,4 +1,4 @@
-import nacl from 'tweetnacl'
+import { verifyDetached } from '@vex-chat/crypto'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.ts'
 import { AuthMessageSchema, InboundMessageSchema } from './ws.schemas.ts'
@@ -125,8 +125,8 @@ export function createConnectionManager(options?: ConnectionManagerOptions): Con
           const signKeyBytes = Buffer.from(device.signKey, 'hex')
           const sigBytes = Buffer.from(signature, 'hex')
 
-          // nacl.sign.detached.verify uses constant-time comparison — safe against timing attacks
-          const valid = nacl.sign.detached.verify(challenge, sigBytes, signKeyBytes)
+          // verifyDetached uses constant-time comparison — safe against timing attacks
+          const valid = verifyDetached(challenge, sigBytes, signKeyBytes)
           if (!valid) {
             ws.close()
             return
