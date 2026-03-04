@@ -1,13 +1,14 @@
 import argon2 from 'argon2'
 import nacl from 'tweetnacl'
-import { SignJWT } from 'jose'
+import { SignJWT, jwtVerify } from 'jose'
 import { v4 as uuidv4, stringify as uuidStringify } from 'uuid'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
 import { ConflictError, ValidationError } from '#errors'
 import type { RegistrationPayload, CensoredUser } from './auth.schemas.js'
-export type { RegistrationPayload, CensoredUser } from './auth.schemas.js'
-export { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema } from './auth.schemas.js'
+import { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema, JWTPayloadSchema } from './auth.schemas.js'
+export type { RegistrationPayload, CensoredUser }
+export { RegistrationPayloadSchema, LoginBodySchema, CensoredUserSchema, JWTPayloadSchema }
 
 const TOKEN_EXPIRY = 10 * 60 * 1000 // 10 minutes in ms
 
@@ -268,4 +269,37 @@ export async function loginUser(
     .sign(jwtSecret())
 
   return token
+}
+
+// ---------------------------------------------------------------------------
+// issueJWT
+// ---------------------------------------------------------------------------
+
+/**
+ * Issues a signed JWT (7-day expiry) directly from a CensoredUser object.
+ * Use this after registration (user is already authenticated — no re-verify needed).
+ */
+export async function issueJWT(user: CensoredUser): Promise<string> {
+  return new SignJWT({ user })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('7d')
+    .sign(jwtSecret())
+}
+
+// ---------------------------------------------------------------------------
+// verifyJWT
+// ---------------------------------------------------------------------------
+
+/**
+ * Verifies a JWT and returns the censored user payload, or null if invalid.
+ */
+export async function verifyJWT(token: string): Promise<CensoredUser | null> {
+  try {
+    const { payload } = await jwtVerify(token, jwtSecret())
+    const parsed = JWTPayloadSchema.safeParse(payload)
+    return parsed.success ? parsed.data.user : null
+  } catch {
+    return null
+  }
 }

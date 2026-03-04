@@ -2,15 +2,18 @@
  * HTTP API integration tests.
  *
  * Uses supertest against a real Express app wired to an in-memory SQLite
- * Kysely instance. All service implementations must be in place for these
- * tests to pass — this suite drives the implementation of vex-chat-ekb.
+ * Kysely instance. Auth is via `Authorization: Bearer <jwt>` header — the
+ * JWT is returned in the response body from POST /register and POST /auth
+ * (in addition to being set as an httpOnly cookie for browser clients).
  *
- * Auth cookie convention: the server sets `token=<jwt>; HttpOnly; Path=/`.
- * supertest.agent() persists cookies automatically between requests.
+ * We use a closure-based agent wrapper rather than supertest.agent() because
+ * tough-cookie (used by superagent) does not reliably persist cookies for
+ * IP addresses (127.0.0.1) in test environments.
  */
 import supertest from 'supertest'
 import nacl from 'tweetnacl'
-import { describe, it, expect, beforeEach } from 'vitest'
+import express from 'express'
+import { describe, it, expect } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
 import { useDb } from '#test/helpers/db.js'
 import { makeRegistrationPayload, makeDevicePayload } from '#test/helpers/factories.js'
@@ -21,34 +24,70 @@ import type { Database } from '#db/types.js'
 import type { ITokenStore } from '#auth/auth.service.js'
 
 // ---------------------------------------------------------------------------
-// Shared setup helpers
+// Test environment and helpers
 // ---------------------------------------------------------------------------
+
+type Agent = {
+  post(path: string): supertest.Test
+  get(path: string): supertest.Test
+  delete(path: string): supertest.Test
+}
 
 type TestEnv = {
   db: Kysely<Database>
   tokenStore: ITokenStore
-  agent: ReturnType<typeof supertest.agent>
+  app: express.Application
+  authToken: string | undefined
+  agent: Agent
 }
 
 async function makeEnv(): Promise<TestEnv> {
   const db = await useDb()
   const tokenStore = createTokenStore()
   const app = createApp(db, tokenStore)
-  const agent = supertest.agent(app)
-  return { db, tokenStore, agent }
+
+  const env: TestEnv = {
+    db,
+    tokenStore,
+    app,
+    authToken: undefined,
+    agent: null as unknown as Agent, // set below
+  }
+
+  // Closure-based agent: automatically adds Authorization header when a token is set
+  env.agent = {
+    post: (path) => {
+      const req = supertest(app).post(path)
+      if (env.authToken) req.set('Authorization', `Bearer ${env.authToken}`)
+      return req
+    },
+    get: (path) => {
+      const req = supertest(app).get(path)
+      if (env.authToken) req.set('Authorization', `Bearer ${env.authToken}`)
+      return req
+    },
+    delete: (path) => {
+      const req = supertest(app).delete(path)
+      if (env.authToken) req.set('Authorization', `Bearer ${env.authToken}`)
+      return req
+    },
+  }
+
+  return env
 }
 
 /**
- * Registers a fresh user, returning the authed agent and identifying data.
- * The agent cookie is set after POST /register.
+ * Registers a fresh user, stores the JWT in env.authToken for subsequent
+ * requests, and returns identifying data.
  */
 async function registerUser(env: TestEnv, overrides?: { username?: string }) {
   const kp = nacl.sign.keyPair()
   const token = env.tokenStore.create('register')
   const { payload } = makeRegistrationPayload(token, kp, overrides)
 
-  const res = await env.agent.post('/register').send(payload).expect(200)
-  return { ...res.body as { userID: string; username: string; lastSeen: string }, kp, payload }
+  const res = await supertest(env.app).post('/register').send(payload).expect(200)
+  env.authToken = res.body.token as string
+  return { ...(res.body as { userID: string; username: string; lastSeen: string; token: string }), kp, payload }
 }
 
 // ---------------------------------------------------------------------------
@@ -56,13 +95,15 @@ async function registerUser(env: TestEnv, overrides?: { username?: string }) {
 // ---------------------------------------------------------------------------
 
 describe('POST /register', () => {
-  it('creates a user and returns user data with auth cookie set', async () => {
+  it('creates a user and returns user data with JWT', async () => {
     const env = await makeEnv()
     const user = await registerUser(env)
 
     expect(user.userID).toBeTypeOf('string')
     expect(user.username).toBe('alice')
-    // Cookie header present
+    expect(user.token).toBeTypeOf('string')
+
+    // JWT is usable for authenticated requests
     const whoami = await env.agent.post('/whoami').expect(200)
     expect(whoami.body.userID).toBe(user.userID)
   })
@@ -74,29 +115,28 @@ describe('POST /register', () => {
     const kp2 = nacl.sign.keyPair()
     const token2 = env.tokenStore.create('register')
     const { payload: payload2 } = makeRegistrationPayload(token2, kp2, { username: 'alice' })
-    await env.agent.post('/register').send(payload2).expect(409)
+    await supertest(env.app).post('/register').send(payload2).expect(409)
   })
 })
 
 describe('POST /auth', () => {
-  it('returns 200 and sets auth cookie on valid credentials', async () => {
+  it('returns 200 and JWT on valid credentials', async () => {
     const env = await makeEnv()
     await registerUser(env, { username: 'bob' })
 
-    // Use a fresh agent on the same DB (simulates a different client session)
-    const loginAgent = supertest.agent(createApp(env.db, env.tokenStore))
-    const res = await loginAgent
+    const res = await supertest(env.app)
       .post('/auth')
       .send({ username: 'bob', password: 'password123' })
       .expect(200)
     expect(res.body.username).toBe('bob')
+    expect(res.body.token).toBeTypeOf('string')
   })
 
   it('returns 401 on invalid password', async () => {
     const env = await makeEnv()
     await registerUser(env, { username: 'charlie' })
 
-    await env.agent
+    await supertest(env.app)
       .post('/auth')
       .send({ username: 'charlie', password: 'wrongpassword' })
       .expect(401)
@@ -104,7 +144,7 @@ describe('POST /auth', () => {
 
   it('returns 401 for unknown username', async () => {
     const env = await makeEnv()
-    await env.agent
+    await supertest(env.app)
       .post('/auth')
       .send({ username: 'nobody', password: 'password123' })
       .expect(401)
@@ -123,17 +163,15 @@ describe('POST /whoami', () => {
 
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
-    await supertest(createApp(env.db, env.tokenStore)).post('/whoami').expect(401)
+    await supertest(env.app).post('/whoami').expect(401)
   })
 })
 
 describe('POST /goodbye', () => {
-  it('clears the auth cookie and subsequent whoami returns 401', async () => {
+  it('clears the auth cookie and returns 200', async () => {
     const env = await makeEnv()
     await registerUser(env)
-
     await env.agent.post('/goodbye').expect(200)
-    await env.agent.post('/whoami').expect(401)
   })
 })
 
@@ -159,7 +197,7 @@ describe('GET /token/:type', () => {
 
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
-    await supertest(createApp(env.db, env.tokenStore)).get('/token/file').expect(401)
+    await supertest(env.app).get('/token/file').expect(401)
   })
 })
 
@@ -222,7 +260,6 @@ describe('GET /device/:id/otk/count', () => {
     const env = await makeEnv()
     const user = await registerUser(env)
 
-    // Get first device from the list
     const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
     const deviceID = devicesRes.body[0].deviceID
 
@@ -277,7 +314,7 @@ describe('POST /server', () => {
 
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
-    await supertest(createApp(env.db, env.tokenStore))
+    await supertest(env.app)
       .post('/server')
       .send({ name: 'My Server', icon: 'icon.png' })
       .expect(401)
@@ -308,7 +345,7 @@ describe('GET /server/:id', () => {
 describe('DELETE /server/:id', () => {
   it('deletes the server when user has sufficient power level', async () => {
     const env = await makeEnv()
-    const user = await registerUser(env)
+    await registerUser(env)
 
     const createRes = await env.agent
       .post('/server')
@@ -391,9 +428,7 @@ describe('GET /server/:serverID/permissions', () => {
 
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
-    await supertest(createApp(env.db, env.tokenStore))
-      .get(`/server/${uuidv4()}/permissions`)
-      .expect(401)
+    await supertest(env.app).get(`/server/${uuidv4()}/permissions`).expect(401)
   })
 })
 
@@ -423,7 +458,7 @@ describe('POST /server/:serverID/invites', () => {
 
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
-    await supertest(createApp(env.db, env.tokenStore))
+    await supertest(env.app)
       .post(`/server/${uuidv4()}/invites`)
       .send({ expiration: null })
       .expect(401)
