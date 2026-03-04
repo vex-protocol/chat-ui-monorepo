@@ -19,6 +19,7 @@
       "#invites/*": ["./src/invites/*"],
       "#files/*": ["./src/files/*"],
       "#utils/*": ["./src/utils/*"],
+      "#middleware/*": ["./src/middleware/*"],
       "#config": ["./src/config.js"],
       "#openapi": ["./src/openapi.js"],
       "#errors": ["./src/errors.js"],

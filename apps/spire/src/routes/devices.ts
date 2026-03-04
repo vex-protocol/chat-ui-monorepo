@@ -5,8 +5,8 @@ import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
 import { getOTKCount, saveOTKs } from '#keys/keys.service.js'
 import { OTKPayloadSchema } from '#keys/keys.schemas.js'
-import { checkAuth } from '../middleware/checkAuth.js'
-import { validateBody } from '../middleware/validate.js'
+import { checkAuth } from '#middleware/checkAuth.js'
+import { validateBody } from '#middleware/validate.js'
 
 const OTKListSchema = z.array(OTKPayloadSchema).min(1)
 

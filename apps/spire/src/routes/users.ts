@@ -4,8 +4,8 @@ import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.js'
 import { createDevice, retrieveUserDeviceList } from '#devices/devices.service.js'
 import { DevicePayloadSchema } from '#devices/devices.schemas.js'
-import { checkAuth } from '../middleware/checkAuth.js'
-import { validateBody } from '../middleware/validate.js'
+import { checkAuth } from '#middleware/checkAuth.js'
+import { validateBody } from '#middleware/validate.js'
 import { NotFoundError } from '#errors'
 
 export function createUserRouter(db: Kysely<Database>): Router {

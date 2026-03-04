@@ -17,6 +17,7 @@ export default defineConfig({
       '#invites': new URL('./src/invites', import.meta.url).pathname,
       '#files': new URL('./src/files', import.meta.url).pathname,
       '#utils': new URL('./src/utils', import.meta.url).pathname,
+      '#middleware': new URL('./src/middleware', import.meta.url).pathname,
       '#config': new URL('./src/config.js', import.meta.url).pathname,
       '#openapi': new URL('./src/openapi.js', import.meta.url).pathname,
       '#errors': new URL('./src/errors.js', import.meta.url).pathname,
