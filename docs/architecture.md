@@ -380,6 +380,72 @@ The full model is in `AGENTS.md`. In brief:
 
 ---
 
+## Security Invariants
+
+These rules are derived directly from the Vex privacy policy and cryptographic protocol. Violating them breaks the promise that **the server cannot read, forge, or misdirect messages**.
+
+### What the server MUST enforce
+
+#### 1. Device ownership on key material uploads
+
+One-time keys (OTKs) and pre-keys are consumed during X3DH session establishment. If an attacker can upload OTKs to a device they don't own, they can inject their own key material into the key exchange. The next sender who fetches that device's key bundle would unknowingly establish a session with the attacker instead of the device owner — a **man-in-the-middle on the encryption layer**.
+
+This violates the privacy policy's guarantee that "the server cannot impersonate users" and that "device keys are generated on the client device and private keys never leave the device." If the server accepts OTKs from anyone, a compromised account can silently intercept another user's incoming messages.
+
+**Rule:** OTK and pre-key upload endpoints MUST verify that `req.user` owns the target device before accepting key material.
+
+**Current violation:** `POST /device/:id/otk` in `src/devices/devices.routes.ts` passes `req.user!.userID` to `saveOTKs()`, but `saveOTKs()` in `src/keys/keys.service.ts` does not verify the device belongs to that user — it inserts OTKs for any device ID.
+
+#### 2. Mail delivery failures must not be silent
+
+The privacy policy states: "Mail is deleted from the server after it is fetched by the intended recipient." This means the server is a **relay** — messages pass through briefly and are gone. If a mail save fails silently, the sender believes the message was delivered, but it was dropped. The recipient never receives it. There is no second chance — the OTK was already consumed, the session state has advanced, and the message is gone forever.
+
+Silent message loss is worse than a visible error. The user has no way to know the message was lost, no way to resend, and no audit trail.
+
+**Rule:** Mail save failures MUST propagate as errors to the sender. Never swallow errors in the mail pipeline.
+
+**Current violation:** `src/run.ts` line 45 — the WebSocket `onMail` handler calls `saveMail(db, result.data).catch(() => {})`, silently discarding all save errors.
+
+#### 3. Invite join must be atomic
+
+Server membership grants access to group channels and their encrypted message streams. If a race condition allows duplicate membership records or joining an expired invite, it undermines access control integrity.
+
+**Rule:** The invite validation → membership check → permission creation sequence MUST run inside a database transaction.
+
+**Current violation:** `POST /invite/:inviteID/join` in `src/servers/servers.routes.ts` performs three separate DB calls (`isInviteValid`, `hasPermission`, `createPermission`) without a transaction. Concurrent requests can bypass the membership check.
+
+#### 4. Auth endpoints must have stricter rate limits
+
+Login and registration endpoints are the only routes that accept passwords. The global rate limit (500 requests per 15 minutes) is far too permissive for credential-testing attacks. A dedicated attacker can attempt 500 passwords in 15 minutes per IP.
+
+**Rule:** Auth endpoints (`POST /auth`, `POST /register`) MUST have a separate, tighter rate limit (e.g., 10 attempts per 15 minutes) applied at the router level, on top of the global limit.
+
+**Current violation:** `src/app.ts` applies only `globalRateLimit` (500/15min). `src/auth/auth.routes.ts` has no `authRateLimit` middleware. The architecture doc's middleware order section already specifies this should exist — it was never implemented.
+
+### What the server must NOT enforce (anti-patterns)
+
+These are security measures that sound reasonable but would **violate the Vex privacy model** if implemented. They create surveillance infrastructure — the server gains knowledge about who talks to whom, or gains the ability to selectively deny service based on social graph information.
+
+#### Do NOT add access control to device listing
+
+`GET /user/:id/devices` MUST remain accessible to any authenticated user. This is a **protocol requirement**, not a missing access check.
+
+X3DH key exchange requires the sender to fetch the recipient's device list and key bundle *before* sending the first message. If the server restricts device listing to "own devices only," no one can send anyone a message. If the server restricts it to "contacts only," the server is now maintaining a social graph — it knows who talks to whom. The privacy policy explicitly states that the server should not build profiles of users and their conversations.
+
+Signal, Matrix, and every other E2E encrypted protocol with X3DH-style key exchange has open device/key bundle endpoints for the same reason.
+
+#### Do NOT add server-side file access control
+
+File uploads support a `nonce` field for client-side encryption metadata. The intended model is the same as mail: the server stores ciphertext, the client decrypts. If the server enforces "only the intended recipient can download this file," the server must track who each file is intended for — building a content-access graph that maps files to users.
+
+The correct fix is to ensure files are **always client-encrypted** (enforce non-empty nonce on upload). Then any user downloading the file gets ciphertext they cannot decrypt without the session key, and the server has no knowledge of file contents or intended recipients.
+
+#### Do NOT restrict user search
+
+`GET /users/search?query=` returns public user profiles. Usernames in Vex are public identifiers — you need to find someone to message them. Restricting search would force users to exchange userIDs out-of-band, which defeats the purpose of a chat platform. Basic length validation on the query parameter is fine (prevent empty/absurdly long queries), but do not add contact-list gating.
+
+---
+
 ## Learning Resources
 
 ### Start here (concepts)
@@ -418,13 +484,14 @@ The full model is in `AGENTS.md`. In brief:
 
 Read in this order:
 1. `docs/vex-overview.md` — what Vex is, components, and cryptographic protocol
-2. `docs/platform-strategy.md` — cross-platform architecture (Tauri+Svelte desktop, React Native mobile, shared packages)
-3. `docs/design-system.md` — Figma ↔ Storybook pipeline, Mitosis component strategy, designer/developer workflow
-4. `docs/auth-comparison.md` — how auth works, our design decisions
-5. `AGENTS.md` — implementation rules all contributors must follow
-6. `docs/testing-strategy.md` — how tests are structured
-7. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
-8. `docs/config.md` — env validation, secret hygiene, singleton pattern
-9. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
-10. `src/db/types.ts` — all 11 database tables
-11. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
+2. `docs/ops/` — start with `README.md`, then `journeys.md` (story map backbone), then `roadmap.md` (Now/Next/Later with stories and status)
+3. `docs/platform-strategy.md` — cross-platform architecture (Tauri+Svelte desktop, React Native mobile, shared packages)
+4. `docs/design-system.md` — Figma ↔ Storybook pipeline, Mitosis component strategy, designer/developer workflow
+5. `docs/auth-comparison.md` — how auth works, our design decisions
+6. `AGENTS.md` — implementation rules all contributors must follow
+7. `docs/testing-strategy.md` — how tests are structured
+8. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
+9. `docs/config.md` — env validation, secret hygiene, singleton pattern
+10. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
+11. `src/db/types.ts` — all 11 database tables
+12. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
