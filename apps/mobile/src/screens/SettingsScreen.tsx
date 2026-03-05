@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import { useStore } from '@nanostores/react'
+import notifee, { AndroidImportance } from '@notifee/react-native'
 import { $user, $client } from '../store'
 import { clearCredentials } from '../lib/keychain'
 
@@ -72,6 +73,25 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         <View style={styles.row}>
           <Text style={styles.label}>Version</Text>
           <Text style={styles.value}>0.1.0</Text>
+        </View>
+
+        <View style={[styles.row, styles.rowLast]}>
+          <View style={styles.rowInfo}>
+            <Text style={styles.label}>Notifications</Text>
+            <Text style={styles.desc}>Send a test notification</Text>
+          </View>
+          <TouchableOpacity style={styles.testBtn} onPress={async () => {
+            await notifee.createChannel({ id: 'vex-messages', name: 'Messages', importance: AndroidImportance.HIGH, sound: 'default' })
+            await notifee.displayNotification({
+              title: 'Test User',
+              body: 'This is a test notification from Vex.',
+              data: { authorID: 'test', username: 'Test User' },
+              android: { channelId: 'vex-messages', pressAction: { id: 'default' }, sound: 'default' },
+              ios: { sound: 'default' },
+            })
+          }}>
+            <Text style={styles.testBtnText}>Test</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -175,6 +195,18 @@ const styles = StyleSheet.create({
   },
   dangerBtnText: {
     color: '#e53935',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  testBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+  testBtnText: {
+    color: '#a0a0a0',
     fontSize: 13,
     fontWeight: '600',
   },
