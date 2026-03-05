@@ -16,6 +16,7 @@
   import { user, keyReplaced, servers, channels, client } from './lib/store/index.js'
   import { setupNotifications } from './lib/notifications.js'
   import { setupTray } from './lib/tray.js'
+  import { setupDeepLinks } from './lib/deeplink.js'
 
   const routes = {
     '/':                            Launch,
@@ -56,6 +57,13 @@
     const unNotify = setupNotifications(c, u.userID)
     const unTray = setupTray(c, u.userID)
     return () => { unNotify(); unTray() }
+  })
+
+  // Register vex:// deep-link handler
+  $effect(() => {
+    let unsub: (() => void) | undefined
+    setupDeepLinks().then((fn) => { unsub = fn })
+    return () => { unsub?.() }
   })
 
   // When navigating to a server without a channel, redirect to the first channel

@@ -23,16 +23,17 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/plugin-opener": "^2.5.3",
+    "@tauri-apps/plugin-deep-link": "^2.4.7",
     "@tauri-apps/plugin-notification": "^2",
-    "@vex-chat/crypto": "workspace:*",
-    "uuid": "catalog:",
+    "@tauri-apps/plugin-opener": "^2.5.3",
+    "@types/dompurify": "catalog:",
     "@types/uuid": "catalog:",
+    "@vex-chat/crypto": "workspace:*",
     "@vex-chat/store": "workspace:*",
     "@vex-chat/types": "workspace:*",
-    "svelte-spa-router": "^4.0.1",
-    "marked": "catalog:",
     "dompurify": "catalog:",
-    "@types/dompurify": "catalog:"
+    "marked": "catalog:",
+    "svelte-spa-router": "^4.0.1",
+    "uuid": "catalog:"
   }
 }
