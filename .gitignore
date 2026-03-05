@@ -7,6 +7,12 @@ node_modules
 
 AGENTS.md
 
+# iOS
+apps/mobile/ios/Pods/
+apps/mobile/ios/build/
+apps/mobile/ios/.xcode.env.local
+apps/mobile/ios/VexMobile.xcworkspace/xcuserdata/
+
 # Dolt database files
 .dolt/
 *.db

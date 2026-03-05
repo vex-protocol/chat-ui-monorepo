@@ -4,6 +4,50 @@ How to configure bare React Native inside this pnpm workspace. Covers Metro, Typ
 
 ---
 
+## iOS Development Setup
+
+Before running `pnpm dev`, you need the following on macOS:
+
+### Prerequisites
+
+1. **Xcode** (not just Command Line Tools) — install from the Mac App Store
+2. **Xcode Command Line Tools** — run `xcode-select --install` if not already present
+3. **Point xcode-select to Xcode** — required after installing Xcode or if you see `xcode-select: error: tool 'xcodebuild' requires Xcode`:
+   ```bash
+   sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+   ```
+4. **CocoaPods** — managed via mise (see `mise.toml`). Run `mise install` from the repo root — it installs Ruby 3.3 and CocoaPods automatically on macOS (skipped on Linux). Make sure mise is activated in your shell (`mise activate zsh` / `mise activate bash`).
+5. **iOS Simulator** — open Xcode → Settings → Platforms → download an iOS Simulator runtime
+
+### Install pods
+
+From the repo root:
+
+```bash
+pnpm --filter @vex-chat/mobile run pod-install
+```
+
+Or manually:
+
+```bash
+cd apps/mobile/ios && pod install
+```
+
+Run `pod install` again whenever native dependencies change (new RN libraries, version bumps). The `pod-install` script is macOS-only — it's a no-op on Linux.
+
+### Verify setup
+
+```bash
+xcodebuild -version   # Should print Xcode and Build version
+pod --version          # Should print CocoaPods version (installed via mise)
+```
+
+> **Note:** If `pod` is not found after `mise install`, make sure mise is activated in your shell. Add `eval "$(mise activate zsh)"` to your `~/.zshrc` (or equivalent for your shell).
+
+If `xcodebuild -version` fails with a Command Line Tools error, re-run step 3 above.
+
+---
+
 ## The Core Problem
 
 pnpm's default isolation builds a virtual store under `.pnpm/` and places only direct dependencies (as symlinks) in each package's `node_modules/`. Metro was designed for npm/Yarn's flat `node_modules` — it climbs the directory tree and can load packages from the wrong location, causing duplicate React instances and "Invalid hook call" errors.
