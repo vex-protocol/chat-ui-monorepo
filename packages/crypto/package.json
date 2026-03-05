@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@noble/curves": "catalog:",
-    "@noble/hashes": "catalog:"
+    "@noble/hashes": "catalog:",
+    "@noble/ciphers": "catalog:"
   }
 }

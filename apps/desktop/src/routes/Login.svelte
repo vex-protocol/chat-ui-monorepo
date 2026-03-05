@@ -20,6 +20,7 @@
       const savedUsername = localStorage.getItem('vex-username')
       const deviceKeyHex = localStorage.getItem('vex-device-key')
       const deviceIDHex = localStorage.getItem('vex-device-id')
+      const preKeyHex = localStorage.getItem('vex-prekey')
 
       if (!deviceKeyHex || !deviceIDHex) {
         error = 'No device key found. Please register first.'
@@ -52,7 +53,8 @@
 
       // 3. Bootstrap store with device key + JWT
       const deviceKey = decodeHex(deviceKeyHex)
-      await bootstrap(SERVER_URL, deviceIDHex, deviceKey, token)
+      const preKeySecret = preKeyHex ? decodeHex(preKeyHex) : undefined
+      await bootstrap(SERVER_URL, deviceIDHex, deviceKey, token, preKeySecret)
 
       // Navigate into the app
       if (userAtom.get()) {

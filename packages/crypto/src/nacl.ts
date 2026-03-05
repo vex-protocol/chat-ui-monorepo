@@ -65,3 +65,11 @@ export function generateSignKeyPair(): { publicKey: Uint8Array; secretKey: Uint8
   const publicKey = ed25519.getPublicKey(secretKey)
   return { publicKey, secretKey }
 }
+
+/**
+ * Derives the Ed25519 public key from a 32-byte secret key seed.
+ * Use this to recover the public key from a stored secret key.
+ */
+export function derivePublicKey(secretKey: Uint8Array): Uint8Array {
+  return ed25519.getPublicKey(secretKey)
+}

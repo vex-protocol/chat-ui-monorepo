@@ -11,6 +11,7 @@
   onMount(() => {
     const deviceID = localStorage.getItem('vex-device-id')
     const deviceKeyHex = localStorage.getItem('vex-device-key')
+    const preKeyHex = localStorage.getItem('vex-prekey')
 
     if (!deviceID || !deviceKeyHex) {
       push('/login')
@@ -20,8 +21,11 @@
     const deviceKey = new Uint8Array(
       deviceKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
     )
+    const preKeySecret = preKeyHex
+      ? new Uint8Array(preKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)))
+      : undefined
 
-    bootstrap(SERVER_URL, deviceID, deviceKey).catch(() => push('/login'))
+    bootstrap(SERVER_URL, deviceID, deviceKey, undefined, preKeySecret).catch(() => push('/login'))
 
     // Watch $user — once set, navigate to the main app
     const unsub = user.subscribe((u) => {

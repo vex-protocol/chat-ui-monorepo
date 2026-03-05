@@ -20,17 +20,21 @@ export const $keyReplaced = atom<boolean>(false)
  * Call this once during app startup before rendering any components that read
  * atoms. Calling it a second time replaces the previous client.
  *
- * @param serverUrl - Base HTTP URL of the Vex server (e.g. 'https://chat.example.com')
- * @param deviceID  - UUID of the registered device
- * @param deviceKey - Ed25519 secret key for the device (64 bytes)
+ * @param serverUrl    - Base HTTP URL of the Vex server (e.g. 'https://chat.example.com')
+ * @param deviceID     - UUID of the registered device
+ * @param deviceKey    - Ed25519 secret key seed for the device (32 bytes)
+ * @param authToken    - Optional JWT to pre-seed the client (from login/register response)
+ * @param preKeySecret - Ed25519 secret key seed of the registered preKey (32 bytes).
+ *                       Required to decrypt incoming messages via SessionManager.
  */
 export async function bootstrap(
   serverUrl: string,
   deviceID: string,
   deviceKey: Uint8Array,
   authToken?: string,
+  preKeySecret?: Uint8Array,
 ): Promise<void> {
-  const client = VexClient.create(serverUrl, deviceID, deviceKey)
+  const client = VexClient.create(serverUrl, deviceID, deviceKey, preKeySecret)
   if (authToken) client.setAuthToken(authToken)
   $client.set(client)
 
@@ -40,8 +44,9 @@ export async function bootstrap(
   })
 
   client.on('mail', (mail) => {
+    // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
     if (mail.group) {
-      // Group / channel message
+      // Group / channel message — key by channelID
       const prev = $groupMessages.get()[mail.group] ?? []
       $groupMessages.setKey(mail.group, [...prev, mail])
     } else {

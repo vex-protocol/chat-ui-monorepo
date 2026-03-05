@@ -11,6 +11,7 @@ export interface AuthUser {
   userID: string    // uuid.stringify(regKey) — derived from client NaCl signature, not server-assigned
   username: string
   lastSeen: string  // ISO timestamp
+  deviceID?: string // UUID of the newly created device — only present in registration responses
 }
 
 function censorUser(row: { userID: string; username: string; lastSeen: string }): CensoredUser {
@@ -79,7 +80,7 @@ export async function registerUser(
     throw err
   }
 
-  return { userID, username: payload.username, lastSeen: now }
+  return { userID, username: payload.username, lastSeen: now, deviceID }
 }
 
 /**
