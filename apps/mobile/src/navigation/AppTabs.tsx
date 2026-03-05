@@ -1,6 +1,6 @@
 import React from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { DMListScreen } from '../screens/DMListScreen'
+import { DMsStack } from './DMsStack'
 import { ServersStack } from './ServersStack'
 import { SettingsScreen } from '../screens/SettingsScreen'
 
@@ -17,7 +17,7 @@ export function AppTabs() {
         tabBarInactiveTintColor: '#666666',
       }}
     >
-      <Tab.Screen name="DMs" component={DMListScreen} />
+      <Tab.Screen name="DMs" component={DMsStack} options={{ headerShown: false }} />
       <Tab.Screen name="Servers" component={ServersStack} options={{ headerShown: false }} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
