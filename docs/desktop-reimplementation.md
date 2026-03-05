@@ -304,7 +304,7 @@ WS → VexClient ("mail" event)
 | Message rendering (MessageBox, ChatInput) | ✓ Done (chunkMessages, markdown, Avatar) |
 | Direct messaging | ✓ Done (Messaging route, DM send via listDevices) |
 | Servers / channels | ✓ Done (ServerChannel route, create server/channel) |
-| Server management (create, invite, settings) | Partial — create server + channel done; invite/settings not started |
+| Server management (create, invite, settings) | Partial — create server + channel done; invite system half-built in spire (create/list endpoints exist, no join/redeem endpoint); no UI |
 | User search & familiars | ✓ Done (FamiliarsList with search + localStorage persistence) |
 | Avatar system | ✓ Done (shared Mitosis Avatar component) |
 | Sound effects | ✓ Done (auth + notification audio) |

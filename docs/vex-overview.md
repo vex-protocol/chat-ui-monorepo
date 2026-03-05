@@ -37,10 +37,9 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `apps/desktop` | `vex-desktop` | Tauri 2.0 + Svelte (replaces Electron+React) |
 | `apps/mobile` | — | React Native mobile client (new) |
 | `packages/types` | `types-js` | Shared TypeScript interfaces and enums |
-| `packages/core` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
-| `packages/crypto` | `crypto-js` | NaCl encryption, key management |
-| `packages/validation` | — | Input validation, message formatting |
-| `packages/store` | — | Framework-agnostic state containers (event emitter pattern) |
+| `packages/libvex` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
+| `packages/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
+| `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
 | `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
 
 See `docs/platform-strategy.md` for architecture details and `docs/design-system.md` for the Figma ↔ Storybook pipeline.
@@ -49,7 +48,7 @@ See `docs/platform-strategy.md` for architecture details and `docs/design-system
 
 ## Cryptographic Protocol
 
-Vex uses **TweetNaCl** (NaCl/Curve25519) throughout.
+Vex uses **@noble/curves** (Ed25519/Curve25519) throughout. The original upstream used tweetnacl; we migrated to @noble/curves for RFC 8032 compliance and active maintenance.
 
 ### Key hierarchy
 
