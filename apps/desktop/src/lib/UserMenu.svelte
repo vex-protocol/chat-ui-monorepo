@@ -24,31 +24,33 @@
 </script>
 
 <div class="user-menu">
-  <button
-    class="user-menu__trigger"
-    onclick={() => (menuOpen = !menuOpen)}
-    aria-label="User menu"
-    aria-expanded={menuOpen}
-  >
-    <div class="user-menu__avatar-wrap">
-      {#if userID}
-        <Avatar {userID} serverUrl={getServerUrl()} version={$avatarHash} size={32} name={username} />
-      {:else}
-        <div class="user-menu__avatar" title={username}>?</div>
-      {/if}
-      <span class="user-menu__status-dot"></span>
-    </div>
-    <div class="user-menu__info">
-      <span class="user-menu__name">{username || 'Not logged in'}</span>
-      <span class="user-menu__status-text">online</span>
-    </div>
+  <div class="user-menu__trigger-row">
+    <button
+      class="user-menu__trigger"
+      onclick={() => (menuOpen = !menuOpen)}
+      aria-label="User menu"
+      aria-expanded={menuOpen}
+    >
+      <div class="user-menu__avatar-wrap">
+        {#if userID}
+          <Avatar {userID} serverUrl={getServerUrl()} version={$avatarHash} size={32} name={username} />
+        {:else}
+          <div class="user-menu__avatar" title={username}>?</div>
+        {/if}
+        <span class="user-menu__status-dot"></span>
+      </div>
+      <div class="user-menu__info">
+        <span class="user-menu__name">{username || 'Not logged in'}</span>
+        <span class="user-menu__status-text">online</span>
+      </div>
+    </button>
     <button
       class="user-menu__gear"
       onclick={openSettings}
       title="Settings"
       aria-label="Settings"
     >⚙</button>
-  </button>
+  </div>
 
   {#if menuOpen}
     <div class="user-menu__dropdown" role="menu">
@@ -77,14 +79,21 @@
     flex-shrink: 0;
   }
 
+  .user-menu__trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+
   .user-menu__trigger {
-    width: 100%;
+    flex: 1;
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 4px;
     border-radius: 4px;
     transition: background 0.1s;
+    min-width: 0;
   }
 
   .user-menu__trigger:hover { background: var(--bg-hover); }

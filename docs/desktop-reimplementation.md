@@ -315,7 +315,7 @@ WS → VexClient ("mail" event)
 | System tray | ✓ Done (macOS tray, restore from minimized) |
 | Deep links (vex://) | — Not started |
 | Auto-update | — Not started |
-| **Desktop UI polish** | — Needed (server bar pill, top header bar, members sidebar, user status bar) |
+| **Desktop UI polish** | Done (server bar pill indicators, header action icons, members sidebar, user status bar, chat input redesign) |
 
 ### `packages/store`
 
@@ -346,6 +346,6 @@ WS → VexClient ("mail" event)
 | React Native scaffold + navigation | ✓ Done (bare RN, bottom tabs, stack navigators) |
 | Auth screens (login, register, keychain) | ✓ Done |
 | Servers & channels screens | ✓ Done (ServerList, ChannelList, Channel) |
-| Direct messaging | ◐ In progress (DMListScreen, ConversationScreen) |
+| Direct messaging | Done (DMListScreen with search + familiars, ConversationScreen with send) |
 | Push notifications | — Not started |
-| Settings | — Not started |
+| Settings | Done (account info, danger zone with sign out + clear keys) |
