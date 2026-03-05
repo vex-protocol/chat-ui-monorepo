@@ -29,6 +29,9 @@
     "@types/uuid": "catalog:",
     "@vex-chat/store": "workspace:*",
     "@vex-chat/types": "workspace:*",
-    "svelte-spa-router": "^4.0.1"
+    "svelte-spa-router": "^4.0.1",
+    "marked": "catalog:",
+    "dompurify": "catalog:",
+    "@types/dompurify": "catalog:"
   }
 }
