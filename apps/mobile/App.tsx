@@ -8,12 +8,18 @@ import { bootstrap, $keyReplaced, $user, $client } from './src/store'
 import { loadCredentials, clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
-import { requestNotificationPermission, showMessageNotification } from './src/lib/notifications'
+import { navigationRef } from './src/navigation/navigationRef'
+import { requestNotificationPermission, showMessageNotification, setupNotificationHandlers } from './src/lib/notifications'
 
 function App() {
   const keyReplaced = useStore($keyReplaced)
   const user = useStore($user)
   const client = useStore($client)
+
+  useEffect(() => {
+    const unsubNotif = setupNotificationHandlers()
+    return () => { unsubNotif() }
+  }, [])
 
   useEffect(() => {
     // Auto-login: try loading credentials from keychain on mount
@@ -54,6 +60,7 @@ function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
       <NavigationContainer
+        ref={navigationRef}
         theme={{
           dark: true,
           colors: {
