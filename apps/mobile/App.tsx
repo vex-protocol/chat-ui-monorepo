@@ -4,18 +4,22 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
 import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced, $user } from './src/store'
+import { bootstrap, $keyReplaced, $user, $client } from './src/store'
 import { loadCredentials, clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
+import { requestNotificationPermission, showMessageNotification } from './src/lib/notifications'
 
 function App() {
   const keyReplaced = useStore($keyReplaced)
   const user = useStore($user)
+  const client = useStore($client)
 
   useEffect(() => {
     // Auto-login: try loading credentials from keychain on mount
     ;(async () => {
+      await requestNotificationPermission()
+
       const creds = await loadCredentials()
       if (!creds) return
 
@@ -30,6 +34,13 @@ function App() {
       }
     })()
   }, [])
+
+  // Show local notifications for incoming messages when app is backgrounded
+  useEffect(() => {
+    if (!client) return
+    client.on('mail', showMessageNotification)
+    return () => { client.off('mail', showMessageNotification) }
+  }, [client])
 
   useEffect(() => {
     if (keyReplaced) {
