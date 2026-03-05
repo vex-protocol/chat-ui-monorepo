@@ -11,6 +11,8 @@ import { migrateToLatest } from '#db/migrate.ts'
 import { createTokenStore } from '#auth/auth.token-store.ts'
 import { createConnectionManager } from '#ws/ws.service.ts'
 import { createApp } from './app.ts'
+import { saveMail } from '#mail/mail.service.ts'
+import { MailPayloadSchema } from '#mail/mail.schemas.ts'
 import { rootLogger as logger } from './utils/logger.ts'
 
 let config: ReturnType<typeof parseConfig>
@@ -30,14 +32,29 @@ const db = createDb(config)
 await migrateToLatest(db)
 
 const tokenStore = createTokenStore()
-const app = createApp(db, tokenStore, config.JWT_SECRET, config.OPEN_REGISTRATION)
+
+// Create connManager before createApp so we can pass sendToDevice into the HTTP mail route
+const connManager = createConnectionManager({
+  onMail: (_senderDeviceID, payload) => {
+    const result = MailPayloadSchema.safeParse(payload)
+    if (!result.success) return
+    saveMail(db, result.data)
+      .then(() => {
+        connManager.send(result.data.recipient, JSON.stringify({ resource: 'mail', ...result.data }))
+      })
+      .catch(() => {})
+  },
+})
+
+const app = createApp(db, tokenStore, config.JWT_SECRET, config.OPEN_REGISTRATION, (deviceID, data) =>
+  connManager.send(deviceID, data),
+)
 if (config.OPEN_REGISTRATION) {
   logger.warn('OPEN_REGISTRATION=true — unauthenticated /token/open/register is active. Disable in production.')
 }
 
 const httpServer = createServer(app)
 
-const connManager = createConnectionManager()
 const wss = new WebSocketServer({ server: httpServer })
 wss.on('connection', ws => connManager.handleConnection(ws, db))
 

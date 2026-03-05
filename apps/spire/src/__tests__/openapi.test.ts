@@ -64,11 +64,14 @@ const expectedPaths = [
   ['get', '/user/{id}/servers'],
   // Devices
   ['get', '/device/{id}'],
-  ['post', '/device/{id}/keyBundle'],
-  ['post', '/device/{id}/mail'],
   ['post', '/device/{id}/connect'],
   ['get', '/device/{id}/otk/count'],
   ['post', '/device/{id}/otk'],
+  // Keys
+  ['get', '/keys/{deviceID}'],
+  // Mail
+  ['post', '/mail'],
+  ['get', '/mail/{deviceID}'],
   // Servers
   ['get', '/server/{id}'],
   ['post', '/server'],
