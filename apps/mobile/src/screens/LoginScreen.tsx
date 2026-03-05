@@ -85,6 +85,7 @@ export function LoginScreen({ navigation }: { navigation: any }) {
             style={styles.input}
             value={username}
             onChangeText={setUsername}
+            onChange={(e) => setUsername(e.nativeEvent.text)}
             placeholder="your username"
             placeholderTextColor="#666666"
             autoCapitalize="none"
@@ -99,6 +100,7 @@ export function LoginScreen({ navigation }: { navigation: any }) {
             style={styles.input}
             value={password}
             onChangeText={setPassword}
+            onChange={(e) => setPassword(e.nativeEvent.text)}
             placeholder="••••••••"
             placeholderTextColor="#666666"
             secureTextEntry
