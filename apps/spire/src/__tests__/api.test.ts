@@ -13,8 +13,11 @@
 import supertest from 'supertest'
 import { generateSignKeyPair, signMessage } from '@vex-chat/crypto'
 import express from 'express'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterAll } from 'vitest'
 import { v4 as uuidv4 } from 'uuid'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { useDb } from '#test/helpers/db.ts'
 import { makeRegistrationPayload, makeDevicePayload } from '#test/helpers/factories.ts'
 import { createTokenStore } from '#auth/auth.token-store.ts'
@@ -41,10 +44,10 @@ type TestEnv = {
   agent: Agent
 }
 
-async function makeEnv(): Promise<TestEnv> {
+async function makeEnv(dataDir?: string): Promise<TestEnv> {
   const db = await useDb()
   const tokenStore = createTokenStore()
-  const app = createApp(db, tokenStore, process.env['JWT_SECRET']!)
+  const app = createApp(db, tokenStore, process.env['JWT_SECRET']!, false, undefined, dataDir)
 
   const env: TestEnv = {
     db,
@@ -797,5 +800,106 @@ describe('POST /invite/:inviteID/join', () => {
   it('returns 401 when not authenticated', async () => {
     const env = await makeEnv()
     await supertest(env.app).post(`/invite/${uuidv4()}/join`).expect(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// File upload / download
+// ---------------------------------------------------------------------------
+
+describe('POST /file', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'vex-file-test-'))
+  afterAll(() => { rmSync(tempDir, { recursive: true, force: true }) })
+
+  it('uploads a file and returns fileID', async () => {
+    const env = await makeEnv(tempDir)
+    await registerUser(env)
+
+    const body = Buffer.from('hello world')
+    const res = await env.agent
+      .post('/file')
+      .set('Content-Type', 'text/plain')
+      .send(body)
+      .expect(200)
+
+    expect(res.body.fileID).toBeTypeOf('string')
+    expect(res.body.fileID.length).toBeGreaterThan(0)
+  })
+
+  it('returns 400 for empty body', async () => {
+    const env = await makeEnv(tempDir)
+    await registerUser(env)
+
+    await env.agent
+      .post('/file')
+      .set('Content-Type', 'application/octet-stream')
+      .send(Buffer.alloc(0))
+      .expect(400)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv(tempDir)
+    await supertest(env.app)
+      .post('/file')
+      .set('Content-Type', 'text/plain')
+      .send(Buffer.from('test'))
+      .expect(401)
+  })
+})
+
+describe('GET /file/:id', () => {
+  const tempDir = mkdtempSync(path.join(tmpdir(), 'vex-file-test-'))
+  afterAll(() => { rmSync(tempDir, { recursive: true, force: true }) })
+
+  it('downloads the uploaded file with correct content type', async () => {
+    const env = await makeEnv(tempDir)
+    await registerUser(env)
+
+    const body = Buffer.from('file content here')
+    const uploadRes = await env.agent
+      .post('/file')
+      .set('Content-Type', 'image/png')
+      .send(body)
+      .expect(200)
+
+    const downloadRes = await env.agent
+      .get(`/file/${uploadRes.body.fileID}`)
+      .expect(200)
+
+    expect(downloadRes.headers['content-type']).toContain('image/png')
+    expect(Buffer.from(downloadRes.body).toString()).toBe('file content here')
+  })
+
+  it('returns nonce in X-File-Nonce header', async () => {
+    const env = await makeEnv(tempDir)
+    await registerUser(env)
+
+    const body = Buffer.from('encrypted data')
+    const uploadRes = await env.agent
+      .post('/file')
+      .set('Content-Type', 'application/octet-stream')
+      .set('X-File-Nonce', 'abc123nonce')
+      .send(body)
+      .expect(200)
+
+    expect(uploadRes.body.nonce).toBe('abc123nonce')
+
+    const downloadRes = await env.agent
+      .get(`/file/${uploadRes.body.fileID}`)
+      .expect(200)
+
+    expect(downloadRes.headers['x-file-nonce']).toBe('abc123nonce')
+  })
+
+  it('returns 404 for unknown fileID', async () => {
+    const env = await makeEnv(tempDir)
+    await registerUser(env)
+
+    await env.agent.get(`/file/${uuidv4()}`).expect(404)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv(tempDir)
+    await supertest(env.app).get(`/file/${uuidv4()}`).expect(401)
   })
 })
