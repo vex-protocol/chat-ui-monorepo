@@ -53,8 +53,8 @@ export class HttpClient {
     }
   }
 
-  async postRaw(path: string, body: Uint8Array, contentType: string): Promise<HttpResult<void>> {
-    const h: Record<string, string> = { 'Content-Type': contentType }
+  async postRaw(path: string, body: Uint8Array, contentType: string, extraHeaders?: Record<string, string>): Promise<HttpResult<void>> {
+    const h: Record<string, string> = { 'Content-Type': contentType, ...extraHeaders }
     if (this.token) h['Authorization'] = `Bearer ${this.token}`
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
@@ -65,6 +65,42 @@ export class HttpClient {
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: undefined }
+    } catch (err) {
+      return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
+    }
+  }
+
+  async postRawJson<T>(path: string, body: Uint8Array, contentType: string, extraHeaders?: Record<string, string>): Promise<HttpResult<T>> {
+    const h: Record<string, string> = { 'Content-Type': contentType, ...extraHeaders }
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: h,
+        credentials: 'include',
+        body: body as BodyInit,
+      })
+      if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
+      return { ok: true, data: (await res.json()) as T }
+    } catch (err) {
+      return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
+    }
+  }
+
+  async getRaw(path: string): Promise<HttpResult<{ data: Uint8Array; contentType: string; headers: Record<string, string> }>> {
+    const h: Record<string, string> = {}
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        headers: h,
+        credentials: 'include',
+      })
+      if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
+      const buf = new Uint8Array(await res.arrayBuffer())
+      const contentType = res.headers.get('content-type') ?? 'application/octet-stream'
+      const responseHeaders: Record<string, string> = {}
+      res.headers.forEach((v, k) => { responseHeaders[k] = v })
+      return { ok: true, data: { data: buf, contentType, headers: responseHeaders } }
     } catch (err) {
       return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
     }

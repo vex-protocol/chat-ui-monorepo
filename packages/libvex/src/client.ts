@@ -317,4 +317,41 @@ export class VexClient extends EventEmitter<VexEvents> {
     const result = await this.http.delete(`/server/${serverID}/invites/${inviteID}`)
     if (!result.ok) throw new Error(result.error.message)
   }
+
+  // ── Files ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Uploads a file to the server.
+   * @param data        - Raw file bytes
+   * @param contentType - MIME type (e.g. 'image/png', 'application/pdf')
+   * @param nonce       - Optional nonce for client-side encryption metadata
+   * @returns The assigned fileID and nonce
+   */
+  async uploadFile(data: Uint8Array, contentType: string, nonce = ''): Promise<{ fileID: string; nonce: string }> {
+    const extra: Record<string, string> = {}
+    if (nonce) extra['X-File-Nonce'] = nonce
+    const result = await this.http.postRawJson<{ fileID: string; nonce: string }>('/file', data, contentType, extra)
+    if (!result.ok) throw new Error(result.error.message)
+    return result.data
+  }
+
+  /**
+   * Downloads a file from the server.
+   * @param fileID - The file's UUID
+   * @returns The file data, content type, and nonce
+   */
+  async downloadFile(fileID: string): Promise<{ data: Uint8Array; contentType: string; nonce: string }> {
+    const result = await this.http.getRaw(`/file/${fileID}`)
+    if (!result.ok) throw new Error(result.error.message)
+    return {
+      data: result.data.data,
+      contentType: result.data.contentType,
+      nonce: result.data.headers['x-file-nonce'] ?? '',
+    }
+  }
+
+  /** Returns the URL for a file (for use in <img> tags etc.) */
+  fileUrl(fileID: string): string {
+    return `${this.serverUrl}/file/${fileID}`
+  }
 }
