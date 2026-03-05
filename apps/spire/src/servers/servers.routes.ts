@@ -8,6 +8,7 @@ import {
   deleteServer,
   createChannel,
   getChannels,
+  deleteChannel,
 } from '#servers/servers.service.ts'
 import { CreateServerSchema } from '#servers/servers.schemas.ts'
 import {
@@ -79,6 +80,15 @@ export function createServerRouter(db: Kysely<Database>, checkAuth: RequestHandl
     try {
       const channels = await getChannels(db, req.params.id)
       res.json(channels)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  router.delete('/channel/:id', checkAuth, async (req, res, next) => {
+    try {
+      await deleteChannel(db, req.params.id)
+      res.json({ ok: true })
     } catch (err) {
       next(err)
     }

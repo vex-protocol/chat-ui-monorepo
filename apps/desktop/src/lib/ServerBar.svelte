@@ -1,12 +1,11 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import type { IServer } from '@vex-chat/types'
+  import CreateServerModal from './CreateServerModal.svelte'
 
   let { serverList = [], activeServerID = '' }: { serverList?: IServer[]; activeServerID?: string } = $props()
 
-  function navToServer(id: string) {
-    push(`/server/${id}/text/general`)
-  }
+  let showCreate = $state(false)
 </script>
 
 <nav class="server-bar" aria-label="Servers">
@@ -15,7 +14,7 @@
       <li>
         <button
           class="server-bar__item {activeServerID === server.serverID ? 'server-bar__item--active' : ''}"
-          onclick={() => navToServer(server.serverID)}
+          onclick={() => push(`/server/${server.serverID}/`)}
           title={server.name}
           aria-label={server.name}
         >
@@ -27,12 +26,21 @@
     <li class="server-bar__divider" role="separator"></li>
 
     <li>
-      <button class="server-bar__item server-bar__item--add" title="Add Server" aria-label="Add server">
+      <button
+        class="server-bar__item server-bar__item--add"
+        title="Create Server"
+        aria-label="Create server"
+        onclick={() => { showCreate = true }}
+      >
         +
       </button>
     </li>
   </ul>
 </nav>
+
+{#if showCreate}
+  <CreateServerModal onclose={() => { showCreate = false }} />
+{/if}
 
 <style>
   .server-bar {

@@ -43,6 +43,16 @@
       push('/login')
     }
   })
+
+  // When navigating to a server without a channel, redirect to the first channel
+  $effect(() => {
+    if (activeServerID && !activeChannelID) {
+      const first = activeChannels[0]
+      if (first) {
+        push(`/server/${activeServerID}/${first.channelID}`)
+      }
+    }
+  })
 </script>
 
 <div class="app">
