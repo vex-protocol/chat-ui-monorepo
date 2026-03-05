@@ -5,8 +5,9 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
-    "dev": "react-native start",
+    "dev": "if [ \"$(uname)\" = \"Darwin\" ]; then react-native run-ios; else react-native run-android; fi",
     "start": "react-native start",
+    "pod-install": "if [ \"$(uname)\" = \"Darwin\" ]; then cd ios && pod install; fi",
     "test": "jest"
   },
   "dependencies": {
