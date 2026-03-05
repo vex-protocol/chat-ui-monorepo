@@ -11,8 +11,8 @@ export async function createServer(
   return result.data
 }
 
-export async function listServers(http: HttpClient): Promise<IServer[]> {
-  const result = await http.get<IServer[]>('/server')
+export async function listServers(http: HttpClient, userID: string): Promise<IServer[]> {
+  const result = await http.get<IServer[]>(`/user/${userID}/servers`)
   if (!result.ok) throw new Error(result.error.message)
   return result.data
 }
@@ -28,7 +28,7 @@ export async function createChannel(
   serverID: string,
   name: string,
 ): Promise<IChannel> {
-  const result = await http.post<IChannel>('/channel', { serverID, name })
+  const result = await http.post<IChannel>(`/server/${serverID}/channels`, { name })
   if (!result.ok) throw new Error(result.error.message)
   return result.data
 }

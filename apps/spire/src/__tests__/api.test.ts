@@ -205,6 +205,65 @@ describe('GET /token/:type', () => {
 // User routes
 // ---------------------------------------------------------------------------
 
+describe('GET /users/search', () => {
+  it('returns users matching the query', async () => {
+    const env = await makeEnv()
+    await registerUser(env, { username: 'alice' })
+
+    const res = await env.agent.get('/users/search?q=ali').expect(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body.some((u: { username: string }) => u.username === 'alice')).toBe(true)
+  })
+
+  it('returns empty array for no matches', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const res = await env.agent.get('/users/search?q=zzznomatch').expect(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('returns empty array when q is empty', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const res = await env.agent.get('/users/search?q=').expect(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).get('/users/search?q=alice').expect(401)
+  })
+})
+
+describe('GET /user/:id/servers', () => {
+  it('returns servers the user is a member of', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    await env.agent.post('/server').send({ name: 'MyServer', icon: 'i.png' }).expect(200)
+
+    const res = await env.agent.get(`/user/${user.userID}/servers`).expect(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body.length).toBeGreaterThanOrEqual(1)
+    expect(res.body[0].name).toBe('MyServer')
+  })
+
+  it('returns empty array for a user with no servers', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const res = await env.agent.get(`/user/${user.userID}/servers`).expect(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).get(`/user/${uuidv4()}/servers`).expect(401)
+  })
+})
+
 describe('GET /user/:id', () => {
   it('returns a censored user (no passwordHash)', async () => {
     const env = await makeEnv()

@@ -62,6 +62,7 @@ const expectedPaths = [
   ['delete', '/user/{userID}/devices/{deviceID}'],
   ['get', '/user/{id}/permissions'],
   ['get', '/user/{id}/servers'],
+  ['get', '/users/search'],
   // Devices
   ['get', '/device/{id}'],
   ['post', '/device/{id}/connect'],

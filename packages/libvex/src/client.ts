@@ -11,6 +11,7 @@ import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle } from './devices.ts'
 import { createServer, listServers, listChannels, createChannel } from './servers.ts'
+import { getUser as getUserById, searchUsers as searchUsersHttp } from './users.ts'
 
 export interface VexEvents {
   /** Emitted when the WebSocket connection is established (before auth handshake). */
@@ -231,7 +232,18 @@ export class VexClient extends EventEmitter<VexEvents> {
 
   /** Returns all servers the authenticated user is a member of. */
   async listServers(): Promise<IServer[]> {
-    return listServers(this.http)
+    if (!this.currentUserID) return []
+    return listServers(this.http, this.currentUserID)
+  }
+
+  /** Returns the public profile for a user by ID, or null if not found. */
+  async getUser(userID: string): Promise<IUser | null> {
+    return getUserById(this.http, userID)
+  }
+
+  /** Searches for users by username substring. Returns at most 10 results. */
+  async searchUsers(query: string): Promise<IUser[]> {
+    return searchUsersHttp(this.http, query)
   }
 
   /** Returns all channels within a server. */

@@ -62,6 +62,7 @@ registry.registerPath({ method: 'post',   path: '/user/{id}/devices',           
 registry.registerPath({ method: 'delete', path: '/user/{userID}/devices/{deviceID}', operationId: 'deleteDevice',     security: auth, request: { params: pid(['userID', 'deviceID']) },      responses: { 200: { description: 'Deleted' } } })
 registry.registerPath({ method: 'get',    path: '/user/{id}/permissions',            operationId: 'getUserPerms',     security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Permissions' } } })
 registry.registerPath({ method: 'get',    path: '/user/{id}/servers',                operationId: 'getUserServers',   security: auth, request: { params: pid(['id']) },                      responses: { 200: { description: 'Servers' } } })
+registry.registerPath({ method: 'get',    path: '/users/search',                     operationId: 'searchUsers',      security: auth, request: { query: z.object({ q: z.string() }) },        responses: { 200: { description: 'Matching users' } } })
 
 // Devices
 registry.registerPath({ method: 'get',  path: '/device/{id}',            operationId: 'getDevice',     security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Device' },    404: { description: 'Not found' } } })

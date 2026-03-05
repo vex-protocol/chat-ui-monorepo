@@ -26,17 +26,19 @@ export async function login(
   username: string,
   password: string,
 ): Promise<LoginResult> {
-  const result = await http.post<{ user: IUser; token: string }>('/auth', { username, password })
+  // Spire returns a flat response: { token, userID, username, lastSeen }
+  const result = await http.post<{ token: string; userID: string; username: string; lastSeen: string }>('/auth', { username, password })
   if (!result.ok) return { ok: false, error: result.error }
-  return { ok: true, user: result.data.user, token: result.data.token }
+  const { token, ...user } = result.data
+  return { ok: true, user, token }
 }
 
 export async function logout(http: HttpClient): Promise<void> {
-  await http.post('/logout')
+  await http.post('/goodbye')
 }
 
 export async function whoami(http: HttpClient): Promise<IUser> {
-  const result = await http.get<IUser>('/users/me')
+  const result = await http.post<IUser>('/whoami')
   if (!result.ok) throw new Error(result.error.message)
   return result.data
 }
