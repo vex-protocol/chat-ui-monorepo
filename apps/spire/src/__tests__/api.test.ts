@@ -295,6 +295,141 @@ describe('POST /device/:id/otk', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Keys routes
+// ---------------------------------------------------------------------------
+
+describe('GET /keys/:deviceID', () => {
+  it('returns key bundle for a registered device with a pre-key', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    const res = await env.agent.get(`/keys/${deviceID}`).expect(200)
+    expect(res.body.signKey).toBeTypeOf('string')
+    expect(res.body.preKey).toBeDefined()
+    expect(res.body.preKey.publicKey).toBeTypeOf('string')
+    expect(res.body.otk).toBeNull() // no OTKs uploaded yet
+  })
+
+  it('returns 404 for a device with no pre-key', async () => {
+    await env404()
+
+    async function env404() {
+      const env = await makeEnv()
+      await registerUser(env)
+      await env.agent.get(`/keys/${uuidv4()}`).expect(404)
+    }
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).get(`/keys/${uuidv4()}`).expect(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Mail routes
+// ---------------------------------------------------------------------------
+
+function makeMailPayload(recipientDeviceID: string, senderSignKey: string) {
+  return {
+    mailID: uuidv4(),
+    nonce: uuidv4(),
+    recipient: recipientDeviceID,
+    sender: senderSignKey,
+    header: 'aabbccdd',
+    cipher: 'deadbeef',
+    mailType: 'direct',
+    time: new Date().toISOString(),
+    group: null,
+    extra: null,
+    forward: null,
+    authorID: uuidv4(),
+    readerID: uuidv4(),
+  }
+}
+
+describe('POST /mail', () => {
+  it('stores a mail message and returns { ok: true }', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    const payload = makeMailPayload(deviceID, Buffer.from(user.kp.publicKey).toString('hex'))
+    const res = await env.agent.post('/mail').send(payload).expect(200)
+    expect(res.body.ok).toBe(true)
+  })
+
+  it('returns 400 for a missing required field', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    const { cipher: _omit, ...incomplete } = makeMailPayload(deviceID, 'abc')
+    await env.agent.post('/mail').send(incomplete).expect(400)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).post('/mail').send({}).expect(401)
+  })
+})
+
+describe('GET /mail/:deviceID', () => {
+  it('returns pending mail for the device', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    const signKeyHex = Buffer.from(user.kp.publicKey).toString('hex')
+    await env.agent.post('/mail').send(makeMailPayload(deviceID, signKeyHex)).expect(200)
+    await env.agent.post('/mail').send(makeMailPayload(deviceID, signKeyHex)).expect(200)
+
+    const res = await env.agent.get(`/mail/${deviceID}`).expect(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body).toHaveLength(2)
+  })
+
+  it('returns empty array when no pending mail', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const res = await env.agent.get(`/mail/${uuidv4()}`).expect(200)
+    expect(res.body).toEqual([])
+  })
+
+  it('consumes mail on retrieval (relay model)', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    await env.agent
+      .post('/mail')
+      .send(makeMailPayload(deviceID, Buffer.from(user.kp.publicKey).toString('hex')))
+      .expect(200)
+
+    await env.agent.get(`/mail/${deviceID}`).expect(200)
+    const second = await env.agent.get(`/mail/${deviceID}`).expect(200)
+    expect(second.body).toEqual([])
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).get(`/mail/${uuidv4()}`).expect(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Server routes
 // ---------------------------------------------------------------------------
 

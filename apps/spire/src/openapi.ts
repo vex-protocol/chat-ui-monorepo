@@ -65,11 +65,16 @@ registry.registerPath({ method: 'get',    path: '/user/{id}/servers',           
 
 // Devices
 registry.registerPath({ method: 'get',  path: '/device/{id}',            operationId: 'getDevice',     security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Device' },    404: { description: 'Not found' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/keyBundle',   operationId: 'getKeyBundle',  security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Key bundle' } } })
-registry.registerPath({ method: 'post', path: '/device/{id}/mail',        operationId: 'sendMail',      security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'Mail sent' } } })
 registry.registerPath({ method: 'post', path: '/device/{id}/connect',     operationId: 'wsConnect',     security: auth, request: { params: pid(['id']) }, responses: { 101: { description: 'WebSocket upgrade' } } })
 registry.registerPath({ method: 'get',  path: '/device/{id}/otk/count',   operationId: 'getOtkCount',   security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'OTK count' } } })
 registry.registerPath({ method: 'post', path: '/device/{id}/otk',         operationId: 'uploadOtks',    security: auth, request: { params: pid(['id']) }, responses: { 200: { description: 'OTKs saved' } } })
+
+// Keys — X3DH key bundle for encrypted messaging
+registry.registerPath({ method: 'get',  path: '/keys/{deviceID}',         operationId: 'getKeyBundle',  security: auth, request: { params: pid(['deviceID']) }, responses: { 200: { description: 'X3DH key bundle' }, 404: { description: 'No key bundle' } } })
+
+// Mail — end-to-end encrypted message relay
+registry.registerPath({ method: 'post', path: '/mail',                    operationId: 'sendMail',      security: auth, responses: { 200: { description: 'Mail stored' } } })
+registry.registerPath({ method: 'get',  path: '/mail/{deviceID}',         operationId: 'getMail',       security: auth, request: { params: pid(['deviceID']) }, responses: { 200: { description: 'Pending mail' } } })
 
 // Servers
 registry.registerPath({ method: 'post',   path: '/server',                          operationId: 'createServer',     security: auth,                                                    responses: { 200: { description: 'Server created' }, 401: { description: 'Unauthorized' } } })
