@@ -6,9 +6,17 @@ use tauri::{
 
 const TRAY_ID: &str = "main";
 
-/// Called from the frontend when a new message arrives while the window is
-/// unfocused. Updates the tray tooltip to show an unread count.
-/// Pass count = 0 to clear the indicator (called when window regains focus).
+fn show_window(app: &tauri::AppHandle) {
+    // On macOS, activating the NSApplication is required before the window
+    // can come to the foreground after being hidden.
+    let _ = app.show();
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 #[tauri::command]
 fn set_tray_unread(app: tauri::AppHandle, count: u32) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
@@ -37,7 +45,6 @@ pub fn run() {
                 )?;
             }
 
-            // ── System tray ───────────────────────────────────────────────
             let show_item =
                 MenuItem::with_id(app, "show", "Show Window", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -47,15 +54,9 @@ pub fn run() {
                 .icon(app.default_window_icon().cloned().unwrap())
                 .tooltip("Vex Chat")
                 .menu(&menu)
-                // Left-click shows the window; right-click opens the menu (platform default).
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
-                    }
+                    "show" => show_window(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -66,19 +67,13 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
-                        if let Some(w) = app.get_webview_window("main") {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                        show_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
 
             Ok(())
         })
-        // Close button hides to tray instead of quitting.
-        // Use Tray → Quit to exit the app.
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let _ = window.hide();
