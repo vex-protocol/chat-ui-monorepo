@@ -92,6 +92,12 @@ importers:
       '@tauri-apps/plugin-opener':
         specifier: ^2.5.3
         version: 2.5.3
+      '@tauri-apps/plugin-process':
+        specifier: ^2.3.1
+        version: 2.3.1
+      '@tauri-apps/plugin-updater':
+        specifier: ^2.10.0
+        version: 2.10.0
       '@types/dompurify':
         specifier: 'catalog:'
         version: 3.2.0
@@ -413,7 +419,7 @@ importers:
         version: 8.6.17(react-dom@18.3.1(react@19.2.3))(react@19.2.3)(rollup@4.59.0)(storybook@8.6.17(prettier@2.8.8))(typescript@5.9.3)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       '@storybook/svelte-vite':
         specifier: ^8.6.0
-        version: 8.6.17(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))(postcss@8.5.8)(storybook@8.6.17(prettier@2.8.8))(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
+        version: 8.6.17(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))(postcss@8.5.8)(storybook@8.6.17(prettier@2.8.8))(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       concurrently:
         specifier: ^9.1.0
         version: 9.2.1
@@ -2421,6 +2427,12 @@ packages:
 
   '@tauri-apps/plugin-opener@2.5.3':
     resolution: {integrity: sha512-CCcUltXMOfUEArbf3db3kCE7Ggy1ExBEBl51Ko2ODJ6GDYHRp1nSNlQm5uNCFY5k7/ufaK5Ib3Du/Zir19IYQQ==}
+
+  '@tauri-apps/plugin-process@2.3.1':
+    resolution: {integrity: sha512-nCa4fGVaDL/B9ai03VyPOjfAHRHSBz5v6F/ObsB73r/dA3MHHhZtldaDMIc0V/pnUw9ehzr2iEG+XkSEyC0JJA==}
+
+  '@tauri-apps/plugin-updater@2.10.0':
+    resolution: {integrity: sha512-ljN8jPlnT0aSn8ecYhuBib84alxfMx6Hc8vJSKMJyzGbTPFZAC44T2I1QNFZssgWKrAlofvJqCC6Rr472JWfkQ==}
 
   '@ts-morph/common@0.20.0':
     resolution: {integrity: sha512-7uKjByfbPpwuzkstL3L5MQyuXPSKdoNG93Fmi2JoDcTf3pEP731JdRFAduRVkOs8oqxPsXKA+ScrWkdQ8t/I+Q==}
@@ -8905,7 +8917,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@storybook/svelte-vite@8.6.17(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))(postcss@8.5.8)(storybook@8.6.17(prettier@2.8.8))(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))':
+  '@storybook/svelte-vite@8.6.17(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2)))(postcss@8.5.8)(storybook@8.6.17(prettier@2.8.8))(svelte@5.53.7)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
       '@storybook/builder-vite': 8.6.17(storybook@8.6.17(prettier@2.8.8))(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
       '@storybook/svelte': 8.6.17(storybook@8.6.17(prettier@2.8.8))(svelte@5.53.7)
@@ -8913,7 +8925,7 @@ snapshots:
       magic-string: 0.30.21
       storybook: 8.6.17(prettier@2.8.8)
       svelte: 5.53.7
-      svelte-preprocess: 5.1.4(@babel/core@7.29.0)(postcss@8.5.8)(svelte@5.53.7)(typescript@5.9.3)
+      svelte-preprocess: 5.1.4(@babel/core@7.14.5)(postcss@8.5.8)(svelte@5.53.7)(typescript@5.9.3)
       svelte2tsx: 0.7.51(svelte@5.53.7)(typescript@5.9.3)
       sveltedoc-parser: 4.2.1
       ts-dedent: 2.2.0
@@ -9047,6 +9059,14 @@ snapshots:
       '@tauri-apps/api': 2.10.1
 
   '@tauri-apps/plugin-opener@2.5.3':
+    dependencies:
+      '@tauri-apps/api': 2.10.1
+
+  '@tauri-apps/plugin-process@2.3.1':
+    dependencies:
+      '@tauri-apps/api': 2.10.1
+
+  '@tauri-apps/plugin-updater@2.10.0':
     dependencies:
       '@tauri-apps/api': 2.10.1
 
@@ -13032,7 +13052,7 @@ snapshots:
       postcss: 8.5.8
       typescript: 5.9.3
 
-  svelte-preprocess@5.1.4(@babel/core@7.29.0)(postcss@8.5.8)(svelte@5.53.7)(typescript@5.9.3):
+  svelte-preprocess@5.1.4(@babel/core@7.14.5)(postcss@8.5.8)(svelte@5.53.7)(typescript@5.9.3):
     dependencies:
       '@types/pug': 2.0.10
       detect-indent: 6.1.0
@@ -13041,7 +13061,7 @@ snapshots:
       strip-indent: 3.0.0
       svelte: 5.53.7
     optionalDependencies:
-      '@babel/core': 7.29.0
+      '@babel/core': 7.14.5
       postcss: 8.5.8
       typescript: 5.9.3
 
