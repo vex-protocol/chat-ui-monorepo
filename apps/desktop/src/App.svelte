@@ -13,7 +13,8 @@
   import Settings from './routes/Settings.svelte'
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
-  import { user, keyReplaced, servers, channels } from './lib/store/index.js'
+  import { user, keyReplaced, servers, channels, client } from './lib/store/index.js'
+  import { setupNotifications } from './lib/notifications.js'
 
   const routes = {
     '/':                            Launch,
@@ -44,6 +45,14 @@
     if ($keyReplaced) {
       push('/login')
     }
+  })
+
+  // Wire desktop notifications — set up when client + user are both available
+  $effect(() => {
+    const c = $client
+    const u = $user
+    if (!c || !u) return
+    return setupNotifications(c, u.userID)
   })
 
   // When navigating to a server without a channel, redirect to the first channel
