@@ -4,6 +4,17 @@
   import { client, user } from '../lib/store/index.js'
   import { getServerUrl, setServerUrl, loadCredentials, clearCredentials } from '../lib/config.js'
   import { encodeHex } from '@vex-chat/crypto'
+  import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
+
+  // ── Sounds ──────────────────────────────────────────────────────────────────
+
+  let soundsEnabled = $state(getSoundsEnabled())
+
+  function toggleSounds(): void {
+    soundsEnabled = !soundsEnabled
+    setSoundsEnabled(soundsEnabled)
+    if (soundsEnabled) playNotify()
+  }
 
   // ── Server URL ──────────────────────────────────────────────────────────────
 
@@ -70,6 +81,15 @@
         </div>
         <button class="settings-btn" onclick={toggleTheme}>
           {$theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
+        </button>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row__info">
+          <span class="settings-row__label">Sound effects</span>
+          <span class="settings-row__desc">Play sounds for login, logout, errors, and notifications</span>
+        </div>
+        <button class="settings-btn settings-btn--toggle {soundsEnabled ? 'settings-btn--toggle-on' : ''}" onclick={toggleSounds}>
+          {soundsEnabled ? 'On' : 'Off'}
         </button>
       </div>
     </section>
@@ -303,6 +323,16 @@
   .settings-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
+  }
+
+  .settings-btn--toggle {
+    min-width: 48px;
+  }
+
+  .settings-btn--toggle-on {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
   }
 
   .settings-btn--danger {
