@@ -270,6 +270,31 @@
         }
       }
     },
+    "/users/search": {
+      "get": {
+        "operationId": "searchUsers",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching users"
+          }
+        }
+      }
+    },
     "/device/{id}": {
       "get": {
         "operationId": "getDevice",
@@ -294,56 +319,6 @@
           },
           "404": {
             "description": "Not found"
-          }
-        }
-      }
-    },
-    "/device/{id}/keyBundle": {
-      "post": {
-        "operationId": "getKeyBundle",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Key bundle"
-          }
-        }
-      }
-    },
-    "/device/{id}/mail": {
-      "post": {
-        "operationId": "sendMail",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Mail sent"
           }
         }
       }
@@ -419,6 +394,74 @@
         "responses": {
           "200": {
             "description": "OTKs saved"
+          }
+        }
+      }
+    },
+    "/keys/{deviceID}": {
+      "get": {
+        "operationId": "getKeyBundle",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "deviceID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "X3DH key bundle"
+          },
+          "404": {
+            "description": "No key bundle"
+          }
+        }
+      }
+    },
+    "/mail": {
+      "post": {
+        "operationId": "sendMail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mail stored"
+          }
+        }
+      }
+    },
+    "/mail/{deviceID}": {
+      "get": {
+        "operationId": "getMail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "deviceID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending mail"
           }
         }
       }
@@ -668,6 +711,99 @@
         "responses": {
           "200": {
             "description": "Invite list"
+          }
+        }
+      }
+    },
+    "/server/{serverID}/invites/{inviteID}": {
+      "delete": {
+        "operationId": "deleteInvite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "serverID",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "inviteID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/invite/{inviteID}": {
+      "get": {
+        "operationId": "getInvite",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "inviteID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invite details + server name"
+          },
+          "404": {
+            "description": "Not found or expired"
+          }
+        }
+      }
+    },
+    "/invite/{inviteID}/join": {
+      "post": {
+        "operationId": "joinViaInvite",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "inviteID",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Joined server"
+          },
+          "404": {
+            "description": "Invite not found or expired"
+          },
+          "409": {
+            "description": "Already a member"
           }
         }
       }
