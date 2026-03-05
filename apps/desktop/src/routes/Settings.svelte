@@ -5,6 +5,7 @@
   import { getServerUrl, setServerUrl, loadCredentials, clearCredentials } from '../lib/config.js'
   import { encodeHex } from '@vex-chat/crypto'
   import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
+  import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
 
   // ── Sounds ──────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,15 @@
     soundsEnabled = !soundsEnabled
     setSoundsEnabled(soundsEnabled)
     if (soundsEnabled) playNotify()
+  }
+
+  // ── Notifications ────────────────────────────────────────────────────────────
+
+  let notificationsEnabled = $state(getNotificationsEnabled())
+
+  function toggleNotifications(): void {
+    notificationsEnabled = !notificationsEnabled
+    setNotificationsEnabled(notificationsEnabled)
   }
 
   // ── Server URL ──────────────────────────────────────────────────────────────
@@ -90,6 +100,15 @@
         </div>
         <button class="settings-btn settings-btn--toggle {soundsEnabled ? 'settings-btn--toggle-on' : ''}" onclick={toggleSounds}>
           {soundsEnabled ? 'On' : 'Off'}
+        </button>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row__info">
+          <span class="settings-row__label">Desktop notifications</span>
+          <span class="settings-row__desc">Show OS alerts for incoming messages when the window is not focused</span>
+        </div>
+        <button class="settings-btn settings-btn--toggle {notificationsEnabled ? 'settings-btn--toggle-on' : ''}" onclick={toggleNotifications}>
+          {notificationsEnabled ? 'On' : 'Off'}
         </button>
       </div>
     </section>
