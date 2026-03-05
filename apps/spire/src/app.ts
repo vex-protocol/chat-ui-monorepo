@@ -52,7 +52,9 @@ export function createApp(
   const checkAuth = createCheckAuth(jwtSecret)
 
   app.use(helmet())
-  app.use(cors({ credentials: true }))
+  // origin: true reflects the request Origin header, required for credentials: true
+  // (browsers reject Access-Control-Allow-Origin: * combined with credentials)
+  app.use(cors({ origin: true, credentials: true }))
   app.use(express.json())
   app.use(cookieParser())
   app.use(globalRateLimit)
