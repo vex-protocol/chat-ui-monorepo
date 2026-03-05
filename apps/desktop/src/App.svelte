@@ -10,6 +10,7 @@
   import Register from './routes/Register.svelte'
   import Messaging from './routes/Messaging.svelte'
   import ServerChannel from './routes/ServerChannel.svelte'
+  import Settings from './routes/Settings.svelte'
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import { user, keyReplaced, servers, channels } from './lib/store/index.js'
@@ -19,6 +20,7 @@
     '/launch':                      Launch,
     '/login':                       Login,
     '/register':                    Register,
+    '/settings':                    Settings,
     '/messaging/:userID':           Messaging,
     '/server/:serverID/:channelID': ServerChannel,
     '*':                            Launch,
