@@ -4,6 +4,64 @@ The Vex design system bridges Figma and code. Designers own the visual truth in 
 
 ---
 
+## Visual Direction
+
+**Dark, dense, and red-accented.** Information-rich without being cluttered. Inspired by a hacker-aesthetic Discord — near-black panels, desaturated text, and a single crimson accent that owns all interactive states.
+
+### Color palette (reference values — finalize in Figma)
+
+| Token | Dark | Light | Role |
+|---|---|---|---|
+| `--accent` | `#cc2a2a` | `#b01c1c` | Buttons, active states, focus rings, self-message author name |
+| `--bg-primary` | `#1a1a1a` | `#f0f0f0` | Main content area |
+| `--bg-secondary` | `#141414` | `#e6e6e6` | Sidebar / panel backgrounds |
+| `--bg-tertiary` | `#0f0f0f` | `#dadada` | Server bar background (deepest layer) |
+| `--bg-surface` | `#242424` | `#d0d0d0` | Cards, input backgrounds |
+| `--bg-hover` | `#2e2e2e` | `#c4c4c4` | Hover highlight |
+| `--text-primary` | `#e8e8e8` | `#1a1a1a` | Body text |
+| `--text-secondary` | `#a0a0a0` | `#4a4a4a` | Timestamps, metadata |
+| `--text-muted` | `#666666` | `#888888` | Placeholders, empty states |
+| `--danger` | `#e53935` | `#c62828` | Destructive actions |
+| `--success` | `#43a047` | `#2e7d32` | Confirmations |
+| `--warning` | `#fb8c00` | `#e65100` | Alerts |
+| `--border` | `#2a2a2a` | `#d0d0d0` | Dividers |
+
+> The current app uses Catppuccin Mocha (purple accent). The target palette is **monochromatic near-black + crimson**. Update `app.css` CSS variables to migrate; the light theme follows the same warm-neutral approach.
+
+### Layout
+
+```
+┌──────────┬────────────────┬────────────────────────────────┬──────────────┐
+│ Server   │  Channel list  │  Message area                  │  Members /   │
+│ bar      │  (220px)       │  (flex: 1)                     │  Familiars   │
+│ (64px)   │                │                                │  (220px)     │
+│          │  #general      │  [Avatar] Username  12:34pm    │              │
+│  [●]     │  #random       │    Message content here        │  ● user1     │
+│  [●]     │  #off-topic    │    Another line                │  ● user2     │
+│  [+]     │                │                                │  ○ user3     │
+│          │                │  [Avatar] username2  12:36pm   │              │
+│          │                │    Their message               │              │
+└──────────┴────────────────┴────────────────────────────────┴──────────────┘
+│  [Avatar] You              [text input ──────────────────────]            │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+Key layout observations from the design:
+- **Server bar** shows circular avatar thumbnails (uploaded images), not letter initials
+- **Message chunks** group consecutive messages from the same author; only the first line shows avatar + name
+- **Member panel** (right) shows compact rows: 8px status dot + avatar + username
+- **All interactive states** use the crimson accent — active server, focus ring, self-author name, hover backgrounds
+
+### Typography
+
+- **Font**: System UI stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`)
+- **Body**: 14px / 1.5 line-height
+- **Timestamps / metadata**: 11–12px, `--text-muted`
+- **Channel headers / section labels**: 11px, uppercase, `letter-spacing: 0.05em`, `--text-muted`
+- **Monospace (code blocks)**: `'SF Mono', 'Fira Code', monospace`, 13px
+
+---
+
 ## Architecture
 
 ```
@@ -47,17 +105,38 @@ Building generates `output/svelte/` and `output/react/` directories with idiomat
 
 ### What Mitosis handles well
 
-Stateless or lightly stateful **presentational components** — the 20-30 design primitives:
-- Button, Avatar, Badge, Icon
-- TextInput, SearchBar, MessageInput
-- ChannelListItem, MessageBubble, ServerListItem
-- Modal, Tooltip, Popover
+Stateless or lightly stateful **presentational components** — pure display, no scroll refs, no complex lifecycle. These are written once and compiled to both Svelte and React Native.
+
+#### Tier 1 — High-value, clearly shared
+
+| Component | Props surface | Notes |
+|---|---|---|
+| `Avatar` | `src`, `userID`, `size`, `name` | Circular image + deterministic hue+initials fallback. Already in desktop — needs to be the shared primitive. |
+| `Badge` | `count`, `max?` | Red dot with number. Overlaid on ServerIcon for unread count. |
+| `ServerIcon` | `src?`, `name`, `active`, `size` | Avatar variant for servers: image or letter initial; active = colored ring (not squircle pill — that's Svelte-specific). |
+| `MessageChunk` | `authorID`, `authorName`, `avatarSrc?`, `time`, `messages[]` | Avatar + bold name + timestamp + grouped message lines. Core chat primitive. |
+| `ChannelListItem` | `name`, `active`, `unread?` | `#name` with active state. |
+| `MemberListItem` | `userID`, `username`, `avatarSrc?`, `online?` | `StatusDot` + Avatar + name. Right panel rows. |
+| `Button` | `variant` (primary/secondary/ghost/danger), `size` (sm/md/lg), `disabled?` | All interactive action buttons. |
+| `TextInput` | `value`, `placeholder`, `label?`, `error?` | Crimson focus ring. |
+| `StatusDot` | `status` (online/away/offline/dnd) | 8px colored circle. Composable into Avatar and MemberListItem. |
+| `Loading` | `size?`, `label?` | Spinner for async states. |
+
+#### Tier 2 — Useful but watch Mitosis limits
+
+| Component | Notes |
+|---|---|
+| `SearchBar` | TextInput + leading search icon. Icon rendering differs slightly between Svelte and RN. |
+| `EmptyState` | Centered icon + headline + sub-copy. Fully stateless. |
+| `Tooltip` | Hover-triggered overlay. Mitosis can output the structure; web uses CSS `:hover`, RN uses `onPressIn`. May need per-platform override. |
 
 ### What Mitosis does NOT handle
 
-- Framework-specific animations, transitions, gestures
-- Complex state management or lifecycle hooks
-- Navigation, routing, platform-specific APIs
+- **Complex lifecycle** — `MessageBox` (scroll ref, `onMount`, `$effect`), `ChatInput` (textarea auto-grow)
+- **Navigation chrome** — `ServerBar`, `ChannelBar`, `FamiliarsList` — layout and routing differ per platform
+- **Modals** — Tauri uses DOM overlays; React Native uses `<Modal>` component
+- **Platform APIs** — file picker, haptics, push notification registration
+- **CSS transitions** — the ServerIcon squircle-to-pill border-radius animation is CSS-only; skip in Mitosis output
 
 Screen-level components are written natively in each framework, composing the shared Mitosis primitives.
 
