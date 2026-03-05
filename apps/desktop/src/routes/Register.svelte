@@ -4,6 +4,7 @@
   import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
   import { getServerUrl, saveCredentials } from '../lib/config.js'
+  import { playUnlock, playError } from '../lib/sounds.js'
 
   let username = $state('')
   let password = $state('')
@@ -63,6 +64,7 @@
       if (!regRes.ok) {
         const body = await regRes.json().catch(() => ({})) as { message?: string }
         error = body.message ?? `Registration failed (${regRes.status})`
+        playError()
         loading = false
         return
       }
@@ -82,9 +84,11 @@
 
       // Navigate into the app (no servers yet after fresh register)
       if (userAtom.get()) {
+        playUnlock()
         push('/settings')
       } else {
         error = 'Registration succeeded but could not connect to server'
+        playError()
         loading = false
       }
     } catch (err) {

@@ -2,6 +2,7 @@
   import { push } from 'svelte-spa-router'
   import { client } from './store/index.js'
   import { clearCredentials } from './config.js'
+  import { playLock } from './sounds.js'
 
   let { username = '', userID = '' }: { username?: string; userID?: string } = $props()
 
@@ -9,6 +10,7 @@
 
   async function logout(): Promise<void> {
     menuOpen = false
+    playLock()
     try { await $client?.logout() } catch { /* ignore */ }
     clearCredentials()
     push('/login')

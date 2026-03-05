@@ -3,6 +3,7 @@
   import { decodeHex } from '@vex-chat/crypto'
   import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
   import { getServerUrl, loadCredentials } from '../lib/config.js'
+  import { playUnlock, playError } from '../lib/sounds.js'
 
   let username = $state('')
   let password = $state('')
@@ -42,6 +43,7 @@
       if (!authRes.ok) {
         const body = await authRes.json().catch(() => ({})) as { message?: string }
         error = body.message ?? 'Invalid username or password'
+        playError()
         loading = false
         return
       }
@@ -55,6 +57,7 @@
 
       // Navigate into the app
       if (userAtom.get()) {
+        playUnlock()
         const serverList = Object.values(serversAtom.get())
         if (serverList.length > 0) {
           push(`/server/${serverList[0]!.serverID}/`)
@@ -63,10 +66,12 @@
         }
       } else {
         error = 'Could not verify credentials after login'
+        playError()
         loading = false
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Unexpected error'
+      playError()
       loading = false
     }
   }
