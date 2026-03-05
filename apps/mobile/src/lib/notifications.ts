@@ -1,7 +1,8 @@
-import notifee, { AndroidImportance } from '@notifee/react-native'
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import { AppState } from 'react-native'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $user, $familiars } from '../store'
+import { navigateToConversation } from '../navigation/navigationRef'
 
 const CHANNEL_ID = 'vex-messages'
 
@@ -13,6 +14,7 @@ async function ensureChannel(): Promise<void> {
     id: CHANNEL_ID,
     name: 'Messages',
     importance: AndroidImportance.HIGH,
+    sound: 'default',
   })
   channelReady = true
 }
@@ -43,6 +45,40 @@ export async function showMessageNotification(mail: DecryptedMail): Promise<void
   await notifee.displayNotification({
     title,
     body,
-    android: { channelId: CHANNEL_ID, pressAction: { id: 'default' } },
+    data: {
+      authorID: mail.authorID,
+      username: author?.username ?? mail.authorID,
+    },
+    android: {
+      channelId: CHANNEL_ID,
+      pressAction: { id: 'default' },
+      sound: 'default',
+    },
+    ios: {
+      sound: 'default',
+    },
   })
+}
+
+function handleNotificationPress(data: Record<string, string | number | object> | undefined): void {
+  if (!data?.authorID || !data?.username) return
+  navigateToConversation(String(data.authorID), String(data.username))
+}
+
+export function setupNotificationHandlers(): () => void {
+  // Foreground events (app is open, user taps notification from notification center)
+  const unsubForeground = notifee.onForegroundEvent(({ type, detail }) => {
+    if (type === EventType.PRESS) {
+      handleNotificationPress(detail.notification?.data)
+    }
+  })
+
+  // Background/killed events (app was closed or backgrounded)
+  notifee.onBackgroundEvent(async ({ type, detail }) => {
+    if (type === EventType.PRESS) {
+      handleNotificationPress(detail.notification?.data)
+    }
+  })
+
+  return unsubForeground
 }
