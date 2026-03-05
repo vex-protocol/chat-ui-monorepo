@@ -8,4 +8,5 @@
 {"key":"compact_tier2_dep_levels","value":"5"}
 {"key":"compaction_enabled","value":"false"}
 {"key":"issue_prefix","value":"vex-chat"}
+{"key":"kv.memory.arch-decision-decryption-belongs-in-the-sdk-libvex","value":"ARCH DECISION: Decryption belongs in the SDK (libvex), not the apps. VexClient.on('mail') emits DecryptedMail (plaintext). IMail wire format is internal to libvex. Pattern: Signal/libsignal, Matrix/matrix-js-sdk. Key storage at rest is app-specific (KeyStore interface injected into VexClient). New bead vex-chat-7dq implements this: box.ts in packages/crypto, SessionManager in packages/libvex, DecryptedMail type in packages/types. Blocks vex-chat-oz0, 9q0, 14y."}
 {"key":"schema_version","value":"6"}
