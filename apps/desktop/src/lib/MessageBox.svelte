@@ -1,0 +1,214 @@
+<script lang="ts">
+  import type { DecryptedMail } from '@vex-chat/types'
+  import { onMount } from 'svelte'
+  import { chunkMessages, renderContent, handleLinkClick, formatTime } from './utils/messages.js'
+  import { user } from './store/index.js'
+
+  let { messages = [] }: { messages: DecryptedMail[] } = $props()
+
+  const chunks = $derived(chunkMessages(messages))
+
+  let containerEl: HTMLDivElement | null = $state(null)
+  let autoScroll = true
+
+  function scrollToBottom(): void {
+    if (containerEl && autoScroll) {
+      containerEl.scrollTop = containerEl.scrollHeight
+    }
+  }
+
+  function onScroll(): void {
+    if (!containerEl) return
+    const distFromBottom = containerEl.scrollHeight - containerEl.scrollTop - containerEl.clientHeight
+    autoScroll = distFromBottom < 120
+  }
+
+  // Scroll to bottom whenever messages change
+  $effect(() => {
+    void messages.length // reactive dependency
+    // nextTick equivalent — wait for DOM to update
+    setTimeout(scrollToBottom, 0)
+  })
+
+  onMount(() => {
+    scrollToBottom()
+  })
+</script>
+
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+  class="message-box"
+  bind:this={containerEl}
+  onscroll={onScroll}
+  onclick={handleLinkClick}
+  role="log"
+  aria-label="Messages"
+  aria-live="polite"
+>
+  {#if chunks.length === 0}
+    <div class="message-box__empty">No messages yet.</div>
+  {/if}
+
+  {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
+    <div class="message-chunk">
+      <div class="message-chunk__header">
+        <div class="message-chunk__avatar" aria-hidden="true">
+          {chunk.authorID.slice(0, 1).toUpperCase()}
+        </div>
+        <div class="message-chunk__meta">
+          <span
+            class="message-chunk__author"
+            class:message-chunk__author--self={chunk.authorID === $user?.userID}
+          >
+            {chunk.authorID === $user?.userID ? 'You' : chunk.authorID.slice(0, 8)}
+          </span>
+          <span class="message-chunk__time">{formatTime(chunk.firstTime)}</span>
+        </div>
+      </div>
+
+      {#each chunk.messages as msg (msg.mailID)}
+        <div class="message">
+          {@html renderContent(msg.content)}
+        </div>
+      {/each}
+    </div>
+  {/each}
+</div>
+
+<style>
+  .message-box {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 16px;
+    gap: 2px;
+  }
+
+  .message-box__empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .message-chunk {
+    padding: 4px 0;
+  }
+
+  .message-chunk__header {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 2px;
+  }
+
+  .message-chunk__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .message-chunk__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .message-chunk__author {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+  }
+
+  .message-chunk__author--self {
+    color: var(--accent);
+  }
+
+  .message-chunk__time {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .message {
+    padding-left: 46px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    word-break: break-word;
+  }
+
+  /* ── Markdown element styles ── */
+  .message :global(p) { margin: 0; }
+  .message :global(p + p) { margin-top: 4px; }
+
+  .message :global(code) {
+    background: var(--bg-surface);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .message :global(pre) {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    margin: 6px 0;
+  }
+
+  .message :global(pre code) {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+  }
+
+  .message :global(a) {
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .message :global(blockquote) {
+    border-left: 3px solid var(--border);
+    margin: 4px 0;
+    padding-left: 12px;
+    color: var(--text-muted);
+  }
+
+  .message :global(strong) { color: var(--text-primary); font-weight: 600; }
+  .message :global(em) { font-style: italic; }
+  .message :global(del) { text-decoration: line-through; color: var(--text-muted); }
+
+  .message :global(ul),
+  .message :global(ol) {
+    padding-left: 20px;
+    margin: 2px 0;
+  }
+
+  .message :global(h1),
+  .message :global(h2),
+  .message :global(h3) {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 4px 0 2px;
+  }
+</style>

@@ -15,7 +15,7 @@
   } = $props()
 
   function navToChannel(channelID: string) {
-    push(`/server/${serverID}/text/${channelID}`)
+    push(`/server/${serverID}/${channelID}`)
   }
 </script>
 
