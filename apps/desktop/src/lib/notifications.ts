@@ -1,8 +1,13 @@
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import type { VexClient } from '@vex-chat/libvex'
 import type { DecryptedMail } from '@vex-chat/types'
 import { playNotify } from './sounds.js'
+
+/** Minimal interface needed to subscribe/unsubscribe to mail events. */
+interface MailEventEmitter {
+  on(event: 'mail', handler: (mail: DecryptedMail) => void): void
+  off(event: 'mail', handler: (mail: DecryptedMail) => void): void
+}
 
 // ── Preference ────────────────────────────────────────────────────────────────
 
@@ -62,7 +67,7 @@ async function notify(title: string, body: string): Promise<void> {
  * for incoming messages not authored by the current user.
  * Returns an unsubscribe function.
  */
-export function setupNotifications(client: VexClient, currentUserID: string): () => void {
+export function setupNotifications(client: MailEventEmitter, currentUserID: string): () => void {
   const handler = (mail: DecryptedMail): void => {
     if (mail.authorID === currentUserID) return  // don't notify for own messages
     const title = mail.group ? `#${mail.group}` : mail.authorID
