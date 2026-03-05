@@ -17,13 +17,14 @@ import {
   deletePermission,
   hasPermission,
 } from '#permissions/permissions.service.ts'
-import { createInvite, getServerInvites } from '#invites/invites.service.ts'
+import { createInvite, getInvite, getServerInvites, deleteInvite, isInviteValid } from '#invites/invites.service.ts'
 import { validateBody } from '#middleware/validate.ts'
 import type { RequestHandler } from 'express'
-import { NotFoundError, ForbiddenError } from '#errors'
+import { NotFoundError, ForbiddenError, ConflictError } from '#errors'
 
 const DELETE_POWER = 50
 const INVITE_POWER = 25
+const DEFAULT_MEMBER_POWER = 1
 
 const CreateInviteBodySchema = z.object({
   expiration: z.string().datetime().nullable(),
@@ -127,6 +128,54 @@ export function createServerRouter(db: Kysely<Database>, checkAuth: RequestHandl
     try {
       const invites = await getServerInvites(db, req.params.serverID)
       res.json(invites)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  router.delete('/server/:serverID/invites/:inviteID', checkAuth, async (req, res, next) => {
+    try {
+      const invite = await getInvite(db, req.params.inviteID)
+      if (!invite) return next(new NotFoundError('Invite not found'))
+      if (invite.serverID !== req.params.serverID) return next(new NotFoundError('Invite not found'))
+      // Owner of invite or server admin (DELETE_POWER) can delete
+      const isOwner = invite.owner === req.user!.userID
+      const isAdmin = await hasPermission(db, req.user!.userID, req.params.serverID, DELETE_POWER)
+      if (!isOwner && !isAdmin) return next(new ForbiddenError())
+      await deleteInvite(db, req.params.inviteID)
+      res.json({ ok: true })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // Public invite info — no auth required so invite links can show server name before login
+  router.get('/invite/:inviteID', async (req, res, next) => {
+    try {
+      const invite = await getInvite(db, req.params.inviteID)
+      if (!invite) return next(new NotFoundError('Invite not found'))
+      const valid = await isInviteValid(db, req.params.inviteID)
+      if (!valid) return next(new NotFoundError('Invite expired'))
+      const server = await getServer(db, invite.serverID)
+      res.json({ inviteID: invite.inviteID, serverID: invite.serverID, serverName: server?.name ?? null, expiration: invite.expiration })
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  // Redeem invite — authenticated user joins the server
+  router.post('/invite/:inviteID/join', checkAuth, async (req, res, next) => {
+    try {
+      const valid = await isInviteValid(db, req.params.inviteID)
+      if (!valid) return next(new NotFoundError('Invite not found or expired'))
+      const invite = await getInvite(db, req.params.inviteID)
+      if (!invite) return next(new NotFoundError('Invite not found'))
+      // Check if already a member
+      const alreadyMember = await hasPermission(db, req.user!.userID, invite.serverID, 0)
+      if (alreadyMember) return next(new ConflictError('Already a member of this server'))
+      await createPermission(db, req.user!.userID, 'server', invite.serverID, DEFAULT_MEMBER_POWER)
+      const server = await getServer(db, invite.serverID)
+      res.json({ ok: true, server })
     } catch (err) {
       next(err)
     }

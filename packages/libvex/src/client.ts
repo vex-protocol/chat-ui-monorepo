@@ -1,6 +1,6 @@
 import { EventEmitter } from 'eventemitter3'
 import { generateSignKeyPair } from '@vex-chat/crypto'
-import type { IUser, IDevice, IKeyBundle, IServer, IChannel, IActionToken, TokenType, DecryptedMail } from '@vex-chat/types'
+import type { IUser, IDevice, IKeyBundle, IServer, IChannel, IInvite, IActionToken, TokenType, DecryptedMail } from '@vex-chat/types'
 import { HttpClient } from './http.ts'
 import { VexConnection } from './connection.ts'
 import { SessionManager } from './session.ts'
@@ -280,5 +280,41 @@ export class VexClient extends EventEmitter<VexEvents> {
   /** Returns the URL of a user's avatar with an optional cache-busting version param. */
   avatarUrl(userID: string, version?: number): string {
     return `${this.serverUrl}/avatar/${userID}${version !== undefined ? `?v=${version}` : ''}`
+  }
+
+  // ── Invites ────────────────────────────────────────────────────────────────
+
+  /** Creates an invite for a server. Requires INVITE_POWER (25+) on the server. */
+  async createInvite(serverID: string, expiration: string | null = null): Promise<IInvite> {
+    const result = await this.http.post<IInvite>(`/server/${serverID}/invites`, { expiration })
+    if (!result.ok) throw new Error(result.error.message)
+    return result.data
+  }
+
+  /** Lists all invites for a server. */
+  async listInvites(serverID: string): Promise<IInvite[]> {
+    const result = await this.http.get<IInvite[]>(`/server/${serverID}/invites`)
+    if (!result.ok) throw new Error(result.error.message)
+    return result.data
+  }
+
+  /** Fetches public invite details (server name, expiration). No auth required. */
+  async getInvite(inviteID: string): Promise<{ inviteID: string; serverID: string; serverName: string | null; expiration: string | null }> {
+    const result = await this.http.get<{ inviteID: string; serverID: string; serverName: string | null; expiration: string | null }>(`/invite/${inviteID}`)
+    if (!result.ok) throw new Error(result.error.message)
+    return result.data
+  }
+
+  /** Joins a server via invite code. Returns the server on success. */
+  async joinServerViaInvite(inviteID: string): Promise<IServer> {
+    const result = await this.http.post<{ ok: boolean; server: IServer }>(`/invite/${inviteID}/join`)
+    if (!result.ok) throw new Error(result.error.message)
+    return result.data.server
+  }
+
+  /** Deletes an invite. Must be the invite creator or a server admin. */
+  async deleteInvite(serverID: string, inviteID: string): Promise<void> {
+    const result = await this.http.delete(`/server/${serverID}/invites/${inviteID}`)
+    if (!result.ok) throw new Error(result.error.message)
   }
 }
