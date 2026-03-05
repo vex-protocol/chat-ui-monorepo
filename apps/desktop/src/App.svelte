@@ -11,6 +11,7 @@
   import Messaging from './routes/Messaging.svelte'
   import ServerChannel from './routes/ServerChannel.svelte'
 
+  import FamiliarsList from './lib/FamiliarsList.svelte'
   import { user, keyReplaced, servers, channels } from './lib/store/index.js'
 
   const routes = {
@@ -63,8 +64,7 @@
     </div>
 
     {#if !isAuthRoute}
-      <!-- vex-chat-xv9: DM / familiars list -->
-      <aside class="app__familiars" aria-label="Direct messages"></aside>
+      <FamiliarsList />
     {/if}
   </div>
 
@@ -100,10 +100,4 @@
     overflow: hidden;
   }
 
-  .app__familiars {
-    width: 220px;
-    flex-shrink: 0;
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
-  }
 </style>
