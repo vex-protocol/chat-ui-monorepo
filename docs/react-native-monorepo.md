@@ -8,36 +8,18 @@ How to configure bare React Native inside this pnpm workspace. Covers Metro, Typ
 
 pnpm's default isolation builds a virtual store under `.pnpm/` and places only direct dependencies (as symlinks) in each package's `node_modules/`. Metro was designed for npm/Yarn's flat `node_modules` — it climbs the directory tree and can load packages from the wrong location, causing duplicate React instances and "Invalid hook call" errors.
 
-Two strategies exist. We use Strategy A.
+## Our Approach: pnpm isolation + Metro symlink support
 
----
+We use pnpm's default isolated `node_modules` (no `node-linker=hoisted`). This preserves strict dependency isolation for desktop, spire, and all shared packages. Metro's built-in symlink support (RN ≥ 0.72) handles resolution for the mobile app.
 
-## Strategy A: `node-linker=hoisted` (our choice)
+Key requirements:
+1. Metro config with `unstable_enableSymlinks: true` + `watchFolders` + `nodeModulesPaths`
+2. Transitive deps that RN tooling expects must be explicit in `apps/mobile/package.json`
+3. Pin singleton versions (e.g. `react`) via `pnpm.overrides` in root `package.json`
 
-Add to the **root** `.npmrc`:
+**Why not `node-linker=hoisted`?** It's a workspace-global setting — can't scope it to just the mobile app. Hoisting breaks pnpm's strict isolation for all packages, which is undesirable for the Tauri desktop app and spire server.
 
-```ini
-node-linker=hoisted
-```
-
-This makes pnpm produce a flat `node_modules` like npm/Yarn. Metro, Gradle, and CocoaPods all work without any symlink gymnastics. The tradeoff — you lose pnpm's strict isolation — is acceptable for a mobile app project where the native toolchain (Gradle, CocoaPods) also assumes flat layouts.
-
-Also pin singleton versions to prevent duplicates:
-
-```json
-// root package.json
-{
-  "pnpm": {
-    "overrides": {
-      "react": "18.3.1"
-    }
-  }
-}
-```
-
-## Strategy B: Default pnpm isolation + Metro symlink config
-
-Keep pnpm's default, configure Metro with `unstable_enableSymlinks: true` + `nodeModulesPaths`. More complex, more edge cases. Details in the `metro.config.js` section below. Not used here but documented for reference.
+**Fallback:** If Metro symlink resolution causes issues (especially with Android Gradle), add `@rnx-kit/metro-resolver-symlinks` as a more battle-tested resolver. See the "Fallback: rnx-kit" section below.
 
 ---
 
@@ -57,13 +39,13 @@ module.exports = mergeConfig(getDefaultConfig(projectRoot), {
   watchFolders: [workspaceRoot],
 
   resolver: {
-    // Stable as of RN 0.73; option name retained for compatibility
+    // RN 0.72+ symlink support — follows pnpm's symlinked node_modules
     unstable_enableSymlinks: true,
 
     // Respect package.json `exports` fields (needed for workspace packages)
     unstable_enablePackageExports: true,
 
-    // App-local node_modules first, then workspace root for hoisted deps
+    // App-local node_modules first, then workspace root for shared deps
     nodeModulesPaths: [
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(workspaceRoot, 'node_modules'),
@@ -74,30 +56,55 @@ module.exports = mergeConfig(getDefaultConfig(projectRoot), {
 
 **Key points:**
 - `watchFolders: [workspaceRoot]` — Metro must see all source trees, including `packages/*`
-- `unstable_enableSymlinks: true` — required even with `node-linker=hoisted` when workspace symlinks exist
+- `unstable_enableSymlinks: true` — follows pnpm's symlinked `node_modules`
 - `unstable_enablePackageExports: true` — respects `exports` fields in `packages/*/package.json`
 - Do NOT set `disableHierarchicalLookup: true` — breaks pnpm's virtual store resolution
 
-**If using Strategy B (default pnpm isolation)**, add an `extraNodeModules` Proxy to force app-local copies of singletons:
+---
+
+## Fallback: `@rnx-kit/metro-resolver-symlinks`
+
+If Metro's built-in symlink support isn't sufficient (e.g. Gradle can't find scripts through symlinks), use Microsoft's resolver:
+
+```bash
+pnpm add -D @rnx-kit/metro-config @rnx-kit/metro-resolver-symlinks
+```
 
 ```js
-resolver: {
-  // ...above settings...
-  extraNodeModules: new Proxy(
-    {},
-    {
-      get: (_target, name) =>
-        path.join(projectRoot, 'node_modules', String(name)),
-    }
-  ),
-},
+const { makeMetroConfig } = require("@rnx-kit/metro-config")
+const MetroSymlinksResolver = require("@rnx-kit/metro-resolver-symlinks")
+
+module.exports = makeMetroConfig({
+  projectRoot: __dirname,
+  watchFolders: [path.resolve(__dirname, '../..')],
+  resolver: {
+    resolveRequest: MetroSymlinksResolver(),
+    nodeModulesPaths: [
+      path.resolve(__dirname, 'node_modules'),
+      path.resolve(__dirname, '../../node_modules'),
+    ],
+  },
+})
 ```
+
+---
+
+## Explicit Transitive Dependencies
+
+With pnpm isolation, RN tooling can't find transitive deps it expects to be hoisted. These must be explicit in `apps/mobile/package.json` devDependencies:
+
+- `@react-native-community/cli`
+- `@react-native-community/cli-platform-android`
+- `@react-native-community/cli-platform-ios`
+- `@react-native/gradle-plugin`
+- `@react-native/codegen`
+- `@babel/core`, `@babel/preset-env`, `@babel/runtime`
 
 ---
 
 ## `apps/mobile/react-native.config.js`
 
-Required when the RN app is nested (not at the workspace root). Tells the RN CLI where to find `react-native` and `@react-native-community/cli-platform-ios`:
+Required when the RN app is nested (not at the workspace root). Tells the RN CLI where to find `react-native`:
 
 ```js
 // apps/mobile/react-native.config.js
@@ -106,42 +113,11 @@ module.exports = {
 }
 ```
 
-If you have workspace-internal packages with native code (currently none), add them to `dependencies`:
-
-```js
-module.exports = {
-  reactNativePath: '../../node_modules/react-native',
-  dependencies: {
-    '@vex-chat/native-module': {
-      root: path.join(__dirname, '../../packages/native-module'),
-    },
-  },
-}
-```
-
 ---
 
 ## TypeScript Config
 
-The official `@react-native/typescript-config` package provides the base tsconfig for RN 0.73+:
-
-```json
-{
-  "extends": "@react-native/typescript-config/tsconfig.json",
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "allowImportingTsExtensions": true,
-    "skipLibCheck": true
-  },
-  "include": ["src"]
-}
-```
-
-The official base sets `"module": "commonjs"`, `"jsx": "react-native"`, `"moduleResolution": "node"`, `"noEmit": true`, `"isolatedModules": true`.
-
-**Alternative (our current setup):** A standalone config with `moduleResolution: bundler` is also valid and arguably more correct for Metro (it understands `package.json` exports maps natively). Metro uses Babel for transpilation — TypeScript's `module` setting only affects type checking, not runtime. See `apps/mobile/tsconfig.json`.
+A standalone config with `moduleResolution: bundler` — more correct for Metro than the official base config's `commonjs`/`node`. Metro uses Babel for transpilation; TypeScript's `module` setting only affects type checking, not runtime. See `apps/mobile/tsconfig.json`.
 
 **Avoid `moduleResolution: node16` or `nodenext`** — they require file extensions in imports, which breaks RN's platform-specific extension resolution (`.ios.ts`, `.android.ts`).
 
@@ -182,9 +158,10 @@ pluginManagement {
 **`apps/mobile/android/app/build.gradle`**
 ```gradle
 react {
-  reactNativeDir = file("../../../node_modules/react-native")
-  codegenDir = file("../../../node_modules/@react-native/codegen")
-  cliFile = file("../../../node_modules/react-native/cli.js")
+  root = file("../../")
+  reactNativeDir = file("../../../../node_modules/react-native")
+  codegenDir = file("../../../../node_modules/@react-native/codegen")
+  cliFile = file("../../../../node_modules/react-native/cli.js")
 }
 ```
 
@@ -194,32 +171,15 @@ The generated paths from `react-native init` assume the app is at the repo root.
 
 ## iOS CocoaPods Paths
 
-**`apps/mobile/ios/Podfile`**
+The scaffolded Podfile uses Node's `require.resolve` to find paths dynamically, which works regardless of nesting depth:
+
 ```ruby
-require_relative '../../../node_modules/react-native/scripts/react_native_pods'
-require_relative '../../../node_modules/@react-native-community/cli-platform-ios/native_modules'
+require Pod::Executable.execute_command('node', ['-p',
+  'require.resolve("react-native/scripts/react_native_pods.rb",
+    {paths: [process.argv[1]]})', __dir__]).strip
 ```
 
-After adjusting paths, run `pod install` from `apps/mobile/ios/`.
-
----
-
-## Scaffold Approach
-
-`npx react-native@latest init` generates the app at the current working directory. Two options:
-
-**Option A:** Run init outside the monorepo, then move the output into `apps/mobile/`. Adjust all relative paths in Gradle and Podfile.
-
-**Option B:** Run init directly at `apps/mobile/` with `--directory apps/mobile` flag, rename `package.json#name` to `@vex-chat/mobile`. This is cleaner.
-
-After scaffold:
-1. Add `node-linker=hoisted` to root `.npmrc` if not already present
-2. Create/update `metro.config.js` per above
-3. Create `react-native.config.js` per above
-4. Fix Android Gradle paths
-5. Fix iOS Podfile paths
-6. `pnpm install` from workspace root
-7. `cd apps/mobile/ios && pod install`
+After scaffold, run `pod install` from `apps/mobile/ios/`.
 
 ---
 
@@ -227,10 +187,9 @@ After scaffold:
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Metro can't find `@babel/runtime` | pnpm doesn't hoist it | `node-linker=hoisted` in root `.npmrc` |
+| Metro can't find `@babel/runtime` | Not an explicit dep | Add `@babel/runtime` to mobile's devDependencies |
 | "Invalid hook call" / duplicate React | Two copies of `react` in bundle | `pnpm.overrides.react` in root `package.json` |
 | Gradle: "Plugin not found" | `includeBuild` path wrong | Adjust `../` count for actual nesting depth |
-| CocoaPods: "cannot load such file" | CLI platform package not in flat `node_modules` | `node-linker=hoisted` |
 | Metro errors for files outside projectRoot | `watchFolders` not set | Add `watchFolders: [workspaceRoot]` |
 | `disableHierarchicalLookup: true` breaks resolution | Metro can't walk pnpm virtual store | Remove this option; use `nodeModulesPaths` instead |
 | TypeScript `paths` aliases not working | Metro doesn't read `tsconfig.json` `paths` | Mirror them with `babel-plugin-module-resolver` |
@@ -240,6 +199,7 @@ After scaffold:
 
 ## What We Do NOT Use
 
+- **`node-linker=hoisted`** — breaks pnpm's strict isolation for the entire workspace. Not needed with Metro's symlink support.
 - **Expo SDK** — no `expo-cli`, no EAS Build, no Expo managed workflow. OTA updates are out of scope.
 - **Turborepo / Nx** — currently not adopted. Pure pnpm workspaces with workspace symlinks is sufficient.
 - **`react-native-monorepo-config`** — optional Callstack helper that wraps Metro config. Not used here; the manual config above is simpler and more transparent.
