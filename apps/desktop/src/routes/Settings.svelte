@@ -8,6 +8,7 @@
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
   import { avatarHash } from '../lib/store/index.js'
   import Avatar from '../lib/Avatar.svelte'
+  import { checkForUpdates, applyUpdate, type UpdateStatus } from '../lib/updater.js'
 
   // ── Sounds ──────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,22 @@
       avatarUploading = false
       if (avatarInput) avatarInput.value = ''
     }
+  }
+
+  // ── Updates ────────────────────────────────────────────────────────────────
+
+  let updateStatus: UpdateStatus = $state({
+    available: false,
+    downloading: false,
+    progress: 0,
+    readyToInstall: false,
+  })
+  let checking = $state(false)
+
+  async function handleCheckUpdate(): Promise<void> {
+    checking = true
+    await checkForUpdates((s) => { updateStatus = s })
+    checking = false
   }
 
   // ── Danger zone ─────────────────────────────────────────────────────────────
@@ -168,6 +185,32 @@
             {serverUrlSaved ? 'Saved!' : 'Save'}
           </button>
         </div>
+      </div>
+    </section>
+
+    <!-- ── Updates ── -->
+    <section class="settings-section">
+      <h2 class="settings-section__title">Updates</h2>
+      <div class="settings-row">
+        <div class="settings-row__info">
+          <span class="settings-row__label">Current version</span>
+          <span class="settings-row__desc">v0.1.0</span>
+        </div>
+        {#if updateStatus.readyToInstall}
+          <button class="settings-btn settings-btn--toggle-on" onclick={applyUpdate}>
+            Restart to update
+          </button>
+        {:else if updateStatus.downloading}
+          <span class="settings-row__value">Downloading… {Math.round(updateStatus.progress * 100)}%</span>
+        {:else if updateStatus.available}
+          <span class="settings-row__value">v{updateStatus.version} available</span>
+        {:else if updateStatus.error}
+          <span class="settings-row__desc settings-row__desc--error">{updateStatus.error}</span>
+        {:else}
+          <button class="settings-btn" onclick={handleCheckUpdate} disabled={checking}>
+            {checking ? 'Checking…' : 'Check for updates'}
+          </button>
+        {/if}
       </div>
     </section>
 

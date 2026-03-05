@@ -42,6 +42,12 @@
       "desktop": {
         "schemes": ["vex"]
       }
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/user/vex-chat/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
     }
   }
 }
