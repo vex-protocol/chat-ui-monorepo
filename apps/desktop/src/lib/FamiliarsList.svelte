@@ -3,6 +3,10 @@
   import type { IUser } from '@vex-chat/types'
   import { familiars, client } from './store/index.js'
   import { $familiars as familiarsStore } from '@vex-chat/store'
+  import { getServerUrl } from './config.js'
+  import Avatar from './Avatar.svelte'
+
+  const serverUrl = getServerUrl()
 
   // ── Familiar persistence ─────────────────────────────────────────────────────
 
@@ -85,7 +89,7 @@
             role="option"
             aria-selected="false"
           >
-            <span class="familiars__avatar">{user.username.slice(0, 1).toUpperCase()}</span>
+            <Avatar userID={user.userID} name={user.username} size={28} {serverUrl} />
             <span class="familiars__result-name">{user.username}</span>
           </button>
         </li>
@@ -103,7 +107,7 @@
     {#each familiarList as user (user.userID)}
       <li>
         <button class="familiars__item" onclick={() => openDM(user)}>
-          <span class="familiars__avatar">{user.username.slice(0, 1).toUpperCase()}</span>
+          <Avatar userID={user.userID} name={user.username} size={28} {serverUrl} />
           <span class="familiars__name">{user.username}</span>
         </button>
       </li>
@@ -217,20 +221,6 @@
   .familiars__item:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-  }
-
-  .familiars__avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--bg-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 700;
-    flex-shrink: 0;
   }
 
   .familiars__name,

@@ -3,6 +3,10 @@
   import { onMount } from 'svelte'
   import { chunkMessages, renderContent, handleLinkClick, formatTime } from './utils/messages.js'
   import { user } from './store/index.js'
+  import { getServerUrl } from './config.js'
+  import Avatar from './Avatar.svelte'
+
+  const serverUrl = getServerUrl()
 
   let { messages = [] }: { messages: DecryptedMail[] } = $props()
 
@@ -53,9 +57,7 @@
   {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
     <div class="message-chunk">
       <div class="message-chunk__header">
-        <div class="message-chunk__avatar" aria-hidden="true">
-          {chunk.authorID.slice(0, 1).toUpperCase()}
-        </div>
+        <Avatar userID={chunk.authorID} size={36} {serverUrl} />
         <div class="message-chunk__meta">
           <span
             class="message-chunk__author"
@@ -105,21 +107,6 @@
     align-items: flex-start;
     gap: 10px;
     margin-bottom: 2px;
-  }
-
-  .message-chunk__avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--bg-primary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
-    flex-shrink: 0;
-    user-select: none;
   }
 
   .message-chunk__meta {
