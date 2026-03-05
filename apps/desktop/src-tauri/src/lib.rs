@@ -7,12 +7,15 @@ use tauri::{
 const TRAY_ID: &str = "main";
 
 fn show_window(app: &tauri::AppHandle) {
-    // On macOS, activating the NSApplication is required before the window
-    // can come to the foreground after being hidden.
     let _ = app.show();
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.unminimize();
-        let _ = w.show();
+        if w.is_minimized().unwrap_or(false) {
+            // Unminimize plays the macOS Dock animation; calling show() on top
+            // of it causes a flicker, so we take separate paths.
+            let _ = w.unminimize();
+        } else {
+            let _ = w.show();
+        }
         let _ = w.set_focus();
     }
 }
