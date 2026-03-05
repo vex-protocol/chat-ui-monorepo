@@ -264,16 +264,16 @@ describe('POST /register', () => {
 
 ## Testing NaCl Crypto
 
-The full-fidelity privacy model requires NaCl Ed25519 key pairs in tests. Use `tweetnacl` directly — it ships with built-in TypeScript types.
+The full-fidelity privacy model requires Ed25519 key pairs in tests. Use `@vex-chat/crypto` — it wraps `@noble/curves` with NaCl-compatible wire format.
 
 ### Generating key pairs
 
 ```ts
-import nacl from 'tweetnacl'
+import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
 
-const keyPair = nacl.sign.keyPair()
+const keyPair = generateSignKeyPair()
 // keyPair.publicKey  → Uint8Array(32)
-// keyPair.secretKey  → Uint8Array(64)
+// keyPair.secretKey  → Uint8Array(32) — seed, not the 64-byte expanded key
 ```
 
 ### Signing a token UUID for registration
@@ -284,14 +284,14 @@ The registration token is a UUID string. To sign it:
 import { parse as uuidParse } from 'uuid'
 
 const tokenBytes = uuidParse(token.key) as Uint8Array  // 16 bytes
-const signedMessage = nacl.sign(tokenBytes, keyPair.secretKey) // 80 bytes: 64-byte sig + 16-byte msg
+const signedMessage = signMessage(tokenBytes, keyPair.secretKey) // 80 bytes: 64-byte sig + 16-byte msg
 ```
 
 ### Verifying and deriving userID
 
 ```ts
 import { stringify as uuidStringify } from 'uuid'
-import { verifyNaClSignature } from '../../src/auth/index.js'
+import { verifyNaClSignature } from '@vex-chat/crypto'
 
 const regKey = verifyNaClSignature(signedMessage, keyPair.publicKey) // → 16 bytes or null
 const userID = uuidStringify(regKey!)  // = token.key (the original UUID)

@@ -258,49 +258,19 @@ If any code in this repo is ever shared with a browser environment (e.g., moved 
 
 ---
 
-## tweetnacl vs @noble/ed25519
+## Crypto library: @noble/curves
 
-We use **tweetnacl** for all Ed25519 operations. This is mandated by `AGENTS.md` for consistency, but it's worth understanding the trade-off.
+We use **`@noble/curves`** (Ed25519 via `@noble/curves/ed25519`) for all signing operations, wrapped in `@vex-chat/crypto`. The original upstream used tweetnacl; we migrated for RFC 8032 compliance, active maintenance, and a more recent Cure53 audit (2022).
 
-### Comparison
-
-| | tweetnacl | @noble/ed25519 |
-|---|---|---|
-| Performance (`sign`) | ~650 ops/sec | ~5,900 ops/sec (**~9x faster**) |
-| Performance (`getPublicKey`) | ~1,800 ops/sec | ~22,000 ops/sec (**~12x faster**) |
-| Bundle size | ~7KB | ~5KB |
-| TypeScript | Types included | Written in TypeScript |
-| Dependencies | Zero | Zero |
-| Audit | Cure53 (2017) | Cure53 (Feb 2022, v2 rewrite) |
-| RFC compliance | Partial (NaCl spec) | RFC 8032 + FIPS 186-5 |
-| Last major update | Maintenance-only | Actively developed |
-| API style | Sync | Async by default (sync via `@noble/curves`) |
-
-### Why the gap matters (or doesn't)
-
-For Spire, Ed25519 operations happen at:
-- Registration (once per device lifetime)
-- Token redemption (once per action)
-- WebSocket connection setup (once per session)
-
-At the load levels a self-hosted Vex server sees, the 9x performance difference between tweetnacl and @noble/ed25519 is not meaningful — both are fast enough. The difference matters at scale (e.g., a high-traffic auth service verifying thousands of signatures per second).
-
-The stronger argument for `@noble/ed25519` is not performance — it is that it is RFC 8032 compliant, actively maintained, and has a more recent security audit. tweetnacl implements the original NaCl spec, which predates RFC 8032 and has subtle compatibility differences (particularly around cofactor clearing and batch verification).
-
-### Switching cost
-
-If you want to switch, the API shapes are different:
+Our `@vex-chat/crypto` package preserves NaCl-compatible wire format (64-byte signature prepended to message) so the protocol is unchanged from upstream — only the underlying library differs.
 
 ```ts
-// tweetnacl (current)
-const result = nacl.sign.open(signedMessage, publicKey) // returns Uint8Array | null
+import { generateSignKeyPair, signMessage, verifyNaClSignature, encodeHex } from '@vex-chat/crypto'
 
-// @noble/ed25519 (async)
-const isValid = await ed.verify(signature, message, publicKey) // returns boolean
-// Note: separate signature and message, not the 64+N combined format tweetnacl uses
+const keyPair = generateSignKeyPair()              // { publicKey, secretKey } — 32 bytes each
+const signed = signMessage(message, keyPair.secretKey) // 64-byte sig || message (NaCl format)
+const original = verifyNaClSignature(signed, keyPair.publicKey) // Uint8Array | null
 ```
-
-tweetnacl's `nacl.sign()` produces a 64-byte signature prepended to the message. `@noble/ed25519` works with the signature and message separately. Migration would require updating all signing and verification call sites. The protocol itself (what gets signed and how) would not change — only the library calls.
 
 ---
 
