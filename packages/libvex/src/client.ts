@@ -318,6 +318,20 @@ export class VexClient extends EventEmitter<VexEvents> {
     if (!result.ok) throw new Error(result.error.message)
   }
 
+  // ── Fingerprints ────────────────────────────────────────────────────────────
+
+  /**
+   * Computes a conversation fingerprint for verifying the encryption session
+   * with another user's device. Both parties produce the same string.
+   *
+   * @param theirSignKey - Hex Ed25519 public key of the other party's device
+   * @returns Formatted fingerprint, or null if SessionManager unavailable
+   */
+  getFingerprint(theirSignKey: string): string | null {
+    if (!this.sessionManager) return null
+    return this.sessionManager.fingerprint(theirSignKey)
+  }
+
   // ── Files ──────────────────────────────────────────────────────────────────
 
   /**
