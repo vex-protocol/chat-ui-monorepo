@@ -2,36 +2,34 @@
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
-  import { bootstrap, user } from '../lib/store/index.js'
-
-  // TODO (vex-chat-vyp): load saved deviceID + deviceKey from secure storage (react-native-keychain / Tauri store)
-  // For now, redirect to /login if no session credentials are found.
-  const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000'
+  import { bootstrap, user, servers as serversAtom } from '../lib/store/index.js'
+  import { getServerUrl, loadCredentials } from '../lib/config.js'
+  import { decodeHex } from '@vex-chat/crypto'
 
   onMount(() => {
-    const deviceID = localStorage.getItem('vex-device-id')
-    const deviceKeyHex = localStorage.getItem('vex-device-key')
-    const preKeyHex = localStorage.getItem('vex-prekey')
+    const creds = loadCredentials()
 
-    if (!deviceID || !deviceKeyHex) {
+    if (!creds) {
       push('/login')
       return
     }
 
-    const deviceKey = new Uint8Array(
-      deviceKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
-    )
-    const preKeySecret = preKeyHex
-      ? new Uint8Array(preKeyHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)))
-      : undefined
+    const deviceKey = decodeHex(creds.deviceKey)
+    const preKeySecret = decodeHex(creds.preKey)
 
-    bootstrap(SERVER_URL, deviceID, deviceKey, undefined, preKeySecret).catch(() => push('/login'))
+    bootstrap(getServerUrl(), creds.deviceID, deviceKey, undefined, preKeySecret)
+      .catch(() => push('/login'))
 
     // Watch $user — once set, navigate to the main app
     const unsub = user.subscribe((u) => {
       if (u) {
         unsub()
-        push('/server/home/general')
+        const serverList = Object.values(serversAtom.get())
+        if (serverList.length > 0) {
+          push(`/server/${serverList[0]!.serverID}/`)
+        } else {
+          push('/settings')
+        }
       }
     })
 

@@ -47,7 +47,7 @@ const connManager = createConnectionManager({
 })
 
 const app = createApp(db, tokenStore, config.JWT_SECRET, config.OPEN_REGISTRATION, (deviceID, data) =>
-  connManager.send(deviceID, data),
+  connManager.send(deviceID, data), config.DATA_DIR,
 )
 if (config.OPEN_REGISTRATION) {
   logger.warn('OPEN_REGISTRATION=true — unauthenticated /token/open/register is active. Disable in production.')

@@ -13,6 +13,7 @@ import { createDeviceRouter } from './devices/devices.routes.ts'
 import { createServerRouter } from './servers/servers.routes.ts'
 import { createKeysRouter } from './keys/keys.routes.ts'
 import { createMailRouter } from './mail/mail.routes.ts'
+import { createAvatarRouter } from './avatar/avatar.routes.ts'
 import { errorMiddleware } from './middleware/error.ts'
 import { createCheckAuth } from './middleware/checkAuth.ts'
 import { NotFoundError } from '#errors'
@@ -47,6 +48,7 @@ export function createApp(
   jwtSecret: string,
   openRegistration = false,
   sendToDevice?: (deviceID: string, data: string) => void,
+  dataDir = './data',
 ): express.Application {
   const app = express()
   const checkAuth = createCheckAuth(jwtSecret)
@@ -66,6 +68,7 @@ export function createApp(
   app.use(createServerRouter(db, checkAuth))
   app.use(createKeysRouter(db, checkAuth))
   app.use(createMailRouter(db, checkAuth, sendToDevice))
+  app.use(createAvatarRouter(dataDir, checkAuth))
 
   app.use((_req, _res, next) => next(new NotFoundError()))
   app.use(errorMiddleware)

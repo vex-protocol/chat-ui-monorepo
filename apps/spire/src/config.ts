@@ -18,6 +18,7 @@ export const ConfigSchema = z
       .enum(['true', 'false'])
       .default('false')
       .transform((v) => v === 'true'),
+    DATA_DIR: z.string().default('./data'),
   })
   .refine(data => data.DB_TYPE !== 'postgres' || !!data.DATABASE_URL, {
     message: 'DATABASE_URL is required when DB_TYPE=postgres',

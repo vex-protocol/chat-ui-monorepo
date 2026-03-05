@@ -1,8 +1,9 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { client } from './store/index.js'
-  import { clearCredentials } from './config.js'
+  import { client, avatarHash } from './store/index.js'
+  import { clearCredentials, getServerUrl } from './config.js'
   import { playLock } from './sounds.js'
+  import Avatar from './Avatar.svelte'
 
   let { username = '', userID = '' }: { username?: string; userID?: string } = $props()
 
@@ -29,9 +30,11 @@
     aria-label="User menu"
     aria-expanded={menuOpen}
   >
-    <div class="user-menu__avatar" title={username}>
-      {username ? username[0]?.toUpperCase() : '?'}
-    </div>
+    {#if userID}
+      <Avatar {userID} serverUrl={getServerUrl()} version={$avatarHash} size={32} name={username} />
+    {:else}
+      <div class="user-menu__avatar" title={username}>?</div>
+    {/if}
     <span class="user-menu__name">{username || 'Not logged in'}</span>
   </button>
 

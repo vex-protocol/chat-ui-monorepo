@@ -6,6 +6,8 @@
   import { encodeHex } from '@vex-chat/crypto'
   import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
+  import { avatarHash } from '../lib/store/index.js'
+  import Avatar from '../lib/Avatar.svelte'
 
   // ── Sounds ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,41 @@
         Array.from({ length: 8 }, (_, i) => parseInt(creds.deviceKey.slice(i * 2, i * 2 + 2), 16))
       )).toUpperCase()
     : 'N/A'
+
+  // ── Avatar upload ────────────────────────────────────────────────────────────
+
+  let avatarInput: HTMLInputElement | undefined = $state()
+  let avatarError = $state('')
+  let avatarUploading = $state(false)
+
+  async function handleAvatarChange(e: Event): Promise<void> {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+
+    if (file.size > 5 * 1024 * 1024) {
+      avatarError = 'Image must be under 5 MB'
+      return
+    }
+
+    const userID = $user?.userID
+    if (!userID || !$client) {
+      avatarError = 'Not authenticated'
+      return
+    }
+
+    avatarError = ''
+    avatarUploading = true
+    try {
+      const data = new Uint8Array(await file.arrayBuffer())
+      await $client.setAvatar(data, file.type)
+      avatarHash.set(Date.now())
+    } catch (err) {
+      avatarError = err instanceof Error ? err.message : 'Upload failed'
+    } finally {
+      avatarUploading = false
+      if (avatarInput) avatarInput.value = ''
+    }
+  }
 
   // ── Danger zone ─────────────────────────────────────────────────────────────
 
@@ -148,6 +185,31 @@
       <div class="settings-row">
         <span class="settings-row__label">Device fingerprint</span>
         <span class="settings-row__value settings-row__value--mono">{fingerprint}…</span>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row__info">
+          <span class="settings-row__label">Avatar</span>
+          {#if avatarError}
+            <span class="settings-row__desc settings-row__desc--error">{avatarError}</span>
+          {:else}
+            <span class="settings-row__desc">Upload a profile picture (JPG, PNG, GIF, or WebP, max 5 MB)</span>
+          {/if}
+        </div>
+        <div class="settings-avatar-actions">
+          {#if $user?.userID}
+            <Avatar userID={$user.userID} serverUrl={serverUrl} version={$avatarHash} size={40} name={$user.username} />
+          {/if}
+          <button class="settings-btn" onclick={() => avatarInput?.click()} disabled={avatarUploading}>
+            {avatarUploading ? 'Uploading…' : 'Change'}
+          </button>
+          <input
+            bind:this={avatarInput}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            style="display:none"
+            onchange={handleAvatarChange}
+          />
+        </div>
       </div>
     </section>
 
@@ -363,6 +425,17 @@
   .settings-btn--danger:hover:not(:disabled) {
     background: var(--danger);
     color: #fff;
+  }
+
+  .settings-row__desc--error {
+    color: var(--danger);
+  }
+
+  .settings-avatar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
   }
 
   .settings-confirm {

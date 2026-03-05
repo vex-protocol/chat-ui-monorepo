@@ -14,6 +14,7 @@ export {
   $onlineLists as onlineLists,
   $client as client,
   $keyReplaced as keyReplaced,
+  $avatarHash as avatarHash,
 } from '@vex-chat/store'
 
 export { bootstrap } from '@vex-chat/store'
