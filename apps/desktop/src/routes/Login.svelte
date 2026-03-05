@@ -2,8 +2,7 @@
   import { push } from 'svelte-spa-router'
   import { decodeHex } from '@vex-chat/crypto'
   import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
-
-  const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:16777'
+  import { getServerUrl, loadCredentials } from '../lib/config.js'
 
   let username = $state('')
   let password = $state('')
@@ -16,25 +15,23 @@
     error = ''
 
     try {
-      // 1. Load saved device credentials
-      const savedUsername = localStorage.getItem('vex-username')
-      const deviceKeyHex = localStorage.getItem('vex-device-key')
-      const deviceIDHex = localStorage.getItem('vex-device-id')
-      const preKeyHex = localStorage.getItem('vex-prekey')
+      const SERVER_URL = getServerUrl()
 
-      if (!deviceKeyHex || !deviceIDHex) {
+      // 1. Load saved device credentials
+      const creds = loadCredentials()
+      if (!creds) {
         error = 'No device key found. Please register first.'
         loading = false
         return
       }
 
-      if (savedUsername && savedUsername !== username) {
+      if (creds.username && creds.username !== username) {
         error = 'Username does not match registered device.'
         loading = false
         return
       }
 
-      // 2. POST /auth to get JWT (sets httpOnly cookie + returns token in body)
+      // 2. POST /auth to get JWT
       const authRes = await fetch(`${SERVER_URL}/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -52,17 +49,17 @@
       const { token } = await authRes.json() as { token: string }
 
       // 3. Bootstrap store with device key + JWT
-      const deviceKey = decodeHex(deviceKeyHex)
-      const preKeySecret = preKeyHex ? decodeHex(preKeyHex) : undefined
-      await bootstrap(SERVER_URL, deviceIDHex, deviceKey, token, preKeySecret)
+      const deviceKey = decodeHex(creds.deviceKey)
+      const preKeySecret = decodeHex(creds.preKey)
+      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, token, preKeySecret)
 
       // Navigate into the app
       if (userAtom.get()) {
         const serverList = Object.values(serversAtom.get())
         if (serverList.length > 0) {
-          push(`/server/${serverList[0]!.serverID}/general`)
+          push(`/server/${serverList[0]!.serverID}/`)
         } else {
-          push('/server/home/general')
+          push('/settings')
         }
       } else {
         error = 'Could not verify credentials after login'

@@ -3,8 +3,7 @@
   import { parse as uuidParse } from 'uuid'
   import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
-
-  const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:16777'
+  import { getServerUrl, saveCredentials } from '../lib/config.js'
 
   let username = $state('')
   let password = $state('')
@@ -20,6 +19,8 @@
     error = ''
 
     try {
+      const SERVER_URL = getServerUrl()
+
       // 1. Generate Ed25519 device signing key pair
       const signKeyPair = generateSignKeyPair()
       const preKeyPair = generateSignKeyPair()
@@ -68,19 +69,20 @@
 
       const regData = await regRes.json() as { token: string; userID: string; deviceID: string }
 
-      // 6. Save device credentials to localStorage (upgraded to Tauri FS in vex-chat-tyu)
-      // deviceID is the UUID assigned by spire (used for WS auth and API calls)
-      localStorage.setItem('vex-device-id', regData.deviceID)
-      localStorage.setItem('vex-device-key', encodeHex(signKeyPair.secretKey))
-      localStorage.setItem('vex-prekey', encodeHex(preKeyPair.secretKey))
-      localStorage.setItem('vex-username', username)
+      // 6. Save device credentials
+      saveCredentials({
+        username,
+        deviceID: regData.deviceID,
+        deviceKey: encodeHex(signKeyPair.secretKey),
+        preKey: encodeHex(preKeyPair.secretKey),
+      })
 
       // 7. Bootstrap the store with the JWT from registration response
       await bootstrap(SERVER_URL, regData.deviceID, signKeyPair.secretKey, regData.token, preKeyPair.secretKey)
 
       // Navigate into the app (no servers yet after fresh register)
       if (userAtom.get()) {
-        push('/server/home/general')
+        push('/settings')
       } else {
         error = 'Registration succeeded but could not connect to server'
         loading = false

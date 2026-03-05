@@ -1,15 +1,22 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { theme, toggleTheme } from './stores/theme.js'
+  import { client } from './store/index.js'
+  import { clearCredentials } from './config.js'
 
-  // Placeholder — user data from $user atom in vex-chat-6m0
   let { username = '', userID = '' }: { username?: string; userID?: string } = $props()
 
   let menuOpen = $state(false)
 
-  function logout() {
+  async function logout(): Promise<void> {
     menuOpen = false
+    try { await $client?.logout() } catch { /* ignore */ }
+    clearCredentials()
     push('/login')
+  }
+
+  function openSettings(): void {
+    menuOpen = false
+    push('/settings')
   }
 </script>
 
@@ -28,8 +35,8 @@
 
   {#if menuOpen}
     <div class="user-menu__dropdown" role="menu">
-      <button class="user-menu__item" role="menuitem" onclick={toggleTheme}>
-        {$theme === 'dark' ? '☀️ Light mode' : '🌙 Dark mode'}
+      <button class="user-menu__item" role="menuitem" onclick={openSettings}>
+        Settings
       </button>
       <div class="user-menu__divider" role="separator"></div>
       <button class="user-menu__item user-menu__item--danger" role="menuitem" onclick={logout}>
