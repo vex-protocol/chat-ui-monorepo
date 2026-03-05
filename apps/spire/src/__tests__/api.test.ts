@@ -680,3 +680,122 @@ describe('GET /server/:serverID/invites', () => {
     expect(res.body).toHaveLength(1)
   })
 })
+
+describe('DELETE /server/:serverID/invites/:inviteID', () => {
+  it('deletes an invite as the creator', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'S', icon: 'x.png' }).expect(200)
+    const serverID = serverRes.body.serverID
+
+    const inviteRes = await env.agent
+      .post(`/server/${serverID}/invites`)
+      .send({ expiration: null })
+      .expect(200)
+
+    await env.agent
+      .delete(`/server/${serverID}/invites/${inviteRes.body.inviteID}`)
+      .expect(200)
+
+    const list = await env.agent.get(`/server/${serverID}/invites`).expect(200)
+    expect(list.body).toHaveLength(0)
+  })
+
+  it('returns 404 for non-existent invite', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'S', icon: 'x.png' }).expect(200)
+    await env.agent.delete(`/server/${serverRes.body.serverID}/invites/${uuidv4()}`).expect(404)
+  })
+})
+
+describe('GET /invite/:inviteID', () => {
+  it('returns invite details with server name (no auth required)', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'TestServer', icon: 'x.png' }).expect(200)
+    const inviteRes = await env.agent
+      .post(`/server/${serverRes.body.serverID}/invites`)
+      .send({ expiration: null })
+      .expect(200)
+
+    // No auth — use raw supertest
+    const res = await supertest(env.app)
+      .get(`/invite/${inviteRes.body.inviteID}`)
+      .expect(200)
+
+    expect(res.body.inviteID).toBe(inviteRes.body.inviteID)
+    expect(res.body.serverName).toBe('TestServer')
+  })
+
+  it('returns 404 for expired invite', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'S', icon: 'x.png' }).expect(200)
+    const inviteRes = await env.agent
+      .post(`/server/${serverRes.body.serverID}/invites`)
+      .send({ expiration: '2020-01-01T00:00:00.000Z' })
+      .expect(200)
+
+    await supertest(env.app).get(`/invite/${inviteRes.body.inviteID}`).expect(404)
+  })
+})
+
+describe('POST /invite/:inviteID/join', () => {
+  it('adds the user to the server via invite', async () => {
+    const env = await makeEnv()
+    await registerUser(env, { username: 'owner' })
+
+    const serverRes = await env.agent.post('/server').send({ name: 'JoinMe', icon: 'x.png' }).expect(200)
+    const serverID = serverRes.body.serverID
+
+    const inviteRes = await env.agent
+      .post(`/server/${serverID}/invites`)
+      .send({ expiration: null })
+      .expect(200)
+
+    // Register a second user
+    await registerUser(env, { username: 'joiner' })
+
+    const res = await env.agent.post(`/invite/${inviteRes.body.inviteID}/join`).expect(200)
+    expect(res.body.ok).toBe(true)
+    expect(res.body.server.serverID).toBe(serverID)
+    expect(res.body.server.name).toBe('JoinMe')
+  })
+
+  it('returns 409 if already a member', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'S', icon: 'x.png' }).expect(200)
+    const inviteRes = await env.agent
+      .post(`/server/${serverRes.body.serverID}/invites`)
+      .send({ expiration: null })
+      .expect(200)
+
+    // Creator is already a member (power level 100)
+    await env.agent.post(`/invite/${inviteRes.body.inviteID}/join`).expect(409)
+  })
+
+  it('returns 404 for expired invite', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent.post('/server').send({ name: 'S', icon: 'x.png' }).expect(200)
+    const inviteRes = await env.agent
+      .post(`/server/${serverRes.body.serverID}/invites`)
+      .send({ expiration: '2020-01-01T00:00:00.000Z' })
+      .expect(200)
+
+    await env.agent.post(`/invite/${inviteRes.body.inviteID}/join`).expect(404)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).post(`/invite/${uuidv4()}/join`).expect(401)
+  })
+})
