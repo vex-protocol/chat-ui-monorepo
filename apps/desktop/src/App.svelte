@@ -1,6 +1,5 @@
 <script lang="ts">
   import Router, { location, push } from 'svelte-spa-router'
-  import TitleBar from './lib/TitleBar.svelte'
   import ServerBar from './lib/ServerBar.svelte'
   import ChannelBar from './lib/ChannelBar.svelte'
   import UserMenu from './lib/UserMenu.svelte'
@@ -70,8 +69,6 @@
 </script>
 
 <div class="app">
-  <TitleBar />
-
   <div class="app__body">
     {#if !isAuthRoute}
       <div class="app__sidebar">
