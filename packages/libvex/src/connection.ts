@@ -37,6 +37,8 @@ export class VexConnection {
     private readonly deviceID: string,
     private readonly deviceKey: Uint8Array,
     private readonly emitter: EventEmitter<VexEvents>,
+    /** Called with the raw (encrypted) IMail frame before SessionManager decrypts it. */
+    private readonly onRawMail: (mail: IMail) => void,
   ) {}
 
   connect(): void {
@@ -71,7 +73,7 @@ export class VexConnection {
         'resource' in msg &&
         (msg as Record<string, unknown>)['resource'] === 'mail'
       ) {
-        this.emitter.emit('mail', (msg as Record<string, unknown>)['payload'] as IMail)
+        this.onRawMail((msg as Record<string, unknown>)['payload'] as IMail)
       }
     })
 

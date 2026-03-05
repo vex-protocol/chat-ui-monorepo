@@ -66,16 +66,17 @@
         return
       }
 
-      const regData = await regRes.json() as { token: string; userID: string }
+      const regData = await regRes.json() as { token: string; userID: string; deviceID: string }
 
       // 6. Save device credentials to localStorage (upgraded to Tauri FS in vex-chat-tyu)
-      const deviceID = encodeHex(signKeyPair.publicKey)
-      localStorage.setItem('vex-device-id', deviceID)
+      // deviceID is the UUID assigned by spire (used for WS auth and API calls)
+      localStorage.setItem('vex-device-id', regData.deviceID)
       localStorage.setItem('vex-device-key', encodeHex(signKeyPair.secretKey))
+      localStorage.setItem('vex-prekey', encodeHex(preKeyPair.secretKey))
       localStorage.setItem('vex-username', username)
 
       // 7. Bootstrap the store with the JWT from registration response
-      await bootstrap(SERVER_URL, deviceID, signKeyPair.secretKey, regData.token)
+      await bootstrap(SERVER_URL, regData.deviceID, signKeyPair.secretKey, regData.token, preKeyPair.secretKey)
 
       // Navigate into the app (no servers yet after fresh register)
       if (userAtom.get()) {

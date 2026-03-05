@@ -7,6 +7,8 @@ export type VexErrorCode =
   | 'CONFLICT'
   | 'INVALID_INPUT'
   | 'SERVER_ERROR'
+  | 'CRYPTO_ERROR'
+  | 'NOT_AUTHENTICATED'
 
 export interface VexError {
   code: VexErrorCode

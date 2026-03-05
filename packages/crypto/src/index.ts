@@ -5,6 +5,7 @@ export {
   signMessage,
   signDetached,
   generateSignKeyPair,
+  derivePublicKey,
 } from './nacl.ts'
 export {
   convertPublicKey,
@@ -14,3 +15,4 @@ export {
   deriveSessionKey,
   dh,
 } from './session.ts'
+export { generateNonce, encryptSecretBox, decryptSecretBox } from './box.ts'

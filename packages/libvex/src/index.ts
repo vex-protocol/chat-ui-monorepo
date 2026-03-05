@@ -1,5 +1,7 @@
 export { VexClient } from './client.ts'
 export type { VexEvents } from './client.ts'
+export { SessionManager } from './session.ts'
+export type { MailMeta } from './session.ts'
 export type { RegisterResult, LoginResult } from './auth.ts'
 export type { SendResult } from './mail.ts'
 export type { VexError, VexErrorCode } from './errors.ts'
