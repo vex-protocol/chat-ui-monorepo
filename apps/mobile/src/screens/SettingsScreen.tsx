@@ -19,10 +19,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
   async function handleLogout() {
     setLoggingOut(true)
     try {
-      await client?.logout()
+      await client?.disconnect()
     } catch { /* ignore */ }
     await clearCredentials()
-    setLoggingOut(false)
+    $client.set(null)
+    $user.set(null)
   }
 
   function handleClearKeys() {
@@ -35,7 +36,12 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           text: 'Clear keys',
           style: 'destructive',
           onPress: async () => {
+            try {
+              await client?.disconnect()
+            } catch { /* ignore */ }
             await clearCredentials()
+            $client.set(null)
+            $user.set(null)
           },
         },
       ],

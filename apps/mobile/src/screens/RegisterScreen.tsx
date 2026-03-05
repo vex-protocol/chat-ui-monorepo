@@ -122,10 +122,12 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
               style={styles.input}
               value={username}
               onChangeText={setUsername}
+              onChange={(e) => setUsername(e.nativeEvent.text)}
               placeholder="choose a username"
               placeholderTextColor="#666666"
               autoCapitalize="none"
               autoCorrect={false}
+              textContentType="none"
               maxLength={19}
               editable={!loading}
             />
@@ -137,9 +139,11 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
               style={styles.input}
               value={password}
               onChangeText={setPassword}
+              onChange={(e) => setPassword(e.nativeEvent.text)}
               placeholder="••••••••"
               placeholderTextColor="#666666"
               secureTextEntry
+              textContentType="none"
               editable={!loading}
             />
           </View>
@@ -150,9 +154,11 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
               style={styles.input}
               value={confirm}
               onChangeText={setConfirm}
+              onChange={(e) => setConfirm(e.nativeEvent.text)}
               placeholder="••••••••"
               placeholderTextColor="#666666"
               secureTextEntry
+              textContentType="none"
               editable={!loading}
             />
           </View>
