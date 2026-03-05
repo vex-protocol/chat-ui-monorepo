@@ -36,38 +36,53 @@
 </script>
 
 <div class="chat-input">
-  <textarea
-    bind:this={textareaEl}
-    bind:value
-    rows={1}
-    {placeholder}
-    {disabled}
-    onkeydown={handleKeyDown}
-    oninput={autoResize}
-    class="chat-input__textarea"
-    aria-label="Message input"
-  ></textarea>
-
-  <button
-    class="chat-input__send"
-    onclick={send}
-    disabled={!value.trim() || disabled}
-    aria-label="Send message"
-    title="Send (Enter)"
-  >
-    ↑
-  </button>
+  <div class="chat-input__wrap">
+    <textarea
+      bind:this={textareaEl}
+      bind:value
+      rows={1}
+      {placeholder}
+      {disabled}
+      onkeydown={handleKeyDown}
+      oninput={autoResize}
+      class="chat-input__textarea"
+      aria-label="Message input"
+    ></textarea>
+    <div class="chat-input__icons">
+      <button class="chat-input__icon" title="Attach file" aria-label="Attach file" disabled>📎</button>
+      <button class="chat-input__icon" title="Emoji" aria-label="Emoji" disabled>😊</button>
+      {#if value.trim()}
+        <button
+          class="chat-input__send"
+          onclick={send}
+          disabled={!value.trim() || disabled}
+          aria-label="Send message"
+          title="Send (Enter)"
+        >↑</button>
+      {/if}
+    </div>
+  </div>
 </div>
 
 <style>
   .chat-input {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
     padding: 10px 16px 12px;
     border-top: 1px solid var(--border);
     background: var(--bg-primary);
     flex-shrink: 0;
+  }
+
+  .chat-input__wrap {
+    display: flex;
+    align-items: flex-end;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.15s;
+  }
+
+  .chat-input__wrap:focus-within {
+    border-color: var(--accent);
   }
 
   .chat-input__textarea {
@@ -75,21 +90,18 @@
     resize: none;
     line-height: 1.5;
     padding: 8px 12px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    background: transparent;
+    border: none;
     color: var(--text-primary);
     font-size: 14px;
     font-family: inherit;
     max-height: 144px;
     overflow-y: auto;
-    transition: border-color 0.15s;
     width: auto;
   }
 
   .chat-input__textarea:focus {
     outline: none;
-    border-color: var(--accent);
   }
 
   .chat-input__textarea:disabled {
@@ -97,20 +109,50 @@
     cursor: not-allowed;
   }
 
-  .chat-input__send {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: var(--accent);
-    color: var(--bg-primary);
+  .chat-input__icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 6px;
+    flex-shrink: 0;
+  }
+
+  .chat-input__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 14px;
+    color: var(--text-muted);
+    filter: grayscale(1);
+    opacity: 0.5;
+    transition: opacity 0.1s;
+  }
+
+  .chat-input__icon:not(:disabled):hover {
+    opacity: 0.8;
+    background: var(--bg-hover);
+  }
+
+  .chat-input__icon:disabled {
+    cursor: default;
+  }
+
+  .chat-input__send {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
     font-weight: 700;
     flex-shrink: 0;
     transition: opacity 0.15s;
-    margin-bottom: 1px;
   }
 
   .chat-input__send:not(:disabled):hover {

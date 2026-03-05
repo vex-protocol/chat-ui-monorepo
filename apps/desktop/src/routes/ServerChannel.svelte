@@ -42,8 +42,15 @@
 
 <div class="channel-pane">
   <header class="channel-pane__header">
-    <span class="channel-pane__hash">#</span>
-    <span class="channel-pane__name">{channelName}</span>
+    <div class="channel-pane__title-group">
+      <span class="channel-pane__hash">#</span>
+      <span class="channel-pane__name">{channelName}</span>
+    </div>
+    <div class="channel-pane__actions">
+      <button class="channel-pane__action" title="Notification settings" aria-label="Notification settings">🔔</button>
+      <button class="channel-pane__action" title="Toggle members" aria-label="Toggle members">👥</button>
+      <button class="channel-pane__action" title="Search" aria-label="Search">🔍</button>
+    </div>
   </header>
 
   <MessageBox messages={channelMessages} />
@@ -71,11 +78,17 @@
   .channel-pane__header {
     display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: space-between;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-secondary);
     flex-shrink: 0;
+  }
+
+  .channel-pane__title-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .channel-pane__hash {
@@ -89,6 +102,31 @@
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
+  }
+
+  .channel-pane__actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .channel-pane__action {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: background 0.1s, color 0.1s;
+    filter: grayscale(1);
+    opacity: 0.6;
+  }
+
+  .channel-pane__action:hover {
+    background: var(--bg-hover);
+    opacity: 1;
   }
 
   .channel-pane__error {
