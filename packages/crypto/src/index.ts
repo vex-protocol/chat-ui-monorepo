@@ -16,3 +16,4 @@ export {
   dh,
 } from './session.ts'
 export { generateNonce, encryptSecretBox, decryptSecretBox } from './box.ts'
+export { computeFingerprint } from './fingerprint.ts'

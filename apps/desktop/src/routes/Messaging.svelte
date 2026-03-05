@@ -3,7 +3,7 @@
   import { onMount } from 'svelte'
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client } from '../lib/store/index.js'
+  import { messages, client, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -12,9 +12,35 @@
 
   let sending = $state(false)
   let sendError = $state('')
+  let showFingerprint = $state(false)
+  let fingerprint = $state('')
+  let theirSignKey = $state('')
+
+  // Fetch the recipient's signKey and compute the fingerprint
+  $effect(() => {
+    if (!$client || !targetUserID) return
+    $client.listDevices(targetUserID).then((devices) => {
+      const device = devices[0]
+      if (!device) return
+      $client!.fetchKeyBundle(device.deviceID).then((bundle) => {
+        theirSignKey = bundle.signKey
+        fingerprint = $client!.getFingerprint(bundle.signKey) ?? ''
+      }).catch(() => {})
+    }).catch(() => {})
+  })
+
+  const isVerifiedKey = $derived(theirSignKey ? $verifiedKeys.has(theirSignKey) : false)
+
+  function toggleVerified() {
+    if (!theirSignKey) return
+    if (isVerifiedKey) {
+      unmarkVerified(theirSignKey)
+    } else {
+      markVerified(theirSignKey)
+    }
+  }
 
   onMount(() => {
-    // Drain any pending inbox messages on mount
     $client?.fetchInbox().catch(console.error)
   })
 
@@ -23,7 +49,6 @@
     sending = true
     sendError = ''
     try {
-      // Find the recipient's first device
       const devices = await $client.listDevices(targetUserID)
       const device = devices[0]
       if (!device) {
@@ -46,9 +71,41 @@
   <header class="dm-pane__header">
     <span class="dm-pane__title">@{targetUserID.slice(0, 8)}</span>
     <div class="dm-pane__actions">
+      {#if fingerprint}
+        <button
+          class="dm-pane__action dm-pane__shield"
+          class:dm-pane__shield--verified={isVerifiedKey}
+          title={isVerifiedKey ? 'Verified — click to view fingerprint' : 'Unverified — click to verify'}
+          aria-label="Session fingerprint"
+          onclick={() => { showFingerprint = !showFingerprint }}
+        >
+          {isVerifiedKey ? '🟢' : '🟡'}
+        </button>
+      {/if}
       <button class="dm-pane__action" title="Search" aria-label="Search">🔍</button>
     </div>
   </header>
+
+  {#if showFingerprint && fingerprint}
+    <div class="fingerprint-panel">
+      <div class="fingerprint-panel__header">
+        <span class="fingerprint-panel__title">Session fingerprint</span>
+        <button class="fingerprint-panel__close" onclick={() => { showFingerprint = false }}>✕</button>
+      </div>
+      <code class="fingerprint-panel__code">{fingerprint}</code>
+      <p class="fingerprint-panel__desc">
+        Compare this fingerprint with the other party via a trusted channel (phone, in person).
+        If they match, mark as verified.
+      </p>
+      <button
+        class="fingerprint-panel__btn"
+        class:fingerprint-panel__btn--verified={isVerifiedKey}
+        onclick={toggleVerified}
+      >
+        {isVerifiedKey ? 'Mark as unverified' : 'Mark as verified'}
+      </button>
+    </div>
+  {/if}
 
   <MessageBox messages={threadMessages} />
 
@@ -107,6 +164,91 @@
   .dm-pane__action:hover {
     background: var(--bg-hover);
     opacity: 1;
+  }
+
+  .dm-pane__shield {
+    filter: none;
+    opacity: 1;
+  }
+
+  .dm-pane__shield--verified {
+    filter: none;
+    opacity: 1;
+  }
+
+  .fingerprint-panel {
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .fingerprint-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .fingerprint-panel__title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+  }
+
+  .fingerprint-panel__close {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .fingerprint-panel__close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .fingerprint-panel__code {
+    display: block;
+    font-family: monospace;
+    font-size: 16px;
+    letter-spacing: 0.1em;
+    color: var(--text-primary);
+    padding: 8px 0;
+    word-break: break-all;
+  }
+
+  .fingerprint-panel__desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 8px;
+    line-height: 1.4;
+  }
+
+  .fingerprint-panel__btn {
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  .fingerprint-panel__btn:hover {
+    background: var(--bg-hover);
+  }
+
+  .fingerprint-panel__btn--verified {
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .dm-pane__error {

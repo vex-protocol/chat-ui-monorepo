@@ -23,6 +23,7 @@ import {
   generateNonce,
   encryptSecretBox,
   decryptSecretBox,
+  computeFingerprint,
 } from '@vex-chat/crypto'
 import type { IMail, IKeyBundle, DecryptedMail } from '@vex-chat/types'
 
@@ -79,6 +80,17 @@ export class SessionManager {
     this.myIdX = convertSecretKey(deviceKey)
     this.myPreKeyX = preKeySecret ? convertSecretKey(preKeySecret) : null
     this.signKey = encodeHex(derivePublicKey(deviceKey))
+  }
+
+  /**
+   * Computes a conversation fingerprint for verification with the given party.
+   * Order-independent: both sides produce the same string.
+   *
+   * @param theirSignKey - Hex-encoded Ed25519 public key of the other party
+   * @returns Formatted fingerprint like "A1B2 C3D4 E5F6 ..."
+   */
+  fingerprint(theirSignKey: string): string {
+    return computeFingerprint(this.signKey, theirSignKey)
   }
 
   /**
