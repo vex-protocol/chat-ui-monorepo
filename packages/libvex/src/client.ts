@@ -265,4 +265,20 @@ export class VexClient extends EventEmitter<VexEvents> {
   async deleteChannel(channelID: string): Promise<void> {
     return deleteChannel(this.http, channelID)
   }
+
+  /**
+   * Uploads a new avatar image for the authenticated user.
+   * @param data      - Raw image bytes
+   * @param mimeType  - MIME type (e.g. 'image/jpeg', 'image/png')
+   */
+  async setAvatar(data: Uint8Array, mimeType: string): Promise<void> {
+    if (!this.currentUserID) throw new Error('Not authenticated')
+    const result = await this.http.postRaw(`/avatar/${this.currentUserID}`, data, mimeType)
+    if (!result.ok) throw new Error(result.error.message)
+  }
+
+  /** Returns the URL of a user's avatar with an optional cache-busting version param. */
+  avatarUrl(userID: string, version?: number): string {
+    return `${this.serverUrl}/avatar/${userID}${version !== undefined ? `?v=${version}` : ''}`
+  }
 }

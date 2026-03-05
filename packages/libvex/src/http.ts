@@ -53,6 +53,23 @@ export class HttpClient {
     }
   }
 
+  async postRaw(path: string, body: Uint8Array, contentType: string): Promise<HttpResult<void>> {
+    const h: Record<string, string> = { 'Content-Type': contentType }
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: h,
+        credentials: 'include',
+        body: body as BodyInit,
+      })
+      if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
+      return { ok: true, data: undefined }
+    } catch (err) {
+      return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
+    }
+  }
+
   async delete<T>(path: string): Promise<HttpResult<T>> {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {

@@ -66,14 +66,8 @@ export async function bootstrap(
 
   // ── Waterfall: populate initial state ──────────────────────────────────────
 
-  // 1. Current user
-  let user
-  try {
-    user = await client.whoami()
-  } catch {
-    // Not authenticated — stop here. The app should navigate to /login.
-    return
-  }
+  // 1. Current user — throws if not authenticated, letting the caller redirect.
+  const user = await client.whoami()
   $user.set(user)
 
   // 2. Servers
