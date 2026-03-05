@@ -30,12 +30,24 @@
     aria-label="User menu"
     aria-expanded={menuOpen}
   >
-    {#if userID}
-      <Avatar {userID} serverUrl={getServerUrl()} version={$avatarHash} size={32} name={username} />
-    {:else}
-      <div class="user-menu__avatar" title={username}>?</div>
-    {/if}
-    <span class="user-menu__name">{username || 'Not logged in'}</span>
+    <div class="user-menu__avatar-wrap">
+      {#if userID}
+        <Avatar {userID} serverUrl={getServerUrl()} version={$avatarHash} size={32} name={username} />
+      {:else}
+        <div class="user-menu__avatar" title={username}>?</div>
+      {/if}
+      <span class="user-menu__status-dot"></span>
+    </div>
+    <div class="user-menu__info">
+      <span class="user-menu__name">{username || 'Not logged in'}</span>
+      <span class="user-menu__status-text">online</span>
+    </div>
+    <button
+      class="user-menu__gear"
+      onclick={openSettings}
+      title="Settings"
+      aria-label="Settings"
+    >⚙</button>
   </button>
 
   {#if menuOpen}
@@ -77,6 +89,11 @@
 
   .user-menu__trigger:hover { background: var(--bg-hover); }
 
+  .user-menu__avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+
   .user-menu__avatar {
     width: 32px;
     height: 32px;
@@ -88,11 +105,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
+  }
+
+  .user-menu__status-dot {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--success);
+    border: 2px solid var(--bg-tertiary);
+  }
+
+  .user-menu__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   .user-menu__name {
-    flex: 1;
     font-size: 13px;
     font-weight: 600;
     color: var(--text-primary);
@@ -100,6 +133,32 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  .user-menu__status-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: left;
+    line-height: 1.2;
+  }
+
+  .user-menu__gear {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .user-menu__gear:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
   }
 
   .user-menu__dropdown {

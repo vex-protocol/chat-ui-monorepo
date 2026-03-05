@@ -77,6 +77,23 @@
     align-items: center;
     justify-content: center;
     transition: border-radius 0.15s, background 0.15s, color 0.15s;
+    position: relative;
+  }
+
+  /* Pill indicator on the left edge */
+  .server-bar__item::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    width: 4px;
+    border-radius: 0 4px 4px 0;
+    background: var(--text-primary);
+    height: 0;
+    transition: height 0.15s;
+  }
+
+  .server-bar__item:hover::before {
+    height: 20px;
   }
 
   .server-bar__item:hover {
@@ -89,6 +106,10 @@
     border-radius: 16px;
     background: var(--accent);
     color: #fff;
+  }
+
+  .server-bar__item--active::before {
+    height: 36px;
   }
 
   .server-bar__item--add {

@@ -12,6 +12,7 @@
   import Settings from './routes/Settings.svelte'
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
+  import MembersPanel from './lib/MembersPanel.svelte'
   import { user, keyReplaced, servers, channels, client } from './lib/store/index.js'
   import { setupNotifications } from './lib/notifications.js'
   import { setupTray } from './lib/tray.js'
@@ -85,7 +86,11 @@
     </div>
 
     {#if !isAuthRoute}
-      <FamiliarsList />
+      {#if activeServerID}
+        <MembersPanel serverID={activeServerID} />
+      {:else}
+        <FamiliarsList />
+      {/if}
     {/if}
   </div>
 

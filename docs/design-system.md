@@ -26,7 +26,7 @@ The Vex design system bridges Figma and code. Designers own the visual truth in 
 | `--warning` | `#fb8c00` | `#e65100` | Alerts |
 | `--border` | `#2a2a2a` | `#d0d0d0` | Dividers |
 
-> The current app uses Catppuccin Mocha (purple accent). The target palette is **monochromatic near-black + crimson**. Update `app.css` CSS variables to migrate; the light theme follows the same warm-neutral approach.
+> ~~The current app uses Catppuccin Mocha (purple accent).~~ **Done.** Both dark and light themes now use the crimson palette in `app.css`.
 
 ### Layout
 

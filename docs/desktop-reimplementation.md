@@ -299,48 +299,53 @@ WS → VexClient ("mail" event)
 | Vite + Svelte scaffold | ✓ Done |
 | Tauri 2 init + Rust build | ✓ Done |
 | External links (`tauri-plugin-opener`) | ✓ Done |
-| App shell (routing, TitleBar, layout) | — Not started |
-| Auth UI (login / register) | — Not started |
-| Message rendering (MessageBox, ChatInput) | — Not started |
-| Direct messaging | — Not started |
-| Servers / channels | — Not started |
-| Server management (create, invite, settings) | — Not started |
-| User search & familiars | — Not started |
-| Avatar system | — Not started |
-| Sound effects | — Not started |
-| Notifications | — Not started |
-| Settings / key storage | — Not started |
+| App shell (routing, TitleBar, layout) | ✓ Done (ServerBar, ChannelBar, FamiliarsList, UserMenu) |
+| Auth UI (login / register) | ✓ Done |
+| Message rendering (MessageBox, ChatInput) | ✓ Done (chunkMessages, markdown, Avatar) |
+| Direct messaging | ✓ Done (Messaging route, DM send via listDevices) |
+| Servers / channels | ✓ Done (ServerChannel route, create server/channel) |
+| Server management (create, invite, settings) | Partial — create server + channel done; invite/settings not started |
+| User search & familiars | ✓ Done (FamiliarsList with search + localStorage persistence) |
+| Avatar system | ✓ Done (shared Mitosis Avatar component) |
+| Sound effects | ✓ Done (auth + notification audio) |
+| Notifications | ✓ Done (Tauri notifications + tray badge) |
+| Settings / key storage | Partial — key storage done; settings screen exists |
 | File / image attachments | — Not started |
 | Session fingerprint verification | — Not started |
-| System tray | — Not started |
+| System tray | ✓ Done (macOS tray, restore from minimized) |
 | Deep links (vex://) | — Not started |
 | Auto-update | — Not started |
+| **Desktop UI polish** | — Needed (server bar pill, top header bar, members sidebar, user status bar) |
 
 ### `packages/store`
 
 | Area | Status |
 |---|---|
-| VexStore class + state Maps | — Not started |
-| Bootstrap sequence | — Not started |
-| Real-time event wiring | — Not started |
-| Svelte adapter | — Not started |
-| React adapter | — Not started |
+| nanostores atoms (user, messages, servers, channels, etc.) | ✓ Done |
+| Bootstrap sequence | ✓ Done |
+| Real-time event wiring (mail, serverChange) | ✓ Done |
+| Svelte adapter (nanostores native) | ✓ Done |
+| React adapter (@nanostores/react) | ✓ Done |
 
 ### `packages/ui`
 
 | Area | Status |
 |---|---|
-| Mitosis setup + compile pipeline | — Not started |
-| Core primitives (Button, Avatar, MessageBubble, etc.) | — Not started |
+| Mitosis setup + compile pipeline | ✓ Done |
+| Avatar | ✓ Done (deterministic hue fallback, image support) |
+| MessageChunk | ✓ Done (composes Avatar) |
+| StatusDot | ✓ Done |
+| MemberListItem | ✓ Done (composes Avatar + StatusDot) |
+| Remaining primitives (Button, TextInput, Badge, etc.) | — Not started |
 | Storybook stories | — Not started |
 
 ### `apps/mobile`
 
 | Area | Status |
 |---|---|
-| Expo scaffold + React Navigation | — Not started |
-| Auth screens | — Not started |
-| Direct messaging | — Not started |
-| Servers / channels | — Not started |
+| React Native scaffold + navigation | ✓ Done (bare RN, bottom tabs, stack navigators) |
+| Auth screens (login, register, keychain) | ✓ Done |
+| Servers & channels screens | ✓ Done (ServerList, ChannelList, Channel) |
+| Direct messaging | ◐ In progress (DMListScreen, ConversationScreen) |
 | Push notifications | — Not started |
 | Settings | — Not started |

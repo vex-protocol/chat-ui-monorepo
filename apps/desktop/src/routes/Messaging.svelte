@@ -45,6 +45,9 @@
 <div class="dm-pane">
   <header class="dm-pane__header">
     <span class="dm-pane__title">@{targetUserID.slice(0, 8)}</span>
+    <div class="dm-pane__actions">
+      <button class="dm-pane__action" title="Search" aria-label="Search">🔍</button>
+    </div>
   </header>
 
   <MessageBox messages={threadMessages} />
@@ -66,6 +69,9 @@
   }
 
   .dm-pane__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     background: var(--bg-secondary);
@@ -76,6 +82,31 @@
     font-size: 15px;
     font-weight: 600;
     color: var(--text-primary);
+  }
+
+  .dm-pane__actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .dm-pane__action {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: background 0.1s, color 0.1s;
+    filter: grayscale(1);
+    opacity: 0.6;
+  }
+
+  .dm-pane__action:hover {
+    background: var(--bg-hover);
+    opacity: 1;
   }
 
   .dm-pane__error {
