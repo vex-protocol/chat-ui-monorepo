@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { client, servers } from './store/index.js'
-  import { $servers as serversStore } from '@vex-chat/store'
+  import { client, servers, channels } from './store/index.js'
+  import { $servers as serversStore, $channels as channelsStore } from '@vex-chat/store'
   import { push } from 'svelte-spa-router'
 
   let { onclose }: { onclose: () => void } = $props()
@@ -16,10 +16,12 @@
     submitting = true
     error = ''
     try {
-      const server = await $client!.createServer(n, '')
+      const server = await $client!.createServer(n, n.slice(0, 1).toUpperCase())
       serversStore.setKey(server.serverID, server)
+      const channel = await $client!.createChannel(server.serverID, 'general')
+      channelsStore.setKey(server.serverID, [channel])
       onclose()
-      push(`/server/${server.serverID}/`)
+      push(`/server/${server.serverID}/${channel.channelID}`)
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create server'
     } finally {
