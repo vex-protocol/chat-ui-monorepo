@@ -46,6 +46,23 @@ pod --version          # Should print CocoaPods version (installed via mise)
 
 If `xcodebuild -version` fails with a Command Line Tools error, re-run step 3 above.
 
+### Running from Xcode
+
+You can build and run the app directly from Xcode instead of using `react-native run-ios`. This gives you the full Xcode console for debugging native crashes and startup issues.
+
+1. Open the **workspace** (not the project):
+   ```bash
+   open apps/mobile/ios/VexMobile.xcworkspace
+   ```
+2. Select the **VexMobile** scheme and your target simulator in the top bar
+3. Start Metro in a separate terminal:
+   ```bash
+   cd apps/mobile && npx react-native start
+   ```
+4. Hit **Cmd+R** in Xcode to build and run
+
+> **Important:** Always open `.xcworkspace`, not `.xcodeproj`. The workspace includes the CocoaPods dependencies — the project file alone will fail to link them.
+
 ---
 
 ## The Core Problem
@@ -238,6 +255,48 @@ After scaffold, run `pod install` from `apps/mobile/ios/`.
 | `disableHierarchicalLookup: true` breaks resolution | Metro can't walk pnpm virtual store | Remove this option; use `nodeModulesPaths` instead |
 | TypeScript `paths` aliases not working | Metro doesn't read `tsconfig.json` `paths` | Mirror them with `babel-plugin-module-resolver` |
 | `.ios.ts` / `.android.ts` extensions not resolved | Wrong `moduleResolution` | Use `bundler` or `node`, never `node16`/`nodenext` |
+| `HMRClient.setup()` / only `AppRegistry` registered | Metro prelude path matching fails with pnpm symlinks | Add `import 'react-native/Libraries/Core/InitializeCore'` to `index.js` |
+| `crypto.getRandomValues must be defined` | Hermes doesn't provide Web Crypto API ([hermes#915](https://github.com/facebook/hermes/issues/915)) | Add `react-native-get-random-values` and import before any crypto consumers |
+
+---
+
+## InitializeCore Prelude (pnpm workaround)
+
+Metro's default config (`@react-native/metro-config`) sets `getModulesRunBeforeMainModule` to run `react-native/Libraries/Core/InitializeCore` as a prelude — a `__r()` call before the entry point. This module registers the callable JS modules that native code calls into immediately after bundle load (`HMRClient`, `RCTDeviceEventEmitter`, `Systrace`, etc.).
+
+With pnpm, this prelude silently fails to generate. The serializer calls `require.resolve("react-native/Libraries/Core/InitializeCore")` which returns the **realpath** through the pnpm virtual store. Metro's module graph tracks the same file through the **symlink path**. The path mismatch means the serializer can't find the module ID, so no `__r()` prelude is emitted.
+
+**Symptom:** App crashes immediately with:
+```
+Failed to call into JavaScript module method HMRClient.setup().
+Module has not been registered as callable.
+Registered callable JavaScript modules (n = 1): AppRegistry.
+```
+
+**Fix:** Explicitly import InitializeCore at the top of `apps/mobile/index.js`:
+
+```js
+import 'react-native/Libraries/Core/InitializeCore';
+import { AppRegistry } from 'react-native';
+```
+
+This bypasses the broken serializer path matching — Metro resolves it as a normal dependency of the entry point module.
+
+---
+
+## Crypto Polyfill (`react-native-get-random-values`)
+
+Hermes does not provide the Web Crypto API (`crypto.getRandomValues`). This is a [long-standing gap](https://github.com/facebook/hermes/issues/915) in the engine. Libraries that depend on it — `@noble/hashes`, `@noble/ciphers`, `uuid` — will throw at runtime.
+
+The `react-native-get-random-values` package bridges to the platform's native secure RNG. It must be imported in `apps/mobile/index.js` **before** any module that calls `globalThis.crypto.getRandomValues`:
+
+```js
+import 'react-native/Libraries/Core/InitializeCore';
+import 'react-native-get-random-values';  // must precede @noble/*, uuid, etc.
+import { AppRegistry } from 'react-native';
+```
+
+After adding the dependency, run `pod install` — the package includes a native iOS module.
 
 ---
 
