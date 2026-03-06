@@ -315,4 +315,4 @@ The sweep should **always stay**. It has no meaningful overhead (a Map iteration
 
 ---
 
-See also: [vex-overview.md](vex-overview.md) for the cryptographic protocol, [architecture.md](architecture.md) for security invariants, [glossary.md](glossary.md) for term definitions.
+See also: [vex-overview.md](../vex-overview.md) for the cryptographic protocol, [architecture.md](architecture.md) for security invariants, [glossary.md](../glossary.md) for term definitions.

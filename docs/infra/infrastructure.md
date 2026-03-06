@@ -396,4 +396,4 @@ When the provider changes prices, update one YAML file. Version it in git. Revie
 
 ---
 
-See also: [scalability.md](scalability.md) for the SQLite → Postgres scaling path, [config.md](config.md) for environment variable setup.
+See also: [scalability.md](scalability.md) for the SQLite → Postgres scaling path, [config.md](../server/config.md) for environment variable setup.

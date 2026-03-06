@@ -442,4 +442,4 @@ The key principle: **don't add infrastructure until you've exhausted what you ha
 
 ---
 
-See also: [infrastructure.md](infrastructure.md) for provider selection, [architecture.md](architecture.md) for the current server structure, [websocket.md](websocket.md) for connection lifecycle.
+See also: [infrastructure.md](infrastructure.md) for provider selection, [architecture.md](../server/architecture.md) for the current server structure, [websocket.md](../server/websocket.md) for connection lifecycle.
