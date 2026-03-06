@@ -42,7 +42,7 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
 | `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
 
-See `docs/platform/platform-strategy.md` for architecture details and `docs/platform/design-system.md` for the Figma ↔ Storybook pipeline.
+See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
 ---
 
@@ -179,4 +179,4 @@ The reimplementation preserves all privacy properties of the original while mode
 
 ---
 
-See also: [architecture.md](server/architecture.md) for server structure and security invariants, [auth-comparison.md](server/auth-comparison.md) for auth design decisions, [glossary.md](glossary.md) for term definitions.
+See also: [architecture.md](reference/architecture.md) for server structure and security invariants, [auth-comparison.md](explanation/auth-comparison.md) for auth design decisions, [glossary.md](glossary.md) for term definitions.

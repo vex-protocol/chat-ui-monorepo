@@ -311,4 +311,4 @@ After adding the dependency, run `pod install` — the package includes a native
 
 ---
 
-See also: [platform-strategy.md](platform-strategy.md) for the cross-platform architecture, [packages-store-ui.md](../packages/packages-store-ui.md) for nanostores atoms and `@nanostores/react` binding.
+See also: [platform-strategy.md](platform-strategy.md) for the cross-platform architecture, [packages-store-ui.md](../reference/packages-store-ui.md) for nanostores atoms and `@nanostores/react` binding.
