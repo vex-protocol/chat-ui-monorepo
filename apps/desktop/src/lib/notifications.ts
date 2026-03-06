@@ -66,11 +66,20 @@ async function notify(title: string, body: string): Promise<void> {
  * Attaches a mail listener to the client that fires desktop notifications
  * for incoming messages not authored by the current user.
  * Returns an unsubscribe function.
+ *
+ * @param resolveChannelName - Optional lookup from channelID to display name.
+ *   When omitted, group notifications fall back to "Group message".
  */
-export function setupNotifications(client: MailEventEmitter, currentUserID: string): () => void {
+export function setupNotifications(
+  client: MailEventEmitter,
+  currentUserID: string,
+  resolveChannelName?: (channelID: string) => string | undefined,
+): () => void {
   const handler = (mail: DecryptedMail): void => {
     if (mail.authorID === currentUserID) return  // don't notify for own messages
-    const title = mail.group ? `#${mail.group}` : mail.authorID
+    const title = mail.group
+      ? `#${resolveChannelName?.(mail.group) ?? 'channel'}`
+      : mail.authorID
     void notify(title, mail.content)
   }
 

@@ -1,7 +1,7 @@
-import type { IMail } from '@vex-chat/types'
+import type { DecryptedMail } from '@vex-chat/types'
 import type { VexClient } from '../client.ts'
 
-type MailHandler = (mail: IMail, client: VexClient) => Promise<void> | void
+type MailHandler = (mail: DecryptedMail, client: VexClient) => Promise<void> | void
 
 /**
  * CommandRouter routes incoming mail messages to handlers based on message prefix.
@@ -18,7 +18,7 @@ export class CommandRouter {
 
   /**
    * Registers a handler for mail messages that start with the given prefix.
-   * The prefix is matched against `mail.cipher` (the plaintext content after decryption).
+   * The prefix is matched against `mail.content` (the plaintext body after decryption).
    */
   on(prefix: string, handler: MailHandler): this {
     this.handlers.set(prefix, handler)
@@ -36,7 +36,7 @@ export class CommandRouter {
       for await (const mail of this.client.mail()) {
         if (!active) break
         for (const [prefix, handler] of this.handlers) {
-          if (mail.cipher.startsWith(prefix)) {
+          if (mail.content.startsWith(prefix)) {
             void Promise.resolve(handler(mail, this.client)).catch((err: unknown) => {
               this.client.emit('error', err instanceof Error ? err : new Error(String(err)))
             })

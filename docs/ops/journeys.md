@@ -51,6 +51,7 @@ A complete comparison of what shipped in the old client versus what's available 
 - Message forwarding to sender's own devices
 - Group messaging (member list endpoint + ServerChannel fan-out)
 - Local message persistence (IndexedDB — survives app restart)
+- Sound effects (4 synthesised effects: unlock, lock, notify, error — Web Audio API, no binary assets)
 
 ### Partially Ported (gaps)
 
@@ -66,7 +67,6 @@ A complete comparison of what shipped in the old client versus what's available 
 |---------|-------|
 | Session healing | Old: auto-creates new session on HMAC failure. New: no recovery |
 | Custom emoji | Old: upload/render per-server. New: not implemented |
-| Sound effects | Old: 4 effects (unlock, lock, notify, error). New: none |
 | Random username generation | Old: BIP39 mnemonic. New: not implemented |
 | Real-time username availability | Old: checked on keystroke. New: deferred to submit |
 | Message purge | Old: server-side + client-side clear. New: not implemented |
