@@ -139,7 +139,7 @@ export { $messages as messages, $user as user, $servers as servers } from '@vex-
 
 ## `packages/ui` — `@vex-chat/ui`
 
-Mitosis design primitives. Written once as `.lite.tsx` files, compiled to idiomatic Svelte components (`output/svelte/`) and React components (`output/react/`). Desktop imports from `output/svelte/`; mobile imports from `output/react/`. See [design-system.md](../platform/design-system.md) for the full Figma-to-Storybook pipeline.
+Mitosis design primitives. Written once as `.lite.tsx` files, compiled to idiomatic Svelte components (`output/svelte/`) and React components (`output/react/`). Desktop imports from `output/svelte/`; mobile imports from `output/react/`. See [design-system.md](../explanation/design-system.md) for the full Figma-to-Storybook pipeline.
 
 ### Files
 
@@ -238,4 +238,4 @@ Compiled output is committed to the repo so consuming apps don't need to run the
 
 ---
 
-See also: [packages.md](packages.md) for the full dependency graph, [packages-libvex.md](packages-libvex.md) for the SDK that feeds the store, [design-system.md](../platform/design-system.md) for the Figma-to-code pipeline.
+See also: [packages.md](packages.md) for the full dependency graph, [packages-libvex.md](packages-libvex.md) for the SDK that feeds the store, [design-system.md](../explanation/design-system.md) for the Figma-to-code pipeline.

@@ -177,4 +177,4 @@ const messages = useStore($messages)
 
 ---
 
-See also: [packages.md](../packages/packages.md) for package APIs and dependency graph, [design-system.md](design-system.md) for the Mitosis component pipeline, [desktop-reimplementation.md](desktop-reimplementation.md) for the Electron → Tauri migration.
+See also: [packages.md](../reference/packages.md) for package APIs and dependency graph, [design-system.md](design-system.md) for the Mitosis component pipeline, [desktop-reimplementation.md](desktop-reimplementation.md) for the Electron → Tauri migration.
