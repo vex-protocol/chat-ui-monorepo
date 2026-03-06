@@ -125,6 +125,12 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`packages-libvex.md`](docs/reference/packages-libvex.md) | VexClient SDK: typed events, async iterators, discriminated unions |
 | [`packages-store-ui.md`](docs/reference/packages-store-ui.md) | Nanostores state layer + Mitosis design system primitives |
 
+**`docs/architecture/`** — Architecture Decision Records (ADRs)
+
+| Doc | What it covers |
+|---|---|
+| [`adr-001-monorepo-consolidation.md`](docs/architecture/adr-001-monorepo-consolidation.md) | Why five repos became one monorepo, every technology replacement, trade-offs accepted |
+
 **`docs/explanation/`** — why decisions were made, strategy and rationale
 
 | Doc | What it covers |
@@ -149,6 +155,7 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`journeys.md`](docs/ops/journeys.md) | User journey inventory and feature coverage matrix |
 | [`roadmap.md`](docs/ops/roadmap.md) | Now/Next/Later roadmap with priorities and release goals |
 | [`concepts.md`](docs/ops/concepts.md) | Story mapping methodology and glossary |
+| [`ai-agents.md`](docs/ops/ai-agents.md) | AI agent roles for a small team: PM and scrum |
 
 **Recommended reading order for new contributors:**
 1. This README

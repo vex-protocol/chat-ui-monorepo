@@ -1,6 +1,6 @@
 # Migration from Upstream Repos
 
-Detailed API-level comparison between the original standalone repos (`libvex-js`, `vex-desktop`, `spire`) and the current `vex-chat` monorepo. For architecture and framework differences (Electron vs Tauri, React vs Svelte), see [`desktop-reimplementation.md`](./desktop-reimplementation.md).
+Detailed API-level comparison between the original standalone repos (`libvex-js`, `vex-desktop`, `spire`) and the current `vex-chat` monorepo. For the high-level decision and trade-offs behind the consolidation, see [ADR-001: Monorepo Consolidation](../architecture/adr-001-monorepo-consolidation.md). For architecture and framework differences (Electron vs Tauri, React vs Svelte), see [`desktop-reimplementation.md`](./desktop-reimplementation.md).
 
 ---
 
