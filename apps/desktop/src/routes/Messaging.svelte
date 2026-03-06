@@ -3,7 +3,8 @@
   import { onMount } from 'svelte'
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { messages, client, user, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { loadCredentials } from '../lib/config.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -50,14 +51,34 @@
     sendError = ''
     try {
       const devices = await $client.listDevices(targetUserID)
-      const device = devices[0]
-      if (!device) {
+      if (devices.length === 0) {
         sendError = 'Recipient has no registered devices.'
         return
       }
-      const result = await $client.sendMail(content, device.deviceID, targetUserID)
-      if (!result.ok) {
-        sendError = result.error.message
+
+      // Send to ALL recipient devices
+      const results = await Promise.allSettled(
+        devices.map(d => $client!.sendMail(content, d.deviceID, targetUserID)),
+      )
+      const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
+      if (!anyOk) {
+        const first = results.find(r => r.status === 'fulfilled' && !r.value.ok) as
+          | PromiseFulfilledResult<{ ok: false; error: { message: string } }>
+          | undefined
+        sendError = first?.value.error.message ?? 'Failed to send to any device'
+        return
+      }
+
+      // Forward to sender's own other devices so sent messages appear everywhere
+      const creds = loadCredentials()
+      if ($user && creds) {
+        const myDevices = await $client.listDevices($user.userID)
+        const otherDevices = myDevices.filter(d => d.deviceID !== creds.deviceID)
+        if (otherDevices.length > 0) {
+          await Promise.allSettled(
+            otherDevices.map(d => $client!.sendMail(content, d.deviceID, targetUserID)),
+          )
+        }
       }
     } catch (err) {
       sendError = err instanceof Error ? err.message : 'Failed to send'
