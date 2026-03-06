@@ -17,6 +17,7 @@ import {
   deletePermission,
   hasPermission,
 } from '#permissions/permissions.service.ts'
+import { getServerMembers } from '#users/users.service.ts'
 import { createInvite, getInvite, getServerInvites, deleteInvite, isInviteValid } from '#invites/invites.service.ts'
 import { validateBody } from '#middleware/validate.ts'
 import type { RequestHandler } from 'express'
@@ -99,6 +100,17 @@ export function createServerRouter(db: Kysely<Database>, checkAuth: RequestHandl
     try {
       const perms = await getPermissionsByResource(db, req.params.serverID)
       res.json(perms)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  router.get('/server/:serverID/members', checkAuth, async (req, res, next) => {
+    try {
+      const isMember = await hasPermission(db, req.user!.userID, req.params.serverID, 0)
+      if (!isMember) return next(new ForbiddenError())
+      const members = await getServerMembers(db, req.params.serverID)
+      res.json(members)
     } catch (err) {
       next(err)
     }

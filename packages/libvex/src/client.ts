@@ -10,7 +10,7 @@ import type { RegisterResult, LoginResult } from './auth.ts'
 import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle } from './devices.ts'
-import { createServer, listServers, listChannels, createChannel, deleteServer, deleteChannel } from './servers.ts'
+import { createServer, listServers, listChannels, createChannel, deleteServer, deleteChannel, listMembers } from './servers.ts'
 import { getUser as getUserById, searchUsers as searchUsersHttp } from './users.ts'
 
 export interface VexEvents {
@@ -264,6 +264,11 @@ export class VexClient extends EventEmitter<VexEvents> {
   /** Deletes a channel. */
   async deleteChannel(channelID: string): Promise<void> {
     return deleteChannel(this.http, channelID)
+  }
+
+  /** Returns all members of a server. Requires membership. */
+  async listMembers(serverID: string): Promise<IUser[]> {
+    return listMembers(this.http, serverID)
   }
 
   /**

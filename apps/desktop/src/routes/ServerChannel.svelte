@@ -2,7 +2,10 @@
   // Route: /server/:serverID/:channelID
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { groupMessages, client, channels } from '../lib/store/index.js'
+  import { groupMessages, client, channels, user } from '../lib/store/index.js'
+  import { loadCredentials } from '../lib/config.js'
+  import { saveMessage } from '../lib/persistence.js'
+  import type { DecryptedMail } from '@vex-chat/types'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -17,18 +20,58 @@
   let sendError = $state('')
 
   async function handleSend(content: string) {
-    if (!$client || sending) return
+    if (!$client || !$user || sending) return
     sending = true
     sendError = ''
     try {
-      // Group messages: send to each channel member's device.
-      // Requires server-side member enumeration (GET /server/:id/members).
-      // Until that endpoint exists, we log a warning and no-op.
-      //
-      // TODO (vex-chat-14y): replace with real member enumeration once
-      // GET /server/:id/members is implemented in spire.
-      console.warn('[ServerChannel] Group send not yet implemented — needs /server/:id/members')
-      sendError = 'Group messaging coming soon.'
+      // Get all server members and their devices
+      const members = await $client.listMembers(serverID)
+      const creds = loadCredentials()
+
+      // Collect all devices across all members (excluding sender's current device)
+      const deviceTargets: { deviceID: string; userID: string }[] = []
+      for (const member of members) {
+        const devices = await $client.listDevices(member.userID)
+        for (const d of devices) {
+          if (member.userID === $user.userID && creds && d.deviceID === creds.deviceID) continue
+          deviceTargets.push({ deviceID: d.deviceID, userID: member.userID })
+        }
+      }
+
+      if (deviceTargets.length === 0) {
+        sendError = 'No devices to send to.'
+        return
+      }
+
+      // Fan out to all devices with { group: channelID }
+      const results = await Promise.allSettled(
+        deviceTargets.map(t =>
+          $client!.sendMail(content, t.deviceID, t.userID, { group: channelID }),
+        ),
+      )
+      const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
+      if (!anyOk) {
+        sendError = 'Failed to send to any device'
+        return
+      }
+
+      // Show sent message on sender's device
+      const sentMail: DecryptedMail = {
+        mailID: crypto.randomUUID(),
+        authorID: $user.userID,
+        readerID: $user.userID,
+        group: channelID,
+        mailType: 'text',
+        time: new Date().toISOString(),
+        content,
+        extra: null,
+        forward: null,
+      }
+      const prev = $groupMessages[channelID] ?? []
+      groupMessages.setKey(channelID, [...prev, sentMail])
+      saveMessage(sentMail, $user.userID).catch(() => {})
+    } catch (err) {
+      sendError = err instanceof Error ? err.message : 'Failed to send'
     } finally {
       sending = false
     }

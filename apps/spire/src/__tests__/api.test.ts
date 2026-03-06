@@ -629,6 +629,47 @@ describe('GET /server/:serverID/permissions', () => {
   })
 })
 
+describe('GET /server/:serverID/members', () => {
+  it('returns member profiles for the server', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const serverRes = await env.agent
+      .post('/server')
+      .send({ name: 'MemberServer', icon: 'm.png' })
+      .expect(200)
+    const serverID = serverRes.body.serverID
+
+    const res = await env.agent.get(`/server/${serverID}/members`).expect(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body.length).toBe(1)
+    expect(res.body[0].userID).toBe(user.userID)
+    expect(res.body[0].username).toBe(user.username)
+    expect(res.body[0]).toHaveProperty('lastSeen')
+  })
+
+  it('returns 403 for non-members', async () => {
+    const env = await makeEnv()
+    await registerUser(env)
+
+    const serverRes = await env.agent
+      .post('/server')
+      .send({ name: 'PrivateServer', icon: 'p.png' })
+      .expect(200)
+    const serverID = serverRes.body.serverID
+
+    // Register a second user who is NOT a member (same app/db)
+    await registerUser(env, { username: 'bob' })
+
+    await env.agent.get(`/server/${serverID}/members`).expect(403)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    await supertest(env.app).get(`/server/${uuidv4()}/members`).expect(401)
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Invite routes
 // ---------------------------------------------------------------------------
