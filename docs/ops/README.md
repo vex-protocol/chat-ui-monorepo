@@ -10,7 +10,9 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 
 | File | Purpose |
 |---|---|
-| `journeys.md` | User journey maps — the story map backbone. What users do, what breaks, where the opportunities are |
+| `journeys.md` | Journey inventory and feature coverage matrix — the story map hub |
+| `journeys-core.md` | Journeys 1–6: registration, login, bootstrap, send/receive messages, search |
+| `journeys-features.md` | Journeys 7–16: verification, servers, groups, files, devices, settings, logout |
 | `roadmap.md` | Now/Next/Later roadmap. The big picture: what we're building, in what order, and why |
 | `concepts.md` | Story mapping methodology, core concepts, and glossary |
 | `personas.md` | User archetypes (when we have research data) |
