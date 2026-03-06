@@ -1,4 +1,4 @@
-import type { IServer, IChannel } from '@vex-chat/types'
+import type { IServer, IChannel, IUser } from '@vex-chat/types'
 import type { HttpClient } from './http.ts'
 
 export async function createServer(
@@ -41,4 +41,10 @@ export async function createChannel(
 export async function deleteChannel(http: HttpClient, channelID: string): Promise<void> {
   const result = await http.delete<{ ok: boolean }>(`/channel/${channelID}`)
   if (!result.ok) throw new Error(result.error.message)
+}
+
+export async function listMembers(http: HttpClient, serverID: string): Promise<IUser[]> {
+  const result = await http.get<IUser[]>(`/server/${serverID}/members`)
+  if (!result.ok) throw new Error(result.error.message)
+  return result.data
 }

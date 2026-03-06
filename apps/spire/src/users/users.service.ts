@@ -40,6 +40,22 @@ export async function getServersForUser(
 }
 
 /**
+ * Returns all members of a server (users with a permission entry).
+ */
+export async function getServerMembers(
+  db: Kysely<Database>,
+  serverID: string,
+): Promise<PublicUser[]> {
+  return db
+    .selectFrom('permissions')
+    .innerJoin('users', 'users.userID', 'permissions.userID')
+    .where('permissions.resourceID', '=', serverID)
+    .where('permissions.resourceType', '=', 'server')
+    .select(['users.userID', 'users.username', 'users.lastSeen'])
+    .execute()
+}
+
+/**
  * Searches users by username prefix/substring. Returns at most 10 results.
  * Case-insensitive via SQLite LIKE.
  */
