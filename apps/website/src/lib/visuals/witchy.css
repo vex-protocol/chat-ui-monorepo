@@ -235,6 +235,7 @@
 	border-radius: 50%;
 	animation: witchy-star 8s ease-in-out infinite;
 	pointer-events: none;
+	will-change: transform, opacity;
 }
 
 /* Spacecraft network SVG */
@@ -271,6 +272,7 @@
 	background: radial-gradient(ellipse at 50% 50%, transparent 30%, #e70000 100%);
 	opacity: 0.05;
 	animation: witchy-mist 20s ease-in-out infinite;
+	will-change: transform, opacity;
 }
 
 /* Mascot orb — girl inside a crystal ball */
@@ -399,6 +401,7 @@
 	background: rgba(231,0,0,0.6);
 	box-shadow: 0 0 8px rgba(231,0,0,0.6);
 	animation: particle-glow-soft 2.5s ease-in-out infinite;
+	will-change: opacity;
 }
 .card-mascot__particle:nth-child(1) { top: 5%; left: 50%; margin-left: -3px; animation-delay: 0s; }
 .card-mascot__particle:nth-child(2) { top: 28%; right: 5%; animation-delay: 0.5s; }

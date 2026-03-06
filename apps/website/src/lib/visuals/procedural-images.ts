@@ -7,7 +7,7 @@
 import type { OrbColor } from './orb-images';
 import { isImageUsed, markImagesUsed, ORB_IMAGES_BY_COLOR } from './orb-images';
 
-const HALO_IMAGES = ['/orbs/halo-red.jpeg', '/orbs/ROYALPURPLE/BLACKHOLE.jpg'];
+const HALO_IMAGES = ['/orbs/halo-red.webp', '/orbs/ROYALPURPLE/BLACKHOLE.webp'];
 
 const IMAGES_WITH_COLORS: Array<{ image: string; color: OrbColor }> = (() => {
 	const result: Array<{ image: string; color: OrbColor }> = [];
