@@ -1,0 +1,443 @@
+/* ================================================================
+   Witchy visual system — ported from vex-website style.sass
+   Orbs, stars, spacecraft, mist, mascot, card-mascot
+   ================================================================ */
+
+/* Keyframes */
+@keyframes witchy-float-spin {
+	0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+	25% { transform: translate3d(8%, -5%, 0) rotate(90deg) scale(1.02); }
+	50% { transform: translate3d(-5%, 8%, 0) rotate(180deg) scale(0.98); }
+	75% { transform: translate3d(-8%, -3%, 0) rotate(270deg) scale(1.01); }
+	100% { transform: translate3d(0, 0, 0) rotate(360deg) scale(1); }
+}
+@keyframes witchy-particle-orbit {
+	to { transform: translate3d(0, 0, 0) rotate(360deg); }
+}
+@keyframes witchy-star {
+	0% { opacity: 0.25; transform: translate(0, 0); }
+	33% { opacity: 0.7; transform: translate(0.8px, -0.5px); }
+	66% { opacity: 0.9; transform: translate(-0.4px, 0.6px); }
+	100% { opacity: 0.25; transform: translate(0, 0); }
+}
+@keyframes witchy-mist {
+	0% { opacity: 0.03; transform: translateX(-10%); }
+	100% { opacity: 0.08; transform: translateX(10%); }
+}
+@keyframes witchy-float-only {
+	0% { transform: translate3d(0, 0, 0) scale(1); }
+	25% { transform: translate3d(6%, -4%, 0) scale(1.02); }
+	50% { transform: translate3d(-4%, 6%, 0) scale(0.98); }
+	75% { transform: translate3d(-6%, -2%, 0) scale(1.01); }
+	100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+@keyframes witchy-orb-rotate {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+@keyframes witchy-orb-counter-rotate {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(-360deg); }
+}
+@keyframes mascot-orb-spin {
+	to { transform: translate3d(0, 0, 0) rotate(360deg); }
+}
+@keyframes mascot-orb-rotate {
+	to { transform: rotate(360deg); }
+}
+@keyframes witchy-spacecraft-arrival {
+	0%, 94% { opacity: 0.5; transform: scale(1); }
+	97% { opacity: 0.2; transform: scale(1.3); }
+	100% { opacity: 0; transform: scale(1.5); }
+}
+@keyframes witchy-spacecraft-explosion-burst {
+	0% { opacity: 0.9; transform: translate(0, 0); }
+	100% { opacity: 0; transform: translate(2.5px, 0); }
+}
+@keyframes particle-glow-soft {
+	0%, 100% { opacity: 0.3; }
+	50% { opacity: 0.9; }
+}
+
+/* Witchy container — full-height orb/star canvas */
+.witchy-container {
+	width: 100%;
+	height: 100%;
+	min-height: 0;
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: hidden;
+	z-index: 0;
+	pointer-events: none;
+}
+
+/* Base orb */
+.witchy-orb {
+	border-radius: 50%;
+	position: absolute;
+	opacity: 0.55;
+	background: radial-gradient(circle at 30% 30%, #e70000, #e70000 45%, #0a0a0a 100%);
+	box-shadow:
+		inset -10px -10px 25px rgba(0,0,0,0.4),
+		inset 8px 8px 20px rgba(255,100,100,0.25),
+		0 0 50px 15px rgba(231,0,0,0.5),
+		0 0 90px 25px rgba(231,0,0,0.25);
+	animation: witchy-float-spin 20s ease-in-out infinite;
+	will-change: transform;
+	overflow: hidden;
+}
+/* Glass dome overlay */
+.witchy-orb::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	pointer-events: none;
+	z-index: 2;
+	background:
+		radial-gradient(ellipse 75% 45% at 30% 22%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.12) 30%, transparent 60%),
+		radial-gradient(circle at 50% 50%, transparent 40%, rgba(0,0,0,0.12) 80%, rgba(0,0,0,0.3) 100%);
+	border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Color variants */
+.witchy-orb--purple {
+	background: radial-gradient(circle at 30% 30%, #2a075b, #2a075b 45%, #0a0a0a 100%);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.4), inset 8px 8px 20px rgba(90,42,142,0.3), 0 0 50px 15px rgba(42,7,91,0.5), 0 0 90px 25px rgba(42,7,91,0.25);
+}
+.witchy-orb--purple .witchy-orb__particle { background: rgba(120,80,180,0.6); }
+
+.witchy-orb--blue {
+	background: radial-gradient(circle at 30% 30%, #a8c8df, #a8c8df 45%, #0a0a0a 100%);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.4), inset 8px 8px 20px rgba(122,176,224,0.25), 0 0 50px 15px rgba(168,200,223,0.5), 0 0 90px 25px rgba(82,145,191,0.25);
+}
+.witchy-orb--blue .witchy-orb__particle { background: rgba(122,176,224,0.6); }
+
+.witchy-orb--green {
+	background: radial-gradient(circle at 30% 30%, #91e643, #91e643 45%, #0a0a0a 100%);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.4), inset 8px 8px 20px rgba(168,230,122,0.25), 0 0 50px 15px rgba(145,230,67,0.5), 0 0 90px 25px rgba(71,131,17,0.25);
+}
+.witchy-orb--green .witchy-orb__particle { background: rgba(168,230,122,0.6); }
+
+.witchy-orb--pink {
+	background: radial-gradient(circle at 30% 30%, #c5698b, #c5698b 45%, #0a0a0a 100%);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.4), inset 8px 8px 20px rgba(232,165,192,0.25), 0 0 50px 15px rgba(197,105,139,0.5), 0 0 90px 25px rgba(197,105,139,0.25);
+}
+.witchy-orb--pink .witchy-orb__particle { background: rgba(232,165,192,0.6); }
+
+.witchy-orb--cream {
+	background: radial-gradient(circle at 30% 30%, #d9c2a3, #d9c2a3 45%, #0a0a0a 100%);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.2), inset 8px 8px 20px rgba(217,194,163,0.3), 0 0 50px 15px rgba(217,194,163,0.4), 0 0 90px 25px rgba(217,194,163,0.2);
+}
+.witchy-orb--cream .witchy-orb__particle { background: rgba(255,248,240,0.6); }
+
+.witchy-orb--rainbow {
+	background: conic-gradient(#e70000, #c5698b, #2a075b, #a8c8df, #91e643, #d9c2a3, #e70000);
+	box-shadow: inset -10px -10px 25px rgba(0,0,0,0.35), inset 8px 8px 20px rgba(255,255,255,0.15), 0 0 50px 15px rgba(197,105,139,0.4), 0 0 90px 25px rgba(231,0,0,0.2);
+}
+.witchy-orb--rainbow .witchy-orb__particle { background: rgba(255,255,255,0.5); }
+
+/* Orb with image — float only, no rotation (image stays upright) */
+.witchy-orb--with-image {
+	animation: witchy-float-only 20s ease-in-out infinite;
+}
+.witchy-orb--with-image .witchy-orb__inner {
+	position: absolute;
+	inset: 8px;
+	z-index: 1;
+	border-radius: 50%;
+	overflow: hidden;
+	border: 1px solid rgba(231,0,0,0.2);
+	pointer-events: none;
+}
+.witchy-orb--with-image .witchy-orb__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+/* Particles orbiting an orb */
+.witchy-orb__particles {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	left: 0;
+	pointer-events: none;
+	animation: witchy-particle-orbit 12s linear infinite;
+	will-change: transform;
+}
+.witchy-orb__particle {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 4px;
+	height: 4px;
+	margin-left: -2px;
+	margin-top: -2px;
+	background: rgba(255,80,80,0.6);
+	border-radius: 50%;
+	transform-origin: 50% 50%;
+}
+
+/* Size: small */
+.witchy-orb--sm {
+	width: 80px;
+	height: 80px;
+	animation-duration: 18s;
+	animation-delay: -2s;
+	box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(255,100,100,0.2), 0 0 30px 8px rgba(231,0,0,0.5), 0 0 50px 12px rgba(231,0,0,0.2);
+}
+.witchy-orb--sm::before { border-width: 1px; }
+.witchy-orb--sm.witchy-orb--purple { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(90,42,142,0.25), 0 0 30px 8px rgba(42,7,91,0.5), 0 0 50px 12px rgba(42,7,91,0.2); }
+.witchy-orb--sm.witchy-orb--blue { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(122,176,224,0.2), 0 0 30px 8px rgba(168,200,223,0.5), 0 0 50px 12px rgba(82,145,191,0.2); }
+.witchy-orb--sm.witchy-orb--green { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(168,230,122,0.2), 0 0 30px 8px rgba(145,230,67,0.5), 0 0 50px 12px rgba(71,131,17,0.2); }
+.witchy-orb--sm.witchy-orb--pink { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(232,165,192,0.2), 0 0 30px 8px rgba(197,105,139,0.5), 0 0 50px 12px rgba(197,105,139,0.2); }
+.witchy-orb--sm.witchy-orb--cream { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.4), inset 2px 2px 6px rgba(217,194,163,0.25), 0 0 30px 8px rgba(217,194,163,0.4), 0 0 50px 12px rgba(217,194,163,0.15); }
+.witchy-orb--sm.witchy-orb--rainbow { box-shadow: inset -3px -3px 8px rgba(0,0,0,0.35), inset 2px 2px 6px rgba(255,255,255,0.12), 0 0 30px 8px rgba(197,105,139,0.35), 0 0 50px 12px rgba(231,0,0,0.15); }
+.witchy-orb--sm .witchy-orb__particle { transform: translate3d(0, -32px, 0); }
+.witchy-orb--sm .witchy-orb__particles { animation-duration: 10s; }
+.witchy-orb--sm .witchy-orb__particle:nth-child(2) { transform: translate3d(28px, 16px, 0); }
+.witchy-orb--sm .witchy-orb__particle:nth-child(3) { transform: translate3d(-28px, 16px, 0); }
+
+/* Size: medium */
+.witchy-orb--md {
+	width: 140px;
+	height: 140px;
+	animation-duration: 24s;
+	animation-delay: -5s;
+}
+.witchy-orb--md .witchy-orb__particle { transform: translate3d(0, -52px, 0); }
+.witchy-orb--md .witchy-orb__particles { animation-duration: 14s; }
+.witchy-orb--md .witchy-orb__particle:nth-child(2) { transform: translate3d(45px, 26px, 0); }
+.witchy-orb--md .witchy-orb__particle:nth-child(3) { transform: translate3d(-45px, 26px, 0); }
+
+/* Size: large */
+.witchy-orb--lg {
+	width: 220px;
+	height: 220px;
+	animation-duration: 28s;
+	animation-delay: -8s;
+}
+.witchy-orb--lg .witchy-orb__particle { transform: translate3d(0, -82px, 0); }
+.witchy-orb--lg .witchy-orb__particles { animation-duration: 18s; }
+.witchy-orb--lg .witchy-orb__particle:nth-child(2) { transform: translate3d(71px, 41px, 0); }
+.witchy-orb--lg .witchy-orb__particle:nth-child(3) { transform: translate3d(-71px, 41px, 0); }
+
+/* Stars */
+.witchy-star {
+	position: absolute;
+	width: 2px;
+	height: 2px;
+	background: #f5f5f5;
+	border-radius: 50%;
+	animation: witchy-star 8s ease-in-out infinite;
+	pointer-events: none;
+}
+
+/* Spacecraft network SVG */
+.witchy-network {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	pointer-events: none;
+	z-index: 0;
+}
+.witchy-spacecraft {
+	opacity: 0.5;
+	animation: witchy-spacecraft-arrival 6s linear infinite;
+}
+.witchy-spacecraft-explosion {
+	pointer-events: none;
+}
+.witchy-spacecraft-explosion__particle {
+	opacity: 0;
+	transform: translate(0, 0);
+	transform-origin: 0 0;
+	animation: witchy-spacecraft-explosion-burst 0.4s ease-out forwards;
+}
+
+/* Mist */
+.witchy-mist {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: radial-gradient(ellipse at 50% 50%, transparent 30%, #e70000 100%);
+	opacity: 0.05;
+	animation: witchy-mist 20s ease-in-out infinite;
+}
+
+/* Mascot orb — girl inside a crystal ball */
+.mascot-witchy-orb {
+	position: relative;
+	width: 140px;
+	height: 140px;
+	margin-bottom: 1rem;
+	flex-shrink: 0;
+}
+.witchy-container .mascot-witchy-orb--float {
+	position: absolute;
+	margin: 0;
+	width: 200px;
+	height: 200px;
+	animation: witchy-float-only 24s ease-in-out infinite;
+	animation-delay: -4s;
+	will-change: transform;
+}
+.mascot-witchy-orb__orb {
+	position: absolute;
+	inset: 0;
+	z-index: 0;
+	border-radius: 50%;
+	overflow: visible;
+	background: radial-gradient(circle at 35% 35%, rgba(255,80,80,0.35), rgba(231,0,0,0.5) 50%, rgba(139,0,0,0.7) 100%);
+	box-shadow:
+		0 0 35px 12px rgba(231,0,0,0.6),
+		0 0 60px 20px rgba(231,0,0,0.35),
+		inset -5px -5px 20px rgba(0,0,0,0.25),
+		inset 5px 5px 15px rgba(255,100,100,0.2);
+	border: 2px solid rgba(231,0,0,0.6);
+	animation: mascot-orb-rotate 20s linear infinite;
+	will-change: transform;
+}
+.mascot-witchy-orb__inner {
+	position: absolute;
+	inset: 12px;
+	z-index: 1;
+	border-radius: 50%;
+	overflow: hidden;
+	border: 1px solid rgba(231,0,0,0.25);
+	box-shadow: inset 0 0 30px rgba(231,0,0,0.2);
+	pointer-events: none;
+}
+.hero-mascot {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	filter: contrast(1.05) saturate(1.1);
+}
+.mascot-witchy-orb__particles {
+	position: absolute;
+	inset: -5px;
+	pointer-events: none;
+	animation: witchy-particle-orbit 18s linear infinite;
+	will-change: transform;
+}
+.mascot-witchy-orb__particle {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 4px;
+	height: 4px;
+	margin-left: -2px;
+	margin-top: -2px;
+	background: rgba(255,80,80,0.8);
+	border-radius: 50%;
+	box-shadow: 0 0 6px rgba(231,0,0,0.8);
+}
+.mascot-witchy-orb__particle:nth-child(1) { transform: translate3d(0, -62px, 0); }
+.mascot-witchy-orb__particle:nth-child(2) { transform: translate3d(54px, 31px, 0); }
+.mascot-witchy-orb__particle:nth-child(3) { transform: translate3d(-54px, 31px, 0); }
+.mascot-witchy-orb--float .mascot-witchy-orb__particle:nth-child(1) { transform: translate3d(0, -88px, 0); }
+.mascot-witchy-orb--float .mascot-witchy-orb__particle:nth-child(2) { transform: translate3d(77px, 44px, 0); }
+.mascot-witchy-orb--float .mascot-witchy-orb__particle:nth-child(3) { transform: translate3d(-77px, 44px, 0); }
+
+/* Card mascot — circular image + lightweight glow */
+.card-mascot {
+	position: relative;
+	width: 180px;
+	height: 180px;
+	flex-shrink: 0;
+}
+.card-mascot__glow {
+	position: absolute;
+	inset: -20px;
+	border-radius: 50%;
+	background: radial-gradient(circle, rgba(231,0,0,0.08) 0%, transparent 70%);
+	box-shadow: 0 0 40px 15px rgba(231,0,0,0.15);
+	pointer-events: none;
+}
+.card-mascot__frame {
+	position: relative;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	overflow: hidden;
+	border: 2px solid #0a0a0a;
+	box-shadow:
+		inset 0 2px 8px rgba(0,0,0,0.5),
+		0 0 20px rgba(231,0,0,0.06),
+		inset 0 0 15px rgba(231,0,0,0.08);
+}
+.card-mascot__img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	filter: contrast(1.05);
+}
+.card-mascot__particles {
+	position: absolute;
+	inset: -8px;
+	border-radius: 50%;
+	pointer-events: none;
+	z-index: 0;
+}
+.card-mascot__particle {
+	position: absolute;
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: rgba(231,0,0,0.6);
+	box-shadow: 0 0 8px rgba(231,0,0,0.6);
+	animation: particle-glow-soft 2.5s ease-in-out infinite;
+}
+.card-mascot__particle:nth-child(1) { top: 5%; left: 50%; margin-left: -3px; animation-delay: 0s; }
+.card-mascot__particle:nth-child(2) { top: 28%; right: 5%; animation-delay: 0.5s; }
+.card-mascot__particle:nth-child(3) { bottom: 28%; right: 5%; animation-delay: 1s; }
+.card-mascot__particle:nth-child(4) { bottom: 5%; left: 50%; margin-left: -3px; animation-delay: 1.5s; }
+.card-mascot__particle:nth-child(5) { top: 28%; left: 5%; animation-delay: 2s; }
+
+.card-mascot--logo .card-mascot__frame {
+	background: rgba(20,20,20,0.9);
+}
+.card-mascot--logo .card-mascot__img {
+	object-fit: contain;
+	padding: 12%;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.witchy-orb,
+	.witchy-orb--with-image,
+	.witchy-orb__particles,
+	.witchy-star,
+	.witchy-spacecraft,
+	.witchy-spacecraft-explosion__particle,
+	.witchy-mist,
+	.mascot-witchy-orb--float,
+	.mascot-witchy-orb__orb,
+	.mascot-witchy-orb__particles,
+	.card-mascot__particle {
+		animation: none !important;
+	}
+	.witchy-orb { opacity: 0.35; }
+	.witchy-star { opacity: 0.5; }
+	.witchy-mist { opacity: 0.04; }
+}
+
+/* Mobile: smaller orbs */
+@media (max-width: 768px) {
+	.witchy-orb--sm { width: 60px; height: 60px; }
+	.witchy-orb--md { width: 100px; height: 100px; }
+	.witchy-orb--lg { width: 160px; height: 160px; }
+	.witchy-container .mascot-witchy-orb--float { width: 140px; height: 140px; }
+}
