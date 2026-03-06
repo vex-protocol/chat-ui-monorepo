@@ -9,6 +9,45 @@
   import { avatarHash } from '../lib/store/index.js'
   import Avatar from '../lib/Avatar.svelte'
   import { checkForUpdates, applyUpdate, type UpdateStatus } from '../lib/updater.js'
+  import type { IDevice } from '@vex-chat/types'
+
+  // ── Devices ────────────────────────────────────────────────────────────────
+
+  let devices: IDevice[] = $state([])
+  let devicesLoading = $state(false)
+  let devicesError = $state('')
+  let deleteConfirmID: string | null = $state(null)
+  let deleteError = $state('')
+
+  async function loadDevices(): Promise<void> {
+    const userID = $user?.userID
+    if (!userID || !$client) return
+    devicesLoading = true
+    devicesError = ''
+    try {
+      devices = await $client.listDevices(userID)
+    } catch (err) {
+      devicesError = err instanceof Error ? err.message : 'Failed to load devices'
+    } finally {
+      devicesLoading = false
+    }
+  }
+
+  async function handleDeleteDevice(deviceID: string): Promise<void> {
+    const userID = $user?.userID
+    if (!userID || !$client) return
+    deleteError = ''
+    try {
+      await $client.deleteDevice(userID, deviceID)
+      devices = devices.filter(d => d.deviceID !== deviceID)
+      deleteConfirmID = null
+    } catch (err) {
+      deleteError = err instanceof Error ? err.message : 'Failed to delete device'
+    }
+  }
+
+  // Load devices on mount
+  loadDevices()
 
   // ── Sounds ──────────────────────────────────────────────────────────────────
 
@@ -256,6 +295,64 @@
       </div>
     </section>
 
+    <!-- ── Devices ── -->
+    <section class="settings-section">
+      <h2 class="settings-section__title">Devices</h2>
+      {#if devicesLoading}
+        <div class="settings-row">
+          <span class="settings-row__desc">Loading devices…</span>
+        </div>
+      {:else if devicesError}
+        <div class="settings-row">
+          <span class="settings-row__desc settings-row__desc--error">{devicesError}</span>
+          <button class="settings-btn" onclick={loadDevices}>Retry</button>
+        </div>
+      {:else}
+        {#each devices as device (device.deviceID)}
+          {@const isCurrent = creds?.deviceID === device.deviceID}
+          <div class="settings-row settings-row--device">
+            <div class="settings-row__info">
+              <span class="settings-row__label">
+                {device.name || 'Unnamed device'}
+                {#if isCurrent}
+                  <span class="device-badge">current</span>
+                {/if}
+              </span>
+              <span class="settings-row__desc settings-row__value--mono">
+                {device.signKey.slice(0, 16)}…
+              </span>
+              <span class="settings-row__desc">
+                {device.lastLogin ? `Last login: ${new Date(device.lastLogin).toLocaleString()}` : 'Never logged in'}
+              </span>
+            </div>
+            {#if !isCurrent}
+              {#if deleteConfirmID === device.deviceID}
+                <div class="settings-confirm">
+                  <span class="settings-confirm__msg">Delete?</span>
+                  <button class="settings-btn settings-btn--danger" onclick={() => handleDeleteDevice(device.deviceID)}>Yes</button>
+                  <button class="settings-btn" onclick={() => { deleteConfirmID = null; deleteError = '' }}>No</button>
+                </div>
+              {:else}
+                <button
+                  class="settings-btn settings-btn--danger"
+                  onclick={() => { deleteConfirmID = device.deviceID; deleteError = '' }}
+                  disabled={devices.length <= 1}
+                  title={devices.length <= 1 ? 'Cannot delete your last device' : 'Remove this device'}
+                >
+                  Delete
+                </button>
+              {/if}
+            {/if}
+          </div>
+        {/each}
+        {#if deleteError}
+          <div class="settings-row">
+            <span class="settings-row__desc settings-row__desc--error">{deleteError}</span>
+          </div>
+        {/if}
+      {/if}
+    </section>
+
     <!-- ── Danger zone ── -->
     <section class="settings-section settings-section--danger">
       <h2 class="settings-section__title">Danger Zone</h2>
@@ -492,5 +589,23 @@
     font-size: 13px;
     color: var(--danger);
     font-weight: 600;
+  }
+
+  .device-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    margin-left: 6px;
+    border-radius: 3px;
+    background: var(--accent);
+    color: #fff;
+    vertical-align: middle;
+  }
+
+  .settings-row--device {
+    align-items: flex-start;
   }
 </style>
