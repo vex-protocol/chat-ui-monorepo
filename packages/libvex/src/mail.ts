@@ -1,4 +1,4 @@
-import type { IMail, DecryptedMail } from '@vex-chat/types'
+import type { IMail, DecryptedMail, IKeyBundle } from '@vex-chat/types'
 import type { HttpClient } from './http.ts'
 import type { SessionManager, MailMeta } from './session.ts'
 import type { VexError } from './errors.ts'
@@ -18,12 +18,11 @@ export async function sendMailEncrypted(
   meta: MailMeta,
 ): Promise<SendResult> {
   // Fetch recipient's key bundle for X3DH
-  const bundleResult = await http.get<IMail>(`/keys/${meta.recipientDeviceID}`)
+  const bundleResult = await http.get<IKeyBundle>(`/keys/${meta.recipientDeviceID}`)
   if (!bundleResult.ok) {
     return { ok: false, error: bundleResult.error }
   }
-  // Re-type the raw response as IKeyBundle (keys route returns KeyBundle shape)
-  const bundle = bundleResult.data as unknown as import('@vex-chat/types').IKeyBundle
+  const bundle = bundleResult.data
 
   // Build encrypted mail payload (server assigns mailID + time)
   const mailID = globalThis.crypto.randomUUID()

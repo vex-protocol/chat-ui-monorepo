@@ -129,7 +129,7 @@ const data = await invoke<string>('read_file', { path: '/path/to/file' })
 | iOS | ✗ | ✓ (v2.0+) |
 | Android | ✗ | ✓ (v2.0+) |
 
-Tauri 2's mobile support means a potential `apps/mobile` that shares the same Svelte frontend and `@vex-chat/libvex` SDK without a separate React Native codebase.
+Tauri 2 supports iOS and Android natively, though `apps/mobile` uses React Native instead — see [platform-strategy.md](platform-strategy.md) for the rationale.
 
 ### Performance
 
@@ -202,12 +202,13 @@ Tauri 2's mobile support means a potential `apps/mobile` that shares the same Sv
 - `user`, `familiars`, `messages`, `sessions`, `app`, `servers`, `channels`, `groupMessages`, `permissions`, `devices`, `onlineLists`, `historyStacks`, `avatarHash`, `files`
 - Redux Saga for side effects (notification, device fetch on new session, permission refresh)
 
-**New:** `packages/store` (`@vex-chat/store`) + Svelte adapter.
-- `VexStore` maintains all shared state as plain Maps — framework-agnostic, shared with mobile
-- Svelte adapter (`packages/store/adapters/svelte`) wraps each slice as a `readable()` store
-- Components import from the adapter: `import { useMessages } from '$lib/store/svelte'`
-- Local ephemeral UI state (modal open, input value) uses Svelte `$state` runes — never in VexStore
-- No saga middleware — `VexStore` wires all real-time handlers internally; components just subscribe
+**New:** `packages/store` (`@vex-chat/store`) — nanostores atoms.
+- Each state slice is a nanostores `atom()` or `map()` — framework-agnostic, shared with mobile
+- `bootstrap()` wires `VexClient` events directly to atoms, then runs a waterfall HTTP fetch
+- Svelte: atoms implement the Svelte store contract natively — `apps/desktop/src/lib/store/index.ts` re-exports without `$` prefix
+- React Native: `@nanostores/react` provides `useStore($atom)` binding
+- Local ephemeral UI state (modal open, input value) uses Svelte `$state` runes — never in the store
+- No saga middleware — `bootstrap()` wires all real-time handlers; components just subscribe to atoms
 
 ---
 
@@ -224,9 +225,9 @@ WS → libvex Client → "message" event → Redux dispatch → selector → Rea
 
 ```
 WS → VexClient ("mail" event)
-   → VexStore.on("mail") → update messages/groupMessages Map → emit "messages:changed"
-   → Svelte adapter readable() → Svelte component reactive update (no virtual DOM)
-   → Tauri notification plugin (side effect, also in VexStore)
+   → bootstrap() handler → $messages.setKey() or $groupMessages.setKey()
+   → nanostores subscriber notification → Svelte reactive update (no virtual DOM)
+   → Tauri notification plugin (separate listener in notifications.ts)
 ```
 
 ---
@@ -240,8 +241,8 @@ WS → VexClient ("mail" event)
 | `src/ipc-handlers.ts` | 35 IPC handlers | Tauri Rust commands |
 | `src/index.tsx` | React + Redux bootstrap | `src/main.ts` (Svelte mount) |
 | `src/Base.tsx` | Root router | `src/App.svelte` + svelte-routing |
-| `src/rootReducer.ts` | 14 Redux slices | `packages/store` VexStore Maps |
-| `src/store.ts` | Redux store + saga middleware | `@vex-chat/store` VexStore |
+| `src/rootReducer.ts` | 14 Redux slices | `packages/store` nanostores atoms |
+| `src/store.ts` | Redux store + saga middleware | `@vex-chat/store` nanostores atoms |
 | `src/views/ClientLauncher.tsx` | SDK init + bootstrap waterfall | `packages/store/src/bootstrap.ts` |
 | `src/views/Login.tsx` | Auth UI | `src/routes/login/Login.svelte` |
 | `src/utils/KeyGaurdian.ts` | In-memory key store | Svelte writable store + Tauri plugin-fs |
@@ -337,8 +338,8 @@ WS → VexClient ("mail" event)
 | MessageChunk | ✓ Done (composes Avatar) |
 | StatusDot | ✓ Done |
 | MemberListItem | ✓ Done (composes Avatar + StatusDot) |
-| Remaining primitives (Button, TextInput, Badge, etc.) | — Not started |
-| Storybook stories | — Not started |
+| Remaining primitives (Button, TextInput, Badge, etc.) | ✓ Done |
+| Storybook stories | ✓ Done (shared + generated per-framework wrappers) |
 
 ### `apps/mobile`
 

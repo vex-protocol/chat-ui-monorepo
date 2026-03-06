@@ -178,7 +178,7 @@ Only 3 files change. Everything else (routes, services, Zod schemas, DB types, m
 ## Verification Checklist
 
 ```bash
-pnpm --filter @vex-chat/spire test    # 255 green
+pnpm --filter @vex-chat/spire test    # all green
 pnpm --filter @vex-chat/spire lint    # clean
 pnpm -r exec tsc --noEmit            # zero errors across workspace
 ```
