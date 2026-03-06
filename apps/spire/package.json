@@ -79,6 +79,7 @@
     "generate:openapi": "node --conditions=development scripts/generate-openapi.ts",
     "lint": "eslint src",
     "lint:openapi": "spectral lint openapi.json",
+    "docs": "npx @scalar/cli document serve openapi.json --port 5555 --watch",
     "env:init": "node scripts/setup-env.ts"
   },
   "dependencies": {
