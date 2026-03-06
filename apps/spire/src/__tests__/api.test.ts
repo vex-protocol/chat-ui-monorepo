@@ -317,6 +317,60 @@ describe('POST /user/:id/devices', () => {
   })
 })
 
+describe('DELETE /user/:id/devices/:deviceID', () => {
+  it('soft-deletes a device when user has multiple devices', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    // Add a second device so we can delete the first
+    const devicePayload = makeDevicePayload()
+    await env.agent.post(`/user/${user.userID}/devices`).send(devicePayload).expect(200)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    expect(devicesRes.body.length).toBe(2)
+
+    const targetDeviceID = devicesRes.body[0].deviceID
+    await env.agent.delete(`/user/${user.userID}/devices/${targetDeviceID}`).expect(200)
+
+    const afterRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    expect(afterRes.body.length).toBe(1)
+    expect(afterRes.body[0].deviceID).not.toBe(targetDeviceID)
+  })
+
+  it('returns 400 when trying to delete the last device', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    expect(devicesRes.body.length).toBe(1)
+
+    const res = await env.agent.delete(`/user/${user.userID}/devices/${devicesRes.body[0].deviceID}`).expect(400)
+    expect(res.body.error).toBe('Cannot delete your last device')
+  })
+
+  it('returns 403 when deleting another user\'s device', async () => {
+    const env = await makeEnv()
+    const alice = await registerUser(env, { username: 'alice' })
+    await registerUser(env, { username: 'bob' })
+
+    // bob is currently authed, try to delete alice's device
+    const aliceDevicesRes = await env.agent.get(`/user/${alice.userID}/devices`).expect(200)
+    const aliceDeviceID = aliceDevicesRes.body[0].deviceID
+
+    await env.agent.delete(`/user/${alice.userID}/devices/${aliceDeviceID}`).expect(403)
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    const env = await makeEnv()
+    const user = await registerUser(env)
+    const devicesRes = await env.agent.get(`/user/${user.userID}/devices`).expect(200)
+    const deviceID = devicesRes.body[0].deviceID
+
+    env.authToken = undefined
+    await supertest(env.app).delete(`/user/${user.userID}/devices/${deviceID}`).expect(401)
+  })
+})
+
 describe('GET /device/:id/otk/count', () => {
   it('returns the OTK count for a device', async () => {
     const env = await makeEnv()
