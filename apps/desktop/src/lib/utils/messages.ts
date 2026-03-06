@@ -3,6 +3,36 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
+// ── File attachment parsing ──────────────────────────────────────────────────
+
+export interface FileAttachment {
+  fileID: string
+  fileName: string
+  fileSize: number
+  contentType: string
+}
+
+export function parseFileExtra(extra: string | null): FileAttachment | null {
+  if (!extra) return null
+  try {
+    const obj = JSON.parse(extra)
+    if (obj && typeof obj.fileID === 'string' && typeof obj.fileName === 'string') {
+      return obj as FileAttachment
+    }
+  } catch { /* not file JSON */ }
+  return null
+}
+
+export function isImageType(contentType: string): boolean {
+  return contentType.startsWith('image/')
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
+
 // ── Message chunking ─────────────────────────────────────────────────────────
 
 export interface MessageChunk {
@@ -71,8 +101,8 @@ export function renderContent(content: string): string {
   const annotated = raw.replace(/<a\s+href="([^"]+)"/g, '<a href="$1" data-external="$1"')
   return DOMPurify.sanitize(annotated, {
     ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'code', 'pre', 'blockquote',
-      'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'del'],
-    ALLOWED_ATTR: ['href', 'data-external', 'rel'],
+      'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'del', 'img'],
+    ALLOWED_ATTR: ['href', 'data-external', 'rel', 'src', 'alt'],
   })
 }
 

@@ -42,20 +42,37 @@
     }
   }
 
-  async function handleSend(content: string) {
+  async function handleSend(content: string, attachment?: File) {
     if (!$client || sending) return
     sending = true
     sendError = ''
     try {
+      // Upload attachment first if present
+      let mailType = 'text'
+      let extra: string | null = null
+      if (attachment) {
+        const buf = new Uint8Array(await attachment.arrayBuffer())
+        const { fileID } = await $client.uploadFile(buf, attachment.type)
+        mailType = 'file'
+        extra = JSON.stringify({
+          fileID,
+          fileName: attachment.name,
+          fileSize: attachment.size,
+          contentType: attachment.type,
+        })
+      }
+
       const devices = await $client.listDevices(targetUserID)
       if (devices.length === 0) {
         sendError = 'Recipient has no registered devices.'
         return
       }
 
+      const sendOpts = { mailType, extra }
+
       // Send to ALL recipient devices
       const results = await Promise.allSettled(
-        devices.map(d => $client!.sendMail(content, d.deviceID, targetUserID)),
+        devices.map(d => $client!.sendMail(content, d.deviceID, targetUserID, sendOpts)),
       )
       const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
       if (!anyOk) {
@@ -72,10 +89,10 @@
         authorID: $user!.userID,
         readerID: targetUserID,
         group: null,
-        mailType: 'text',
+        mailType,
         time: new Date().toISOString(),
         content,
-        extra: null,
+        extra,
         forward: null,
       }
       const prev = $messages[targetUserID] ?? []
@@ -89,7 +106,7 @@
         const otherDevices = myDevices.filter(d => d.deviceID !== creds.deviceID)
         if (otherDevices.length > 0) {
           await Promise.allSettled(
-            otherDevices.map(d => $client!.sendMail(content, d.deviceID, targetUserID)),
+            otherDevices.map(d => $client!.sendMail(content, d.deviceID, targetUserID, sendOpts)),
           )
         }
       }

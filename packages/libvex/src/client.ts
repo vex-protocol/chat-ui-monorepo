@@ -176,7 +176,7 @@ export class VexClient extends EventEmitter<VexEvents> {
     content: string,
     recipientDeviceID: string,
     recipientUserID: string,
-    options?: { group?: string | null },
+    options?: { group?: string | null; mailType?: string; extra?: string | null },
   ): Promise<SendResult> {
     if (!this.sessionManager) {
       return { ok: false, error: { code: 'CRYPTO_ERROR', message: 'preKeySecret not provided — cannot encrypt' } }
@@ -191,6 +191,8 @@ export class VexClient extends EventEmitter<VexEvents> {
       recipientDeviceID,
       recipientUserID,
       group: options?.group ?? null,
+      mailType: options?.mailType,
+      extra: options?.extra,
     })
   }
 
