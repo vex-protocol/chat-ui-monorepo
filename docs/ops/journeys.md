@@ -21,9 +21,9 @@ End-to-end journey maps for the Vex platform. Each journey documents what the us
 | 7 | Verify Conversation | Security-conscious user | "Is this really them?" | Implemented (desktop) | [journeys-features.md](journeys-features.md#7-verify-conversation) |
 | 8 | Create Server | Group organiser | "I want a group space" | Implemented (desktop) | [journeys-features.md](journeys-features.md#8-create-server) |
 | 9 | Join Server via Invite | Invited user | Receives invite link | Implemented | [journeys-features.md](journeys-features.md#9-join-server-via-invite) |
-| 10 | Send Group Message | Server member | "I want to post in a channel" | Partial (backend done, UI incomplete) | [journeys-features.md](journeys-features.md#10-send-group-message) |
+| 10 | Send Group Message | Server member | "I want to post in a channel" | Implemented (desktop) | [journeys-features.md](journeys-features.md#10-send-group-message) |
 | 11 | Manage Server & Channels | Server admin | "I need to organise my server" | Partial | [journeys-features.md](journeys-features.md#11-manage-server--channels) |
-| 12 | Share a File | Any user | "I want to send a file" | Partial (backend done, UI not wired) | [journeys-features.md](journeys-features.md#12-share-a-file) |
+| 12 | Share a File | Any user | "I want to send a file" | Implemented (desktop) | [journeys-features.md](journeys-features.md#12-share-a-file) |
 | 13 | Set Avatar | Any user | "I want a profile picture" | Implemented (desktop) | [journeys-features.md](journeys-features.md#13-set-avatar) |
 | 14 | Manage Devices | Multi-device user | "I logged in on a new device" | Partial | [journeys-features.md](journeys-features.md#14-manage-devices) |
 | 15 | Settings | Any user | "I want to change preferences" | Partial | [journeys-features.md](journeys-features.md#15-settings) |
@@ -45,18 +45,17 @@ A complete comparison of what shipped in the old client versus what's available 
 - Invite system with expiration
 - Avatar upload and display
 - Conversation fingerprint verification
-- File upload/download (backend only)
+- File upload/download + inline display (desktop)
 - User search (desktop and mobile)
 - Multi-device fan-out (sends to all recipient devices)
 - Message forwarding to sender's own devices
+- Group messaging (member list endpoint + ServerChannel fan-out)
+- Local message persistence (IndexedDB — survives app restart)
 
 ### Partially Ported (gaps)
 
 | Feature | What's Done | What's Missing |
 |---------|-------------|----------------|
-| Group messaging | Backend stores + delivers group mail | UI send disabled, no member list endpoint |
-| File sharing | Upload/download API + SDK methods | No chat UI (picker, inline render, progress), no encryption protocol |
-| User search | Both desktop and mobile have search UI, SDK has `searchUsers()` | — |
 | Settings | Basic avatar + theme | No sound toggle, notifications, DM toggle, purge |
 | Device management | SDK has `listDevices()` | No UI for device list, add, or remove |
 | Online presence | `$onlineLists` atom exists | Not wired to any endpoint or UI |
@@ -65,7 +64,6 @@ A complete comparison of what shipped in the old client versus what's available 
 
 | Feature | Notes |
 |---------|-------|
-| Local message history | Old: SQLite with NaCl at-rest encryption. New: memory only |
 | Session healing | Old: auto-creates new session on HMAC failure. New: no recovery |
 | Custom emoji | Old: upload/render per-server. New: not implemented |
 | Sound effects | Old: 4 effects (unlock, lock, notify, error). New: none |

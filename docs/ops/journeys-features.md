@@ -117,15 +117,13 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 |-----------|-----|-----|
 | Backend | `POST /mail` with `group` field | Same — `saveMail()` stores group channelID |
 | Client SDK | `client.messages.group(channelID, message)` — fans out to ALL devices of ALL channel members | `client.sendMail(..., { group: channelID })` — sends to one device per call; app loops over devices with `Promise.allSettled` |
-| Desktop UI | Fully working (sends + renders in `ServerPane.tsx`) | `ServerChannel.svelte` shows `console.warn('group messaging not yet wired')` |
+| Desktop UI | Fully working (sends + renders in `ServerPane.tsx`) | `ServerChannel.svelte` — fully working: `listMembers()` → enumerate devices → `Promise.allSettled` fan-out with `{ group: channelID }`. Sent messages appear on sender's device and persist to IndexedDB |
 | Mobile UI | N/A | `ChannelScreen.tsx` has send function but marked as incomplete |
-| Member list | `POST /userList/:channelID` returns all server members | No equivalent endpoint. Backend needs `GET /server/:id/members` |
+| Member list | `POST /userList/:channelID` returns all server members | `GET /server/:id/members` — returns user profiles (joins permissions with users). Requires server membership (403 otherwise) |
 
-### Pain Points
+### Status: Fixed
 
-- **Not functional in new client.** This is the biggest feature gap. Users can see channels but can't post (story `group-messaging-ui` in roadmap).
-- **Fan-out complexity.** Group messages must be encrypted separately for every device of every member. Multi-device fan-out is now implemented for DMs (`Promise.allSettled` over all devices). Group messaging needs a `GET /server/:id/members` endpoint to enumerate recipients.
-- **No member list endpoint.** Backend has `GET /server/:id/permissions` which returns permission objects (userID + power level), but no endpoint returning user profiles. Need a proper `GET /server/:id/members` that joins permissions with user profiles (tracked in `group-messaging-ui`).
+Group messaging is fully functional in the desktop client. `ServerChannel.svelte` calls `client.listMembers(serverID)` to enumerate all server members, resolves each member's devices, and fans out encrypted messages via `Promise.allSettled`. File attachments are also supported in group channels.
 
 ---
 
@@ -165,19 +163,22 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 
 | Stage | Old Client | New Client |
 |-------|------------|------------|
-| **Pick file** | Drag into chat or paste image. File picker via ChatInput | Not implemented in UI |
+| **Pick file** | Drag into chat or paste image. File picker via ChatInput | ChatInput has 📎 file picker button, shows thumbnail preview for images, filename + size for other files |
 | **Validate** | Max 20MB files, 5MB avatars | Backend: max 25MB |
 | **Upload** | `client.files.create(buffer)` → returns `{ fileID, key }` | `client.uploadFile(data, contentType, nonce)` → returns `{ fileID, nonce }` |
-| **Send reference** | Embeds `{{name:fileID:key:mimeType}}` in message body | No reference format defined |
-| **Render** | `MessageBox` parses `{{...}}` syntax, renders images inline, files as download links | Not implemented |
-| **Download** | `GET /file/:fileID` + client-side decryption with key | `client.downloadFile(fileID)` exists in SDK |
+| **Send reference** | Embeds `{{name:fileID:key:mimeType}}` in message body | Sends `mailType: 'file'` with `extra: JSON.stringify({ fileID, fileName, fileSize, contentType })` |
+| **Render** | `MessageBox` parses `{{...}}` syntax, renders images inline, files as download links | `MessageBox` parses `extra` JSON, renders images inline (`<img>`), other files as styled download links |
+| **Download** | `GET /file/:fileID` + client-side decryption with key | `client.downloadFile(fileID)` exists in SDK; images load directly via `client.fileUrl(fileID)` |
 | **Progress** | Upload progress shown: "XX% Uploaded: YYB/ZZB at Aaa/second" | No progress tracking |
 
-### Pain Points
+### Status: Implemented
 
-- **No file UI in new client.** Backend and SDK are done. ChatInput needs a file picker, MessageBox needs inline rendering (story `file-attachments` in roadmap, P1).
-- **No encryption format defined.** Old client embedded the encryption key in the message. New client has a `nonce` field but no defined protocol for sharing the decryption key with the recipient.
-- **No file size feedback.** Old client showed real-time upload progress. New client has no progress callback.
+File sharing is functional in the desktop client for both DMs and group channels. ChatInput has a file picker with image preview; MessageBox renders images inline and other files as download links. The `sendMail()` options accept `mailType` and `extra` to carry file metadata through encryption.
+
+### Remaining Gaps
+
+- **No upload progress.** Files upload in a single request; no progress callback.
+- **No encryption at rest.** Files are stored as plaintext on the server. The `nonce` field exists but no client-side encryption protocol is defined yet.
 
 ---
 

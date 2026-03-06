@@ -47,7 +47,7 @@ Detailed API-level comparison between the original standalone repos (`libvex-js`
 | Old | New | Notes |
 |---|---|---|
 | `client.messages.send(userID, msg)` | `client.sendMail(content, deviceID, userID)` | **Breaking:** caller must resolve devices first via `listDevices()` |
-| `client.messages.group(channelID, msg)` | -- | Not yet implemented |
+| `client.messages.group(channelID, msg)` | `client.sendMail(content, deviceID, userID, { group: channelID })` | App enumerates members via `listMembers()` + devices, fans out with `Promise.allSettled` |
 | `client.messages.retrieve(userID)` | `client.fetchInbox()` | Fetches all pending, not per-user history |
 | `client.messages.retrieveGroup(channelID)` | -- | Not yet implemented (needs spire endpoint) |
 | `client.messages.delete(id, duration?)` | -- | Not yet implemented |
@@ -81,7 +81,7 @@ Detailed API-level comparison between the original standalone repos (`libvex-js`
 | `client.channels.retrieveByID(id)` | -- | Not yet implemented |
 | `client.channels.create(name, serverID)` | `client.createChannel(serverID, name)` | Param order swapped |
 | `client.channels.delete(channelID)` | `client.deleteChannel(channelID)` | Flat method |
-| `client.channels.userList(channelID)` | -- | Not yet implemented |
+| `client.channels.userList(channelID)` | `client.listMembers(serverID)` | Returns `IUser[]` — all server members (joins permissions with user profiles) |
 
 ### Sessions, Files, Invites, Emoji, Moderation
 
@@ -90,8 +90,8 @@ These sub-objects existed in old libvex but are **not yet ported** to the new:
 | Old sub-object | Methods | Status |
 |---|---|---|
 | `client.sessions` | `retrieve()`, `verify()`, `markVerified()` | Not ported |
-| `client.files` | `create(buffer)`, `retrieve(id, key)` | Not ported -- needs file upload API |
-| `client.invites` | `create(serverID, duration)`, `redeem(id)`, `retrieve(serverID)` | Not ported |
+| `client.files` | `create(buffer)`, `retrieve(id, key)` | Ported — `client.uploadFile()`, `client.downloadFile()`, `client.fileUrl()` |
+| `client.invites` | `create(serverID, duration)`, `redeem(id)`, `retrieve(serverID)` | Ported — `client.createInvite()`, `client.joinServerViaInvite()`, `client.listInvites()`, `client.deleteInvite()` |
 | `client.emoji` | `create(buffer, name, serverID)`, `retrieveList(serverID)` | Not ported |
 | `client.moderation` | `kick(userID, serverID)`, `fetchPermissionList(serverID)` | Not ported |
 | `client.permissions` | `retrieve()`, `delete(permissionID)` | Not ported |
