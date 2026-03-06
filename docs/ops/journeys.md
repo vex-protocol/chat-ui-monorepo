@@ -270,7 +270,7 @@ Compose  →  Key Exchange (if first msg)  →  Encrypt  →  Send  →  Confirm
 
 | Stage | User Action | System Action |
 |-------|-------------|---------------|
-| **Search** | Types username in search bar | Desktop: navigates to `/messaging/:userID` directly (must know ID). Mobile: `client.searchUsers(query)` with 300ms debounce → shows results |
+| **Search** | Types username in search bar | Desktop: `FamiliarsList.svelte` inline search with 250ms debounce → `client.searchUsers(query)`. Mobile: same SDK call with 300ms debounce → shows results |
 | **Select** | Clicks on result | Navigates to DM screen for that user |
 | **First message** | Types and sends | Triggers X3DH key exchange (Journey 4) |
 
@@ -278,13 +278,13 @@ Compose  →  Key Exchange (if first msg)  →  Encrypt  →  Send  →  Confirm
 
 | Aspect | Old | New |
 |--------|-----|-----|
-| Search | `client.users.retrieve(username)` with real-time green checkmark | Desktop: no search UI (navigate by ID). Mobile: `searchUsers` with debounced results |
+| Search | `client.users.retrieve(username)` with real-time green checkmark | Desktop: `FamiliarsList.svelte` inline search with debounce. Mobile: `searchUsers` with debounced results |
 | Familiar list | `client.users.familiars()` returns all past contacts | `$familiars` atom exists but not populated from server |
 | Contact management | No explicit "add friend" — sessions auto-created on first message | Same implicit model |
 
 ### Pain Points
 
-- **Desktop has no user search UI.** You need to know someone's userID to message them. The old client had an inline search bar (story `desktop-search` in roadmap).
+- **~~Desktop has no user search UI.~~** Fixed — `FamiliarsList.svelte` has inline search with 250ms debounce, calls `client.searchUsers()`, opens DM on selection.
 - **No familiar list on new server.** The old server had a familiars endpoint. New server doesn't track who you've messaged (privacy-positive but UX-negative). The `$familiars` atom exists but is populated client-side from incoming messages, not from a server endpoint.
 - **No contact list.** Neither old nor new has an explicit friend/contact system. You can only see people you've recently messaged.
 
@@ -590,7 +590,7 @@ A complete comparison of what shipped in the old client versus what's available 
 |---------|-------------|----------------|
 | Group messaging | Backend stores + delivers group mail | UI send disabled, no member list endpoint, no fan-out to all devices |
 | File sharing | Upload/download API + SDK methods | No chat UI (picker, inline render, progress), no encryption protocol |
-| User search | Mobile has search UI, SDK has `searchUsers()` | Desktop has no search UI |
+| User search | Both desktop and mobile have search UI, SDK has `searchUsers()` | — |
 | Settings | Basic avatar + theme | No sound toggle, notifications, DM toggle, purge |
 | Device management | SDK has `listDevices()` | No UI for device list, add, or remove |
 | Online presence | `$onlineLists` atom exists | Not wired to any endpoint or UI |
