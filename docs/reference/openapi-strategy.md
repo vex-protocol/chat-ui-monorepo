@@ -9,7 +9,7 @@ High-level plan for auto-generating, linting, and serving OpenAPI documentation 
 | Layer | Tool | Why |
 |---|---|---|
 | Schema generation | `@asteasolutions/zod-to-openapi` | Dominant (~1.7M weekly downloads), Zod v4 native, OAS 3.1 support |
-| Docs UI (local) | `@scalar/express-api-reference` | Modern UI, built-in API client, 25+ language snippets, 11 themes |
+| Docs UI (local) | `@scalar/cli` (via npx) | Modern UI, built-in API client, 25+ language snippets — served standalone, not on the real server |
 | Spec linting | `@stoplight/spectral-cli` | Industry standard, 40+ OAS rules, CI-ready |
 | Pre-commit gate | `husky` + `lint-staged` | Only lints when `openapi.json` is staged — keeps commits fast |
 | Runtime guard (optional) | `express-openapi-validator` | Validates incoming requests against the spec at runtime |
@@ -70,19 +70,17 @@ apps/spire/
 
 ### Dev
 
-The server generates and serves the spec at startup from memory. No file write needed during development — Scalar reads from the live in-memory spec object.
+Docs are served standalone via `@scalar/cli`, not mounted on the real server:
 
-```typescript
-// src/index.ts (dev server)
-import { generateOpenAPIDocument } from "./openapi.js";
-
-const spec = generateOpenAPIDocument();
-
-app.use("/docs", apiReference({ content: spec, theme: "purple" }));
-app.get("/openapi.json", (_req, res) => res.json(spec));
+```bash
+pnpm --filter @vex-chat/spire docs   # opens Scalar at localhost:5555
 ```
 
-Docs available at `http://localhost:16777/docs`.
+This reads from the committed `openapi.json`. Regenerate first if routes changed:
+
+```bash
+pnpm --filter @vex-chat/spire generate:openapi && pnpm --filter @vex-chat/spire docs
+```
 
 ### Build / CI
 
@@ -170,22 +168,13 @@ pnpm --filter @vex-chat/spire lint-staged
 
 ## Local Docs Site
 
-Scalar is served as Express middleware at `/docs`. In dev it is always up-to-date because it reads from the live in-memory spec.
+Scalar runs standalone via `@scalar/cli` (npx, no install needed). The real server never serves docs.
 
-```typescript
-import { apiReference } from "@scalar/express-api-reference";
-
-app.use(
-  "/docs",
-  apiReference({
-    content: generateOpenAPIDocument(),
-    theme: "purple",       // options: default, moon, purple, solarized, bluePlanet, ...
-    layout: "modern",
-  })
-);
+```bash
+pnpm --filter @vex-chat/spire docs   # → http://localhost:5555
 ```
 
-Features available locally:
+Features:
 - Interactive "Try It" API client (no Postman needed)
 - Request/response history
 - Code snippets in 25+ languages (curl, fetch, axios, Python, Go, etc.)
@@ -223,8 +212,7 @@ if (process.env.NODE_ENV === "development") {
 // apps/spire/package.json additions
 {
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^8.x",
-    "@scalar/express-api-reference": "^latest"
+    "@asteasolutions/zod-to-openapi": "^8.x"
   },
   "devDependencies": {
     "@stoplight/spectral-cli": "^6.x",
