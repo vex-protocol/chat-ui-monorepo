@@ -7,6 +7,11 @@ export async function listDevices(http: HttpClient, userID: string): Promise<IDe
   return result.data
 }
 
+export async function deleteDevice(http: HttpClient, userID: string, deviceID: string): Promise<void> {
+  const result = await http.delete(`/user/${userID}/devices/${deviceID}`)
+  if (!result.ok) throw new Error(result.error.message)
+}
+
 export async function fetchKeyBundle(http: HttpClient, deviceID: string): Promise<IKeyBundle> {
   const result = await http.get<IKeyBundle>(`/keys/${deviceID}`)
   if (!result.ok) throw new Error(result.error.message)

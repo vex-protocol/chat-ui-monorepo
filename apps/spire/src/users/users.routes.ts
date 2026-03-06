@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.ts'
 import { getUser, getServersForUser, searchUsers } from '#users/users.service.ts'
-import { createDevice, retrieveUserDeviceList } from '#devices/devices.service.ts'
+import { createDevice, retrieveUserDeviceList, deleteDevice, retrieveDevice } from '#devices/devices.service.ts'
 import { DevicePayloadSchema } from '#devices/devices.schemas.ts'
 import { validateBody } from '#middleware/validate.ts'
 import type { RequestHandler } from 'express'
@@ -54,6 +54,29 @@ export function createUserRouter(db: Kysely<Database>, checkAuth: RequestHandler
     try {
       const device = await createDevice(db, req.params.id, req.body)
       res.json(device)
+    } catch (err) {
+      next(err)
+    }
+  })
+
+  router.delete('/user/:id/devices/:deviceID', checkAuth, async (req, res, next) => {
+    try {
+      if (req.user!.userID !== req.params.id) {
+        res.status(403).json({ error: 'forbidden' })
+        return
+      }
+      const device = await retrieveDevice(db, req.params.deviceID)
+      if (!device || device.owner !== req.user!.userID) {
+        res.status(404).json({ error: 'Device not found' })
+        return
+      }
+      const allDevices = await retrieveUserDeviceList(db, req.user!.userID)
+      if (allDevices.length <= 1) {
+        res.status(400).json({ error: 'Cannot delete your last device' })
+        return
+      }
+      await deleteDevice(db, req.params.deviceID)
+      res.json({ ok: true })
     } catch (err) {
       next(err)
     }

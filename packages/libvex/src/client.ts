@@ -9,7 +9,7 @@ import { register, login, logout, whoami, getToken } from './auth.ts'
 import type { RegisterResult, LoginResult } from './auth.ts'
 import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
-import { listDevices, fetchKeyBundle } from './devices.ts'
+import { listDevices, fetchKeyBundle, deleteDevice } from './devices.ts'
 import { createServer, listServers, listChannels, createChannel, deleteServer, deleteChannel, listMembers } from './servers.ts'
 import { getUser as getUserById, searchUsers as searchUsersHttp } from './users.ts'
 
@@ -220,6 +220,11 @@ export class VexClient extends EventEmitter<VexEvents> {
   /** Returns all devices registered to a user. */
   async listDevices(userID: string): Promise<IDevice[]> {
     return listDevices(this.http, userID)
+  }
+
+  /** Soft-deletes a device. Fails if it's the user's last device. */
+  async deleteDevice(userID: string, deviceID: string): Promise<void> {
+    return deleteDevice(this.http, userID, deviceID)
   }
 
   /** Fetches the X3DH key bundle for a device (used before sending the first message). */
