@@ -117,7 +117,9 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`docs/config.md`](docs/config.md) | Env validation, secret hygiene, singleton pattern, Zod v4 utilities |
 | [`docs/websocket.md`](docs/websocket.md) | WS connection lifecycle, auth handshake, async handler pattern |
 | [`docs/openapi-strategy.md`](docs/openapi-strategy.md) | OpenAPI generation from Zod schemas, Spectral linting |
-| [`docs/packages.md`](docs/packages.md) | Shared packages: types, crypto, libvex, store, ui — APIs and dependency graph |
+| [`docs/packages.md`](docs/packages.md) | Shared packages overview: types, crypto, dependency graph |
+| [`docs/packages-libvex.md`](docs/packages-libvex.md) | VexClient SDK: typed events, async iterators, discriminated unions |
+| [`docs/packages-store-ui.md`](docs/packages-store-ui.md) | Nanostores state layer + Mitosis design system primitives |
 | [`docs/infrastructure.md`](docs/infrastructure.md) | Provider selection, deployment strategy, cost analysis |
 | [`docs/migration-from-upstream.md`](docs/migration-from-upstream.md) | API mapping from original vex-chat repos to monorepo |
 | [`docs/react-native-monorepo.md`](docs/react-native-monorepo.md) | Metro + pnpm configuration for React Native in the monorepo |
