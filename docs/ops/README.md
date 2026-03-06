@@ -15,14 +15,19 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 | `journeys-features.md` | Journeys 7–16: verification, servers, groups, files, devices, settings, logout |
 | `roadmap.md` | Now/Next/Later roadmap. The big picture: what we're building, in what order, and why |
 | `concepts.md` | Story mapping methodology, core concepts, and glossary |
+| `ai-agents.md` | AI agent roster — principles, roles, and next steps |
+| `ai-agent-pm.md` | Role: Product Manager agent |
+| `ai-agent-scrum.md` | Role: Scrum / Standup agent |
+| `ai-agent-chaos.md` | Role: Chaos Engineer agent |
 | `personas.md` | User archetypes (when we have research data) |
 
-## Two Layers
+## Three Layers
 
 | Layer | Where | What | Changes |
 |---|---|---|---|
 | **Strategy** | `docs/ops/` (this folder) | Journeys, roadmap, priorities, release goals | Slowly — when we ship, discover, or reprioritise |
-| **Execution** | Linear | Issues, bugs, PRs, sprint tracking, technical details | Constantly — daily |
+| **Execution** | Linear | Issues, bugs, PRs, sprint tracking, technical details | Regularly — weekly |
+| **Implementation** | bd/beads (`.beads/`) | Granular tasks, agent workflows, dependency tracking | Constantly — daily |
 
 **Strategy answers:** What are we building? Why? In what order? What does the user experience look like?
 

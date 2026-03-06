@@ -155,7 +155,7 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`journeys.md`](docs/ops/journeys.md) | User journey inventory and feature coverage matrix |
 | [`roadmap.md`](docs/ops/roadmap.md) | Now/Next/Later roadmap with priorities and release goals |
 | [`concepts.md`](docs/ops/concepts.md) | Story mapping methodology and glossary |
-| [`ai-agents.md`](docs/ops/ai-agents.md) | AI agent roles for a small team: PM and scrum |
+| [`ai-agents.md`](docs/ops/ai-agents.md) | AI agent roles for a small team: PM, scrum, and chaos engineer |
 
 **Recommended reading order for new contributors:**
 1. This README
