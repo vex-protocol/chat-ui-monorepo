@@ -1,10 +1,11 @@
 <script lang="ts">
   // Route: /messaging/:userID
-  import { onMount } from 'svelte'
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
   import { messages, client, user, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
   import { loadCredentials } from '../lib/config.js'
+  import { saveMessage } from '../lib/persistence.js'
+  import type { DecryptedMail } from '@vex-chat/types'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -41,10 +42,6 @@
     }
   }
 
-  onMount(() => {
-    $client?.fetchInbox().catch(console.error)
-  })
-
   async function handleSend(content: string) {
     if (!$client || sending) return
     sending = true
@@ -68,6 +65,22 @@
         sendError = first?.value.error.message ?? 'Failed to send to any device'
         return
       }
+
+      // Show sent message on sender's device (server doesn't echo back to sender)
+      const sentMail: DecryptedMail = {
+        mailID: crypto.randomUUID(),
+        authorID: $user!.userID,
+        readerID: targetUserID,
+        group: null,
+        mailType: 'text',
+        time: new Date().toISOString(),
+        content,
+        extra: null,
+        forward: null,
+      }
+      const prev = $messages[targetUserID] ?? []
+      messages.setKey(targetUserID, [...prev, sentMail])
+      saveMessage(sentMail, $user!.userID).catch(() => {})
 
       // Forward to sender's own other devices so sent messages appear everywhere
       const creds = loadCredentials()
