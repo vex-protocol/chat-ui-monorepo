@@ -107,7 +107,7 @@ class VexClient extends EventEmitter<VexEvents> {
   async getToken(type: TokenType): Promise<IActionToken>
 
   // Mail — apps use DecryptedMail; IMail wire format is internal to libvex
-  async sendMail(content: string, recipientDeviceID: string, recipientUserID: string, options?: { group?: string | null }): Promise<SendResult>
+  async sendMail(content: string, recipientDeviceID: string, recipientUserID: string, options?: { group?: string | null; mailType?: string; extra?: string | null }): Promise<SendResult>
   async fetchInbox(): Promise<DecryptedMail[]>
   mail(): AsyncIterable<DecryptedMail>   // real-time stream, decrypted
 
@@ -118,6 +118,7 @@ class VexClient extends EventEmitter<VexEvents> {
   // Servers
   async createServer(name: string): Promise<IServer>
   async listServers(): Promise<IServer[]>
+  async listMembers(serverID: string): Promise<IUser[]>
   async createChannel(serverID: string, name: string): Promise<IChannel>
 
   // Key utils

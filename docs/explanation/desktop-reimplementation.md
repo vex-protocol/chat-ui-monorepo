@@ -310,7 +310,7 @@ WS → VexClient ("mail" event)
 | Sound effects | ✓ Done (auth + notification audio) |
 | Notifications | ✓ Done (Tauri notifications + tray badge) |
 | Settings / key storage | Partial — key storage done; settings screen exists |
-| File / image attachments | — Not started |
+| File / image attachments | ✓ Done (ChatInput file picker + preview, MessageBox inline images + download links, mailType/extra metadata) |
 | Session fingerprint verification | — Not started |
 | System tray | ✓ Done (macOS tray, restore from minimized) |
 | Deep links (vex://) | — Not started |

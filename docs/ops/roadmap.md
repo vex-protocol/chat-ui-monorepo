@@ -10,33 +10,11 @@ What we're building, in what order, and why. This is the strategy layer — the 
 
 High confidence in scope. Ship these first.
 
-**Release goal: "Encrypted chat that doesn't lose messages or leak keys"**
+**Release goal: "Device management and polish"**
 
 | Priority | What | Why | Journey |
 |---|---|---|---|
-| **P1** | File attachment UI | Backend and SDK are done. Desktop needs file picker in ChatInput, inline rendering in MessageBox, upload progress | 12 |
-
-**Exit criteria:**
-- Files can be sent and rendered in desktop chat
-
----
-
-## Next — Scoping
-
-Confident these matter. Scope not fully defined yet. May re-order based on what we learn shipping Now.
-
-**Release goal: "Complete communication — groups, history, search"**
-
-| Priority | What | Why | Journey | Depends on |
-|---|---|---|---|---|
-| **P0** | Local message persistence | Close the app, lose all messages. Single biggest UX regression. Old client had SQLite with at-rest encryption | 3, 4, 5 | — |
-| **P0** | Group messaging UI | Users can see channels but can't post. Backend done, UI disabled. Need member list endpoint | 10 | — |
-| **P2** | Device management UI | SDK has `listDevices()` but no UI for viewing, adding, or removing devices | 14 | — |
-
-**Open questions:**
-- Message persistence: SQLite via Tauri SQL plugin? IndexedDB? Need to evaluate both for desktop. Mobile needs SQLite regardless
-- Group fan-out: O(members x devices) encryptions per message. Need to benchmark and possibly batch
-- Desktop search: full-text search of local history, or just user lookup?
+| **P2** | Device management UI | SDK has `listDevices()` but no UI for viewing, adding, or removing devices | 14 |
 
 ---
 
@@ -62,7 +40,9 @@ Important but not scoped. May never ship if priorities change. That's fine.
 
 ## Done
 
-Shipped. Pruned periodically.
+Shipped **and validated** — not just merged. An item moves here when it works in practice, not when a PR lands. If a Done item regresses (bug discovered, feature incomplete, edge case missed), remove it from Done and re-add to Now with a note on what broke. The roadmap should never lie about what actually works.
+
+Pruned periodically.
 
 | What | Shipped |
 |---|---|
@@ -85,3 +65,6 @@ Shipped. Pruned periodically.
 | Auth rate limiting (10/15min on login and register) | v0.2 |
 | Logout state cleanup (resetAll() clears all nanostores atoms) | v0.2 |
 | Invite join atomicity (wrapped in transaction) | v0.2 |
+| Local message persistence (IndexedDB, load/save/clear lifecycle) | v0.3 |
+| Group messaging UI (GET /server/:id/members + ServerChannel fan-out) | v0.3 |
+| File/image attachments (ChatInput picker, MessageBox inline rendering, upload + send) | v0.3 |
