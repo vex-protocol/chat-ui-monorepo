@@ -124,6 +124,7 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`docs/desktop-reimplementation.md`](docs/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
 | [`docs/scalability.md`](docs/scalability.md) | Performance strategy: SQLite-first, connection pooling, scaling path |
 | [`docs/ops/`](docs/ops/README.md) | Strategy layer — user journeys, Now/Next/Later roadmap, story mapping |
+| [`docs/glossary.md`](docs/glossary.md) | Central definitions: OTK, X3DH, mail, device key, NaCl, and more |
 | [`AGENTS.md`](AGENTS.md) | Implementation rules — start here before contributing |
 
 **Recommended reading order for new contributors:**
