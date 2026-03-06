@@ -25,7 +25,7 @@ End-to-end journey maps for the Vex platform. Each journey documents what the us
 | 11 | Manage Server & Channels | Server admin | "I need to organise my server" | Partial | [journeys-features.md](journeys-features.md#11-manage-server--channels) |
 | 12 | Share a File | Any user | "I want to send a file" | Implemented (desktop) | [journeys-features.md](journeys-features.md#12-share-a-file) |
 | 13 | Set Avatar | Any user | "I want a profile picture" | Implemented (desktop) | [journeys-features.md](journeys-features.md#13-set-avatar) |
-| 14 | Manage Devices | Multi-device user | "I logged in on a new device" | Partial | [journeys-features.md](journeys-features.md#14-manage-devices) |
+| 14 | Manage Devices | Multi-device user | "I logged in on a new device" | Implemented (desktop) | [journeys-features.md](journeys-features.md#14-manage-devices) |
 | 15 | Settings | Any user | "I want to change preferences" | Partial | [journeys-features.md](journeys-features.md#15-settings) |
 | 16 | Logout | Any user | "I'm done for now" | Implemented | [journeys-features.md](journeys-features.md#16-logout) |
 
@@ -57,7 +57,7 @@ A complete comparison of what shipped in the old client versus what's available 
 | Feature | What's Done | What's Missing |
 |---------|-------------|----------------|
 | Settings | Basic avatar + theme | No sound toggle, notifications, DM toggle, purge |
-| Device management | SDK has `listDevices()` | No UI for device list, add, or remove |
+| Device management | SDK has `listDevices()` + `deleteDevice()`, Settings UI lists devices with delete | No "add device" flow (multi-device registration not exposed) |
 | Online presence | `$onlineLists` atom exists | Not wired to any endpoint or UI |
 
 ### Not Ported

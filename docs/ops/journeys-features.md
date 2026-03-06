@@ -220,10 +220,11 @@ File sharing is functional in the desktop client for both DMs and group channels
 
 ### New Client
 
-- `client.listDevices(userID)` exists in SDK
-- No UI for device list or management
+- `client.listDevices(userID)` and `client.deleteDevice(userID, deviceID)` in SDK
+- Settings.svelte "Devices" section lists all devices: name, truncated sign key, last login timestamp
+- Current device highlighted with "current" badge
+- Delete button on non-current devices (confirmation dialog, server-side last-device guard returns 400)
 - No "add device" flow (registration creates one device, multi-device add not exposed)
-- Device count shown in Settings (desktop) as truncated hex of device key seed — but no management
 
 ---
 

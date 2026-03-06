@@ -8,13 +8,7 @@ What we're building, in what order, and why. This is the strategy layer — the 
 
 ## Now — Active
 
-High confidence in scope. Ship these first.
-
-**Release goal: "Device management and polish"**
-
-| Priority | What | Why | Journey |
-|---|---|---|---|
-| **P2** | Device management UI | SDK has `listDevices()` but no UI for viewing, adding, or removing devices | 14 |
+No active work. See Later for future candidates.
 
 ---
 
@@ -68,3 +62,4 @@ Pruned periodically.
 | Local message persistence (IndexedDB, load/save/clear lifecycle) | v0.3 |
 | Group messaging UI (GET /server/:id/members + ServerChannel fan-out) | v0.3 |
 | File/image attachments (ChatInput picker, MessageBox inline rendering, upload + send) | v0.3 |
+| Device management (DELETE route + SDK method + Settings UI with list/delete) | v0.3 |
