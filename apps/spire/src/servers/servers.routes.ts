@@ -166,15 +166,16 @@ export function createServerRouter(db: Kysely<Database>, checkAuth: RequestHandl
   // Redeem invite — authenticated user joins the server
   router.post('/invite/:inviteID/join', checkAuth, async (req, res, next) => {
     try {
-      const valid = await isInviteValid(db, req.params.inviteID)
-      if (!valid) return next(new NotFoundError('Invite not found or expired'))
-      const invite = await getInvite(db, req.params.inviteID)
-      if (!invite) return next(new NotFoundError('Invite not found'))
-      // Check if already a member
-      const alreadyMember = await hasPermission(db, req.user!.userID, invite.serverID, 0)
-      if (alreadyMember) return next(new ConflictError('Already a member of this server'))
-      await createPermission(db, req.user!.userID, 'server', invite.serverID, DEFAULT_MEMBER_POWER)
-      const server = await getServer(db, invite.serverID)
+      const server = await db.transaction().execute(async (trx) => {
+        const valid = await isInviteValid(trx, req.params.inviteID)
+        if (!valid) throw new NotFoundError('Invite not found or expired')
+        const invite = await getInvite(trx, req.params.inviteID)
+        if (!invite) throw new NotFoundError('Invite not found')
+        const alreadyMember = await hasPermission(trx, req.user!.userID, invite.serverID, 0)
+        if (alreadyMember) throw new ConflictError('Already a member of this server')
+        await createPermission(trx, req.user!.userID, 'server', invite.serverID, DEFAULT_MEMBER_POWER)
+        return getServer(trx, invite.serverID)
+      })
       res.json({ ok: true, server })
     } catch (err) {
       next(err)
