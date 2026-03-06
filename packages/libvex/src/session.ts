@@ -37,6 +37,7 @@ export interface MailMeta {
   recipientUserID: string  // userID of recipient
   group?: string | null    // channelID for group messages, null for DMs
   mailType?: string
+  extra?: string | null
 }
 
 /**
@@ -132,7 +133,7 @@ export class SessionManager {
       cipher: encodeHex(cipherBytes),
       group: meta.group ?? null,
       mailType: meta.mailType ?? 'message',
-      extra: null,
+      extra: meta.extra ?? null,
       forward: null,
     }
   }

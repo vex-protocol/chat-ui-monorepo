@@ -19,11 +19,26 @@
   let sending = $state(false)
   let sendError = $state('')
 
-  async function handleSend(content: string) {
+  async function handleSend(content: string, attachment?: File) {
     if (!$client || !$user || sending) return
     sending = true
     sendError = ''
     try {
+      // Upload attachment first if present
+      let mailType = 'text'
+      let extra: string | null = null
+      if (attachment) {
+        const buf = new Uint8Array(await attachment.arrayBuffer())
+        const { fileID } = await $client.uploadFile(buf, attachment.type)
+        mailType = 'file'
+        extra = JSON.stringify({
+          fileID,
+          fileName: attachment.name,
+          fileSize: attachment.size,
+          contentType: attachment.type,
+        })
+      }
+
       // Get all server members and their devices
       const members = await $client.listMembers(serverID)
       const creds = loadCredentials()
@@ -43,10 +58,12 @@
         return
       }
 
+      const sendOpts = { group: channelID, mailType, extra }
+
       // Fan out to all devices with { group: channelID }
       const results = await Promise.allSettled(
         deviceTargets.map(t =>
-          $client!.sendMail(content, t.deviceID, t.userID, { group: channelID }),
+          $client!.sendMail(content, t.deviceID, t.userID, sendOpts),
         ),
       )
       const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
@@ -61,10 +78,10 @@
         authorID: $user.userID,
         readerID: $user.userID,
         group: channelID,
-        mailType: 'text',
+        mailType,
         time: new Date().toISOString(),
         content,
-        extra: null,
+        extra,
         forward: null,
       }
       const prev = $groupMessages[channelID] ?? []

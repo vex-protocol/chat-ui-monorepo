@@ -1,12 +1,16 @@
 <script lang="ts">
   import type { DecryptedMail } from '@vex-chat/types'
   import { onMount } from 'svelte'
-  import { chunkMessages, renderContent, handleLinkClick, formatTime } from './utils/messages.js'
-  import { user } from './store/index.js'
+  import { chunkMessages, renderContent, handleLinkClick, formatTime, parseFileExtra, isImageType, formatFileSize } from './utils/messages.js'
+  import { user, client } from './store/index.js'
   import { getServerUrl } from './config.js'
   import Avatar from './Avatar.svelte'
 
   const serverUrl = getServerUrl()
+
+  function fileUrl(fileID: string): string {
+    return $client?.fileUrl(fileID) ?? `${serverUrl}/file/${fileID}`
+  }
 
   let { messages = [] }: { messages: DecryptedMail[] } = $props()
 
@@ -70,8 +74,36 @@
       </div>
 
       {#each chunk.messages as msg (msg.mailID)}
+        {@const fileInfo = parseFileExtra(msg.extra)}
         <div class="message">
-          {@html renderContent(msg.content)}
+          {#if fileInfo}
+            {#if isImageType(fileInfo.contentType)}
+              <img
+                src={fileUrl(fileInfo.fileID)}
+                alt={fileInfo.fileName}
+                class="message__image"
+                loading="lazy"
+              />
+            {:else}
+              <a
+                href={fileUrl(fileInfo.fileID)}
+                class="message__file"
+                data-external={fileUrl(fileInfo.fileID)}
+                download={fileInfo.fileName}
+              >
+                <span class="message__file-icon">📄</span>
+                <span class="message__file-info">
+                  <span class="message__file-name">{fileInfo.fileName}</span>
+                  <span class="message__file-size">{formatFileSize(fileInfo.fileSize)}</span>
+                </span>
+              </a>
+            {/if}
+            {#if msg.content}
+              {@html renderContent(msg.content)}
+            {/if}
+          {:else}
+            {@html renderContent(msg.content)}
+          {/if}
         </div>
       {/each}
     </div>
@@ -137,6 +169,61 @@
     line-height: 1.5;
     color: var(--text-secondary);
     word-break: break-word;
+  }
+
+  /* ── File attachment styles ── */
+  .message__image {
+    max-width: 400px;
+    max-height: 300px;
+    border-radius: 6px;
+    margin: 4px 0;
+    display: block;
+    cursor: pointer;
+  }
+
+  .message__file {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin: 4px 0;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .message__file:hover {
+    background: var(--bg-hover);
+  }
+
+  .message__file-icon {
+    font-size: 20px;
+    filter: grayscale(1);
+    flex-shrink: 0;
+  }
+
+  .message__file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+  }
+
+  .message__file-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .message__file-size {
+    font-size: 11px;
+    color: var(--text-muted);
   }
 
   /* ── Markdown element styles ── */
