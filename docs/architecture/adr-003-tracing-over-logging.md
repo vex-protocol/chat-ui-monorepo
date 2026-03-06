@@ -156,14 +156,35 @@ We do not instrument the clients. No analytics SDKs, no crash reporting librarie
 
 This matches Signal's approach — zero analytics SDKs, zero automated crash reporting. Crash reports are manual and user-initiated.
 
+### Production log level: `error` only
+
+In production, Pino runs at `LOG_LEVEL=error`. This is a security hardening measure, not just noise reduction.
+
+If an attacker compromises the server and reads stdout (via `journalctl`, `docker logs`, or process memory):
+
+| Log Level | What They See |
+|---|---|
+| `info` | Every HTTP request with URL paths containing device IDs, WebSocket connections, general activity — a surveillance record of all server activity |
+| `error` | Only things that broke, with generic messages from `AppError` classes ("Not found", "Unauthorized") — no user identity, no communication patterns, no useful intelligence |
+
+The old Spire's Winston also defaulted to `"error"` in production — but Morgan logged every HTTP request regardless, and developers added `log.info()` calls with tokens and user details throughout the code. The log level was the right idea undermined by undisciplined logging.
+
+Our approach eliminates the risk entirely:
+- **Production stdout contains only error-level logs** — generic messages, no user data
+- **Operational visibility comes from OTel spans** — 13 allow-listed attributes exported via OTLP, never written to the local filesystem
+- **Development uses `info` or `debug` freely** — it's local, not persisted, not a target
+
+An attacker who compromises the server finds: error logs with generic messages on stdout, no log files on disk, and a database containing only ciphertext and public key material. The operational telemetry (SLOs, burn rates, per-endpoint breakdowns) lives in Honeycomb, which requires separate credentials to access.
+
 ### Defence in depth
 
-Even with this minimal collection, four layers prevent data leakage:
+Even with this minimal collection, five layers prevent data leakage:
 
-1. **SDK config** — disable unnecessary instrumentations (fs, dns, net), never enable header/body capture
-2. **PrivacySpanProcessor** — strips `url.full`, `url.path`, `url.query`, `client.address`, `network.peer.address`, `user_agent.original`, `db.query.text` in-process before export
-3. **OTel Collector** — allow-list mode (`allow_all_keys: false`), fail-closed. Last gate before data leaves infrastructure
-4. **Honeycomb EU endpoint** — GDPR compliant, SOC 2 Type II, 60-day retention, encrypted at rest and in transit
+1. **Production log level** — `LOG_LEVEL=error` ensures Pino only writes when something breaks. Generic error messages, no user data in stdout
+2. **SDK config** — disable unnecessary instrumentations (fs, dns, net), never enable header/body capture
+3. **PrivacySpanProcessor** — strips `url.full`, `url.path`, `url.query`, `client.address`, `network.peer.address`, `user_agent.original`, `db.query.text` in-process before export
+4. **OTel Collector** — allow-list mode (`allow_all_keys: false`), fail-closed. Last gate before data leaves infrastructure
+5. **Honeycomb EU endpoint** — GDPR compliant, SOC 2 Type II, 60-day retention, encrypted at rest and in transit
 
 ## Decision
 
@@ -172,7 +193,7 @@ Adopt OpenTelemetry tracing as the primary observability mechanism. Do not ship 
 - **Server (Spire):** OTel SDK with auto-instrumentation (HTTP, Express, Pino) + custom spans for mail delivery, key exchange, WebSocket lifecycle. PrivacySpanProcessor strips all sensitive attributes. Export via OTel Collector to Honeycomb EU.
 - **Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects trace IDs into Pino stdout output. Errors are attached to spans via `span.recordException()`, not shipped as log signals. No `LoggerProvider` configured — no log pipeline exists.
 - **Clients (desktop, mobile):** No instrumentation. A single `X-Vex-Client` header on existing HTTP requests provides client type and version.
-- **Pino logging:** Retained for local development and stdout in production (for operators who self-host and want local logs). Never shipped to a third-party service. Enriched with `trace_id` and `span_id` for local log-trace correlation.
+- **Pino logging:** `LOG_LEVEL=error` in production — only errors reach stdout, with generic messages from `AppError` classes. Development uses `info` or `debug` freely. Never shipped to a third-party service. Enriched with `trace_id` and `span_id` for local log-trace correlation.
 
 ## Rationale
 

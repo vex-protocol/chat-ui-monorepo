@@ -238,6 +238,8 @@ Layer 3 (Collector) is the safety net. Running in allow-list mode (`allow_all_ke
 
 **Error handling:** Errors are attached to spans, not shipped as logs. The error middleware calls `span.recordException(err)` and `span.setStatus(ERROR)` on the active span. The exception event rides with the trace through the existing pipeline. Pino still logs the error to stdout for local visibility (with trace_id auto-injected). No separate log exporter or log pipeline exists.
 
+**Production log level:** `LOG_LEVEL=error` in production. This is a security hardening measure — if an attacker compromises the server, stdout contains only generic error messages ("Not found", "Unauthorized"), not HTTP request URLs with user IDs or WebSocket connection details. Operational visibility comes from OTel spans, which are exported via OTLP and never written to the local filesystem. Development uses `info` or `debug` freely.
+
 ### Instrumentation Points in Spire
 
 How each SLI gets measured, mapped to the actual codebase.
