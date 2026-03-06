@@ -263,4 +263,4 @@ New beads issues to create:
 
 ---
 
-See also: [architecture.md](architecture.md) for route/service layer rules, [vex-overview.md](vex-overview.md) for the HTTP API endpoint list.
+See also: [architecture.md](architecture.md) for route/service layer rules, [vex-overview.md](../vex-overview.md) for the HTTP API endpoint list.

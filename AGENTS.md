@@ -17,7 +17,7 @@ Vex targets desktop and mobile as a cross-platform monorepo:
 | Mobile | **React Native** | React Native |
 | Server | **Node.js** | Express + Kysely |
 
-Shared packages (`types`, `core`, `crypto`, `validation`, `store`) are framework-agnostic TypeScript. Design system primitives live in `packages/ui` as **Mitosis** `.lite.tsx` files that compile to both Svelte and React. See `docs/platform-strategy.md` for the full architecture and `docs/design-system.md` for the Figma ↔ Storybook pipeline.
+Shared packages (`types`, `core`, `crypto`, `validation`, `store`) are framework-agnostic TypeScript. Design system primitives live in `packages/ui` as **Mitosis** `.lite.tsx` files that compile to both Svelte and React. See `docs/platform/platform-strategy.md` for the full architecture and `docs/platform/design-system.md` for the Figma ↔ Storybook pipeline.
 
 `apps/spire` is a clean reimplementation of [`vex-chat/spire`](https://github.com/vex-chat/spire) — the Vex server — using modern tooling (Kysely, Zod, Vitest, ESM) while preserving full protocol and privacy compatibility with the original.
 
@@ -58,7 +58,7 @@ The Vex platform works as follows:
 - **Mail MUST be deleted from the server after it is fetched by the intended recipient.** The server is a relay, not a store. Do not retain delivered mail.
 - **Mail save failures MUST propagate as errors.** Never silently swallow errors in the mail pipeline. A dropped message is unrecoverable — the OTK was consumed, the session advanced, and the plaintext is gone. Silent loss is worse than a visible error.
 - **OTK/pre-key uploads MUST verify device ownership.** Before accepting key material, the server must confirm `req.user` owns the target device. Without this check, an attacker can inject their own OTKs into another user's device key bundle and intercept incoming messages — a man-in-the-middle on the encryption layer. This directly violates the guarantee that the server cannot impersonate users.
-- **Never add server-side access control that builds a social graph.** Device listing (`GET /user/:id/devices`) must remain open to all authenticated users — X3DH requires it. File downloads should rely on client-side encryption, not server-side ACLs that track who accesses what. User search returns public profiles and must not be gated by contact lists. See `docs/architecture.md` → "Security Invariants" for the full rationale.
+- **Never add server-side access control that builds a social graph.** Device listing (`GET /user/:id/devices`) must remain open to all authenticated users — X3DH requires it. File downloads should rely on client-side encryption, not server-side ACLs that track who accesses what. User search returns public profiles and must not be gated by contact lists. See `docs/server/architecture.md` → "Security Invariants" for the full rationale.
 - **Never log or store IP addresses or User-Agent strings.** This is a hard privacy requirement from the vex.wtf privacy policy — not a default Express/Node behaviour, so it must be actively suppressed in middleware and request logging.
 
 ## Quick Reference
@@ -205,7 +205,7 @@ Our current docs are strong on **Reference** and **Explanation**. When adding ne
 - **Never skip heading levels.** h1 → h2 → h3. No h1 → h3 jumps.
 - **Keep docs under 300 lines.** If a doc grows past this, split it into a hub + detail files (see `packages.md` and `journeys.md` for the pattern).
 - **Every doc must be linked from README.md's Documentation table.** No orphan docs — if it's not in the index, it doesn't exist.
-- **Cross-link related docs.** Use "See also" references: `See [architecture.md](docs/architecture.md) for layer rules.`
+- **Cross-link related docs.** Use "See also" references: `See [architecture.md](docs/server/architecture.md) for layer rules.`
 - **Define terms locally on first use, but don't build a glossary into every doc.** Central glossary lives in `docs/glossary.md`.
 
 ### What NOT to do

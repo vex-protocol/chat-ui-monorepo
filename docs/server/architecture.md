@@ -2,7 +2,7 @@
 
 A guide for contributors — especially backend newcomers — to understand how the pieces fit together.
 
-> **Packages layer:** For `packages/types`, `packages/crypto`, and `packages/libvex` see [`docs/packages.md`](./packages.md).
+> **Packages layer:** For `packages/types`, `packages/crypto`, and `packages/libvex` see [`docs/packages.md`](../packages/packages.md).
 
 ---
 
@@ -485,17 +485,17 @@ The correct fix is to ensure files are **always client-encrypted** (enforce non-
 Read in this order:
 1. `docs/vex-overview.md` — what Vex is, components, and cryptographic protocol
 2. `docs/ops/` — start with `README.md`, then `journeys.md` (story map backbone), then `roadmap.md` (Now/Next/Later with stories and status)
-3. `docs/platform-strategy.md` — cross-platform architecture (Tauri+Svelte desktop, React Native mobile, shared packages)
-4. `docs/design-system.md` — Figma ↔ Storybook pipeline, Mitosis component strategy, designer/developer workflow
-5. `docs/auth-comparison.md` — how auth works, our design decisions
+3. `docs/platform/platform-strategy.md` — cross-platform architecture (Tauri+Svelte desktop, React Native mobile, shared packages)
+4. `docs/platform/design-system.md` — Figma ↔ Storybook pipeline, Mitosis component strategy, designer/developer workflow
+5. `docs/server/auth-comparison.md` — how auth works, our design decisions
 6. `AGENTS.md` — implementation rules all contributors must follow
-7. `docs/testing-strategy.md` — how tests are structured
-8. `docs/logging.md` — pino logger setup, redaction, dev vs prod transport
-9. `docs/config.md` — env validation, secret hygiene, singleton pattern
-10. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
+7. `docs/server/testing-strategy.md` — how tests are structured
+8. `docs/server/logging.md` — pino logger setup, redaction, dev vs prod transport
+9. `docs/server/config.md` — env validation, secret hygiene, singleton pattern
+10. `docs/server/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
 11. `src/db/types.ts` — all 11 database tables
 12. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
 
 ---
 
-See also: [packages.md](packages.md) for the shared packages dependency graph, [testing-strategy.md](testing-strategy.md) for test patterns, [vex-overview.md](vex-overview.md) for the cryptographic protocol.
+See also: [packages.md](../packages/packages.md) for the shared packages dependency graph, [testing-strategy.md](testing-strategy.md) for test patterns, [vex-overview.md](../vex-overview.md) for the cryptographic protocol.

@@ -388,4 +388,4 @@ Features that existed in the old repos but are not yet in the monorepo:
 
 ---
 
-See also: [desktop-reimplementation.md](desktop-reimplementation.md) for Electron → Tauri component mapping, [vex-overview.md](vex-overview.md) for the original protocol reference.
+See also: [desktop-reimplementation.md](desktop-reimplementation.md) for Electron → Tauri component mapping, [vex-overview.md](../vex-overview.md) for the original protocol reference.

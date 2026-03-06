@@ -108,33 +108,62 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | Doc | What it covers |
 |---|---|
 | [`docs/vex-overview.md`](docs/vex-overview.md) | What Vex is, the cryptographic protocol, HTTP API, WebSocket protocol, brand |
-| [`docs/architecture.md`](docs/architecture.md) | How `apps/spire` is structured, layer rules, file naming, path aliases, error handling |
-| [`docs/platform-strategy.md`](docs/platform-strategy.md) | Cross-platform monorepo: Tauri desktop, React Native mobile, shared packages |
-| [`docs/design-system.md`](docs/design-system.md) | Figma ↔ Storybook pipeline, Mitosis component strategy |
-| [`docs/auth-comparison.md`](docs/auth-comparison.md) | Auth design decisions: NaCl device keys, registration flow, JWT strategy |
-| [`docs/testing-strategy.md`](docs/testing-strategy.md) | Test structure, in-memory SQLite, factory helpers, Vitest configuration |
-| [`docs/logging.md`](docs/logging.md) | Pino logger setup, IP/UA redaction, dev vs prod transport |
-| [`docs/config.md`](docs/config.md) | Env validation, secret hygiene, singleton pattern, Zod v4 utilities |
-| [`docs/websocket.md`](docs/websocket.md) | WS connection lifecycle, auth handshake, async handler pattern |
-| [`docs/openapi-strategy.md`](docs/openapi-strategy.md) | OpenAPI generation from Zod schemas, Spectral linting |
-| [`docs/packages.md`](docs/packages.md) | Shared packages overview: types, crypto, dependency graph |
-| [`docs/packages-libvex.md`](docs/packages-libvex.md) | VexClient SDK: typed events, async iterators, discriminated unions |
-| [`docs/packages-store-ui.md`](docs/packages-store-ui.md) | Nanostores state layer + Mitosis design system primitives |
-| [`docs/infrastructure.md`](docs/infrastructure.md) | Provider selection, deployment strategy, cost analysis |
-| [`docs/migration-from-upstream.md`](docs/migration-from-upstream.md) | API mapping from original vex-chat repos to monorepo |
-| [`docs/react-native-monorepo.md`](docs/react-native-monorepo.md) | Metro + pnpm configuration for React Native in the monorepo |
-| [`docs/desktop-reimplementation.md`](docs/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
-| [`docs/scalability.md`](docs/scalability.md) | Performance strategy: SQLite-first, connection pooling, scaling path |
-| [`docs/ops/`](docs/ops/README.md) | Strategy layer — user journeys, Now/Next/Later roadmap, story mapping |
 | [`docs/glossary.md`](docs/glossary.md) | Central definitions: OTK, X3DH, mail, device key, NaCl, and more |
 | [`AGENTS.md`](AGENTS.md) | Implementation rules — start here before contributing |
+
+**`docs/server/`** — apps/spire backend
+
+| Doc | What it covers |
+|---|---|
+| [`architecture.md`](docs/server/architecture.md) | How `apps/spire` is structured, layer rules, file naming, path aliases, error handling |
+| [`auth-comparison.md`](docs/server/auth-comparison.md) | Auth design decisions: NaCl device keys, registration flow, JWT strategy |
+| [`testing-strategy.md`](docs/server/testing-strategy.md) | Test structure, in-memory SQLite, factory helpers, Vitest configuration |
+| [`logging.md`](docs/server/logging.md) | Pino logger setup, IP/UA redaction, dev vs prod transport |
+| [`config.md`](docs/server/config.md) | Env validation, secret hygiene, singleton pattern, Zod v4 utilities |
+| [`websocket.md`](docs/server/websocket.md) | WS connection lifecycle, auth handshake, async handler pattern |
+| [`openapi-strategy.md`](docs/server/openapi-strategy.md) | OpenAPI generation from Zod schemas, Spectral linting |
+
+**`docs/packages/`** — shared TypeScript libraries
+
+| Doc | What it covers |
+|---|---|
+| [`packages.md`](docs/packages/packages.md) | Overview: types, crypto, dependency graph |
+| [`packages-libvex.md`](docs/packages/packages-libvex.md) | VexClient SDK: typed events, async iterators, discriminated unions |
+| [`packages-store-ui.md`](docs/packages/packages-store-ui.md) | Nanostores state layer + Mitosis design system primitives |
+
+**`docs/platform/`** — cross-platform strategy
+
+| Doc | What it covers |
+|---|---|
+| [`platform-strategy.md`](docs/platform/platform-strategy.md) | Cross-platform monorepo: Tauri desktop, React Native mobile, shared packages |
+| [`design-system.md`](docs/platform/design-system.md) | Figma ↔ Storybook pipeline, Mitosis component strategy |
+| [`desktop-reimplementation.md`](docs/platform/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
+| [`react-native-monorepo.md`](docs/platform/react-native-monorepo.md) | Metro + pnpm configuration for React Native in the monorepo |
+| [`migration-from-upstream.md`](docs/platform/migration-from-upstream.md) | API mapping from original vex-chat repos to monorepo |
+
+**`docs/infra/`** — deployment & scaling
+
+| Doc | What it covers |
+|---|---|
+| [`infrastructure.md`](docs/infra/infrastructure.md) | Provider selection, deployment strategy, cost analysis |
+| [`scalability.md`](docs/infra/scalability.md) | Performance strategy: SQLite-first, connection pooling, scaling path |
+
+**`docs/ops/`** — strategy layer ([README](docs/ops/README.md))
+
+| Doc | What it covers |
+|---|---|
+| [`journeys.md`](docs/ops/journeys.md) | User journey inventory and feature coverage matrix |
+| [`roadmap.md`](docs/ops/roadmap.md) | Now/Next/Later roadmap with priorities and release goals |
+| [`concepts.md`](docs/ops/concepts.md) | Story mapping methodology and glossary |
+
+**`docs/tutorials/`** — getting started guides (planned)
 
 **Recommended reading order for new contributors:**
 1. This README
 2. `docs/vex-overview.md` — understand what we're building and why
-3. `docs/architecture.md` — understand how the server is structured
+3. `docs/server/architecture.md` — understand how the server is structured
 4. `AGENTS.md` — implementation rules you must follow
-5. `docs/testing-strategy.md` — write tests from day one
+5. `docs/server/testing-strategy.md` — write tests from day one
 
 ---
 
@@ -143,4 +172,4 @@ All variables are validated at startup. Missing or invalid values print a clear 
 1. Check available work: `bd ready`
 2. Create a branch, make changes, run `pnpm --filter @vex-chat/spire test`
 3. All 255 tests must pass before committing
-4. Follow the layer rules in `docs/architecture.md` — route handlers call service functions, service functions call the database, never the other way around
+4. Follow the layer rules in `docs/server/architecture.md` — route handlers call service functions, service functions call the database, never the other way around
