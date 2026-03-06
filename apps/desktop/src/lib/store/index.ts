@@ -17,5 +17,5 @@ export {
   $avatarHash as avatarHash,
 } from '@vex-chat/store'
 
-export { bootstrap, markVerified, unmarkVerified, isVerified } from '@vex-chat/store'
+export { bootstrap, resetAll, markVerified, unmarkVerified, isVerified } from '@vex-chat/store'
 export { $verifiedKeys as verifiedKeys } from '@vex-chat/store'
