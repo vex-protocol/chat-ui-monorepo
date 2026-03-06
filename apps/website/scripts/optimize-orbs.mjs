@@ -8,8 +8,8 @@ import { readdir, stat } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 
 const ORBS_DIR = new URL('../static/orbs', import.meta.url).pathname;
-const MAX_DIM = 440;
-const QUALITY = 80;
+const MAX_DIM = 200;
+const QUALITY = 60;
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png']);
 
 async function walk(dir) {
@@ -31,8 +31,7 @@ let totalSaved = 0;
 for (const file of files) {
 	const webpPath = file.replace(/\.(jpg|jpeg|png)$/i, '.webp');
 	try {
-		const existing = await stat(webpPath).catch(() => null);
-		if (existing) { skipped++; continue; }
+		// Overwrite existing webp files to re-optimize
 
 		const info = await sharp(file).metadata();
 		const needsResize = (info.width ?? 0) > MAX_DIM || (info.height ?? 0) > MAX_DIM;
