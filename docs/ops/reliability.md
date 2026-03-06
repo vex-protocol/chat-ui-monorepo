@@ -227,11 +227,16 @@ Layer 3 (Collector) is the safety net. Running in allow-list mode (`allow_all_ke
 | `@opentelemetry/sdk-trace-base` | Custom SpanProcessor (privacy layer) |
 | `@opentelemetry/sdk-metrics` | Metrics Views (attribute allow-list) |
 | `@opentelemetry/exporter-trace-otlp-http` | Export traces via OTLP |
+| `@opentelemetry/instrumentation-pino` | Inject trace_id/span_id into Pino log output (with `disableLogSending: true`) |
 | `@opentelemetry/exporter-metrics-otlp-http` | Export metrics via OTLP |
 
 **Initialisation:** An `instrumentation.ts` file loads before the app via Node's `--import` flag (`node --import ./instrumentation.ts run.ts`). This ensures all auto-instrumentation hooks are registered before Express, HTTP, and the database driver are imported.
 
 **Disabled instrumentations:** `fs`, `dns`, `net` — these generate high-volume, low-value spans that don't serve any SLI.
+
+**Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects `trace_id` and `span_id` into Pino log lines. No log data is exported — Pino writes to stdout as before, now enriched with trace context for local log-trace correlation. No `LoggerProvider` is configured. See [ADR-003](../architecture/adr-003-tracing-over-logging.md) for the full rationale.
+
+**Error handling:** Errors are attached to spans, not shipped as logs. The error middleware calls `span.recordException(err)` and `span.setStatus(ERROR)` on the active span. The exception event rides with the trace through the existing pipeline. Pino still logs the error to stdout for local visibility (with trace_id auto-injected). No separate log exporter or log pipeline exists.
 
 ### Instrumentation Points in Spire
 

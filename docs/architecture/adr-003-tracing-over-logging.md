@@ -121,6 +121,35 @@ Tracing solves the privacy-observability tension because it separates the data m
 
 Compare this to what a single Pino HTTP log line contains: full URL path with embedded IDs, client IP address, user agent string, request headers, response time, and whatever the developer chose to log in the handler. Tracing is categorically more controllable.
 
+### Pino + OTel integration
+
+Pino is not replaced — it is bridged. Two packages make this work:
+
+**`@opentelemetry/instrumentation-pino`** (with `disableLogSending: true`) automatically injects `trace_id`, `span_id`, and `trace_flags` into every Pino log line emitted inside an active span. This is purely additive — it modifies the log record before Pino serialises it. No log data flows through the OTel pipeline. No log data is exported to Honeycomb.
+
+A local Pino log line becomes:
+```json
+{"level":50,"msg":"Database query failed","trace_id":"abc123...","span_id":"789xyz...","trace_flags":"01"}
+```
+
+When reading local stdout logs, the `trace_id` value can be searched in Honeycomb to find the corresponding trace. This is log-trace correlation without log shipping.
+
+**`span.recordException(err)`** attaches error details to the active span as a span event. When an error occurs anywhere in the request lifecycle, the error middleware:
+
+1. Gets the active span (created by OTel Express auto-instrumentation)
+2. Calls `span.recordException(err)` — creates an `"exception"` event with `exception.type` and `exception.message`
+3. Calls `span.setStatus({ code: SpanStatusCode.ERROR })` — marks the span red in Honeycomb
+4. Logs via Pino for local stdout visibility (with trace_id auto-injected)
+5. Returns a generic error response to the client (no stack traces, no internals)
+
+The span event rides with the trace through the existing trace pipeline — no separate log exporter, no separate log pipeline, no additional data leaving the process. The PrivacySpanProcessor and OTel Collector allow-list filter span event attributes the same way they filter span attributes.
+
+**What we do NOT use:**
+- `pino-opentelemetry-transport` — ships every Pino log line through OTLP to an external backend. Creates its own `LoggerProvider` in a worker thread, bypassing the PrivacySpanProcessor entirely. This is the opposite of what we want.
+- OTel `LogRecordProcessor` / `LogRecordExporter` — no log pipeline is configured. The SDK has no `LoggerProvider`. Even if `disableLogSending` were accidentally left as `false`, log sending would be a no-op because there is no log provider to send to. Defence in depth.
+
+**Privacy note on `recordException`:** The `exception.stacktrace` attribute contains file paths. These reveal internal code structure but not user data. The `exception.message` is the bigger risk — if error messages include user input (e.g., "Device abc-123 not found"), that leaks a device ID into Honeycomb. Error messages must use generic text ("Device not found") or the PrivacySpanProcessor must strip `exception.message`. Our existing error classes (`AppError`, `NotFoundError`, `AuthError`, etc. in `errors.ts`) already use generic messages.
+
 ### No client instrumentation
 
 We do not instrument the clients. No analytics SDKs, no crash reporting libraries, no telemetry beacons. The only client-originated data is a single HTTP header (`X-Vex-Client: desktop/0.3.1`) sent on requests the client already makes. No new network requests.
@@ -140,9 +169,10 @@ Even with this minimal collection, four layers prevent data leakage:
 
 Adopt OpenTelemetry tracing as the primary observability mechanism. Do not ship logs to any third party.
 
-- **Server (Spire):** OTel SDK with auto-instrumentation (HTTP, Express) + custom spans for mail delivery, key exchange, WebSocket lifecycle. PrivacySpanProcessor strips all sensitive attributes. Export via OTel Collector to Honeycomb EU.
+- **Server (Spire):** OTel SDK with auto-instrumentation (HTTP, Express, Pino) + custom spans for mail delivery, key exchange, WebSocket lifecycle. PrivacySpanProcessor strips all sensitive attributes. Export via OTel Collector to Honeycomb EU.
+- **Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects trace IDs into Pino stdout output. Errors are attached to spans via `span.recordException()`, not shipped as log signals. No `LoggerProvider` configured — no log pipeline exists.
 - **Clients (desktop, mobile):** No instrumentation. A single `X-Vex-Client` header on existing HTTP requests provides client type and version.
-- **Pino logging:** Retained for local development and stdout in production (for operators who self-host and want local logs). Never shipped to a third-party service. No change to existing Pino configuration.
+- **Pino logging:** Retained for local development and stdout in production (for operators who self-host and want local logs). Never shipped to a third-party service. Enriched with `trace_id` and `span_id` for local log-trace correlation.
 
 ## Rationale
 
