@@ -93,7 +93,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 
 ### Pain Points
 
-- **Race condition.** `POST /invite/:id/join` is not transactional (story `invite-atomicity` in roadmap). Concurrent joins can create duplicate permissions.
+- ~~**Race condition.**~~ Fixed — `POST /invite/:id/join` now wraps `isInviteValid`, `hasPermission`, and `createPermission` in a single Kysely transaction.
 - **No deep-link on mobile.** Mobile app doesn't handle `vex://` URLs yet.
 - **No invite preview UI.** Both old and new desktop clients auto-join without showing the server name first.
 
@@ -116,7 +116,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 | Component | Old | New |
 |-----------|-----|-----|
 | Backend | `POST /mail` with `group` field | Same — `saveMail()` stores group channelID |
-| Client SDK | `client.messages.group(channelID, message)` — fans out to ALL devices of ALL channel members | `client.sendMail(..., { group: channelID })` — sends to one device only |
+| Client SDK | `client.messages.group(channelID, message)` — fans out to ALL devices of ALL channel members | `client.sendMail(..., { group: channelID })` — sends to one device per call; app loops over devices with `Promise.allSettled` |
 | Desktop UI | Fully working (sends + renders in `ServerPane.tsx`) | `ServerChannel.svelte` shows `console.warn('group messaging not yet wired')` |
 | Mobile UI | N/A | `ChannelScreen.tsx` has send function but marked as incomplete |
 | Member list | `POST /userList/:channelID` returns all server members | No equivalent endpoint. Backend needs `GET /server/:id/members` |
@@ -124,7 +124,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 ### Pain Points
 
 - **Not functional in new client.** This is the biggest feature gap. Users can see channels but can't post (story `group-messaging-ui` in roadmap).
-- **Fan-out complexity.** Group messages must be encrypted separately for every device of every member. The old client did this (`Promise.allSettled` over all devices). The new client sends to one device — completely broken for groups. Depends on `multi-device-fanout` (multi-device fan-out).
+- **Fan-out complexity.** Group messages must be encrypted separately for every device of every member. Multi-device fan-out is now implemented for DMs (`Promise.allSettled` over all devices). Group messaging needs a `GET /server/:id/members` endpoint to enumerate recipients.
 - **No member list endpoint.** Backend has `GET /server/:id/permissions` which returns permission objects (userID + power level), but no endpoint returning user profiles. Need a proper `GET /server/:id/members` that joins permissions with user profiles (tracked in `group-messaging-ui`).
 
 ---
@@ -273,11 +273,11 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 |-------|------------|------------|
 | **Trigger** | Click logout in menu | Click logout in UserMenu |
 | **Server** | `POST /goodbye` → server sets expired JWT cookie | `client.logout()` → same |
-| **Client cleanup** | Closes WebSocket, resets ALL Redux slices (12 reset calls), optionally clears keyfile | Navigates to `/login` |
+| **Client cleanup** | Closes WebSocket, resets ALL Redux slices (12 reset calls), optionally clears keyfile | `resetAll()` clears all nanostores atoms, `clearCredentials()` removes localStorage, navigates to `/login` |
 | **Sound** | `lockFX.play()` | None |
 | **Redirect** | `/` with `?logout=true` | `/login` |
 
 ### Pain Points
 
-- **New client doesn't clear state.** Nanostores atoms retain values in memory. `clearCredentials()` only removes localStorage items. A different user logging in could momentarily see the previous user's conversations (story `logout-cleanup` in roadmap).
+- ~~**New client doesn't clear state.**~~ Fixed — `resetAll()` in `packages/store/src/reset.ts` resets all atoms to defaults. Called in `UserMenu.svelte` logout before `clearCredentials()`. `$verifiedKeys` intentionally not reset (device-scoped).
 - **No key clearing option.** Old client had `?clear=off` to preserve keys. New client doesn't offer the choice.

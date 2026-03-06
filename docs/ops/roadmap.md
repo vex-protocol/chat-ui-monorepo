@@ -14,19 +14,9 @@ High confidence in scope. Ship these first.
 
 | Priority | What | Why | Journey |
 |---|---|---|---|
-| **P0** | Multi-device fan-out | We send to `devices[0]` only. If you have two devices, one never gets the message. Fundamental regression from the old client | 4, 5, 10 |
-| **P0** | OTK ownership verification | Any authenticated user can upload OTKs to any device. An attacker can inject their key material and intercept messages. MITM on the encryption layer | 4 |
-| **P0** | Mail save error propagation | `saveMail().catch(() => {})` silently drops messages. OTK is consumed, session advanced, plaintext gone forever | 4, 5 |
 | **P1** | File attachment UI | Backend and SDK are done. Desktop needs file picker in ChatInput, inline rendering in MessageBox, upload progress | 12 |
-| **P1** | Logout state cleanup | `clearCredentials()` only removes localStorage. Nanostores atoms retain previous user's data in memory | 16 |
-| **P1** | Auth rate limiting | Only global rate limit (500/15min). Login and register need dedicated limits to prevent brute-force | 1, 2 |
 
 **Exit criteria:**
-- Messages delivered to all recipient devices
-- OTK uploads require proof of device ownership
-- Mail pipeline errors propagate visibly
-- Login/register have dedicated rate limits
-- Logout clears all in-memory state
 - Files can be sent and rendered in desktop chat
 
 ---
@@ -40,9 +30,7 @@ Confident these matter. Scope not fully defined yet. May re-order based on what 
 | Priority | What | Why | Journey | Depends on |
 |---|---|---|---|---|
 | **P0** | Local message persistence | Close the app, lose all messages. Single biggest UX regression. Old client had SQLite with at-rest encryption | 3, 4, 5 | — |
-| **P0** | Group messaging UI | Users can see channels but can't post. Backend done, UI disabled. Need member list endpoint + fan-out | 10 | Multi-device fan-out |
-| **P2** | Invite join atomicity | `POST /invite/:id/join` runs 3 separate DB calls without a transaction. Concurrent joins create duplicates | 9 | — |
-| **P2** | Message forwarding to own devices | Sender's other devices don't see messages they sent from this device | 4, 5 | Multi-device fan-out |
+| **P0** | Group messaging UI | Users can see channels but can't post. Backend done, UI disabled. Need member list endpoint | 10 | — |
 | **P2** | Device management UI | SDK has `listDevices()` but no UI for viewing, adding, or removing devices | 14 | — |
 
 **Open questions:**
@@ -91,3 +79,9 @@ Shipped. Pruned periodically.
 | packages/crypto | v0.1 |
 | packages/types | v0.1 |
 | Desktop user search UI (FamiliarsList inline search) | v0.1 |
+| Multi-device fan-out (send to all recipient devices + self-forwarding) | v0.2 |
+| OTK upload device ownership verification (403 for non-owner) | v0.2 |
+| Mail save error propagation (log + error frame to sender) | v0.2 |
+| Auth rate limiting (10/15min on login and register) | v0.2 |
+| Logout state cleanup (resetAll() clears all nanostores atoms) | v0.2 |
+| Invite join atomicity (wrapped in transaction) | v0.2 |

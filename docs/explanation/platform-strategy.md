@@ -8,7 +8,7 @@ Vex is a cross-platform chat application targeting desktop and mobile.
 
 | Platform | Shell | UI Framework | Notes |
 |---|---|---|---|
-| Desktop | **Tauri 2.0** | **Svelte** | Replaces the original Electron+React `vex-desktop` |
+| Desktop | **Tauri 2.0** | **Svelte** | Replaces the original Electron+React `vex-desktop` ([ADR-001](../architecture/adr-001-monorepo-consolidation.md)) |
 | Mobile | **React Native** | React Native | Best native performance for chat (scrolling, gestures, real-time) |
 
 ### Why Tauri + Svelte for desktop
@@ -103,6 +103,8 @@ nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
 | `$permissions` | `map<Record<string, IPermission>>` | bootstrap per server |
 | `$devices` | `map<Record<string, IDevice[]>>` | bootstrap (when familiars API exists) |
 | `$onlineLists` | `map<Record<string, IUser[]>>` | server channel presence events |
+| `$avatarHash` | `atom<number>` | avatar upload (cache-busting) |
+| `$verifiedKeys` | `atom<Set<string>>` | markVerified/unmarkVerified (localStorage-persisted) |
 
 **`packages/store`** — event wiring lives in `bootstrap()`:
 
@@ -130,6 +132,8 @@ export async function bootstrap(serverUrl, deviceID, deviceKey) {
   // ... waterfall HTTP fetch populates $user, $servers, $channels
 }
 ```
+
+**Logout lifecycle:** `resetAll()` (exported from `@vex-chat/store`) sets every atom back to its default value. Call it on logout before clearing localStorage credentials to prevent stale data from leaking to the next user session. `$verifiedKeys` is intentionally NOT reset — verified fingerprints are device-scoped and persist across accounts.
 
 **`apps/desktop`** — nanostores atoms are native Svelte stores (implement `.subscribe()`):
 

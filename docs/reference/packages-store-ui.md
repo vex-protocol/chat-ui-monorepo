@@ -21,9 +21,10 @@ Nanostores atoms per state slice. Wraps `VexClient` from `@vex-chat/libvex` — 
 
 ```
 packages/store/src/
-  index.ts         — barrel: all atoms + bootstrap() + $keyReplaced
+  index.ts         — barrel: all atoms + bootstrap() + resetAll() + $keyReplaced
   client.ts        — $client atom<VexClient | null>
   bootstrap.ts     — bootstrap(serverUrl, deviceID, deviceKey): create client, wire events, connect, waterfall fetch
+  reset.ts         — resetAll(): resets all atoms to defaults on logout
   user.ts          — $user atom<IUser | null>
   familiars.ts     — $familiars map (populated when familiars API exists)
   messages.ts      — $messages, $groupMessages maps (DM keyed by userID, group by channelID)
@@ -32,6 +33,8 @@ packages/store/src/
   permissions.ts   — $permissions map
   devices.ts       — $devices map
   onlineLists.ts   — $onlineLists map
+  avatarHash.ts    — $avatarHash atom<number> (cache-busting counter for avatar uploads)
+  verifiedKeys.ts  — $verifiedKeys atom<Set<string>> (localStorage-persisted) + markVerified/unmarkVerified/isVerified
 ```
 
 ### State atoms
@@ -49,6 +52,8 @@ All state is nanostores `atom()` or `map()` — plain values, no framework react
 | `$permissions` | `map<Record<string, IPermission>>` | permissionID |
 | `$devices` | `map<Record<string, IDevice[]>>` | ownerID (userID) |
 | `$onlineLists` | `map<Record<string, IUser[]>>` | channelID |
+| `$avatarHash` | `atom<number>` | — (cache-busting counter) |
+| `$verifiedKeys` | `atom<Set<string>>` | — (localStorage-persisted signKeys) |
 
 ### Wiring pattern
 
@@ -90,6 +95,10 @@ client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
 - `$permissions` — needs `GET /users/me/permissions` or per-server endpoint
 
 Error recovery: HTTP 470 (corrupt key file) → set `$keyReplaced = true` for the app to navigate to login.
+
+### Logout / state reset
+
+`resetAll()` in `reset.ts` sets every atom back to its default value. Call it on logout before clearing localStorage credentials to prevent stale data from leaking to the next user session. `$verifiedKeys` is intentionally NOT reset — verified fingerprints are device-scoped and persist across accounts.
 
 ### Svelte usage (`apps/desktop`)
 

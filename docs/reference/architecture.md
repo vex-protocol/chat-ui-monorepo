@@ -3,6 +3,8 @@
 A guide for contributors — especially backend newcomers — to understand how the pieces fit together.
 
 > **Packages layer:** For `packages/types`, `packages/crypto`, and `packages/libvex` see [`docs/packages.md`](packages.md).
+>
+> **Why this structure exists:** See [ADR-001: Monorepo Consolidation](../architecture/adr-001-monorepo-consolidation.md) for the decision to consolidate five repos into this monorepo and the rationale behind every technology choice.
 
 ---
 
@@ -394,7 +396,7 @@ This violates the privacy policy's guarantee that "the server cannot impersonate
 
 **Rule:** OTK and pre-key upload endpoints MUST verify that `req.user` owns the target device before accepting key material.
 
-**Current violation:** `POST /device/:id/otk` in `src/devices/devices.routes.ts` passes `req.user!.userID` to `saveOTKs()`, but `saveOTKs()` in `src/keys/keys.service.ts` does not verify the device belongs to that user — it inserts OTKs for any device ID.
+**Status:** Fixed. Both `POST /device/:id/otk` and `GET /device/:id/otk/count` in `src/devices/devices.routes.ts` now query the `devices` table to verify `device.owner === req.user.userID` before proceeding. Returns 403 if the device doesn't exist or belongs to another user.
 
 #### 2. Mail delivery failures must not be silent
 
@@ -404,7 +406,7 @@ Silent message loss is worse than a visible error. The user has no way to know t
 
 **Rule:** Mail save failures MUST propagate as errors to the sender. Never swallow errors in the mail pipeline.
 
-**Current violation:** `src/run.ts` line 45 — the WebSocket `onMail` handler calls `saveMail(db, result.data).catch(() => {})`, silently discarding all save errors.
+**Status:** Fixed. The `onMail` handler in `src/run.ts` now logs the error with `logger.error` (including `mailID` and `recipient`) and sends a WebSocket error frame `{ resource: 'error', error: 'mail_save_failed', mailID }` back to the sender device.
 
 #### 3. Invite join must be atomic
 
@@ -412,7 +414,7 @@ Server membership grants access to group channels and their encrypted message st
 
 **Rule:** The invite validation → membership check → permission creation sequence MUST run inside a database transaction.
 
-**Current violation:** `POST /invite/:inviteID/join` in `src/servers/servers.routes.ts` performs three separate DB calls (`isInviteValid`, `hasPermission`, `createPermission`) without a transaction. Concurrent requests can bypass the membership check.
+**Status:** Fixed. `POST /invite/:inviteID/join` in `src/servers/servers.routes.ts` now wraps all three queries (`isInviteValid`, `hasPermission`, `createPermission`) inside `db.transaction().execute()`, passing `trx` to each service function.
 
 #### 4. Auth endpoints must have stricter rate limits
 
@@ -420,7 +422,7 @@ Login and registration endpoints are the only routes that accept passwords. The 
 
 **Rule:** Auth endpoints (`POST /auth`, `POST /register`) MUST have a separate, tighter rate limit (e.g., 10 attempts per 15 minutes) applied at the router level, on top of the global limit.
 
-**Current violation:** `src/app.ts` applies only `globalRateLimit` (500/15min). `src/auth/auth.routes.ts` has no `authRateLimit` middleware. The architecture doc's middleware order section already specifies this should exist — it was never implemented.
+**Status:** Fixed. `src/auth/auth.routes.ts` now creates a per-router `authRateLimit` (10 requests per 15 minutes, `express-rate-limit`) applied to both `POST /register` and `POST /auth`. Instantiated inside `createAuthRouter()` to avoid shared state across test environments.
 
 ### What the server must NOT enforce (anti-patterns)
 
