@@ -14,9 +14,69 @@ Two approaches exist:
 
 **Option B: Distributed tracing via OpenTelemetry.** Replace log-based observability with OTel traces and metrics. Use a PrivacySpanProcessor to strip sensitive data in-process. Export sanitised spans to Honeycomb. Define SLOs on trace data. Keep Pino only for local development — never ship logs to a third party.
 
-### The privacy problem with logs
+### What logging looked like in old Spire
 
-Pino already redacts `req.headers.authorization`, `req.headers.cookie`, `password`, `passwordHash`, `token`, `accessToken`, `refreshToken`, `secret`, and `apiKey` (see `utils/logger.ts`). But structured logs still contain:
+The original Spire server (pre-monorepo, `~/Public/spire/`) used Winston + Morgan with no meaningful privacy controls. An audit of that codebase reveals what happens when logging is the primary observability tool in a privacy-focused app: **it silently becomes a surveillance system.**
+
+**Action tokens logged in plaintext** (`Spire.ts:153, 293`):
+```
+this.log.info("Validating token: " + key);
+this.log.info("New token created: " + token.key);
+```
+Full UUID tokens used for registration, file uploads, and device connections — written to `vex:spire.log` on disk. An attacker with read access to log files could reuse these tokens for privilege escalation.
+
+**User details dumped on every WebSocket connection** (`Spire.ts:203`):
+```
+this.log.info(JSON.stringify(userDetails));
+```
+User IDs, usernames, and lastSeen timestamps written to disk every time a client connected.
+
+**Message recipient device IDs logged** (`Spire.ts:358`, `ClientManager.ts:281`):
+```
+this.log.info("Received mail for " + mail.recipient);
+```
+Reveals the communication graph — who is messaging whom — in plaintext log files.
+
+**Raw error stack traces sent to clients** (`server/index.ts:338, 429, 462, 506, 552, 588`):
+```
+res.status(500).send(err.toString());
+```
+Internal paths, database error messages, library versions exposed in HTTP responses. Six separate locations.
+
+**Morgan HTTP logging with no redaction** (`server/index.ts:142`):
+```
+api.use(morgan("dev", { stream: process.stdout }));
+```
+Every request logged with full URL path (containing user IDs, device IDs), no filtering.
+
+**Log files written to disk unencrypted:**
+- `vex:spire.log` — all server activity including tokens and user details
+- `vex:spire-db.log` — all database operations
+- `vex:client-manager.log` — all WebSocket connections with token validation
+
+None of these log files had any access controls, encryption, rotation, or retention policy.
+
+### What an attacker would find on a compromised old Spire server
+
+If someone gained read access to the old server — even without database access — the log files alone would expose:
+
+| Data | Location | Impact |
+|---|---|---|
+| Action tokens (registration, file upload, device connect) | `vex:spire.log` | Impersonate users, escalate privileges |
+| Communication graph (who messaged whom) | `vex:spire.log` | Metadata surveillance — the thing E2E encryption is supposed to prevent |
+| User IDs + usernames + last seen timestamps | `vex:spire.log`, `vex:client-manager.log` | Full user directory with activity patterns |
+| Internal error details + stack traces | `vex:spire.log` | Reveal code paths, library versions, database schema for further exploitation |
+| HTTP request URLs with embedded IDs | stdout (Morgan) | Device IDs, user IDs in every request path |
+
+With database access, an attacker additionally gets: all public key material (preKeys, OTKs, signKeys), password hashes (PBKDF2 with only 1,000 iterations — crackable), all message metadata (sender, recipient, timestamps, group info), the server private signing key (SPK) from environment variables, and all uploaded files (avatars named by userID, files by UUID).
+
+**The message ciphertext itself was protected by E2E encryption.** But the metadata — who communicated with whom, when, how often, from which devices — was fully exposed in plaintext log files. For a privacy-focused app, this is the critical failure: E2E encryption protects content, but uncontrolled logging leaks the metadata that intelligence agencies actually care about.
+
+### The new Spire already improved logging
+
+The rewritten Spire (current monorepo) uses Pino with explicit redaction of `req.headers.authorization`, `req.headers.cookie`, `password`, `passwordHash`, `token`, `accessToken`, `refreshToken`, `secret`, and `apiKey` (see `utils/logger.ts`). Error responses return generic messages, not stack traces. This is a significant improvement.
+
+But Pino structured HTTP logs still contain:
 
 | Field | PII Risk | Present in Pino HTTP logs |
 |---|---|---|
@@ -26,9 +86,9 @@ Pino already redacts `req.headers.authorization`, `req.headers.cookie`, `passwor
 | `res.statusCode` | None | Yes |
 | `responseTime` | None | Yes |
 
-If we ship these logs to any third party, we leak user metadata. If we self-host a log aggregator, we take on significant operational burden (Loki + Grafana, or ELK) for a 2-person team.
+The deny-list approach (redact known-bad fields) is better than nothing, but it fails open — any field not on the list passes through. A developer adding `logger.info({ deviceId, action: 'otk_consumed' })` in a new feature inadvertently leaks device identity. The old Spire proves this isn't hypothetical — every `log.info()` call was a data leak waiting to happen.
 
-We could redact logs more aggressively, but then they lose diagnostic value — a log line that says `GET /[REDACTED] 500 42ms` from `[REDACTED]` is useless for debugging.
+If we ship these logs to any third party, we leak user metadata. If we self-host a log aggregator, we take on significant operational burden (Loki + Grafana, or ELK) for a 2-person team. If we redact logs more aggressively, they lose diagnostic value — `GET /[REDACTED] 500 42ms` from `[REDACTED]` is useless for debugging.
 
 ### The tracing advantage
 
@@ -86,15 +146,17 @@ Adopt OpenTelemetry tracing as the primary observability mechanism. Do not ship 
 
 ## Rationale
 
-1. **Privacy by architecture, not policy.** Tracing with an allow-list of 13 attributes is structurally safer than log redaction with a deny-list that must anticipate every possible sensitive field. Allow-lists fail closed. Deny-lists fail open.
+1. **Privacy by architecture, not policy.** Tracing with an allow-list of 13 attributes is structurally safer than log redaction with a deny-list that must anticipate every possible sensitive field. Allow-lists fail closed. Deny-lists fail open. The old Spire proves what happens with deny-lists: developers write `log.info("Received mail for " + mail.recipient)` and nobody catches it because the deny-list doesn't know about `recipient`. With an allow-list, that data never exists in the first place.
 
-2. **Observability without surveillance.** We know *that* a message was delivered (boolean), *how many* devices received it (count), and *which client version* sent it (string). We never know who sent it, who received it, or what it contained. This is sufficient for SLO calculation and regression detection.
+2. **Logs are a liability on disk.** The old Spire wrote `vex:spire.log`, `vex:spire-db.log`, and `vex:client-manager.log` to disk unencrypted with no rotation or retention policy. These files contained action tokens, user details, and communication metadata. A server compromise didn't require accessing the database — the log files were a complete surveillance record. OTel tracing produces no files on disk. Spans are exported over OTLP and never persisted locally.
 
-3. **SLOs are first-class.** Honeycomb defines SLOs directly on span attributes. No log parsing, no regex extraction, no intermediate metrics pipeline. The SLI is `vex.mail.delivered == true` as a percentage of all `vex.mail.fanout` spans.
+3. **Observability without surveillance.** We know *that* a message was delivered (boolean), *how many* devices received it (count), and *which client version* sent it (string). We never know who sent it, who received it, or what it contained. Compare this to what the old Spire's logs contained: the full communication graph, user identities, and reusable authentication tokens.
 
-4. **Signal-grade client privacy.** Signal uses zero analytics SDKs. We match that. The `X-Vex-Client` header is less invasive than what HTTP already exposes (User-Agent) — and we strip User-Agent before export.
+4. **SLOs are first-class.** Honeycomb defines SLOs directly on span attributes. No log parsing, no regex extraction, no intermediate metrics pipeline. The SLI is `vex.mail.delivered == true` as a percentage of all `vex.mail.fanout` spans.
 
-5. **Operational simplicity.** A 2-person team cannot operate a self-hosted log aggregator (Loki/ELK) alongside a tracing backend. Honeycomb Pro at $83/month replaces both, and the OTel Collector runs as a single sidecar process.
+5. **Signal-grade client privacy.** Signal uses zero analytics SDKs. We match that. The `X-Vex-Client` header is less invasive than what HTTP already exposes (User-Agent) — and we strip User-Agent before export.
+
+6. **Operational simplicity.** A 2-person team cannot operate a self-hosted log aggregator (Loki/ELK) alongside a tracing backend. Honeycomb Pro at $83/month replaces both, and the OTel Collector runs as a single sidecar process.
 
 ## Trade-offs
 
@@ -124,7 +186,7 @@ Adopt OpenTelemetry tracing as the primary observability mechanism. Do not ship 
 
 - Privacy claim is architecturally defensible. "We collect 13 operational attributes, zero user identifiers" is auditable and verifiable.
 - SLOs are enforced from day one with burn rate alerts, not aspirational dashboard numbers.
-- No "we forgot to redact X in the logs" incidents. The allow-list prevents collection of anything not explicitly listed.
+- No "we forgot to redact X in the logs" incidents. The old Spire had at least 6 locations where sensitive data was logged without anyone noticing. The allow-list makes this category of bug impossible — data not on the list never exists in the telemetry pipeline.
 - Client privacy matches Signal's standard — zero telemetry SDKs, user-initiated crash reports only.
 
 ### Negative
