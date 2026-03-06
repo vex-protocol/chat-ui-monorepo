@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [svelte()],
   // Tauri expects a fixed port and doesn't need the browser to open
   server: {
-    port: 5173,
+    port: 5180,
     strictPort: true,
   },
   // Hide native browser env APIs from Tauri frontend
