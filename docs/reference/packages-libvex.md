@@ -78,7 +78,7 @@ packages/libvex/src/
   session.ts       — SessionManager: in-memory session key cache, X3DH encrypt/decrypt
   auth.ts          — register(), login(), logout(), whoami(), getToken()
   mail.ts          — sendMailEncrypted(http, session, content, meta), fetchInboxDecrypted(), mail() async iterator
-  devices.ts       — listDevices(), fetchKeyBundle()
+  devices.ts       — listDevices(), deleteDevice(), fetchKeyBundle()
   servers.ts       — createServer(), listServers(), createChannel()
   http.ts          — typed fetch wrapper: get/post/delete
   iterators.ts     — fromEvent(): EventEmitter → AsyncIterable
@@ -113,6 +113,7 @@ class VexClient extends EventEmitter<VexEvents> {
 
   // Devices
   async listDevices(userID: string): Promise<IDevice[]>
+  async deleteDevice(userID: string, deviceID: string): Promise<void>
   async fetchKeyBundle(deviceID: string): Promise<IKeyBundle>
 
   // Servers

@@ -311,6 +311,7 @@ WS → VexClient ("mail" event)
 | Notifications | ✓ Done (Tauri notifications + tray badge) |
 | Settings / key storage | Partial — key storage done; settings screen exists |
 | File / image attachments | ✓ Done (ChatInput file picker + preview, MessageBox inline images + download links, mailType/extra metadata) |
+| Device management (list, delete) | ✓ Done (Settings section, DELETE route + SDK method) |
 | Session fingerprint verification | — Not started |
 | System tray | ✓ Done (macOS tray, restore from minimized) |
 | Deep links (vex://) | — Not started |
