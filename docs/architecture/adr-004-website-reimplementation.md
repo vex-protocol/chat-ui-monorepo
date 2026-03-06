@@ -76,8 +76,8 @@ apps/website/
 |---|---|
 | **SvelteKit** | Already used for desktop app — shared knowledge. Static adapter prerenders everything to HTML at build time. File-based routing eliminates boilerplate. |
 | **Static adapter (primary)** | Marketing pages prerendered to static HTML — fast, indexable, cacheable. Zero JS required for content pages. |
-| **Server route for `/invite/[id]`** | The one dynamic route. Fetches invite metadata at request time, injects OG meta tags into the HTML `<head>` so link previews work on Discord, Slack, iMessage, Twitter. Runs as a Vercel serverless function. |
-| **Vercel** | Already our host. Serverless functions for the invite route. Custom headers via `vercel.json`. Edge network, custom domain, preview deployments on PR. Free tier covers our traffic. |
+| **Server route for `/invite/[id]`** | The one dynamic route. Fetches invite metadata at request time, injects OG meta tags into the HTML `<head>` so link previews work on Discord, Slack, iMessage, Twitter. You write a single `+page.server.ts` file — SvelteKit runs it on the dev server locally, and the Vercel adapter packages it as a serverless function in production. Same code, same behavior, no separate function config. |
+| **Vercel** | Already our host. The adapter is a packaging step, not a runtime abstraction — it takes the SvelteKit app and bundles it for Vercel's infrastructure. Custom headers via `vercel.json`. Edge network, custom domain, preview deployments on PR. Free tier covers our traffic. |
 | **Tailwind CSS** | Already in the monorepo. Utility-first, small bundle, no Sass/Bulma dependency. |
 
 ### SEO implementation
@@ -147,6 +147,25 @@ export async function load({ params, fetch }) {
   };
 }
 ```
+
+### Dev/prod parity
+
+SvelteKit eliminates the "works locally, breaks in production" problem. There is no separate serverless framework, no Lambda config, no API Gateway. You write standard SvelteKit code and the adapter handles deployment packaging.
+
+```
+Local dev:     SvelteKit dev server runs +page.server.ts directly
+                → pnpm dev starts the whole site on localhost:5173
+                → API_URL=http://localhost:16777 (local Spire)
+
+Vercel prod:   adapter-vercel wraps the same +page.server.ts as a serverless function
+                → Static pages served from CDN
+                → Dynamic routes (/invite/[id]) run as functions on each request
+                → API_URL=https://api.vex.wtf
+
+Same code, same load functions, same behavior. The only config difference is the API URL environment variable.
+```
+
+Marketing pages (home, security, download, privacy, about) are prerendered at build time — they become static HTML files regardless of environment. The invite route is the only page that runs server-side on each request, and even that is just a standard SvelteKit load function.
 
 ### Content pages that drive organic traffic
 
@@ -228,7 +247,7 @@ export async function load({ params, fetch }) {
 ### Negative
 
 - **Navigation port effort.** The lateral+vertical navigation engine (AppNavigator, wheel debouncing, touch gestures, keyboard handlers, route indicators) must be rewritten from React to Svelte. The logic is portable but the component APIs differ.
-- **Invite route requires serverless function.** The invite page can't be fully prerendered because invite data is dynamic. Vercel serverless functions handle this, but it's a runtime dependency.
+- **Invite route is dynamic, not static.** The invite page can't be prerendered because invite data changes per request. In dev, SvelteKit's dev server runs the `+page.server.ts` load function directly. In production, the Vercel adapter packages the same file as a serverless function. The only difference between environments is the `API_URL` — locally it points to `localhost:16777` (Spire), in prod it points to `api.vex.wtf`.
 - **Procedural visuals port.** WitchyOrbs, procedural image generation, and animated hero need Svelte equivalents. react-spring animations become Svelte transitions or CSS animations.
 
 ### Mitigation
