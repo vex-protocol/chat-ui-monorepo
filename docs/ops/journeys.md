@@ -47,12 +47,14 @@ A complete comparison of what shipped in the old client versus what's available 
 - Conversation fingerprint verification
 - File upload/download (backend only)
 - User search (desktop and mobile)
+- Multi-device fan-out (sends to all recipient devices)
+- Message forwarding to sender's own devices
 
 ### Partially Ported (gaps)
 
 | Feature | What's Done | What's Missing |
 |---------|-------------|----------------|
-| Group messaging | Backend stores + delivers group mail | UI send disabled, no member list endpoint, no fan-out to all devices |
+| Group messaging | Backend stores + delivers group mail | UI send disabled, no member list endpoint |
 | File sharing | Upload/download API + SDK methods | No chat UI (picker, inline render, progress), no encryption protocol |
 | User search | Both desktop and mobile have search UI, SDK has `searchUsers()` | — |
 | Settings | Basic avatar + theme | No sound toggle, notifications, DM toggle, purge |
@@ -63,10 +65,8 @@ A complete comparison of what shipped in the old client versus what's available 
 
 | Feature | Notes |
 |---------|-------|
-| Message forwarding to own devices | Sender's other devices don't see sent messages |
 | Local message history | Old: SQLite with NaCl at-rest encryption. New: memory only |
 | Session healing | Old: auto-creates new session on HMAC failure. New: no recovery |
-| Multi-device fan-out | Old: sends to ALL recipient devices. New: first device only |
 | Custom emoji | Old: upload/render per-server. New: not implemented |
 | Sound effects | Old: 4 effects (unlock, lock, notify, error). New: none |
 | Random username generation | Old: BIP39 mnemonic. New: not implemented |

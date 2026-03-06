@@ -77,7 +77,7 @@ packages/libvex/src/
   connection.ts    — VexConnection: reconnecting-websocket + NaCl challenge handshake
   session.ts       — SessionManager: in-memory session key cache, X3DH encrypt/decrypt
   auth.ts          — register(), login(), logout(), whoami(), getToken()
-  mail.ts          — sendMail(content, recipientDeviceID), fetchInbox(), mail() async iterator
+  mail.ts          — sendMailEncrypted(http, session, content, meta), fetchInboxDecrypted(), mail() async iterator
   devices.ts       — listDevices(), fetchKeyBundle()
   servers.ts       — createServer(), listServers(), createChannel()
   http.ts          — typed fetch wrapper: get/post/delete
@@ -107,8 +107,8 @@ class VexClient extends EventEmitter<VexEvents> {
   async getToken(type: TokenType): Promise<IActionToken>
 
   // Mail — apps use DecryptedMail; IMail wire format is internal to libvex
-  async sendMail(content: string, recipientDeviceID: string): Promise<SendResult>
-  async fetchInbox(deviceID: string): Promise<DecryptedMail[]>
+  async sendMail(content: string, recipientDeviceID: string, recipientUserID: string, options?: { group?: string | null }): Promise<SendResult>
+  async fetchInbox(): Promise<DecryptedMail[]>
   mail(): AsyncIterable<DecryptedMail>   // real-time stream, decrypted
 
   // Devices
@@ -146,6 +146,12 @@ class VexClient extends EventEmitter<VexEvents> {
   }
 }
 ```
+
+---
+
+### Multi-device fan-out
+
+`sendMail()` sends to a single `recipientDeviceID`. Multi-device delivery is the app's responsibility — the desktop client (`Messaging.svelte`) calls `listDevices(targetUserID)` and loops over all devices with `Promise.allSettled`. It also forwards to the sender's own other devices (excluding the current device via `loadCredentials().deviceID`) so sent messages appear on all of the sender's devices.
 
 ---
 

@@ -171,7 +171,7 @@ Compose  →  Key Exchange (if first msg)  →  Encrypt  →  Send  →  Confirm
 |-------|-------------|---------------|-----------------|
 | **Navigate** | Clicks on a conversation or searches for user | Loads thread from `$messages[userID]` | Intentional |
 | **Compose** | Types message, presses Enter | — | Focused |
-| **Resolve device** | Invisible | `client.listDevices(targetUserID)` → picks first device | Unaware |
+| **Resolve device** | Invisible | `client.listDevices(targetUserID)` → sends to all devices via `Promise.allSettled` | Unaware |
 | **Key exchange** | Invisible (first message only) | Fetches recipient's key bundle (`POST /device/:id/keyBundle`). Performs X3DH: DH(identity, preKey) + DH(ephemeral, identity) + DH(ephemeral, preKey) [+ DH(ephemeral, OTK)]. Derives shared secret via KDF. OTK consumed server-side | Unaware |
 | **Encrypt** | Invisible | `nacl.secretbox(plaintext, nonce, sessionKey)`. Builds mail payload with cipher, nonce, header | Unaware |
 | **Send** | Invisible | `POST /mail` or WebSocket resource message. Server stores ciphertext, notifies recipient if online | Brief wait |
@@ -190,17 +190,17 @@ Compose  →  Key Exchange (if first msg)  →  Encrypt  →  Send  →  Confirm
 
 | Aspect | Old | New |
 |--------|-----|-----|
-| Multi-device delivery | Sends to ALL devices of recipient (fan-out) + forwards to sender's other devices | Sends to first device only |
+| Multi-device delivery | Sends to ALL devices of recipient (fan-out) + forwards to sender's other devices | Same — `Promise.allSettled` over all devices + forwards to sender's other devices |
 | Session management | Full double-ratchet with HMAC verification, auto-healing, and DB-persisted sessions | Each message uses fresh ephemeral keys (no persistent sessions) |
-| Message forwarding | Forwarded to sender's other devices so they see their own sent messages | Not implemented |
+| Message forwarding | Forwarded to sender's other devices so they see their own sent messages | Same — forwards to sender's other devices (excludes current device via `loadCredentials().deviceID`) |
 | Optimistic UI | Message added to outbox immediately, removed on confirm | Message only appears after server confirms |
 | File embedding | `{{name:fileID:key:mimeType}}` syntax in message body | Not implemented in UI |
 | Sound | `notifyFX` on send | None |
 
 ### Pain Points
 
-- **Single-device delivery.** New client only sends to `devices[0]`. If the recipient has two devices, one never gets the message. This is a fundamental regression from the old client (story `multi-device-fanout` in roadmap).
-- **No message forwarding.** Sender's other devices don't see messages they sent from this device (tracked in `multi-device-fanout`).
+- ~~**Single-device delivery.**~~ Fixed — sends to all recipient devices via `Promise.allSettled`.
+- ~~**No message forwarding.**~~ Fixed — forwards to sender's other devices.
 - **No optimistic UI.** Message doesn't appear until server confirms, making the app feel slow.
 - **No retry on failure.** Old client could auto-heal broken sessions. New client just shows an error.
 

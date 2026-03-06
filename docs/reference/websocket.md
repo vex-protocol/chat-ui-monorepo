@@ -98,6 +98,26 @@ Why 15? Kysely's SqliteDialect over better-sqlite3 (synchronous driver) wraps re
 
 ---
 
+## Server-to-Client Error Frames
+
+When the server fails to process a client action, it sends an error frame back over the WebSocket so the client can surface the failure.
+
+### Mail save failure
+
+Sent when `saveMail()` throws (DB insert error). The OTK was consumed and the session advanced, so the message is unrecoverable — the client should notify the user and allow retry.
+
+```json
+{
+  "resource": "error",
+  "error": "mail_save_failed",
+  "mailID": "uuid-of-the-failed-message"
+}
+```
+
+The server also logs the error with `logger.error` (includes `mailID` and `recipient` for debugging).
+
+---
+
 ## Backpressure (Deferred)
 
 The current `send()` implementation calls `ws.send(data)` unconditionally. This is fine at low volume. Under sustained load with slow or stalled clients, data accumulates in the TCP send buffer and memory grows without bound.
