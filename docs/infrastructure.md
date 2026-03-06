@@ -393,3 +393,7 @@ When the provider changes prices, update one YAML file. Version it in git. Revie
 | Unlimited bandwidth | **OVHcloud** | Zero egress fees, speed-capped |
 | Best developer experience | **DigitalOcean** | Best API, best Terraform, best docs |
 | Most global coverage (established) | **Linode/Akamai** | Akamai edge network, 16+ DCs, mature |
+
+---
+
+See also: [scalability.md](scalability.md) for the SQLite → Postgres scaling path, [config.md](config.md) for environment variable setup.

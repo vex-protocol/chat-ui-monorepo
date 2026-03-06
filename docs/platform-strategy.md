@@ -174,3 +174,7 @@ const messages = useStore($messages)
 | — | `apps/mobile` (React Native) | New — mobile client |
 | — | `packages/ui` (Mitosis) | New — shared design primitives |
 | — | `packages/store` | New — framework-agnostic state |
+
+---
+
+See also: [packages.md](packages.md) for package APIs and dependency graph, [design-system.md](design-system.md) for the Mitosis component pipeline, [desktop-reimplementation.md](desktop-reimplementation.md) for the Electron → Tauri migration.

@@ -122,3 +122,7 @@ When building mail delivery, revisit:
 | Unhandled rejections | ✅ `.catch(() => ws.close())` boundary on async handler |
 | Backpressure | ⏳ Deferred — needed before production under load |
 | Cross-site WebSocket hijacking | ⏳ Validate `Origin` header in the HTTP upgrade handler (in `server.ts`) |
+
+---
+
+See also: [architecture.md](architecture.md) for the auth model and middleware order, [auth-comparison.md](auth-comparison.md) for NaCl challenge-response design, [vex-overview.md](vex-overview.md) for the WS protocol overview.

@@ -495,3 +495,7 @@ Read in this order:
 10. `docs/websocket.md` — WS connection lifecycle, auth handshake, async handler pattern
 11. `src/db/types.ts` — all 11 database tables
 12. `src/devices/devices.service.ts` + `src/devices/devices.schemas.ts` — the most complete implemented module, good pattern reference
+
+---
+
+See also: [packages.md](packages.md) for the shared packages dependency graph, [testing-strategy.md](testing-strategy.md) for test patterns, [vex-overview.md](vex-overview.md) for the cryptographic protocol.

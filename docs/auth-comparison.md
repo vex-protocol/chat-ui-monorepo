@@ -312,3 +312,7 @@ sweep.unref()
 - **`.unref()`** is critical: without it, the `setInterval` timer keeps the Node.js process alive even after all other async work is done. This causes test suites to hang indefinitely waiting for the timer to fire. `unref()` tells Node.js it can exit naturally even if this timer is still pending.
 
 The sweep should **always stay**. It has no meaningful overhead (a Map iteration every 5 minutes) and prevents a class of memory exhaustion that the upstream left unaddressed. It also makes the server safer to run under load without a rate limiter on token-issuing endpoints.
+
+---
+
+See also: [vex-overview.md](vex-overview.md) for the cryptographic protocol, [architecture.md](architecture.md) for security invariants, [glossary.md](glossary.md) for term definitions.

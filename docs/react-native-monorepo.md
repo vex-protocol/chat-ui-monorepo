@@ -308,3 +308,7 @@ After adding the dependency, run `pod install` — the package includes a native
 - **`react-native-monorepo-config`** — optional Callstack helper that wraps Metro config. Not used here; the manual config above is simpler and more transparent.
 - **`disableHierarchicalLookup`** — commonly found in old guides, breaks pnpm.
 - **`@nanostores/svelte`** — does not exist on npm. Svelte apps use nanostores atoms natively via `.subscribe()`.
+
+---
+
+See also: [platform-strategy.md](platform-strategy.md) for the cross-platform architecture, [packages-store-ui.md](packages-store-ui.md) for nanostores atoms and `@nanostores/react` binding.

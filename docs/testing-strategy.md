@@ -407,3 +407,7 @@ Usage in tests:
 ```ts
 import { useDb } from '#test/helpers/db.js'
 ```
+
+---
+
+See also: [architecture.md](architecture.md) for layer rules and file naming, [config.md](config.md) for env validation patterns, [logging.md](logging.md) for testing pino output.
