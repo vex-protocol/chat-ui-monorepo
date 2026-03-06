@@ -155,15 +155,17 @@ pnpm --filter @vex-chat/website dev
 ### Build + preview (production)
 
 ```bash
-pnpm --filter @vex-chat/website build
-pnpm --filter @vex-chat/website preview
+pnpm --filter @vex-chat/website build && pnpm --filter @vex-chat/website preview
 ```
 
 Run Lighthouse against the preview URL (not dev server) for accurate performance scores. The dev server serves unminified, unbundled JS.
 
 ### SEO testing
 
-1. Build and preview: `pnpm build && pnpm preview`
+1. Build and preview:
+   ```bash
+   pnpm --filter @vex-chat/website build && pnpm --filter @vex-chat/website preview
+   ```
 2. Open Chrome DevTools → Lighthouse tab
 3. Run audit against `http://localhost:4173`
 4. Check: Performance, Accessibility, SEO scores
