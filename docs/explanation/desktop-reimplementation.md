@@ -1,6 +1,6 @@
 # Desktop App: Upstream vs. Reimplementation
 
-Comparison of the original [`vex-desktop`](https://github.com/vex-chat/vex-desktop) (Electron 28 + React) against the new `apps/desktop` (Tauri 2 + Svelte) in this monorepo.
+Comparison of the original [`vex-desktop`](https://github.com/vex-chat/vex-desktop) (Electron 28 + React) against the new `apps/desktop` (Tauri 2 + Svelte) in this monorepo. For the broader decision to consolidate all repos and reimplement, see [ADR-001](../architecture/adr-001-monorepo-consolidation.md).
 
 ---
 
