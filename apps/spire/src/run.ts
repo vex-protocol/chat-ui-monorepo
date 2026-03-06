@@ -35,14 +35,21 @@ const tokenStore = createTokenStore()
 
 // Create connManager before createApp so we can pass sendToDevice into the HTTP mail route
 const connManager = createConnectionManager({
-  onMail: (_senderDeviceID, payload) => {
+  onMail: (senderDeviceID, payload) => {
     const result = MailPayloadSchema.safeParse(payload)
     if (!result.success) return
     saveMail(db, result.data)
       .then(() => {
         connManager.send(result.data.recipient, JSON.stringify({ resource: 'mail', ...result.data }))
       })
-      .catch(() => {})
+      .catch((err) => {
+        logger.error({ err, mailID: result.data.mailID, recipient: result.data.recipient }, 'saveMail failed — message dropped')
+        connManager.send(senderDeviceID, JSON.stringify({
+          resource: 'error',
+          error: 'mail_save_failed',
+          mailID: result.data.mailID,
+        }))
+      })
   },
 })
 
