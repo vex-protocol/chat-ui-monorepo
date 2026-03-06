@@ -130,6 +130,8 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | Doc | What it covers |
 |---|---|
 | [`adr-001-monorepo-consolidation.md`](docs/architecture/adr-001-monorepo-consolidation.md) | Why five repos became one monorepo, every technology replacement, trade-offs accepted |
+| [`adr-002-agpl-selective-publishing.md`](docs/architecture/adr-002-agpl-selective-publishing.md) | AGPL v3 licensing with selective publishing |
+| [`adr-003-tracing-over-logging.md`](docs/architecture/adr-003-tracing-over-logging.md) | Why OTel tracing instead of log shipping — privacy-first observability with 13 attributes and zero PII |
 
 **`docs/explanation/`** — why decisions were made, strategy and rationale
 

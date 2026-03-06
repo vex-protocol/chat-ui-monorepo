@@ -145,6 +145,8 @@ Vex is an E2E encrypted chat app built by people who don't trust third parties w
 | `vex.ws.event` | Custom span | WebSocket lifecycle event type (connect, auth, disconnect) — no payload |
 | `vex.keys.bundle_ok` | Custom span | Key bundle assembly success/failure — boolean, no key material |
 | `vex.keys.otk_remaining` | Custom metric | OTK pool depth — count, no device identity |
+| `vex.client.type` | `X-Vex-Client` header | Client platform (desktop, mobile) — for per-platform SLI breakdown |
+| `vex.client.version` | `X-Vex-Client` header | Client version (e.g., 0.3.1) — correlate regressions to releases |
 
 #### What We Explicitly Do NOT Collect
 
@@ -163,7 +165,24 @@ Vex is an E2E encrypted chat app built by people who don't trust third parties w
 | User IDs, device IDs | Not collected by default | **Never add as span attributes** | Correlatable to specific users |
 | Message IDs, conversation IDs | Not collected by default | **Never add as span attributes** | Correlatable to specific conversations |
 
-**The principle:** We know *that* a message was delivered (boolean). We know *how many* devices received it (count). We never know *who* sent it, *who* received it, or *what* it contained.
+**The principle:** We know *that* a message was delivered (boolean). We know *how many* devices received it (count). We know *which client version* sent it (string). We never know *who* sent it, *who* received it, or *what* it contained.
+
+#### Client-Side: No Instrumentation
+
+We do not instrument the clients. No analytics SDKs, no crash reporting libraries, no telemetry beacons. This is the same approach Signal takes — they use zero analytics SDKs and rely on manual, user-initiated debug log submission.
+
+The server already sees every HTTP request and WebSocket connection. The only client-originated data we add is a single header (`X-Vex-Client: desktop/0.3.1`) sent on requests the client already makes. This rides on existing traffic — no new network requests, no phoning home.
+
+What this gives us:
+- If desktop v0.3.1 has a key exchange bug, server spans show `vex.client.version: 0.3.1` correlated with `vex.keys.bundle_ok: false`
+- If mobile has worse delivery rates than desktop, per-platform SLI breakdown reveals it
+- "Should we force-update old clients?" becomes data-driven
+
+What this does NOT do:
+- No user identity (not tied to any user or device ID)
+- No device fingerprinting (no OS version, screen size, locale)
+- No usage analytics (no feature tracking, session duration, screen views)
+- No crash reporting (users submit debug logs voluntarily, like Signal)
 
 #### Defence in Depth
 
