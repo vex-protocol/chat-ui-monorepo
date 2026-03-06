@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { stringify as uuidStringify } from 'uuid'
 import { decodeJwt } from 'jose'
+import rateLimit from 'express-rate-limit'
 import type { Kysely } from 'kysely'
 import type { Database } from '#db/types.ts'
 import { registerUser, loginUser } from '#auth/auth.service.ts'
@@ -37,7 +38,14 @@ export function createAuthRouter(
   const checkAuth: RequestHandler = createCheckAuth(jwtSecret)
   const router = Router()
 
-  router.post('/register', validateBody(RegistrationPayloadSchema), async (req, res, next) => {
+  const authRateLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+  })
+
+  router.post('/register', authRateLimit, validateBody(RegistrationPayloadSchema), async (req, res, next) => {
     try {
       const signedBytes = decodeHex(req.body.signed)
       const signKeyBytes = decodeHex(req.body.signKey)
@@ -58,7 +66,7 @@ export function createAuthRouter(
     }
   })
 
-  router.post('/auth', validateBody(LoginBodySchema), async (req, res, next) => {
+  router.post('/auth', authRateLimit, validateBody(LoginBodySchema), async (req, res, next) => {
     try {
       const jwt = await loginUser(db, req.body.username, req.body.password, jwtSecret)
       if (!jwt) return next(new AuthError('Invalid credentials'))
