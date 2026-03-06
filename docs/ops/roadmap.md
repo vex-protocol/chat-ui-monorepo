@@ -41,7 +41,6 @@ Confident these matter. Scope not fully defined yet. May re-order based on what 
 |---|---|---|---|---|
 | **P0** | Local message persistence | Close the app, lose all messages. Single biggest UX regression. Old client had SQLite with at-rest encryption | 3, 4, 5 | — |
 | **P0** | Group messaging UI | Users can see channels but can't post. Backend done, UI disabled. Need member list endpoint + fan-out | 10 | Multi-device fan-out |
-| **P1** | Desktop user search | Desktop requires knowing a userID to message someone. Mobile already has search | 6 | — |
 | **P2** | Invite join atomicity | `POST /invite/:id/join` runs 3 separate DB calls without a transaction. Concurrent joins create duplicates | 9 | — |
 | **P2** | Message forwarding to own devices | Sender's other devices don't see messages they sent from this device | 4, 5 | Multi-device fan-out |
 | **P2** | Device management UI | SDK has `listDevices()` but no UI for viewing, adding, or removing devices | 14 | — |
@@ -91,3 +90,4 @@ Shipped. Pruned periodically.
 | Mail + keys HTTP routes and WS delivery | v0.1 |
 | packages/crypto | v0.1 |
 | packages/types | v0.1 |
+| Desktop user search UI (FamiliarsList inline search) | v0.1 |
