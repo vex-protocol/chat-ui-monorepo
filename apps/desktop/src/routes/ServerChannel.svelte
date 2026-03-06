@@ -1,6 +1,5 @@
 <script lang="ts">
   // Route: /server/:serverID/:channelID
-  import { onMount } from 'svelte'
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
   import { groupMessages, client, channels } from '../lib/store/index.js'
@@ -16,10 +15,6 @@
 
   let sending = $state(false)
   let sendError = $state('')
-
-  onMount(() => {
-    $client?.fetchInbox().catch(console.error)
-  })
 
   async function handleSend(content: string) {
     if (!$client || sending) return
