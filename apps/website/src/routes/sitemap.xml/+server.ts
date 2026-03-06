@@ -6,6 +6,11 @@ const pages = [
 	{ path: '/download', priority: '0.8', changefreq: 'weekly' },
 	{ path: '/privacy', priority: '0.5', changefreq: 'monthly' },
 	{ path: '/about', priority: '0.5', changefreq: 'monthly' },
+	{ path: '/vs/signal', priority: '0.8', changefreq: 'monthly' },
+	{ path: '/vs/discord', priority: '0.8', changefreq: 'monthly' },
+	{ path: '/compare/signal-vs-discord', priority: '0.7', changefreq: 'monthly' },
+	{ path: '/alternatives/signal', priority: '0.7', changefreq: 'monthly' },
+	{ path: '/alternatives/discord', priority: '0.7', changefreq: 'monthly' },
 ];
 
 export const prerender = true;

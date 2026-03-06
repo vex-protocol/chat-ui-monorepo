@@ -10,6 +10,7 @@ export const LATERAL_ROUTES: RouteDef[] = [
 	{ path: '/download', label: 'Download', sectionIds: ['download-hero', 'download-releases'] },
 	{ path: '/privacy', label: 'Privacy', sectionIds: ['privacy-hero', 'privacy-content'] },
 	{ path: '/about', label: 'About', sectionIds: ['about-hero', 'about-team'] },
+	{ path: '/compare/signal-vs-discord', label: 'Compare', sectionIds: ['compare-hero', 'compare-table', 'compare-signal', 'compare-discord', 'compare-gap', 'compare-verdict'] },
 ];
 
 export function routeIndex(pathname: string): number {

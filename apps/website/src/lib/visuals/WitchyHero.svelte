@@ -64,7 +64,7 @@
 			aria-hidden="true"
 		>
 			<div class="witchy-orb__inner">
-				<img src={orb.image} alt="" class="witchy-orb__img" />
+				<img src={orb.image} alt="" class="witchy-orb__img" width="440" height="440" loading="lazy" decoding="async" />
 			</div>
 			<div class="witchy-orb__particles" aria-hidden="true">
 				<span class="witchy-orb__particle"></span>
@@ -77,7 +77,7 @@
 	<div class="mascot-witchy-orb mascot-witchy-orb--float" style="top: 32%; left: 6%;" aria-hidden="true">
 		<div class="mascot-witchy-orb__orb" aria-hidden="true"></div>
 		<div class="mascot-witchy-orb__inner">
-			<img src={mascot} alt="" class="hero-mascot" loading="eager" decoding="async" />
+			<img src={mascot} alt="" class="hero-mascot" width="440" height="440" loading="eager" decoding="async" />
 		</div>
 		<div class="mascot-witchy-orb__particles" aria-hidden="true">
 			<span class="mascot-witchy-orb__particle"></span>

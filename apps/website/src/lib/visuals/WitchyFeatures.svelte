@@ -8,7 +8,7 @@
 	<div class="card-mascot card-mascot--logo" aria-hidden="true">
 		<div class="card-mascot__glow" aria-hidden="true"></div>
 		<div class="card-mascot__frame">
-			<img src="/orbs/vex-logo.svg" alt="" class="card-mascot__img" />
+			<img src="/orbs/vex-logo.svg" alt="" class="card-mascot__img" width="180" height="180" loading="lazy" decoding="async" />
 		</div>
 		<div class="card-mascot__particles" aria-hidden="true">
 			<span class="card-mascot__particle"></span>
