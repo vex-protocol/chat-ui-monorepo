@@ -156,6 +156,7 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | [`roadmap.md`](docs/ops/roadmap.md) | Now/Next/Later roadmap with priorities and release goals |
 | [`concepts.md`](docs/ops/concepts.md) | Story mapping methodology and glossary |
 | [`ai-agents.md`](docs/ops/ai-agents.md) | AI agent roles for a small team: PM, scrum, and chaos engineer |
+| [`reliability.md`](docs/ops/reliability.md) | SLOs, error budgets, observability (OpenTelemetry + Honeycomb) |
 
 **Recommended reading order for new contributors:**
 1. This README

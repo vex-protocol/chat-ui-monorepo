@@ -19,6 +19,7 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 | `ai-agent-pm.md` | Role: Product Manager agent |
 | `ai-agent-scrum.md` | Role: Scrum / Standup agent |
 | `ai-agent-chaos.md` | Role: Chaos Engineer agent |
+| `reliability.md` | SLOs, error budgets, observability stack (OpenTelemetry + Honeycomb), and enforcement policy |
 | `personas.md` | User archetypes (when we have research data) |
 
 ## Three Layers
@@ -56,6 +57,13 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 2. Is it strategic (P0-P1, affects core promise)? Add to `roadmap.md` under Now or Next
 3. Create a Linear issue for the technical work
 4. If it's small and tactical, just the Linear issue is fine — not everything needs a roadmap entry
+
+### Regression — "Done" item isn't actually done
+
+1. Remove from Done in `roadmap.md` and re-add to Now with a note on what broke
+2. Update the journey in `journeys.md` — the pain point is back
+3. Create a Linear issue for the fix
+4. When re-shipped, move back to Done only after validation — not just after merge
 
 ### Six-week review
 
