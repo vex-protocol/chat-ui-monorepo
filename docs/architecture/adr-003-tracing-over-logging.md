@@ -178,19 +178,20 @@ An attacker who compromises the server finds: error logs with generic messages o
 
 ### Defence in depth
 
-Even with this minimal collection, five layers prevent data leakage:
+Even with this minimal collection, four layers prevent data leakage:
 
 1. **Production log level** — `LOG_LEVEL=error` ensures Pino only writes when something breaks. Generic error messages, no user data in stdout
 2. **SDK config** — disable unnecessary instrumentations (fs, dns, net), never enable header/body capture
 3. **PrivacySpanProcessor** — strips `url.full`, `url.path`, `url.query`, `client.address`, `network.peer.address`, `user_agent.original`, `db.query.text` in-process before export
-4. **OTel Collector** — allow-list mode (`allow_all_keys: false`), fail-closed. Last gate before data leaves infrastructure
-5. **Honeycomb EU endpoint** — GDPR compliant, SOC 2 Type II, 60-day retention, encrypted at rest and in transit
+4. **Honeycomb EU endpoint** — GDPR compliant, SOC 2 Type II, 60-day retention, encrypted at rest and in transit
+
+The OTel Collector is not in the initial architecture. The SDK exports directly to Honeycomb from the single box. If added later (Phase 4), it becomes a fifth layer with allow-list mode (`allow_all_keys: false`).
 
 ## Decision
 
 Adopt OpenTelemetry tracing as the primary observability mechanism. Do not ship logs to any third party.
 
-- **Server (Spire):** OTel SDK with auto-instrumentation (HTTP, Express, Pino) + custom spans for mail delivery, key exchange, WebSocket lifecycle. PrivacySpanProcessor strips all sensitive attributes. Export via OTel Collector to Honeycomb EU.
+- **Server (Spire):** OTel SDK with auto-instrumentation (HTTP, Express, Pino) + custom spans for mail delivery, key exchange, WebSocket lifecycle. PrivacySpanProcessor strips all sensitive attributes. Export directly to Honeycomb EU from the single box — no Collector initially.
 - **Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects trace IDs into Pino stdout output. Errors are attached to spans via `span.recordException()`, not shipped as log signals. No `LoggerProvider` configured — no log pipeline exists.
 - **Clients (desktop, mobile):** No instrumentation. A single `X-Vex-Client` header on existing HTTP requests provides client type and version.
 - **Pino logging:** `LOG_LEVEL=error` in production — only errors reach stdout, with generic messages from `AppError` classes. Development uses `info` or `debug` freely. Never shipped to a third-party service. Enriched with `trace_id` and `span_id` for local log-trace correlation.

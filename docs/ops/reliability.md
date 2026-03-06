@@ -216,6 +216,32 @@ Layer 2 (PrivacySpanProcessor) is the critical one. It runs in-process and strip
 
 Layer 3 (Collector) is the safety net. Running in allow-list mode (`allow_all_keys: false`), it drops any attribute not explicitly permitted. This is fail-closed — new attributes are blocked by default.
 
+### Single-Box Architecture
+
+Our target deployment is one Linux box running Spire + SQLite. No Kubernetes, no container orchestration, no microservices. The OTel SDK exports directly to Honeycomb — no Collector process needed.
+
+```
+┌─────────────────────────────────────────────────┐
+│ Single Linux Box                                │
+│                                                 │
+│  Spire (Node.js)                                │
+│    ├── auto-instrumentation (HTTP, Express, Pino)│
+│    ├── PrivacySpanProcessor (strips PII)        │
+│    ├── runtime-node (heap, event loop, GC)      │
+│    ├── host-metrics (CPU, memory, network)      │
+│    ├── custom SQLite metrics (WAL, db size)      │
+│    └── OTLP exporter ──────────────────────────────> api.eu1.honeycomb.io
+│                                                 │
+│  SQLite (spire.db + WAL)                        │
+│                                                 │
+│  UptimeRobot ←── external ping to /health ──────│── uptimerobot.com
+└─────────────────────────────────────────────────┘
+```
+
+**Why no Collector:** For a single process exporting to a single backend, the Collector adds a process to manage with minimal benefit. The PrivacySpanProcessor already strips sensitive data in-process. If you ever need the Collector (host disk metrics, privacy gateway), add it as a systemd service and change one env var (`OTEL_EXPORTER_OTLP_ENDPOINT` from Honeycomb to `localhost:4318`). App code doesn't change.
+
+**External uptime check:** If the server is down, OTel is down too. UptimeRobot (free, 50 monitors, 5-min checks) pings `/health` from outside and alerts via Slack/email. This catches: process crash, network down, VM dead, TLS cert expired.
+
 ### OpenTelemetry Setup
 
 **Packages:**
@@ -223,12 +249,13 @@ Layer 3 (Collector) is the safety net. Running in allow-list mode (`allow_all_ke
 | Package | Purpose |
 |---|---|
 | `@opentelemetry/sdk-node` | Core SDK |
-| `@opentelemetry/auto-instrumentations-node` | Auto-instrument Express, HTTP |
+| `@opentelemetry/auto-instrumentations-node` | Auto-instrument Express, HTTP. Includes `instrumentation-runtime-node` for heap, event loop, GC metrics |
 | `@opentelemetry/sdk-trace-base` | Custom SpanProcessor (privacy layer) |
 | `@opentelemetry/sdk-metrics` | Metrics Views (attribute allow-list) |
 | `@opentelemetry/exporter-trace-otlp-http` | Export traces via OTLP |
-| `@opentelemetry/instrumentation-pino` | Inject trace_id/span_id into Pino log output (with `disableLogSending: true`) |
 | `@opentelemetry/exporter-metrics-otlp-http` | Export metrics via OTLP |
+| `@opentelemetry/instrumentation-pino` | Inject trace_id/span_id into Pino log output (with `disableLogSending: true`) |
+| `@opentelemetry/host-metrics` | CPU, memory, network metrics from the OS (runs in-process via Node's `os` module) |
 
 **Initialisation:** An `instrumentation.ts` file loads before the app via Node's `--import` flag (`node --import ./instrumentation.ts run.ts`). This ensures all auto-instrumentation hooks are registered before Express, HTTP, and the database driver are imported.
 
@@ -239,6 +266,50 @@ Layer 3 (Collector) is the safety net. Running in allow-list mode (`allow_all_ke
 **Error handling:** Errors are attached to spans, not shipped as logs. The error middleware calls `span.recordException(err)` and `span.setStatus(ERROR)` on the active span. The exception event rides with the trace through the existing pipeline. Pino still logs the error to stdout for local visibility (with trace_id auto-injected). No separate log exporter or log pipeline exists.
 
 **Production log level:** `LOG_LEVEL=error` in production. This is a security hardening measure — if an attacker compromises the server, stdout contains only generic error messages ("Not found", "Unauthorized"), not HTTP request URLs with user IDs or WebSocket connection details. Operational visibility comes from OTel spans, which are exported via OTLP and never written to the local filesystem. Development uses `info` or `debug` freely.
+
+### Host and Runtime Metrics
+
+Collected in-process alongside traces. No Collector required.
+
+**Node.js runtime** (via `instrumentation-runtime-node`, included in `auto-instrumentations-node`):
+
+| Metric | Type | Why it matters |
+|---|---|---|
+| `nodejs.eventloop.delay.p99` | Gauge | Event loop saturation — if this climbs, the server is overloaded |
+| `nodejs.eventloop.utilization` | Gauge | Ratio 0.0–1.0. Approaching 1.0 = no headroom |
+| `v8js.memory.heap.used` | Gauge | Growing over time = memory leak |
+| `v8js.gc.duration` | Histogram | Long/frequent GC pauses degrade latency |
+
+**Host** (via `@opentelemetry/host-metrics`):
+
+| Metric | Type | Why it matters |
+|---|---|---|
+| `system.cpu.utilization` | Gauge | Box-level CPU pressure |
+| `system.memory.utilization` | Gauge | Approaching 1.0 = OOM risk |
+| `process.memory.usage` | Gauge | Spire process RSS |
+
+Note: `@opentelemetry/host-metrics` does not collect disk or filesystem metrics — those require the OTel Collector's `hostmetricsreceiver`. For disk-full alerts, use a custom gauge (see SQLite metrics below) or Netdata.
+
+### SQLite Metrics
+
+No off-the-shelf OTel package provides SQLite health metrics. We build it using better-sqlite3's `.pragma()` method and the OTel metrics API.
+
+**Query duration:** Kysely's built-in `log` callback provides `queryDurationMillis` after every query. Feed this into an OTel histogram (`vex.db.query_duration`). No extra dependency needed — Kysely already has this hook.
+
+**Health metrics** (polled every 30–60 seconds via OTel observable gauges):
+
+| Metric | Source | Type | Alert threshold |
+|---|---|---|---|
+| `vex.db.size_bytes` | `fs.statSync('spire.db').size` | Gauge | Approaching disk capacity |
+| `vex.db.wal_size_bytes` | `fs.statSync('spire.db-wal').size` | Gauge | > 50 MB (checkpoint starvation) |
+| `vex.db.page_count` | `db.pragma('page_count', { simple: true })` | Gauge | Growth tracking |
+| `vex.db.freelist_count` | `db.pragma('freelist_count', { simple: true })` | Gauge | > 10% of page_count = wasted space |
+| `vex.db.busy_errors` | Increment on SQLITE_BUSY in error handler | Counter | Any occurrence |
+| `vex.disk.free_bytes` | `fs.statfsSync(dbPath)` | Gauge | < 20% free = critical |
+
+The WAL size is the most important single metric. If it grows without bound, checkpointing is failing — likely due to long-running read transactions holding the WAL open. This directly threatens data integrity.
+
+**What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Kysely's `log` callback gives us query duration without exposing query text.
 
 ### Instrumentation Points in Spire
 
@@ -342,14 +413,22 @@ The killer feature is **BubbleUp**: when a burn alert fires, Honeycomb automatic
 
 **Pricing:**
 
-| Plan | Cost | Notes |
-|---|---|---|
-| Free | $0 | 20M events/month. Queries, traces, BubbleUp. No SLO features |
-| Pro | $83/month | SLOs, burn alerts, 100 triggers. Required for error budget tracking |
+| Plan | Cost | Events/month | SLOs |
+|---|---|---|---|
+| Free | $0 | 20M | No |
+| Pro | $130/month | 100M | Yes — burn alerts, error budgets |
 
-Start on Free to build baseline data. Move to Pro when ready to enforce SLOs.
+**Event volume estimates for a single-box deployment:**
 
-**Privacy trade-off:** Honeycomb is a third-party SaaS. We accept this because: (1) the data they receive contains no user identity, no message content, no IP addresses — only operational booleans and counts; (2) the OTel Collector acts as a fail-closed privacy gateway before data leaves our infrastructure; (3) the self-hosted alternatives (SigNoz, Grafana Stack) require operating ClickHouse or Prometheus+Tempo+Loki, which is a full-time job for a 2-person team.
+| Active users | Traces/month | Metrics/month | Total | Fits Free? |
+|---|---|---|---|---|
+| 100 | ~1M | ~400K | ~1.4M | Yes |
+| 500 | ~9M | ~400K | ~9.4M | Yes |
+| 1,000 | ~18M | ~400K | ~18.4M | Borderline |
+
+Start on Free to build baseline data. The free tier covers us well into hundreds of users. Move to Pro when ready to enforce SLOs.
+
+**Privacy trade-off:** Honeycomb is a third-party SaaS. We accept this because: (1) the data they receive contains no user identity, no message content, no IP addresses — only operational booleans and counts; (2) the PrivacySpanProcessor strips sensitive attributes in-process before export; (3) the self-hosted alternatives (SigNoz, Grafana Stack) require operating ClickHouse or Prometheus+Tempo+Loki, which is a full-time job for a 2-person team.
 
 ### Self-Hosted Alternative
 
@@ -365,34 +444,43 @@ We would graduate to self-hosted only if: (a) we have more than 2 engineers, or 
 
 Skip the full Google SRE ceremony. A 2-person team needs the essentials, not the bureaucracy.
 
-### Month 1: Instrument
+### Phase 1: Instrument (day one)
 
-1. Add OpenTelemetry to Spire (Express server)
-2. Auto-instrument HTTP + Express
-3. Add custom spans for message delivery and key exchange
-4. Export to Honeycomb Free
-5. Observe. Build baseline data. Don't set targets yet
+1. Add OpenTelemetry to Spire — `instrumentation.ts` loaded via `--import`
+2. Auto-instrument HTTP + Express + Pino (trace ID injection)
+3. Add `@opentelemetry/host-metrics` for CPU/memory
+4. Add custom spans for message delivery and key exchange
+5. Add SQLite health metrics (WAL size, db size, busy errors via PRAGMA + `fs.statSync`)
+6. Export directly to Honeycomb Free — no Collector
+7. Set up UptimeRobot to ping `/health` externally
+8. Observe. Build baseline data. Don't set targets yet
 
-### Month 2: Define
+**Cost:** $0. **New processes:** 0.
 
-1. Review 30 days of data. What are the actual success rates and latencies?
+### Phase 2: Define (after 30 days of data)
+
+1. Review baseline data. What are the actual success rates and latencies?
 2. Set SLO targets based on observed performance (not aspirational numbers)
-3. Upgrade to Honeycomb Pro
+3. Upgrade to Honeycomb Pro ($130/month)
 4. Create two SLOs: message delivery success + API availability
 5. Set one burn alert: notify when budget exhausts within 24 hours
 
-### Month 3: Enforce
+### Phase 3: Enforce
 
-1. Write the error budget policy into `roadmap.md` (or reference this doc)
-2. Add burn rate alerts to Slack
-3. Run a monthly 15-minute SLO review: how much budget did we use? What caused it?
-4. First real enforcement: if budget drops below 20%, feature freeze until recovery
+1. Add burn rate alerts to Slack
+2. Run a monthly 15-minute SLO review: how much budget did we use? What caused it?
+3. First real enforcement: if budget drops below 20%, feature freeze until recovery
+
+### Phase 4: Expand (when needed)
+
+- Add OTel Collector as a systemd service for disk/filesystem metrics and privacy gateway
+- Add Netdata for local host dashboard if Honeycomb's infrastructure view is insufficient
+- Add SLIs as the product matures (latency, WebSocket, key exchange)
 
 ### Ongoing
 
 - Monthly SLO review (15 minutes)
 - Postmortem within 48 hours for any incident consuming >20% of budget
-- Add SLIs as the product matures (latency, WebSocket, key exchange)
 - Revisit targets quarterly — if you're always at 99.99%, the target is too loose and you're over-investing in reliability
 
 ---
@@ -408,19 +496,21 @@ Skip the full Google SRE ceremony. A 2-person team needs the essentials, not the
 | **Beads** | Reliability work tracked as beads like any other implementation work |
 
 ```
-OpenTelemetry (collect) ───> Honeycomb (analyse)
-                                  │
-                                  ├── SLO dashboard (budget remaining)
-                                  ├── Burn alerts (Slack/PagerDuty)
-                                  └── BubbleUp (root cause)
-                                        │
-                                        v
-                              Error budget policy triggers
-                                        │
-                              ┌─────────┼─────────┐
-                              v         v         v
-                          roadmap.md  Linear    beads
-                          (priority)  (issues)  (tasks)
+Single Box
+┌──────────────────────────────────┐
+│ Spire + OTel SDK                 │
+│   traces + metrics               │──── OTLP/HTTP ────> Honeycomb EU
+│   PrivacySpanProcessor           │                         │
+│   SQLite health (PRAGMA polls)   │                         ├── SLO dashboard
+└──────────────────────────────────┘                         ├── Burn alerts (Slack)
+                                                             └── BubbleUp (root cause)
+UptimeRobot ──── /health ping ────> Alert if down                   │
+                                                                    v
+                                                          Error budget policy
+                                                                    │
+                                                          ┌─────────┼─────────┐
+                                                          v         v         v
+                                                      roadmap.md  Linear    beads
 ```
 
 ---
