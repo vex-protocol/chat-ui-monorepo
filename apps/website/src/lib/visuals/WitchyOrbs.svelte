@@ -175,7 +175,7 @@
 			aria-hidden="true"
 		>
 			<div class="witchy-orb__inner">
-				<img src={orb.image} alt="" class="witchy-orb__img" width="440" height="440" loading="lazy" decoding="async" />
+				<img src={orb.image} alt="" class="witchy-orb__img" width="200" height="200" loading="lazy" decoding="async" />
 			</div>
 			<div class="witchy-orb__particles" aria-hidden="true">
 				<span class="witchy-orb__particle"></span>
