@@ -265,3 +265,7 @@ For faster handoff, Builder.io's **Visual Copilot** Figma plugin can convert des
 5. Publish to Storybook
 
 This accelerates the initial implementation but generated code always needs review — treat it as a starting point, not final output.
+
+---
+
+See also: [packages-store-ui.md](packages-store-ui.md) for the Mitosis file layout and Storybook architecture, [platform-strategy.md](platform-strategy.md) for how desktop and mobile consume shared components.

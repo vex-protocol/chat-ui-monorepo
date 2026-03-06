@@ -385,3 +385,7 @@ Features that existed in the old repos but are not yet in the monorepo:
 | Emoji picker | `emoji-mart` | UI component |
 | Syntax highlighting | `highlight.js` | UI component |
 | Theme customization | Configurable colors in settings | Settings UI |
+
+---
+
+See also: [desktop-reimplementation.md](desktop-reimplementation.md) for Electron → Tauri component mapping, [vex-overview.md](vex-overview.md) for the original protocol reference.

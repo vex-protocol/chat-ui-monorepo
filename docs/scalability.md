@@ -439,3 +439,7 @@ At this point (50,000+ concurrent users, heavy write load), the SQLite write ser
 | **4: Outgrow SQLite** | PostgreSQL, Redis, maybe Kubernetes | ~50,000+ | PostgreSQL + Redis |
 
 The key principle: **don't add infrastructure until you've exhausted what you have**. Every dependency you add is a dependency you have to operate, monitor, and debug at 3 AM. WhatsApp got to 500 million users on Erlang + Mnesia + FreeBSD. Signal runs on Java + Redis + DynamoDB. Telegram serves a billion users with 30 engineers. Start simple, measure, scale what's actually slow.
+
+---
+
+See also: [infrastructure.md](infrastructure.md) for provider selection, [architecture.md](architecture.md) for the current server structure, [websocket.md](websocket.md) for connection lifecycle.

@@ -154,3 +154,7 @@ it('logs with service binding', async () => {
 ```
 
 **When using transports in tests:** Do not use `transport:` options when testing — worker threads can conflict with Vitest's module isolation. Write to a sink stream directly as above. In `test/setup.ts`, `LOG_LEVEL` is set to `'silent'` which suppresses all output.
+
+---
+
+See also: [config.md](config.md) for env validation (including `LOG_LEVEL`), [testing-strategy.md](testing-strategy.md) for test setup patterns, [architecture.md](architecture.md) for middleware order.

@@ -197,14 +197,16 @@ Every doc should be primarily one of four types. Don't mix them — if a doc nee
 
 Our current docs are strong on **Reference** and **Explanation**. When adding new docs, prefer **How-to** format for anything operational.
 
+**Exception: `docs/ops/`** — The ops folder is the strategy layer and intentionally breaks Diátaxis norms. Journeys, roadmaps, and story maps are not tutorials, how-tos, references, or explanations — they are **planning artifacts** that answer "What are users doing?", "What's broken?", and "What do we build next?". They live in their own folder with their own structure (see `docs/ops/README.md`). Don't try to force them into a Diátaxis type. The ops folder is the bridge between user research and Linear issues — it exists so that engineering decisions trace back to user needs, not just technical intuition.
+
 ### Structure rules
 
 - **One h1 per file.** It's the doc title.
 - **Never skip heading levels.** h1 → h2 → h3. No h1 → h3 jumps.
-- **Keep docs under 300 lines.** If a doc grows past this, split it. `packages.md` and `journeys.md` are grandfathered but should be split when next edited.
+- **Keep docs under 300 lines.** If a doc grows past this, split it into a hub + detail files (see `packages.md` and `journeys.md` for the pattern).
 - **Every doc must be linked from README.md's Documentation table.** No orphan docs — if it's not in the index, it doesn't exist.
 - **Cross-link related docs.** Use "See also" references: `See [architecture.md](docs/architecture.md) for layer rules.`
-- **Define terms locally on first use, but don't build a glossary into every doc.** Central glossary lives in `docs/glossary.md` (when created).
+- **Define terms locally on first use, but don't build a glossary into every doc.** Central glossary lives in `docs/glossary.md`.
 
 ### What NOT to do
 

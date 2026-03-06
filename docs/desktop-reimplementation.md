@@ -349,3 +349,7 @@ WS → VexClient ("mail" event)
 | Direct messaging | Done (DMListScreen with search + familiars, ConversationScreen with send) |
 | Push notifications | — Not started |
 | Settings | Done (account info, danger zone with sign out + clear keys) |
+
+---
+
+See also: [platform-strategy.md](platform-strategy.md) for the cross-platform monorepo strategy, [migration-from-upstream.md](migration-from-upstream.md) for API mapping from original repos.

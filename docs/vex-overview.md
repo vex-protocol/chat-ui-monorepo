@@ -176,3 +176,7 @@ From the `vex-chat/privacy-policy` repo and vex.wtf:
 - **AGPL-3.0** — same license
 
 The reimplementation preserves all privacy properties of the original while modernising the codebase.
+
+---
+
+See also: [architecture.md](architecture.md) for server structure and security invariants, [auth-comparison.md](auth-comparison.md) for auth design decisions, [glossary.md](glossary.md) for term definitions.

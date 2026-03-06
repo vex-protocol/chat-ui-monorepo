@@ -260,3 +260,7 @@ This strategy should be incorporated into the following existing beads issues:
 New beads issues to create:
 - `[TEST] OpenAPI spec shape tests` — vitest tests that call `generateOpenAPIDocument()` and assert key paths/schemas are present and valid
 - `[IMPL] Add Spectral + Husky pre-commit linting for openapi.json`
+
+---
+
+See also: [architecture.md](architecture.md) for route/service layer rules, [vex-overview.md](vex-overview.md) for the HTTP API endpoint list.

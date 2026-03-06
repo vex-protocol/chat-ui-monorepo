@@ -117,3 +117,7 @@ ENABLE_TLS: z.coerce.boolean().default(false),
 `@t3-oss/env-core` provides a `createEnv()` helper that uses a Proxy to throw at runtime if server-only variables are accessed from a client bundle. This is valuable for Next.js / Remix / Nuxt apps where server and client share a codebase.
 
 For a standalone Node.js Express server, there is no client bundle and no client/server separation problem. Manual Zod validation is simpler, more transparent, and gives full control over error formatting. `t3-env` would add an indirect abstraction without providing any of its key benefits.
+
+---
+
+See also: [logging.md](logging.md) for pino logger setup that reads from env, [architecture.md](architecture.md) for the singleton pattern and middleware order.
