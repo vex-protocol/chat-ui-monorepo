@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import '$lib/fonts.css';
 @import '$lib/visuals/witchy.css';
 
 :root {

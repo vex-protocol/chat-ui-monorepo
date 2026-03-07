@@ -149,8 +149,12 @@
 </section>
 
 <style>
-	/* Google Fonts for the CRT/aviation aesthetic */
-	@import url('https://fonts.googleapis.com/css2?family=B612+Mono:wght@400;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+	/* Defer rendering of below-fold sections */
+	:global(#about),
+	:global(#features) {
+		content-visibility: auto;
+		contain-intrinsic-size: auto 100vh;
+	}
 
 	/* Section layout: each section = full viewport height */
 	.home-section {
