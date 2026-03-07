@@ -87,7 +87,7 @@
 
 		<!-- Center -->
 		<div class="arm arm-c">
-			<div class="dot center" aria-label="Position {lateralIndex + 1}, {verticalIndex + 1}">
+			<div class="dot center" role="img" aria-label="Position {lateralIndex + 1}, {verticalIndex + 1}">
 				<span class="reticle-h" />
 				<span class="reticle-v" />
 				<span class="reticle-dot" />
@@ -259,7 +259,7 @@
 	.coords {
 		text-align: center;
 		font-size: 0.65rem;
-		color: var(--text-muted);
+		color: #8e8e96;
 		margin-top: 4px;
 		font-family: monospace;
 	}

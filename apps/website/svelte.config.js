@@ -8,5 +8,6 @@ export default {
 		adapter: adapter({
 			runtime: 'nodejs22.x',
 		}),
+		inlineStyleThreshold: Infinity,
 	},
 };
