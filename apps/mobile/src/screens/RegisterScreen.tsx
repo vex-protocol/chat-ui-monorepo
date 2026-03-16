@@ -10,8 +10,8 @@ import {
   Platform,
   ScrollView,
 } from 'react-native'
-import { parse as uuidParse } from 'uuid'
-import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
+import { encodeHex } from '@vex-chat/crypto'
+import { VexClient } from '@vex-chat/libvex'
 import { bootstrap } from '../store'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -35,65 +35,24 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
     try {
       const SERVER_URL = getServerUrl()
 
-      // Generate Ed25519 device signing key pair + preKey pair
-      const signKeyPair = generateSignKeyPair()
-      const preKeyPair = generateSignKeyPair()
+      const result = await VexClient.registerAndLogin(SERVER_URL, username, password, 'Mobile')
 
-      // Fetch open registration token
-      const tokenRes = await fetch(`${SERVER_URL}/token/open/register`)
-      if (!tokenRes.ok) {
-        setError(
-          tokenRes.status === 404
-            ? 'Registration is invite-only on this server.'
-            : `Failed to get registration token (${tokenRes.status})`,
-        )
+      if (!result.ok) {
+        setError(result.error.message || `Registration failed (${result.error.code})`)
         setLoading(false)
         return
       }
-      const { key: tokenKey } = (await tokenRes.json()) as { key: string }
-
-      // Sign the token UUID bytes with the device signing key
-      const tokenBytes = uuidParse(tokenKey) as Uint8Array
-      const signed = signMessage(tokenBytes, signKeyPair.secretKey)
-
-      // Sign the preKey public key with the signing key
-      const preKeySignature = signMessage(preKeyPair.publicKey, signKeyPair.secretKey)
-
-      // POST /register
-      const regRes = await fetch(`${SERVER_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username,
-          password,
-          signKey: encodeHex(signKeyPair.publicKey),
-          signed: encodeHex(signed),
-          preKey: encodeHex(preKeyPair.publicKey),
-          preKeySignature: encodeHex(preKeySignature),
-          preKeyIndex: 0,
-          deviceName: 'Mobile',
-        }),
-      })
-
-      if (!regRes.ok) {
-        const body = (await regRes.json().catch(() => ({}))) as { message?: string }
-        setError(body.message ?? `Registration failed (${regRes.status})`)
-        setLoading(false)
-        return
-      }
-
-      const regData = (await regRes.json()) as { token: string; userID: string; deviceID: string }
 
       // Save device credentials to OS keychain
       await saveCredentials({
         username,
-        deviceID: regData.deviceID,
-        deviceKey: encodeHex(signKeyPair.secretKey),
-        preKey: encodeHex(preKeyPair.secretKey),
+        deviceID: result.deviceID,
+        deviceKey: encodeHex(result.signKeyPair.secretKey),
+        preKey: encodeHex(result.preKeyPair.secretKey),
       })
 
-      // Bootstrap the store with the JWT from registration response
-      await bootstrap(SERVER_URL, regData.deviceID, signKeyPair.secretKey, regData.token, preKeyPair.secretKey)
+      // Bootstrap the store with the JWT from registration
+      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

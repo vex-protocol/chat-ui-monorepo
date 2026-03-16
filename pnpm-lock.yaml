@@ -300,6 +300,9 @@ importers:
       reconnecting-websocket:
         specifier: 'catalog:'
         version: 4.4.0
+      uuid:
+        specifier: 'catalog:'
+        version: 11.1.0
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

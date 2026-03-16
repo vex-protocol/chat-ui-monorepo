@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { parse as uuidParse } from 'uuid'
-  import { generateSignKeyPair, signMessage, encodeHex } from '@vex-chat/crypto'
+  import { encodeHex } from '@vex-chat/crypto'
+  import { VexClient } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
   import { getServerUrl, saveCredentials } from '../lib/config.js'
   import { playUnlock, playError } from '../lib/sounds.js'
@@ -22,67 +22,26 @@
     try {
       const SERVER_URL = getServerUrl()
 
-      // 1. Generate Ed25519 device signing key pair
-      const signKeyPair = generateSignKeyPair()
-      const preKeyPair = generateSignKeyPair()
+      const result = await VexClient.registerAndLogin(SERVER_URL, username, password, 'Desktop')
 
-      // 2. Fetch an open registration token (requires OPEN_REGISTRATION=true on spire)
-      const tokenRes = await fetch(`${SERVER_URL}/token/open/register`)
-      if (!tokenRes.ok) {
-        error = tokenRes.status === 404
-          ? 'Registration is invite-only on this server.'
-          : `Failed to get registration token (${tokenRes.status})`
-        loading = false
-        return
-      }
-      const { key: tokenKey } = await tokenRes.json() as { key: string }
-
-      // 3. Sign the token UUID bytes with the device signing key (NaCl format: sig || msg)
-      const tokenBytes = uuidParse(tokenKey) as Uint8Array
-      const signed = signMessage(tokenBytes, signKeyPair.secretKey)
-
-      // 4. Sign the preKey public key with the signing key
-      const preKeySignature = signMessage(preKeyPair.publicKey, signKeyPair.secretKey)
-
-      // 5. POST /register
-      const regRes = await fetch(`${SERVER_URL}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          username,
-          password,
-          signKey: encodeHex(signKeyPair.publicKey),
-          signed: encodeHex(signed),
-          preKey: encodeHex(preKeyPair.publicKey),
-          preKeySignature: encodeHex(preKeySignature),
-          preKeyIndex: 0,
-          deviceName: 'Desktop',
-        }),
-      })
-
-      if (!regRes.ok) {
-        const body = await regRes.json().catch(() => ({})) as { message?: string }
-        error = body.message ?? `Registration failed (${regRes.status})`
+      if (!result.ok) {
+        error = result.error.message || `Registration failed (${result.error.code})`
         playError()
         loading = false
         return
       }
 
-      const regData = await regRes.json() as { token: string; userID: string; deviceID: string }
-
-      // 6. Save device credentials
+      // Save device credentials for future logins
       saveCredentials({
         username,
-        deviceID: regData.deviceID,
-        deviceKey: encodeHex(signKeyPair.secretKey),
-        preKey: encodeHex(preKeyPair.secretKey),
+        deviceID: result.deviceID,
+        deviceKey: encodeHex(result.signKeyPair.secretKey),
+        preKey: encodeHex(result.preKeyPair.secretKey),
       })
 
-      // 7. Bootstrap the store with the JWT from registration response
-      await bootstrap(SERVER_URL, regData.deviceID, signKeyPair.secretKey, regData.token, preKeyPair.secretKey)
+      // Bootstrap the store with the JWT from registration
+      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
 
-      // Navigate into the app (no servers yet after fresh register)
       if (userAtom.get()) {
         playUnlock()
         push('/settings')

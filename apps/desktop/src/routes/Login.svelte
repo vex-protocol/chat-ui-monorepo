@@ -1,6 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import { decodeHex } from '@vex-chat/crypto'
+  import { VexClient } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
   import { getServerUrl, loadCredentials } from '../lib/config.js'
   import { playUnlock, playError } from '../lib/sounds.js'
@@ -32,28 +33,21 @@
         return
       }
 
-      // 2. POST /auth to get JWT
-      const authRes = await fetch(`${SERVER_URL}/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ username, password }),
-      })
+      // 2. Login via libvex (handles msgpack + response normalization)
+      const deviceKey = decodeHex(creds.deviceKey)
+      const preKeySecret = decodeHex(creds.preKey)
+      const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
+      const result = await client.login(username, password)
 
-      if (!authRes.ok) {
-        const body = await authRes.json().catch(() => ({})) as { message?: string }
-        error = body.message ?? 'Invalid username or password'
+      if (!result.ok) {
+        error = result.error.message || 'Invalid username or password'
         playError()
         loading = false
         return
       }
 
-      const { token } = await authRes.json() as { token: string }
-
       // 3. Bootstrap store with device key + JWT
-      const deviceKey = decodeHex(creds.deviceKey)
-      const preKeySecret = decodeHex(creds.preKey)
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, token, preKeySecret)
+      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
 
       // Navigate into the app
       if (userAtom.get()) {

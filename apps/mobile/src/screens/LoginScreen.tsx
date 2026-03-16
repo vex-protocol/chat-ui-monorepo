@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native'
 import { decodeHex } from '@vex-chat/crypto'
+import { VexClient } from '@vex-chat/libvex'
 import { bootstrap } from '../store'
 import { loadCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -40,24 +41,19 @@ export function LoginScreen({ navigation }: { navigation: any }) {
         return
       }
 
-      const authRes = await fetch(`${SERVER_URL}/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      })
+      // Login via libvex (handles msgpack + response normalization)
+      const deviceKey = decodeHex(creds.deviceKey)
+      const preKeySecret = decodeHex(creds.preKey)
+      const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
+      const result = await client.login(username, password)
 
-      if (!authRes.ok) {
-        const body = (await authRes.json().catch(() => ({}))) as { message?: string }
-        setError(body.message ?? 'Invalid username or password')
+      if (!result.ok) {
+        setError(result.error.message || 'Invalid username or password')
         setLoading(false)
         return
       }
 
-      const { token } = (await authRes.json()) as { token: string }
-
-      const deviceKey = decodeHex(creds.deviceKey)
-      const preKeySecret = decodeHex(creds.preKey)
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, token, preKeySecret)
+      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
