@@ -1,20 +1,23 @@
 import type { IServer, IChannel, IUser } from '@vex-chat/types'
 import type { HttpClient } from './http.ts'
+import { normalizeServer, normalizeUser } from './wire.ts'
 
 export async function createServer(
   http: HttpClient,
   name: string,
-  icon: string,
+  _icon: string,
 ): Promise<IServer> {
-  const result = await http.post<IServer>('/server', { name, icon })
+  // Old spire uses POST /server/:name where name is base64-encoded
+  const b64Name = btoa(name)
+  const result = await http.post<Record<string, unknown>>(`/server/${b64Name}`)
   if (!result.ok) throw new Error(result.error.message)
-  return result.data
+  return normalizeServer(result.data)
 }
 
 export async function listServers(http: HttpClient, userID: string): Promise<IServer[]> {
-  const result = await http.get<IServer[]>(`/user/${userID}/servers`)
+  const result = await http.get<Record<string, unknown>[]>(`/user/${userID}/servers`)
   if (!result.ok) throw new Error(result.error.message)
-  return result.data
+  return result.data.map(normalizeServer)
 }
 
 export async function listChannels(http: HttpClient, serverID: string): Promise<IChannel[]> {
@@ -24,7 +27,7 @@ export async function listChannels(http: HttpClient, serverID: string): Promise<
 }
 
 export async function deleteServer(http: HttpClient, serverID: string): Promise<void> {
-  const result = await http.delete<{ ok: boolean }>(`/server/${serverID}`)
+  const result = await http.delete<unknown>(`/server/${serverID}`)
   if (!result.ok) throw new Error(result.error.message)
 }
 
@@ -39,12 +42,13 @@ export async function createChannel(
 }
 
 export async function deleteChannel(http: HttpClient, channelID: string): Promise<void> {
-  const result = await http.delete<{ ok: boolean }>(`/channel/${channelID}`)
+  const result = await http.delete<unknown>(`/channel/${channelID}`)
   if (!result.ok) throw new Error(result.error.message)
 }
 
 export async function listMembers(http: HttpClient, serverID: string): Promise<IUser[]> {
-  const result = await http.get<IUser[]>(`/server/${serverID}/members`)
+  // Old spire uses POST /userList/:channelID — we pass serverID and it resolves via permissions
+  const result = await http.post<Record<string, unknown>[]>(`/userList/${serverID}`)
   if (!result.ok) throw new Error(result.error.message)
-  return result.data
+  return result.data.map(normalizeUser)
 }
