@@ -19,24 +19,17 @@ else until it causes pain.
 These are real vulnerabilities or correctness issues. Minimal code change,
 high impact.
 
-### 1.1 Password hashing: PBKDF2 → argon2id
+### 1.1 Password hashing: PBKDF2 → argon2id ✓ DONE
 
-| | Old | Target |
+| | Old | Current |
 |---|---|---|
-| Algorithm | PBKDF2-SHA512, **1,000 iterations** | argon2id (m=19 MiB, t=2, p=1) |
-| Library | `crypto.pbkdf2Sync` | `argon2` npm package |
+| Algorithm | PBKDF2-SHA512, **1,000 iterations** | argon2id (library defaults) |
+| Library | `pbkdf2` npm package | `argon2` npm package |
 
-**Why**: 1,000 PBKDF2 iterations is ~210× below OWASP minimum (210,000). A
-stolen database can be cracked with commodity hardware. argon2id is
-memory-hard and resists GPU/ASIC attacks.
-
-**Scope of change**: `Database.ts` — replace `hashPassword()` (≈10 lines).
-Add a migration path: on successful login with old hash, re-hash with
-argon2id and update the row. No schema change needed (hash output is still a
-string).
-
-**Risk**: Low. Login is async already. argon2 is a C binding — test on the
-deploy target.
+**Completed**: New registrations use argon2id. Existing PBKDF2 users are
+lazily re-hashed on successful login via `upgradeHashIfNeeded()`. Added
+`hashVersion` column to users table (1=PBKDF2, 2=argon2id), auto-migrated
+on startup.
 
 ### 1.2 Stop logging secrets
 
@@ -88,28 +81,18 @@ versions, and database structure from error messages.
 res.status(500).json({ error: 'Internal server error' })
 ```
 
-### 2.2 Crypto: TweetNaCl → @noble
+### 2.2 Crypto: TweetNaCl → @noble ✓ DONE
 
-| | Old | Target |
+| | Old | Current |
 |---|---|---|
-| Library | `tweetnacl@1.0.3` | `@noble/curves` + `@noble/hashes` + `@noble/ciphers` |
+| Library | `tweetnacl@1.0.3` | `@noble/curves` via `naclCompat.ts` |
 | Maintained | Last release 2018 | Active, audited (Cure53), TypeScript-native |
-| Module | CJS only | ESM + CJS |
 
-**Why**: TweetNaCl is unmaintained. No security patches since 2018. The
-`@noble` family is audited, actively maintained, and used by major wallets
-and protocols.
-
-**Scope**: This touches `@vex-chat/crypto` (the shared package, already
-migrated in the monorepo). Old spire consumes `@vex-chat/crypto@0.7.15`
-from npm. The migration path is:
-1. Publish new `@vex-chat/crypto` to npm from the monorepo
-2. Bump the dep in spire
-3. The wire format (hex-encoded Ed25519/Curve25519 keys, NaCl box
-   ciphertext) stays the same — `@noble` produces identical output
-
-**Risk**: Medium. Crypto changes need careful testing. The wire format is
-unchanged but the internal key derivation paths must be verified.
+**Completed**: All 5 `nacl.sign.open()` calls and 1
+`nacl.sign.keyPair.fromSecretKey()` call replaced with `@noble/curves`
+equivalents in `src/utils/naclCompat.ts`. `tweetnacl` removed from
+dependencies. Wire format unchanged. TypeScript upgraded 4.1 → 5.9 to
+support `@noble/curves` type declarations.
 
 ### 2.3 Validation: ad-hoc checks → Zod schemas
 

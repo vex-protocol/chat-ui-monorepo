@@ -15,14 +15,14 @@ Vex targets desktop and mobile as a cross-platform monorepo:
 |---|---|---|
 | Desktop | **Tauri 2.0** | **Svelte** |
 | Mobile | **React Native** | React Native |
-| Server | **Node.js** | Express + Kysely |
+| Server | **Node.js** ([separate repo](https://github.com/vex-chat/spire)) | Express + Knex |
 
 Shared packages (`types`, `core`, `crypto`, `validation`, `store`) are framework-agnostic TypeScript. Design system primitives live in `packages/ui` as **Mitosis** `.lite.tsx` files that compile to both Svelte and React. See `docs/explanation/platform-strategy.md` for the full architecture and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
-`apps/spire` is a clean reimplementation of [`vex-chat/spire`](https://github.com/vex-chat/spire) — the Vex server — using modern tooling (Kysely, Zod, Vitest, ESM) while preserving full protocol and privacy compatibility with the original.
+The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire). It uses Express 4, Knex, @noble/curves, and argon2id. See that repo for server development.
 
 The Vex platform works as follows:
-- Messages are **end-to-end encrypted** using TweetNaCl (NaCl/Curve25519). The server stores only ciphertext, never plaintext.
+- Messages are **end-to-end encrypted** using @noble/curves (Ed25519/Curve25519). The server stores only ciphertext, never plaintext.
 - **Identity is device-key-bound.** Each device generates a NaCl Ed25519 signing key pair. The private key never leaves the device.
 - **Mail** is the encrypted message format. Each mail is addressed to a specific device ID, not a user.
 - **Pre-key bundles** enable session establishment (X3DH-style): `{ signKey, preKey, otk? }`. OTKs are consumed server-side during key exchange.
@@ -43,23 +43,18 @@ The Vex platform works as follows:
 
 ### Implementation rules
 
-- Use `tweetnacl` for all NaCl Ed25519 operations (sign, verify, key generation).
+**Server rules** (apply to the [spire repo](https://github.com/vex-chat/spire)):
+
+- Use `@noble/curves` for all Ed25519 operations (sign, verify, key generation) via the `naclCompat.ts` helper.
 - NaCl signature verification happens at the **route/middleware layer** before any service function is called.
-- Service functions (e.g. `registerUser`, `createDevice`) receive already-verified data — they do not re-verify signatures.
-- Action token store is created per server instance (`createTokenStore()` factory) — never a module-level singleton, for testability.
-- JWT secret (`JWT_SECRET`) is separate from the NaCl server signing key. Do not conflate them.
-- **Derive TypeScript types from Zod schemas** using `z.infer<typeof Schema>`. Never write a separate `interface` that mirrors a `z.object(...)` — they will drift. Export the type alongside the schema from the same `schemas.ts` file.
-- **Validate at the route boundary, not inside service functions.** Use the `validateBody(schema)` / `validateParams(schema)` middleware factories from `src/middleware/validate.ts`. Route handlers receive a typed, already-validated `req.body`. Service functions trust their typed arguments.
-- **Route handlers must be thin (under 15 lines).** No business logic in route handlers. One service call per handler. Fat controllers are forbidden.
-- **Extend `req.user` / `req.device` via `src/types/express.d.ts`.** Never cast `req as AuthenticatedRequest` inside a handler. Use `declare global { namespace Express { interface Request { user?: CensoredUser } } }` so the types are available everywhere.
-- **Error middleware must declare exactly 4 parameters: `(err, req, res, next)`.** Express identifies error-handling middleware by `function.length` — omitting `next` makes Express skip it entirely.
-- **Middleware order in `buildApp()`: helmet → cors → body-parser → rate-limit → pino-http → routes → 404 → error handler.**
-- Strip sensitive fields (`passwordHash`, `passwordSalt`) from any JWT payload or API response. Only `{ userID, username, lastSeen }` is ever exposed (censoredUser pattern).
+- Service functions receive already-verified data — they do not re-verify signatures.
+- JWT secret (`SPK` env var) is separate from the NaCl server signing key (`SK` env var). Do not conflate them.
+- Strip sensitive fields (`passwordHash`, `passwordSalt`, `hashVersion`) from any JWT payload or API response. Only `{ userID, username, lastSeen }` is ever exposed (censoredUser pattern).
 - **Mail MUST be deleted from the server after it is fetched by the intended recipient.** The server is a relay, not a store. Do not retain delivered mail.
 - **Mail save failures MUST propagate as errors.** Never silently swallow errors in the mail pipeline. A dropped message is unrecoverable — the OTK was consumed, the session advanced, and the plaintext is gone. Silent loss is worse than a visible error.
-- **OTK/pre-key uploads MUST verify device ownership.** Before accepting key material, the server must confirm `req.user` owns the target device. Without this check, an attacker can inject their own OTKs into another user's device key bundle and intercept incoming messages — a man-in-the-middle on the encryption layer. This directly violates the guarantee that the server cannot impersonate users.
-- **Never add server-side access control that builds a social graph.** Device listing (`GET /user/:id/devices`) must remain open to all authenticated users — X3DH requires it. File downloads should rely on client-side encryption, not server-side ACLs that track who accesses what. User search returns public profiles and must not be gated by contact lists. See `docs/reference/architecture.md` → "Security Invariants" for the full rationale.
-- **Never log or store IP addresses or User-Agent strings.** This is a hard privacy requirement from the vex.wtf privacy policy — not a default Express/Node behaviour, so it must be actively suppressed in middleware and request logging.
+- **OTK/pre-key uploads MUST verify device ownership.** Before accepting key material, the server must confirm `req.user` owns the target device. Without this check, an attacker can inject their own OTKs into another user's device key bundle and intercept incoming messages — a man-in-the-middle on the encryption layer.
+- **Never add server-side access control that builds a social graph.** Device listing (`GET /user/:id/devices`) must remain open to all authenticated users — X3DH requires it. File downloads should rely on client-side encryption, not server-side ACLs that track who accesses what.
+- **Never log or store IP addresses or User-Agent strings.** This is a hard privacy requirement from the vex.wtf privacy policy.
 
 ## Quick Reference
 
