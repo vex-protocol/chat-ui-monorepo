@@ -43,7 +43,6 @@ export class HttpClient {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
         headers: this.headers(),
-        credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: await parseBody<T>(res) }
@@ -57,7 +56,6 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: this.headers(),
-        credentials: 'include',
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
@@ -74,7 +72,6 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: h,
-        credentials: 'include',
         body: body as BodyInit,
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
@@ -91,7 +88,6 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'POST',
         headers: h,
-        credentials: 'include',
         body: body as BodyInit,
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
@@ -107,7 +103,6 @@ export class HttpClient {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
         headers: h,
-        credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       const buf = new Uint8Array(await res.arrayBuffer())
@@ -125,7 +120,6 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'PATCH',
         headers: this.headers(),
-        credentials: 'include',
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
@@ -140,7 +134,6 @@ export class HttpClient {
       const res = await fetch(`${this.baseUrl}${path}`, {
         method: 'DELETE',
         headers: this.headers(),
-        credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: await parseBody<T>(res) }
