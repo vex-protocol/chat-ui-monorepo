@@ -46,7 +46,8 @@ export async function fetchInboxDecrypted(
   session: SessionManager | null,
   deviceID: string,
 ): Promise<DecryptedMail[]> {
-  const result = await http.get<IMail[]>(`/mail/${deviceID}`)
+  // Old spire uses POST /device/:id/mail
+  const result = await http.post<IMail[]>(`/device/${deviceID}/mail`)
   if (!result.ok) return []
   if (!session) return []
 

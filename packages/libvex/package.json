@@ -13,6 +13,7 @@
   "dependencies": {
     "@vex-chat/types": "workspace:*",
     "@vex-chat/crypto": "workspace:*",
+    "@msgpack/msgpack": "catalog:",
     "eventemitter3": "catalog:",
     "reconnecting-websocket": "catalog:"
   }

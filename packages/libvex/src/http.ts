@@ -1,9 +1,23 @@
+import { decode as decodeMsgpack } from '@msgpack/msgpack'
 import { errorFromStatus } from './errors.ts'
 import type { VexError } from './errors.ts'
 
 export type HttpResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: VexError }
+
+/**
+ * Parses a response body, handling both JSON and msgpack (old spire).
+ * Detects format from Content-Type header.
+ */
+async function parseBody<T>(res: Response): Promise<T> {
+  const ct = res.headers.get('content-type') ?? ''
+  if (ct.includes('msgpack') || ct.includes('octet-stream')) {
+    const buf = await res.arrayBuffer()
+    return decodeMsgpack(new Uint8Array(buf)) as T
+  }
+  return (await res.json()) as T
+}
 
 export class HttpClient {
   constructor(
@@ -32,7 +46,7 @@ export class HttpClient {
         credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
-      return { ok: true, data: (await res.json()) as T }
+      return { ok: true, data: await parseBody<T>(res) }
     } catch (err) {
       return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
     }
@@ -47,7 +61,7 @@ export class HttpClient {
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
-      return { ok: true, data: (await res.json()) as T }
+      return { ok: true, data: await parseBody<T>(res) }
     } catch (err) {
       return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
     }
@@ -106,6 +120,21 @@ export class HttpClient {
     }
   }
 
+  async patch<T>(path: string, body?: unknown): Promise<HttpResult<T>> {
+    try {
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'PATCH',
+        headers: this.headers(),
+        credentials: 'include',
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      })
+      if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
+      return { ok: true, data: await parseBody<T>(res) }
+    } catch (err) {
+      return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
+    }
+  }
+
   async delete<T>(path: string): Promise<HttpResult<T>> {
     try {
       const res = await fetch(`${this.baseUrl}${path}`, {
@@ -114,7 +143,7 @@ export class HttpClient {
         credentials: 'include',
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
-      return { ok: true, data: (await res.json()) as T }
+      return { ok: true, data: await parseBody<T>(res) }
     } catch (err) {
       return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
     }

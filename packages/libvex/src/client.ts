@@ -185,15 +185,16 @@ export class VexClient extends EventEmitter<VexEvents> {
       return { ok: false, error: { code: 'NOT_AUTHENTICATED', message: 'Not authenticated' } }
     }
 
-    return sendMailEncrypted(this.http, this.sessionManager, content, {
+    const meta: Parameters<typeof sendMailEncrypted>[3] = {
       senderDeviceID: this.deviceID,
       senderUserID: this.currentUserID,
       recipientDeviceID,
       recipientUserID,
       group: options?.group ?? null,
-      mailType: options?.mailType,
-      extra: options?.extra,
-    })
+    }
+    if (options?.mailType !== undefined) meta.mailType = options.mailType
+    if (options?.extra !== undefined) meta.extra = options.extra
+    return sendMailEncrypted(this.http, this.sessionManager, content, meta)
   }
 
   /**
@@ -319,15 +320,24 @@ export class VexClient extends EventEmitter<VexEvents> {
 
   /** Joins a server via invite code. Returns the server on success. */
   async joinServerViaInvite(inviteID: string): Promise<IServer> {
-    const result = await this.http.post<{ ok: boolean; server: IServer }>(`/invite/${inviteID}/join`)
+    // Old spire uses PATCH /invite/:id — returns the new IPermission, not the server.
+    // We PATCH to join, then fetch the server details from the permission's serverID.
+    const result = await this.http.patch<{ serverID: string }>(`/invite/${inviteID}`)
     if (!result.ok) throw new Error(result.error.message)
-    return result.data.server
+    const serverID = result.data.serverID
+    // Fetch the full server record
+    const servers = await this.listServers()
+    const server = servers.find(s => s.serverID === serverID)
+    if (!server) throw new Error('Joined server but could not find it in server list')
+    return server
   }
 
-  /** Deletes an invite. Must be the invite creator or a server admin. */
-  async deleteInvite(serverID: string, inviteID: string): Promise<void> {
-    const result = await this.http.delete(`/server/${serverID}/invites/${inviteID}`)
-    if (!result.ok) throw new Error(result.error.message)
+  /**
+   * Deletes an invite. Not supported in old spire — throws with a clear message.
+   * @deprecated Old spire has no DELETE invite route.
+   */
+  async deleteInvite(_serverID: string, _inviteID: string): Promise<void> {
+    throw new Error('deleteInvite is not supported by old spire')
   }
 
   // ── Fingerprints ────────────────────────────────────────────────────────────

@@ -1,14 +1,18 @@
 import type { IUser } from '@vex-chat/types'
 import type { HttpClient } from './http.ts'
+import { normalizeUser } from './wire.ts'
 
 export async function getUser(http: HttpClient, userID: string): Promise<IUser | null> {
-  const result = await http.get<IUser>(`/user/${userID}`)
+  const result = await http.get<Record<string, unknown>>(`/user/${userID}`)
   if (!result.ok) return null
-  return result.data
+  return normalizeUser(result.data)
 }
 
-export async function searchUsers(http: HttpClient, query: string): Promise<IUser[]> {
-  const result = await http.get<IUser[]>(`/users/search?q=${encodeURIComponent(query)}`)
-  if (!result.ok) return []
-  return result.data
+/**
+ * Search users by username. Old spire has no search endpoint —
+ * returns an empty array gracefully.
+ */
+export async function searchUsers(_http: HttpClient, _query: string): Promise<IUser[]> {
+  // Old spire does not have GET /users/search — return empty rather than error
+  return []
 }
