@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 
+const SPIRE_URL = process.env.VITE_SERVER_URL || 'http://localhost:16777'
+const spire = { target: SPIRE_URL, changeOrigin: true } as const
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte()],
@@ -8,6 +11,26 @@ export default defineConfig({
   server: {
     port: 5180,
     strictPort: true,
+    // Proxy API requests to spire so the WebView never makes cross-origin HTTP requests
+    proxy: {
+      '/token': spire,
+      '/register': spire,
+      '/auth': spire,
+      '/whoami': spire,
+      '/goodbye': spire,
+      '/user': spire,
+      '/device': spire,
+      '/server': spire,
+      '/channel': spire,
+      '/file': spire,
+      '/avatar': spire,
+      '/invite': spire,
+      '/emoji': spire,
+      '/permission': spire,
+      '/userList': spire,
+      '/deviceList': spire,
+      '/ws': { target: SPIRE_URL, changeOrigin: true, ws: true },
+    },
   },
   // Hide native browser env APIs from Tauri frontend
   envPrefix: ['VITE_', 'TAURI_ENV_*'],

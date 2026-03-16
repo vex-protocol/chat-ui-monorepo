@@ -16,7 +16,7 @@ const KEYS = {
   preKey:     'vex-prekey',
 } as const
 
-const DEFAULT_SERVER_URL = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:16777'
+const DEFAULT_SERVER_URL = import.meta.env.VITE_SERVER_URL ?? (import.meta.env.DEV ? '' : 'http://localhost:16777')
 
 // ── Server URL ────────────────────────────────────────────────────────────────
 
