@@ -33,7 +33,6 @@ A self-hosted, open-source alternative to Discord or Slack where:
 
 | Package | Replaces | Description |
 |---|---|---|
-| `apps/spire` | `spire` | Server reimplementation (Kysely, Zod, Vitest, ESM) |
 | `apps/desktop` | `vex-desktop` | Tauri 2.0 + Svelte (replaces Electron+React) |
 | `apps/mobile` | — | React Native mobile client (new) |
 | `packages/types` | `types-js` | Shared TypeScript interfaces and enums |
@@ -41,6 +40,8 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `packages/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
 | `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
 | `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
+
+The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Knex, TweetNaCl, SQLite/MySQL. See [`old-spire-migration-path.md`](explanation/old-spire-migration-path.md) for what's worth porting.
 
 See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
@@ -169,14 +170,8 @@ From the `vex-chat/privacy-policy` repo and vex.wtf:
 
 ## What We Are Building
 
-`apps/spire` is a **clean reimplementation** of the `vex-chat/spire` server with:
-- **Same protocol compatibility** — same NaCl device key model, same token flow, same mail format
-- **Better tooling** — Kysely (type-safe SQL) instead of Knex, Zod validation, Vitest, ESM-native
-- **SQLite or PostgreSQL** via config (original supported MySQL or SQLite)
-- **AGPL-3.0** — same license
-
-The reimplementation preserves all privacy properties of the original while modernising the codebase.
+This monorepo provides **shared packages and client apps**. The server (spire) lives in its own repo and is incrementally improved there. See [`old-spire-migration-path.md`](explanation/old-spire-migration-path.md) for the prioritized list of improvements to port to the server.
 
 ---
 
-See also: [architecture.md](reference/architecture.md) for server structure and security invariants, [auth-comparison.md](explanation/auth-comparison.md) for auth design decisions, [glossary.md](glossary.md) for term definitions.
+See also: [auth-comparison.md](explanation/auth-comparison.md) for auth design decisions, [glossary.md](glossary.md) for term definitions.

@@ -11,7 +11,7 @@ Detailed API-level comparison between the original standalone repos (`libvex-js`
 | `libvex-js` (`@vex-chat/libvex` v0.21) | `packages/libvex` | Flat methods instead of sub-objects; caller resolves devices; `@noble/curves` replaces `tweetnacl` |
 | `types-js` (`@vex-chat/types`) | `packages/types` | Dates as ISO strings instead of `Date` objects; `DecryptedMail` replaces `IMessage` |
 | `crypto-js` (`@vex-chat/crypto` v0.7) | `packages/crypto` | `@noble/curves` + `@noble/hashes` replace `tweetnacl` + `ed2curve` + `futoin-hkdf` |
-| `spire` (standalone Express) | `apps/spire` | Kysely replaces Knex; Zod validation; Vitest; ESM-only; layered architecture |
+| `spire` (standalone Express) | Own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) | Stays standalone; incremental improvements per [`old-spire-migration-path.md`](old-spire-migration-path.md) |
 | `vex-desktop` (Electron + React) | `apps/desktop` (Tauri + Svelte) | See `desktop-reimplementation.md` |
 | -- | `packages/store` | New -- nanostores atoms, shared across desktop and mobile |
 | -- | `packages/ui` | New -- Mitosis design primitives compiled to Svelte + React |
@@ -268,18 +268,20 @@ These endpoints have the same HTTP method, path, and semantics:
 | `GET /server/:serverID/emoji` | List server emoji | Not started |
 | `GET /server/:serverID/permissions` | List server permissions | Not started |
 
-### Implementation Differences
+### Planned Server Improvements
 
-| Aspect | Old spire | New spire |
+The server stays in its own repo. These improvements are ported incrementally — see [`old-spire-migration-path.md`](old-spire-migration-path.md) for priority tiers.
+
+| Aspect | Current spire | Target |
 |---|---|---|
-| **ORM** | Knex (query builder) | Kysely (type-safe query builder) |
-| **Validation** | Manual checks in route handlers | Zod schemas with `validateBody()` middleware |
-| **Architecture** | Routes + Database (2 layers) | Routes -> Services -> Database (3 layers) |
-| **Testing** | Jest | Vitest with in-memory SQLite |
-| **Module system** | CommonJS | ESM-only |
-| **Password hashing** | PBKDF2 (1000 iterations, SHA-512) | argon2id |
-| **Wire format** | msgpack responses | JSON responses (msgpack planned) |
-| **Error handling** | Manual status codes in handlers | Typed error classes + error middleware |
+| **Password hashing** | PBKDF2 (1000 iterations, SHA-512) | argon2id (Tier 1 — security) |
+| **JWT secret** | Reuses SPK | Dedicated JWT_SECRET (Tier 1) |
+| **Logging** | Tokens/IDs in plaintext logs | Redacted / removed (Tier 1) |
+| **Crypto** | TweetNaCl | @noble/curves (Tier 2) |
+| **Validation** | Manual checks in route handlers | Zod schemas (Tier 2) |
+| **ORM** | Knex (query builder) | Kysely (Tier 3) |
+| **Module system** | CommonJS | ESM (Tier 3) |
+| **Error handling** | Stack traces sent to clients | Generic error messages (Tier 2) |
 
 ---
 

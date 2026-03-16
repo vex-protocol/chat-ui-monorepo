@@ -149,7 +149,7 @@ Quarterly, 2-4 hours, structured exercise.
                /--------------\
               / Integration      \  ← Service interaction tests
              /--------------------\
-            /    Unit Tests          \  ← Individual functions (255 tests today)
+            /    Unit Tests          \  ← Individual functions
            /____________________________\
 ```
 

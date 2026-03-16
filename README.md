@@ -16,13 +16,14 @@ Every message is encrypted on your device before it leaves. The server stores on
 
 | Package | Description |
 |---|---|
-| `apps/spire` | Server — HTTP API + WebSocket (Node.js, Express, Kysely, SQLite/Postgres) |
 | `apps/desktop` | Desktop client — Tauri 2.0 + Svelte |
 | `apps/mobile` | Mobile client — React Native |
 | `packages/types` | Shared TypeScript interfaces and enums |
 | `packages/core` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
 | `packages/crypto` | NaCl encryption, key management |
 | `packages/ui` | Mitosis design primitives → Svelte + React |
+
+The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire). See [`old-spire-migration-path.md`](docs/explanation/old-spire-migration-path.md) for the integration plan.
 
 ---
 
@@ -46,60 +47,14 @@ cd vex-chat
 pnpm install
 ```
 
-### 2. Set up environment (spire)
+### 2. Start development
 
 ```bash
-# Generates apps/spire/.env with a random SPK and JWT_SECRET
-pnpm --filter @vex-chat/spire env:init
-```
-
-This copies `.env.example` → `.env` and fills in cryptographically generated values. Open `apps/spire/.env` to review or adjust settings (port, log level, database path).
-
-**Manual alternative:** Copy and fill in the template yourself:
-
-```bash
-cp apps/spire/.env.example apps/spire/.env
-# Edit apps/spire/.env — SPK and JWT_SECRET must be filled in
-```
-
-### 3. Start the server
-
-```bash
-# From the repo root — starts all apps in parallel
+# From the repo root — starts client apps in parallel
 pnpm dev
-
-# Or just the server
-pnpm --filter @vex-chat/spire dev
 ```
 
-Spire starts on `http://localhost:16777` by default.
-
-### 4. Run the tests
-
-```bash
-pnpm --filter @vex-chat/spire test
-```
-
-255 tests, no external services required — everything runs against an in-memory SQLite database.
-
----
-
-## Environment variables (spire)
-
-All variables are validated at startup. Missing or invalid values print a clear error and exit immediately rather than crashing mid-request.
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `DB_TYPE` | yes | — | `sqlite` or `postgres` |
-| `DATABASE_URL` | if postgres | — | Postgres connection string |
-| `SQLITE_PATH` | no | `spire.db` | Path to SQLite file |
-| `SPK` | yes | — | NaCl Ed25519 server signing key (hex). `env:init` generates this. |
-| `JWT_SECRET` | yes | — | HMAC secret for JWTs, ≥ 32 chars. `env:init` generates this. |
-| `API_PORT` | no | `16777` | HTTP port |
-| `LOG_LEVEL` | no | `info` | `trace` · `debug` · `info` · `warn` · `error` |
-| `NODE_ENV` | no | `development` | `development` · `production` · `test` |
-
-`SPK` and `JWT_SECRET` are intentionally separate — a NaCl Ed25519 private key is not the right shape for HMAC-SHA256.
+The server (spire) runs separately from its own repo. See the [spire repo](https://github.com/vex-chat/spire) for server setup.
 
 ---
 
@@ -115,12 +70,6 @@ All variables are validated at startup. Missing or invalid values print a clear 
 |---|---|
 | [`vex-overview.md`](docs/vex-overview.md) | What Vex is, the cryptographic protocol, HTTP API, WebSocket protocol, brand |
 | [`glossary.md`](docs/glossary.md) | Central definitions: OTK, X3DH, mail, device key, NaCl, and more |
-| [`architecture.md`](docs/reference/architecture.md) | How `apps/spire` is structured, layer rules, file naming, path aliases, error handling |
-| [`testing-strategy.md`](docs/reference/testing-strategy.md) | Test structure, in-memory SQLite, factory helpers, Vitest configuration |
-| [`logging.md`](docs/reference/logging.md) | Pino logger setup, IP/UA redaction, dev vs prod transport |
-| [`config.md`](docs/reference/config.md) | Env validation, secret hygiene, singleton pattern, Zod v4 utilities |
-| [`websocket.md`](docs/reference/websocket.md) | WS connection lifecycle, auth handshake, async handler pattern |
-| [`openapi-strategy.md`](docs/reference/openapi-strategy.md) | OpenAPI generation from Zod schemas, Spectral linting |
 | [`packages.md`](docs/reference/packages.md) | Shared packages overview: types, crypto, dependency graph |
 | [`packages-libvex.md`](docs/reference/packages-libvex.md) | VexClient SDK: typed events, async iterators, discriminated unions |
 | [`packages-store-ui.md`](docs/reference/packages-store-ui.md) | Nanostores state layer + Mitosis design system primitives |
@@ -139,6 +88,7 @@ All variables are validated at startup. Missing or invalid values print a clear 
 | Doc | What it covers |
 |---|---|
 | [`auth-comparison.md`](docs/explanation/auth-comparison.md) | Auth design decisions: NaCl device keys, registration flow, JWT strategy |
+| [`old-spire-migration-path.md`](docs/explanation/old-spire-migration-path.md) | What's worth porting from the new spire rewrite to old spire |
 | [`platform-strategy.md`](docs/explanation/platform-strategy.md) | Cross-platform monorepo: Tauri desktop, React Native mobile, shared packages |
 | [`design-system.md`](docs/explanation/design-system.md) | Figma ↔ Storybook pipeline, Mitosis component strategy |
 | [`desktop-reimplementation.md`](docs/explanation/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
@@ -164,15 +114,13 @@ All variables are validated at startup. Missing or invalid values print a clear 
 **Recommended reading order for new contributors:**
 1. This README
 2. `docs/vex-overview.md` — understand what we're building and why
-3. `docs/reference/architecture.md` — understand how the server is structured
-4. `AGENTS.md` — implementation rules you must follow
-5. `docs/reference/testing-strategy.md` — write tests from day one
+3. `AGENTS.md` — implementation rules you must follow
+4. `docs/reference/packages.md` — understand the shared package layer
 
 ---
 
 ## Contributing
 
 1. Check available work: `bd ready`
-2. Create a branch, make changes, run `pnpm --filter @vex-chat/spire test`
-3. All 255 tests must pass before committing
-4. Follow the layer rules in `docs/reference/architecture.md` — route handlers call service functions, service functions call the database, never the other way around
+2. Create a branch, make changes
+3. Run relevant package tests before committing

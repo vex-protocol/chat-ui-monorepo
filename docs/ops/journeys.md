@@ -2,7 +2,7 @@
 
 End-to-end journey maps for the Vex platform. Each journey documents what the user does, what the system does, and where the experience breaks down.
 
-> **Source:** Derived from code analysis of both the original repos (`spire`, `vex-desktop`, `libvex-js`, `crypto-js`) and the current monorepo (`apps/spire`, `apps/desktop`, `apps/mobile`, `packages/libvex`, `packages/store`). Last updated March 2026.
+> **Source:** Derived from code analysis of both the original repos (`spire`, `vex-desktop`, `libvex-js`, `crypto-js`) and the current monorepo (`apps/desktop`, `apps/mobile`, `packages/libvex`, `packages/store`). The server (spire) lives in its own repo. Last updated March 2026.
 >
 > This document is the **story map backbone**. For the roadmap (what we're building now), see `roadmap.md`. For how the ops system works, see `README.md`.
 

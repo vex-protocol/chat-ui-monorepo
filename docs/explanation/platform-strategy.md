@@ -43,7 +43,6 @@ packages/
     output/react/  — compiled React components (used by mobile)
     stories/       — Storybook stories for all primitives
 apps/
-  spire/          — server (Node.js, Express, Kysely)
   desktop/        — Tauri + Svelte; @vex-chat/store atoms + @nanostores/svelte + packages/ui/output/svelte
   mobile/         — React Native (bare); @vex-chat/store atoms + @nanostores/react + packages/ui/output/react
 ```
@@ -173,7 +172,7 @@ const messages = useStore($messages)
 | `types-js` | `packages/types` | Same role, modernized |
 | `crypto-js` | `packages/crypto` | Same role |
 | `libvex-js` | `packages/libvex` | Client SDK, framework-agnostic |
-| `spire` | `apps/spire` | Clean reimplementation (Kysely, Zod, Vitest, ESM) |
+| `spire` | Own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) | Stays standalone; incremental improvements |
 | `vex-desktop` (Electron+React) | `apps/desktop` (Tauri+Svelte) | New shell + framework |
 | — | `apps/mobile` (React Native) | New — mobile client |
 | — | `packages/ui` (Mitosis) | New — shared design primitives |

@@ -42,9 +42,9 @@ packages/types/src/
 
 ### Design rules
 
-- **No Kysely-specific fields.** `deleted: number` stays in spire's `src/db/types.ts`, not here.
+- **No DB-specific fields.** `deleted: number` stays in spire's `Database.ts`, not here.
 - **No classes, no enums at runtime.** Use `const` objects + `as const` for enum-like values so tree-shaking works.
-- **No Zod schemas here.** Spire owns its own Zod schemas in `*.schemas.ts` files. These interfaces are the inferred shape.
+- **No validation schemas here.** Spire owns its own validation. These interfaces are the canonical shape.
 
 ### `package.json` shape
 
@@ -63,7 +63,7 @@ packages/types/src/
 
 **Dependency on `@noble/curves` + `@noble/hashes` always. `@noble/ciphers` only for `box.ts`.**
 
-Extracted from `apps/spire/src/auth/auth.crypto.ts` (hex encoding, NaCl signature verify) and extended with client-side primitives (signing, X3DH session setup, authenticated encryption).
+Provides hex encoding, NaCl signature verification, and client-side primitives (signing, X3DH session setup, authenticated encryption). Consumed by libvex (workspace) and by the spire server (via npm).
 
 ### Files
 
@@ -95,7 +95,7 @@ packages/crypto/src/
 | `encryptSecretBox` / `decryptSecretBox` | `box.ts` | libvex only |
 | `generateNonce` | `box.ts` | libvex only |
 
-**Stays in spire only:** `hashPassword` / `verifyPassword` (argon2id, server-only).
+**Stays in spire only:** `hashPassword` / `verifyPassword` (server-only, currently PBKDF2 — see [`old-spire-migration-path.md`](../explanation/old-spire-migration-path.md) for planned argon2id migration).
 
 ### Library rationale
 
@@ -135,7 +135,7 @@ packages/store ──────── @vex-chat/types + @vex-chat/libvex      
                                                                     │
 packages/ui     ─────── (no runtime deps)                           │
                                                                     │
-apps/spire ─────────────────────────────── @vex-chat/crypto         │
+spire (own repo) ──────────────────────── @vex-chat/crypto (npm)    │
                                                                     │
 apps/desktop ─┬── @vex-chat/store  (atoms are native Svelte stores) │
               └── @vex-chat/ui (/svelte/*)                          │
@@ -149,7 +149,7 @@ apps/mobile  ─┬── @vex-chat/store + @nanostores/react              │
 - `packages/libvex` — types + crypto + `eventemitter3` + `reconnecting-websocket`
 - `packages/store` — types + libvex + `nanostores`; apps/mobile optionally installs `@nanostores/react`; Svelte needs no adapter
 - `packages/ui` — no runtime deps; Mitosis is a devDep only
-- `apps/spire` — imports `@vex-chat/crypto` only (server has no state management needs)
+- `spire` (own repo) — imports `@vex-chat/crypto` via npm (server has no state management needs)
 
 ---
 
@@ -161,25 +161,17 @@ apps/mobile  ─┬── @vex-chat/store + @nanostores/react              │
 
 ---
 
-## What Changes in `apps/spire`
+## Spire Integration
 
-Only 3 files change. Everything else (routes, services, Zod schemas, DB types, migrations, JWT, tests) is untouched.
+The spire server lives in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) and consumes `@vex-chat/crypto` via npm. When updating the crypto package, publish to npm so spire can pick up changes.
 
-| File | Change |
-|---|---|
-| `src/auth/auth.crypto.ts` | Import `decodeHex`, `encodeHex`, `verifyNaClSignature` from `@vex-chat/crypto`; delete those implementations |
-| `src/ws/ws.service.ts` | Replace `nacl.sign.detached.verify(...)` with `verifyDetached(...)` from `@vex-chat/crypto` |
-| `package.json` | Add `"@vex-chat/crypto": "workspace:*"` to dependencies |
-
-`hashPassword` / `verifyPassword` stay in spire — they use `argon2id`, which is server-only.
+See [`old-spire-migration-path.md`](../explanation/old-spire-migration-path.md) for the planned incremental migration of spire's internals.
 
 ---
 
 ## Verification Checklist
 
 ```bash
-pnpm --filter @vex-chat/spire test    # all green
-pnpm --filter @vex-chat/spire lint    # clean
 pnpm -r exec tsc --noEmit            # zero errors across workspace
 ```
 
