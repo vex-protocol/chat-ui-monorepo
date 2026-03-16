@@ -4,6 +4,8 @@
 
 Proposed
 
+> **Note (March 2026):** This ADR references `apps/spire/` as part of the monorepo. The server has since been separated to its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)). The publishing strategy for the server still applies — it just lives elsewhere.
+
 ## Context
 
 Vex is a privacy-first encrypted messenger funded by community donations (crypto wallet). The project needs to be open enough to earn trust — especially for `packages/crypto/` and `packages/libvex/` — while protecting the operational and architectural knowledge that constitutes our competitive advantage.

@@ -16,61 +16,7 @@ pnpm install
 
 ## Server (spire)
 
-The API server — Express + SQLite/Postgres, 255 tests.
-
-### First-time setup
-
-```bash
-pnpm --filter @vex-chat/spire env:init
-```
-
-Generates `.env` with random SPK and JWT_SECRET. Or copy `.env.example` and fill in manually.
-
-### Run dev server
-
-```bash
-pnpm --filter @vex-chat/spire dev
-```
-
-Starts on `http://localhost:16777`. Auto-restarts on file changes.
-
-### Run tests
-
-```bash
-pnpm --filter @vex-chat/spire test            # run once
-pnpm --filter @vex-chat/spire test:watch      # watch mode
-pnpm --filter @vex-chat/spire test:coverage   # with coverage
-```
-
-Tests use in-memory SQLite — no external services needed.
-
-### Build for production
-
-```bash
-pnpm --filter @vex-chat/spire build
-node dist/run.js
-```
-
-### API docs
-
-```bash
-pnpm --filter @vex-chat/spire docs            # interactive docs on localhost:5555
-pnpm --filter @vex-chat/spire generate:openapi # regenerate openapi.json
-pnpm --filter @vex-chat/spire lint:openapi     # validate schema
-```
-
-### Environment variables
-
-| Variable | Required | Default | Notes |
-|---|---|---|---|
-| `DB_TYPE` | yes | — | `sqlite` or `postgres` |
-| `DATABASE_URL` | if postgres | — | Postgres connection string |
-| `SQLITE_PATH` | no | `spire.db` | SQLite file path |
-| `SPK` | yes | — | Ed25519 server private key (hex) |
-| `JWT_SECRET` | yes | — | HMAC secret, 32+ chars |
-| `API_PORT` | no | `16777` | HTTP listen port |
-| `LOG_LEVEL` | no | `info` | trace/debug/info/warn/error |
-| `OPEN_REGISTRATION` | no | false | Allow unauthenticated registration (dev only) |
+The server lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire). See that repo for server setup, environment variables, and development workflow.
 
 ---
 
@@ -233,7 +179,7 @@ These have no build step — apps import TypeScript source directly.
 | Package | Purpose | Used by |
 |---|---|---|
 | `packages/types` | Shared TypeScript interfaces | all apps + packages |
-| `packages/crypto` | Ed25519, X3DH, NaCl encryption | desktop, mobile, spire, libvex |
+| `packages/crypto` | Ed25519, X3DH, NaCl encryption | desktop, mobile, libvex (also consumed by spire via npm) |
 | `packages/libvex` | VexClient SDK (WebSocket, auth, messaging) | desktop, mobile, store |
 | `packages/store` | Nanostores reactive state | desktop, mobile |
 
@@ -245,7 +191,7 @@ These have no build step — apps import TypeScript source directly.
 pnpm dev
 ```
 
-Runs all apps in parallel (spire, desktop, website, mobile).
+Runs all client apps in parallel (desktop, website, mobile). The server (spire) runs separately from its own repo.
 
 ---
 
@@ -257,22 +203,8 @@ Runs all apps in parallel (spire, desktop, website, mobile).
 git clone https://github.com/vex-chat/vex-chat.git
 cd vex-chat
 pnpm install
-pnpm --filter @vex-chat/spire env:init
-pnpm --filter @vex-chat/spire test          # verify setup
-pnpm dev                                     # start everything
+pnpm dev                                     # start client apps
 ```
-
-### Server dev loop
-
-```bash
-# Terminal 1
-pnpm --filter @vex-chat/spire dev
-
-# Terminal 2
-pnpm --filter @vex-chat/spire test:watch
-```
-
-Edit `apps/spire/src/` → server restarts + tests rerun automatically.
 
 ### Desktop dev loop
 
@@ -286,23 +218,18 @@ Edit `apps/desktop/src/*.svelte` → Vite HMR updates the Tauri window.
 
 Push to `main` → Vercel auto-deploys.
 
-### Deploy server
-
-```bash
-pnpm --filter @vex-chat/spire build
-# Copy dist/ to server, run: node dist/run.js
-```
-
 ---
 
 ## Dependency Graph
 
 ```
-apps/spire ──────────────────── packages/crypto
 apps/desktop ─── packages/store ─── packages/libvex ─── packages/crypto
                       │                                       │
                       └──────── packages/types ◄──────────────┘
 apps/mobile ──── packages/store
 apps/website ─── packages/types
 packages/ui ──── (standalone, compiles to React + Svelte)
+
+External:
+spire (own repo) ── @vex-chat/crypto (via npm)
 ```

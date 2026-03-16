@@ -1,14 +1,14 @@
-# Auth: Upstream vs Reimplementation
+# Auth: Upstream vs Planned Improvements
 
-> For background on the Vex platform and its cryptographic protocol, see [`vex-overview.md`](./vex-overview.md).
+> For background on the Vex platform and its cryptographic protocol, see [`vex-overview.md`](../vex-overview.md).
 
-Comparison of authentication in [vex-chat/spire](https://github.com/vex-chat/spire) (`src/Spire.ts`, `src/Database.ts`) vs our reimplementation in `apps/spire/src/auth/index.ts`.
+Comparison of authentication in the current [vex-chat/spire](https://github.com/vex-chat/spire) server (`src/Spire.ts`, `src/Database.ts`) vs planned improvements. The server lives in its own repo — these improvements are ported incrementally per [`old-spire-migration-path.md`](old-spire-migration-path.md).
 
 ---
 
 ## Password Hashing
 
-| | Upstream | Ours |
+| | Current | Target |
 |---|---|---|
 | Algorithm | PBKDF2-SHA512, 1000 iterations, 32-byte output | **argon2id** (m=19MiB, t=2, p=1) |
 | Library | `pbkdf2` npm package (sync) | `argon2` npm package (async) |
@@ -27,7 +27,7 @@ The upstream implementation is synchronous, blocks the event loop, and uses 1000
 
 ## JWT Signing
 
-| | Upstream | Ours |
+| | Current | Target |
 |---|---|---|
 | Library | `jsonwebtoken` (CJS) | `jose` (ESM-native) |
 | Secret env var | `process.env.SPK` (the NaCl server signing key — same key for signing and crypto ops) | `process.env.JWT_SECRET` (dedicated secret) |
@@ -90,7 +90,7 @@ private validateToken(key: string, scope: TokenScopes): boolean {
 - Token itself is just a UUID, no signature
 - Client must NaCl-sign the token UUID with their device signing key before submitting it, so the server can verify device ownership as part of redemption
 
-### Ours: Stateless JWTs
+### Target: Stateless JWTs
 
 ```ts
 // Our approach
@@ -110,7 +110,7 @@ If single-use tokens are needed in the future, a small Redis/DB-backed token rev
 
 ## Registration Flow
 
-| | Upstream | Ours |
+| | Current | Target |
 |---|---|---|
 | Requires action token | Yes (type: Register) | Yes (type: register) |
 | Token redemption | Client NaCl-signs the token UUID with their device signing key; server verifies signature | Client presents JWT token directly |
@@ -132,7 +132,7 @@ If single-use tokens are needed in the future, a small Redis/DB-backed token rev
 }
 ```
 
-Our `registerUser(db, username, password)` takes only username and password — device registration is a separate step. This simplifies the auth boundary but requires an additional request for a new device.
+The target `registerUser(db, username, password)` takes only username and password — device registration is a separate step. This simplifies the auth boundary but requires an additional request for a new device.
 
 ---
 
@@ -152,13 +152,13 @@ const checkAuth = (req, res, next) => {
 };
 ```
 
-Authentication is cookie-based. The `protect` middleware is a separate guard that checks `req.user` is set. Our implementation uses Authorization header Bearer tokens (standard REST pattern, no cookies).
+Authentication is cookie-based. The `protect` middleware is a separate guard that checks `req.user` is set. The target implementation uses Authorization header Bearer tokens (standard REST pattern, no cookies).
 
 ---
 
 ## Database Layer
 
-| | Upstream | Ours |
+| | Current | Target |
 |---|---|---|
 | Query builder | Knex | Kysely |
 | Default DB | MySQL | SQLite (configurable → PostgreSQL) |
@@ -171,9 +171,9 @@ The upstream `Database` class creates tables on startup if they don't exist — 
 
 ## Alignment: Full Fidelity
 
-This project is **privacy-first**. We match the upstream privacy model exactly. The table below reflects final decisions.
+This project is **privacy-first**. We match the upstream privacy model exactly. The table below reflects decisions for the planned improvements to the spire server (in its own repo).
 
-| Concern | Upstream | Ours | Status |
+| Concern | Current | Target | Status |
 |---|---|---|---|
 | Token storage | In-memory single-use UUID array | In-memory single-use UUID array (`createTokenStore()`) | **Aligned** |
 | Token reuse | Single-use, consumed on validation | Single-use, consumed on validation | **Aligned** |
@@ -254,7 +254,7 @@ These are **not yet available in any Node.js LTS** as of early 2026. They will e
 
 If any code in this repo is ever shared with a browser environment (e.g., moved to a shared `packages/` module), replace `Buffer` with [`uint8array-extras`](https://github.com/sindresorhus/uint8array-extras) (`hexToUint8Array` / `uint8ArrayToHex`), which works identically in both environments.
 
-**Rule of thumb:** `Buffer` in `apps/spire` (Node.js only) is fine. Any code in a shared package that may run in a browser should use `uint8array-extras` or the native `Uint8Array` API once Node.js LTS supports it.
+**Rule of thumb:** `Buffer` in spire (Node.js only) is fine. Any code in a shared package that may run in a browser should use `uint8array-extras` or the native `Uint8Array` API once Node.js LTS supports it.
 
 ---
 
@@ -315,4 +315,4 @@ The sweep should **always stay**. It has no meaningful overhead (a Map iteration
 
 ---
 
-See also: [vex-overview.md](../vex-overview.md) for the cryptographic protocol, [architecture.md](../reference/architecture.md) for security invariants, [glossary.md](../glossary.md) for term definitions.
+See also: [vex-overview.md](../vex-overview.md) for the cryptographic protocol, [glossary.md](../glossary.md) for term definitions.
