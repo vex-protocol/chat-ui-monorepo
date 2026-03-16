@@ -1,3 +1,0 @@
-{
-  "openapi.json": ["spectral lint --fail-severity=error --ruleset .spectral.yaml"]
-}
