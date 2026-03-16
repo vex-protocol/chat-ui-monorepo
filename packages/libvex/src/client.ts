@@ -5,8 +5,8 @@ import { HttpClient } from './http.ts'
 import { VexConnection } from './connection.ts'
 import { SessionManager } from './session.ts'
 import { fromEvent } from './iterators.ts'
-import { register, login, logout, whoami, getToken } from './auth.ts'
-import type { RegisterResult, LoginResult } from './auth.ts'
+import { register, registerAndLogin, login, logout, whoami, getToken } from './auth.ts'
+import type { RegisterResult, RegisterAndLoginResult, LoginResult } from './auth.ts'
 import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle, deleteDevice } from './devices.ts'
@@ -90,6 +90,22 @@ export class VexClient extends EventEmitter<VexEvents> {
    */
   static generateKeyPair(): { publicKey: Uint8Array; secretKey: Uint8Array } {
     return generateSignKeyPair()
+  }
+
+  /**
+   * Registers a new user, logs in, and discovers the deviceID.
+   * Static because the VexClient needs a deviceID which isn't known until after registration.
+   *
+   * Returns everything needed to call `VexClient.create()` and `bootstrap()`.
+   */
+  static async registerAndLogin(
+    serverUrl: string,
+    username: string,
+    password: string,
+    deviceName: string = 'Desktop',
+  ): Promise<RegisterAndLoginResult> {
+    const http = new HttpClient(serverUrl)
+    return registerAndLogin(http, username, password, deviceName)
   }
 
   /**

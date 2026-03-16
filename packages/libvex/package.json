@@ -15,6 +15,7 @@
     "@vex-chat/crypto": "workspace:*",
     "@msgpack/msgpack": "catalog:",
     "eventemitter3": "catalog:",
-    "reconnecting-websocket": "catalog:"
+    "reconnecting-websocket": "catalog:",
+    "uuid": "catalog:"
   }
 }
