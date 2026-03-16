@@ -29,7 +29,10 @@ response will fail to parse until one side adapts.
 
 ## Data Format Differences
 
-| Field | Old spire (msgpack) | New types (libvex) | Gap |
+> **All gaps below are bridged** by `packages/libvex/src/wire.ts` (normalization)
+> and `packages/libvex/src/http.ts` (msgpack decoding). No spire changes needed.
+
+| Field | Spire (msgpack) | libvex types | Gap |
 |---|---|---|---|
 | `IUser.lastSeen` | `Date` object | `string` (ISO 8601) | msgpack encodes native Date; SDK expects string |
 | `IDevice.lastLogin` | `string` | `string \| null` | Old stores empty string; new allows null |
@@ -193,14 +196,14 @@ encryption header.
 
 ---
 
-## Routes Missing from Old Spire (needed by new libvex)
+## Route Compatibility (libvex ↔ spire)
 
-| SDK method | Expected route | Old spire | Fix needed |
-|---|---|---|---|
-| `searchUsers(query)` | `GET /users/search?q=` | Does not exist | Add route or remove from SDK |
-| `joinServerViaInvite(id)` | `POST /invite/:id/join` | Uses `PATCH /invite/:id` | SDK must use PATCH |
-| `deleteInvite(s, id)` | `DELETE /server/:s/invites/:id` | Does not exist | Add route or remove from SDK |
-| Open registration token | `GET /token/open/register` | Does not exist | SDK feature, not in old spire |
+| SDK method | Status | Notes |
+|---|---|---|
+| `searchUsers(query)` | **Graceful fallback** | Route doesn't exist in spire; SDK returns `[]` |
+| `joinServerViaInvite(id)` | **Fixed** | SDK now uses `PATCH /invite/:id` (was `POST /invite/:id/join`) |
+| `deleteInvite(s, id)` | **Throws** | Route doesn't exist in spire; SDK throws with clear message |
+| Open registration token | **Not supported** | `GET /token/open/register` doesn't exist in spire |
 
 ## Routes in Old Spire Not Used by New libvex
 

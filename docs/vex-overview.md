@@ -41,7 +41,7 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
 | `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
 
-The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Knex, TweetNaCl, SQLite/MySQL. See [`old-spire-migration-path.md`](explanation/old-spire-migration-path.md) for what's worth porting.
+The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Knex, @noble/curves, argon2id, SQLite/MySQL. See [`old-spire-migration-path.md`](explanation/old-spire-migration-path.md) for what's worth porting.
 
 See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
@@ -49,7 +49,7 @@ See `docs/explanation/platform-strategy.md` for architecture details and `docs/e
 
 ## Cryptographic Protocol
 
-Vex uses **@noble/curves** (Ed25519/Curve25519) throughout. The original upstream used tweetnacl; we migrated to @noble/curves for RFC 8032 compliance and active maintenance.
+Vex uses **@noble/curves** (Ed25519/Curve25519) throughout — both the client packages and the server. The original upstream used TweetNaCl; both repos have been migrated to @noble/curves for RFC 8032 compliance and active maintenance.
 
 ### Key hierarchy
 
