@@ -2,7 +2,8 @@
   import { push } from 'svelte-spa-router'
   import { theme, toggleTheme } from '../lib/stores/theme.js'
   import { client, user } from '../lib/store/index.js'
-  import { getServerUrl, setServerUrl, loadCredentials, clearCredentials } from '../lib/config.js'
+  import { getServerUrl, setServerUrl, clearSession } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { encodeHex } from '@vex-chat/crypto'
   import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
@@ -81,14 +82,17 @@
 
   // ── Account info ────────────────────────────────────────────────────────────
 
-  const creds = loadCredentials()
-  const fingerprint = creds?.deviceKey
-    ? encodeHex(new Uint8Array(
-        // First 8 bytes of the public key would be ideal, but we only have the secret seed.
-        // Show truncated hex of the stored device key seed as a session identifier.
-        Array.from({ length: 8 }, (_, i) => parseInt(creds.deviceKey.slice(i * 2, i * 2 + 2), 16))
-      )).toUpperCase()
-    : 'N/A'
+  let creds: import('@vex-chat/types').StoredCredentials | null = $state(null)
+  let fingerprint = $derived(
+    creds?.deviceKey
+      ? encodeHex(new Uint8Array(
+          Array.from({ length: 8 }, (_, i) => parseInt(creds!.deviceKey.slice(i * 2, i * 2 + 2), 16))
+        )).toUpperCase()
+      : 'N/A'
+  )
+
+  // Load credentials from KeyStore on mount
+  keyStore.loadActive().then((c) => { creds = c })
 
   // ── Avatar upload ────────────────────────────────────────────────────────────
 
@@ -150,7 +154,7 @@
     try {
       await $client?.logout()
     } catch { /* ignore */ }
-    clearCredentials()
+    clearSession()
     push('/login')
   }
 
@@ -160,7 +164,9 @@
   }
 
   async function confirmClearKeys(): Promise<void> {
-    clearCredentials()
+    if (creds?.username) {
+      await keyStore.clear(creds.username)
+    }
     confirmClear = false
     push('/register')
   }

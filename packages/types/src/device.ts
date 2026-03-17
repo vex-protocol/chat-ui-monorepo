@@ -10,6 +10,7 @@ export interface IDevice {
 /** Payload sent by a client to register a new device. */
 export interface IDevicePayload {
   signKey: string
+  signed: string           // token signed with device key (NaCl: sig || msg)
   preKey: string
   preKeySignature: string
   preKeyIndex: number

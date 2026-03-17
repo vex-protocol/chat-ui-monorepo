@@ -3,7 +3,7 @@
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
   import { groupMessages, client, channels, user } from '../lib/store/index.js'
-  import { loadCredentials } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { saveMessage } from '../lib/persistence.js'
   import type { DecryptedMail } from '@vex-chat/types'
 
@@ -41,7 +41,7 @@
 
       // Get all server members and their devices
       const members = await $client.listMembers(serverID)
-      const creds = loadCredentials()
+      const creds = await keyStore.loadActive()
 
       // Collect all devices across all members (excluding sender's current device)
       const deviceTargets: { deviceID: string; userID: string }[] = []

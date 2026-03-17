@@ -3,7 +3,7 @@
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
   import { messages, client, user, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
-  import { loadCredentials } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { saveMessage } from '../lib/persistence.js'
   import type { DecryptedMail } from '@vex-chat/types'
 
@@ -100,7 +100,7 @@
       saveMessage(sentMail, $user!.userID).catch(() => {})
 
       // Forward to sender's own other devices so sent messages appear everywhere
-      const creds = loadCredentials()
+      const creds = await keyStore.loadActive()
       if ($user && creds) {
         const myDevices = await $client.listDevices($user.userID)
         const otherDevices = myDevices.filter(d => d.deviceID !== creds.deviceID)

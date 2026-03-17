@@ -3,12 +3,13 @@
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
   import { bootstrap, user, messages, groupMessages, client, servers as serversAtom } from '../lib/store/index.js'
-  import { getServerUrl, loadCredentials } from '../lib/config.js'
+  import { getServerUrl } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { decodeHex } from '@vex-chat/crypto'
   import { loadAllMessages, saveMessage } from '../lib/persistence.js'
 
-  onMount(() => {
-    const creds = loadCredentials()
+  onMount(async () => {
+    const creds = await keyStore.loadActive()
 
     if (!creds) {
       push('/login')

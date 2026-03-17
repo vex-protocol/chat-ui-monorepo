@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import { client, avatarHash, resetAll } from './store/index.js'
-  import { clearCredentials, getServerUrl } from './config.js'
+  import { clearSession, getServerUrl } from './config.js'
   import { clearMessages } from './persistence.js'
   import { playLock } from './sounds.js'
   import Avatar from './Avatar.svelte'
@@ -16,7 +16,7 @@
     try { await $client?.logout() } catch { /* ignore */ }
     resetAll()
     clearMessages().catch(() => {})
-    clearCredentials()
+    clearSession()
     push('/login')
   }
 

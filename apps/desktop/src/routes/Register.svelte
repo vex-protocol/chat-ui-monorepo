@@ -3,7 +3,8 @@
   import { encodeHex } from '@vex-chat/crypto'
   import { VexClient } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
-  import { getServerUrl, saveCredentials } from '../lib/config.js'
+  import { getServerUrl } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { playUnlock, playError } from '../lib/sounds.js'
 
   let username = $state('')
@@ -31,8 +32,8 @@
         return
       }
 
-      // Save device credentials for future logins
-      saveCredentials({
+      // Persist device credentials via KeyStore
+      await keyStore.save({
         username,
         deviceID: result.deviceID,
         deviceKey: encodeHex(result.signKeyPair.secretKey),
