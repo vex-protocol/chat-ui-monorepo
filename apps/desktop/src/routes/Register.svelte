@@ -10,15 +10,100 @@
   let username = $state('')
   let password = $state('')
   let confirm = $state('')
-  let error = $state('')
+  let errors: Record<string, string> = $state({})
   let loading = $state(false)
+
+  // ── Username availability check ────────────────────────────────────────────
+
+  let usernameStatus: 'idle' | 'checking' | 'available' | 'taken' = $state('idle')
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined
+
+  const USERNAME_RE = /^\w+$/
+  const LEADING_TRAILING_RE = /^[-_]|[-_]$/
+
+  function validateUsername(value: string): string | null {
+    if (value.length < 3) return 'Username must be at least 3 characters'
+    if (!USERNAME_RE.test(value)) return 'Username can only contain letters, numbers, hyphens, and underscores'
+    if (LEADING_TRAILING_RE.test(value)) return 'Username cannot start or end with a hyphen or underscore'
+    return null
+  }
+
+  // ── Debounced username availability check ────────────────────────────────────
+
+  let prevUsername = ''
+
+  function checkUsername(value: string): void {
+    clearTimeout(debounceTimer)
+    usernameStatus = 'idle'
+    errors = { ...errors }
+    delete errors.username
+
+    if (!value) return
+
+    const localError = validateUsername(value)
+    if (localError) {
+      if (value.length >= 3) errors = { ...errors, username: localError }
+      return
+    }
+
+    usernameStatus = 'checking'
+    debounceTimer = setTimeout(async () => {
+      try {
+        const taken = await VexClient.checkUsername(getServerUrl(), value)
+        if (username !== value) return // stale
+        usernameStatus = taken ? 'taken' : 'available'
+        if (taken) errors = { ...errors, username: 'Username is already taken' }
+      } catch {
+        usernameStatus = 'idle'
+      }
+    }, 400)
+  }
+
+  // Only react to username changes, not errors/status changes
+  $effect(() => {
+    const value = username
+    if (value !== prevUsername) {
+      prevUsername = value
+      // Use untrack to avoid re-triggering on errors/status writes
+      checkUsername(value)
+    }
+  })
+
+  // Clear field errors when user edits
+  $effect(() => {
+    void password
+    delete errors.password
+  })
+
+  $effect(() => {
+    void confirm
+    delete errors.confirm
+  })
+
+  // ── Submit ─────────────────────────────────────────────────────────────────
 
   async function handleRegister(e: SubmitEvent) {
     e.preventDefault()
-    if (password !== confirm) { error = 'Passwords do not match'; return }
+
+    // Validate all fields
+    const newErrors: Record<string, string> = {}
+    const usernameError = validateUsername(username)
+    if (!username) newErrors.username = 'Username is required'
+    else if (usernameError) newErrors.username = usernameError
+    else if (usernameStatus === 'taken') newErrors.username = 'Username is already taken'
+    if (password.length < 8) newErrors.password = 'Password must be at least 8 characters'
+    if (password !== confirm) newErrors.confirm = 'Passwords do not match'
+
+    if (Object.keys(newErrors).length > 0) {
+      errors = newErrors
+      // Focus first error field
+      const firstKey = Object.keys(newErrors)[0]!
+      document.getElementById(firstKey)?.focus()
+      return
+    }
 
     loading = true
-    error = ''
+    errors = {}
 
     try {
       const SERVER_URL = getServerUrl()
@@ -26,7 +111,7 @@
       const result = await VexClient.registerAndLogin(SERVER_URL, username, password, 'Desktop')
 
       if (!result.ok) {
-        error = result.error.message || `Registration failed (${result.error.code})`
+        errors = { form: result.error.message || `Registration failed (${result.error.code})` }
         playError()
         loading = false
         return
@@ -47,12 +132,12 @@
         playUnlock()
         push('/settings')
       } else {
-        error = 'Registration succeeded but could not connect to server'
+        errors = { form: 'Registration succeeded but could not connect to server' }
         playError()
         loading = false
       }
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Unexpected error'
+      errors = { form: err instanceof Error ? err.message : 'Unexpected error' }
       loading = false
     }
   }
@@ -63,27 +148,69 @@
     <h1 class="auth-card__title">Create account</h1>
     <p class="auth-card__subtitle">Join Vex Chat</p>
 
-    {#if error}
-      <p class="auth-card__error">{error}</p>
+    {#if errors.form}
+      <p class="auth-card__error">{errors.form}</p>
     {/if}
 
-    <form class="auth-form" onsubmit={handleRegister}>
+    <form class="auth-form" onsubmit={handleRegister} novalidate>
       <div class="auth-form__field">
         <label for="username">Username</label>
-        <input id="username" type="text" placeholder="choose a username" bind:value={username} disabled={loading} required minlength="3" maxlength="19" pattern="\w+" />
+        <div class="auth-form__input-wrap">
+          <input
+            id="username"
+            type="text"
+            placeholder="choose a username"
+            bind:value={username}
+            disabled={loading}
+            maxlength={20}
+            autocomplete="username"
+            class:auth-form__input--error={errors.username}
+            class:auth-form__input--ok={usernameStatus === 'available'}
+          />
+          {#if usernameStatus === 'checking'}
+            <span class="auth-form__status auth-form__status--checking">checking…</span>
+          {:else if usernameStatus === 'available'}
+            <span class="auth-form__status auth-form__status--ok">available</span>
+          {/if}
+        </div>
+        {#if errors.username}
+          <span class="auth-form__error">{errors.username}</span>
+        {/if}
       </div>
 
       <div class="auth-form__field">
         <label for="password">Password</label>
-        <input id="password" type="password" placeholder="••••••••" bind:value={password} disabled={loading} required />
+        <input
+          id="password"
+          type="password"
+          placeholder="••••••••"
+          bind:value={password}
+          disabled={loading}
+          autocomplete="new-password"
+          class:auth-form__input--error={errors.password}
+        />
+        {#if errors.password}
+          <span class="auth-form__error">{errors.password}</span>
+        {/if}
       </div>
 
       <div class="auth-form__field">
         <label for="confirm">Confirm password</label>
-        <input id="confirm" type="password" placeholder="••••••••" bind:value={confirm} disabled={loading} required />
+        <input
+          id="confirm"
+          type="password"
+          placeholder="••••••••"
+          bind:value={confirm}
+          disabled={loading}
+          autocomplete="new-password"
+          class:auth-form__input--error={errors.confirm}
+        />
+        {#if errors.confirm}
+          <span class="auth-form__error">{errors.confirm}</span>
+        {/if}
       </div>
 
-      <button class="auth-form__submit" type="submit" disabled={loading}>
+      <button class="auth-form__submit" type="submit" disabled={loading || usernameStatus === 'taken'}>
         {loading ? 'Creating account...' : 'Create account'}
       </button>
     </form>
@@ -137,6 +264,37 @@
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+
+  .auth-form__input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .auth-form__input-wrap input { width: 100%; }
+
+  .auth-form__status {
+    position: absolute;
+    right: 8px;
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  .auth-form__status--checking { color: var(--text-muted); }
+  .auth-form__status--ok { color: var(--success); }
+
+  .auth-form__error {
+    font-size: 12px;
+    color: var(--danger);
+  }
+
+  .auth-form__input--error {
+    border-color: var(--danger) !important;
+  }
+
+  .auth-form__input--ok {
+    border-color: var(--success) !important;
   }
 
   .auth-form__submit {
