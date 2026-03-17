@@ -46,9 +46,8 @@ export async function deleteChannel(http: HttpClient, channelID: string): Promis
   if (!result.ok) throw new Error(result.error.message)
 }
 
-export async function listMembers(http: HttpClient, serverID: string): Promise<IUser[]> {
-  // Old spire uses POST /userList/:channelID — we pass serverID and it resolves via permissions
-  const result = await http.post<Record<string, unknown>[]>(`/userList/${serverID}`)
+export async function listMembers(http: HttpClient, channelID: string): Promise<IUser[]> {
+  const result = await http.post<Record<string, unknown>[]>(`/userList/${channelID}`)
   if (!result.ok) throw new Error(result.error.message)
   return result.data.map(normalizeUser)
 }

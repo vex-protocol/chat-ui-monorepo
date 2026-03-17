@@ -136,12 +136,12 @@ export class VexClient extends EventEmitter<VexEvents> {
    * Emits 'ready' once connected.
    */
   async connect(): Promise<void> {
-    const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/ws'
+    const wsUrl = this.serverUrl.replace(/^http/, 'ws') + '/socket'
     this.connection = new VexConnection(wsUrl, this.deviceID, this.deviceKey, this, (rawMail) => {
       if (!this.sessionManager) return
       const decrypted = this.sessionManager.decrypt(rawMail)
       if (decrypted) this.emit('mail', decrypted)
-    })
+    }, this.http.getToken())
     this.connection.connect()
     await new Promise<void>((resolve) => this.once('ready', resolve))
   }
@@ -313,9 +313,9 @@ export class VexClient extends EventEmitter<VexEvents> {
     return deleteChannel(this.http, channelID)
   }
 
-  /** Returns all members of a server. Requires membership. */
-  async listMembers(serverID: string): Promise<IUser[]> {
-    return listMembers(this.http, serverID)
+  /** Returns all members of a channel. Requires server membership. */
+  async listMembers(channelID: string): Promise<IUser[]> {
+    return listMembers(this.http, channelID)
   }
 
   /**

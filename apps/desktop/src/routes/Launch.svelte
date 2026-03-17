@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
-  import { bootstrap, user, messages, groupMessages, client, servers as serversAtom } from '../lib/store/index.js'
+  import { bootstrap, user, messages, groupMessages, client, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { decodeHex } from '@vex-chat/crypto'
@@ -32,6 +32,20 @@
         const c = client.get()
         if (!c) return
 
+        // Navigate now that bootstrap is complete (servers + channels loaded)
+        const serverList = Object.values(serversAtom.get())
+        if (serverList.length > 0) {
+          const sid = serverList[0]!.serverID
+          const chs = channelsAtom.get()[sid] ?? []
+          if (chs.length > 0) {
+            push(`/server/${sid}/${chs[0]!.channelID}`)
+          } else {
+            push('/home')
+          }
+        } else {
+          push('/home')
+        }
+
         // Persist incoming real-time messages
         c.on('mail', (mail) => {
           const u = user.get()
@@ -59,21 +73,6 @@
         }
       })
       .catch(() => push('/login'))
-
-    // Watch $user — once set, navigate to the main app
-    const unsub = user.subscribe((u) => {
-      if (u) {
-        unsub()
-        const serverList = Object.values(serversAtom.get())
-        if (serverList.length > 0) {
-          push(`/server/${serverList[0]!.serverID}/`)
-        } else {
-          push('/home')
-        }
-      }
-    })
-
-    return unsub
   })
 </script>
 

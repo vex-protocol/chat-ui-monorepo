@@ -1,6 +1,5 @@
 <script lang="ts">
   import { client, servers, channels } from './store/index.js'
-  import { $servers as serversStore, $channels as channelsStore } from '@vex-chat/store'
   import { push } from 'svelte-spa-router'
 
   let { onclose }: { onclose: () => void } = $props()
@@ -17,11 +16,17 @@
     error = ''
     try {
       const server = await $client!.createServer(n, n.slice(0, 1).toUpperCase())
-      serversStore.setKey(server.serverID, server)
-      const channel = await $client!.createChannel(server.serverID, 'general')
-      channelsStore.setKey(server.serverID, [channel])
+      servers.setKey(server.serverID, server)
+      // Spire auto-creates #general during createServer, so just fetch channels
+      const serverChannels = await $client!.listChannels(server.serverID)
+      channels.setKey(server.serverID, serverChannels)
       onclose()
-      push(`/server/${server.serverID}/${channel.channelID}`)
+      const firstChannel = serverChannels[0]
+      if (firstChannel) {
+        push(`/server/${server.serverID}/${firstChannel.channelID}`)
+      } else {
+        push(`/server/${server.serverID}/`)
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create server'
     } finally {

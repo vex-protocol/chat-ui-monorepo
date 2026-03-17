@@ -29,7 +29,7 @@ export default defineConfig({
       '/permission': spire,
       '/userList': spire,
       '/deviceList': spire,
-      '/ws': { target: SPIRE_URL, changeOrigin: true, ws: true },
+      '/socket': { target: SPIRE_URL, changeOrigin: true, ws: true },
     },
   },
   // Hide native browser env APIs from Tauri frontend
