@@ -11,7 +11,7 @@ import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle, deleteDevice } from './devices.ts'
 import { createServer, listServers, listChannels, createChannel, deleteServer, deleteChannel, listMembers } from './servers.ts'
-import { getUser as getUserById, searchUsers as searchUsersHttp } from './users.ts'
+import { getUser as getUserById, searchUsers as searchUsersHttp, isUsernameTaken } from './users.ts'
 
 export interface VexEvents {
   /** Emitted when the WebSocket connection is established (before auth handshake). */
@@ -106,6 +106,12 @@ export class VexClient extends EventEmitter<VexEvents> {
   ): Promise<RegisterAndLoginResult> {
     const http = new HttpClient(serverUrl)
     return registerAndLogin(http, username, password, deviceName)
+  }
+
+  /** Checks whether a username is already registered. No auth required. */
+  static async checkUsername(serverUrl: string, username: string): Promise<boolean> {
+    const http = new HttpClient(serverUrl)
+    return isUsernameTaken(http, username)
   }
 
   /**
