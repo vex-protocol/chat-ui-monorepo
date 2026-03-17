@@ -1,10 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import {
   View,
-  Text,
   FlatList,
-  TextInput,
-  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,9 +9,17 @@ import {
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $groupMessages, $client, $user } from '../store'
+import { colors } from '../theme'
+import { ChatHeader } from '../components/ChatHeader'
+import { MessageBubbleRN } from '../components/MessageBubbleRN'
+import { MessageInputBar } from '../components/MessageInputBar'
 
-export function ChannelScreen({ route }: { route: any }) {
-  const { channelID, channelName } = route.params as { channelID: string; channelName: string }
+export function ChannelScreen({ route, navigation }: { route: any; navigation: any }) {
+  const { channelID, channelName, serverName } = route.params as {
+    channelID: string
+    channelName: string
+    serverName?: string
+  }
   const allGroupMessages = useStore($groupMessages)
   const messages: DecryptedMail[] = allGroupMessages[channelID] ?? []
   const client = useStore($client)
@@ -39,12 +44,11 @@ export function ChannelScreen({ route }: { route: any }) {
   function renderMessage({ item }: { item: DecryptedMail }) {
     const isOwn = item.authorID === user?.userID
     return (
-      <View style={styles.message}>
-        <Text style={[styles.author, isOwn && styles.authorSelf]}>
-          {isOwn ? 'You' : item.authorID.slice(0, 8)}
-        </Text>
-        <Text style={styles.content}>{item.content}</Text>
-      </View>
+      <MessageBubbleRN
+        message={item}
+        isOwn={isOwn}
+        authorName={isOwn ? 'You' : item.authorID.slice(0, 8)}
+      />
     )
   }
 
@@ -52,8 +56,14 @@ export function ChannelScreen({ route }: { route: any }) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={90}
+      keyboardVerticalOffset={0}
     >
+      <ChatHeader
+        title={serverName ?? 'Server'}
+        subtitle={`#${channelName}`}
+        onBack={() => navigation.goBack()}
+      />
+
       <FlatList
         data={messages}
         keyExtractor={(m) => m.mailID}
@@ -61,38 +71,24 @@ export function ChannelScreen({ route }: { route: any }) {
         inverted
         contentContainerStyle={styles.list}
       />
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder={`Message #${channelName}`}
-          placeholderTextColor="#666666"
-          multiline
-          editable={!sending}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!text.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={sendMessage}
-          disabled={!text.trim() || sending}
-        >
-          <Text style={styles.sendText}>Send</Text>
-        </TouchableOpacity>
-      </View>
+
+      <MessageInputBar
+        value={text}
+        onChangeText={setText}
+        onSend={sendMessage}
+        placeholder={`Message #${channelName}`}
+        sending={sending}
+      />
     </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a1a' },
-  list: { padding: 12 },
-  message: { marginBottom: 8 },
-  author: { color: '#a0a0a0', fontSize: 12, fontWeight: '600', marginBottom: 2 },
-  authorSelf: { color: '#cc2a2a' },
-  content: { color: '#e8e8e8', fontSize: 14, lineHeight: 20 },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, borderTopWidth: 1, borderTopColor: '#2a2a2a', backgroundColor: '#141414' },
-  input: { flex: 1, backgroundColor: '#242424', color: '#e8e8e8', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, maxHeight: 100, borderWidth: 1, borderColor: '#2a2a2a' },
-  sendBtn: { backgroundColor: '#cc2a2a', borderRadius: 4, paddingHorizontal: 16, paddingVertical: 10, marginLeft: 8 },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  list: {
+    paddingVertical: 8,
+  },
 })

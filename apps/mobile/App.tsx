@@ -10,6 +10,7 @@ import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
 import { requestNotificationPermission, showMessageNotification, setupNotificationHandlers } from './src/lib/notifications'
+import { colors, fontFamilies } from './src/theme'
 
 function App() {
   const keyReplaced = useStore($keyReplaced)
@@ -64,18 +65,18 @@ function App() {
         theme={{
           dark: true,
           colors: {
-            primary: '#cc2a2a',
-            background: '#1a1a1a',
-            card: '#141414',
-            text: '#e8e8e8',
-            border: '#2a2a2a',
-            notification: '#e53935',
+            primary: colors.accentMuted,
+            background: colors.bg,
+            card: colors.card,
+            text: colors.textSecondary,
+            border: colors.borderSubtle,
+            notification: colors.error,
           },
           fonts: {
-            regular: { fontFamily: 'System', fontWeight: '400' },
-            medium: { fontFamily: 'System', fontWeight: '500' },
-            bold: { fontFamily: 'System', fontWeight: '700' },
-            heavy: { fontFamily: 'System', fontWeight: '900' },
+            regular: { fontFamily: fontFamilies.mono, fontWeight: '300' },
+            medium: { fontFamily: fontFamilies.body, fontWeight: '500' },
+            bold: { fontFamily: fontFamilies.heading, fontWeight: '500' },
+            heavy: { fontFamily: fontFamilies.heading, fontWeight: '500' },
           },
         }}
       >
