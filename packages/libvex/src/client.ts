@@ -338,7 +338,7 @@ export class VexClient extends EventEmitter<VexEvents> {
 
   /** Creates an invite for a server. Requires INVITE_POWER (25+) on the server. */
   async createInvite(serverID: string, expiration: string | null = null): Promise<IInvite> {
-    const result = await this.http.post<IInvite>(`/server/${serverID}/invites`, { expiration })
+    const result = await this.http.post<IInvite>(`/server/${serverID}/invites`, { duration: expiration })
     if (!result.ok) throw new Error(result.error.message)
     return result.data
   }
@@ -359,11 +359,10 @@ export class VexClient extends EventEmitter<VexEvents> {
 
   /** Joins a server via invite code. Returns the server on success. */
   async joinServerViaInvite(inviteID: string): Promise<IServer> {
-    // Old spire uses PATCH /invite/:id — returns the new IPermission, not the server.
-    // We PATCH to join, then fetch the server details from the permission's serverID.
-    const result = await this.http.patch<{ serverID: string }>(`/invite/${inviteID}`)
+    // Old spire uses PATCH /invite/:id — returns the new IPermission (resourceID = serverID).
+    const result = await this.http.patch<{ resourceID: string }>(`/invite/${inviteID}`)
     if (!result.ok) throw new Error(result.error.message)
-    const serverID = result.data.serverID
+    const serverID = result.data.resourceID
     // Fetch the full server record
     const servers = await this.listServers()
     const server = servers.find(s => s.serverID === serverID)
