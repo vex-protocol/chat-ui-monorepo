@@ -154,6 +154,8 @@
     try {
       await $client?.logout()
     } catch { /* ignore */ }
+    // Clear the stored JWT so auto-login won't fire, but keep device keys
+    if (creds) await keyStore.save({ ...creds, token: undefined })
     clearSession()
     push('/login')
   }
@@ -174,7 +176,10 @@
 
 <div class="settings-page">
   <header class="settings-page__header">
-    <button class="settings-page__back" onclick={() => history.back()} aria-label="Go back">←</button>
+    <button class="settings-page__back" onclick={() => {
+      if (window.history.length > 1) history.back()
+      else push('/home')
+    }} aria-label="Go back">←</button>
     <h1 class="settings-page__title">Settings</h1>
   </header>
 

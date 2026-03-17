@@ -2,6 +2,7 @@
   import { push } from 'svelte-spa-router'
   import { client, avatarHash, resetAll } from './store/index.js'
   import { clearSession, getServerUrl } from './config.js'
+  import { keyStore } from './keystore.js'
   import { clearMessages } from './persistence.js'
   import { playLock } from './sounds.js'
   import Avatar from './Avatar.svelte'
@@ -14,6 +15,9 @@
     menuOpen = false
     playLock()
     try { await $client?.logout() } catch { /* ignore */ }
+    // Clear JWT so auto-login won't fire, but keep device keys
+    const creds = await keyStore.loadActive()
+    if (creds) await keyStore.save({ ...creds, token: undefined })
     resetAll()
     clearMessages().catch(() => {})
     clearSession()

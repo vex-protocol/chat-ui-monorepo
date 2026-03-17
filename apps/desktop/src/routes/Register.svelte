@@ -117,12 +117,13 @@
         return
       }
 
-      // Persist device credentials via KeyStore
+      // Persist device credentials + JWT via KeyStore
       await keyStore.save({
         username,
         deviceID: result.deviceID,
         deviceKey: encodeHex(result.signKeyPair.secretKey),
         preKey: encodeHex(result.preKeyPair.secretKey),
+        token: result.token,
       })
 
       // Bootstrap the store with the JWT from registration
@@ -130,7 +131,7 @@
 
       if (userAtom.get()) {
         playUnlock()
-        push('/settings')
+        push('/home')
       } else {
         errors = { form: 'Registration succeeded but could not connect to server' }
         playError()

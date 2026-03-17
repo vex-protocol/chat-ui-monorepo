@@ -31,11 +31,14 @@
         const result = await client.login(username, password)
 
         if (!result.ok) {
-          error = result.error.message || 'Invalid username or password'
+          error = 'Invalid username or password'
           playError()
           loading = false
           return
         }
+
+        // Update stored token for session resumption
+        await keyStore.save({ ...creds, token: result.token })
 
         await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
       } else {
@@ -43,18 +46,19 @@
         const result = await VexClient.loginNewDevice(SERVER_URL, username, password, 'Desktop')
 
         if (!result.ok) {
-          error = result.error.message || 'Invalid username or password'
+          error = 'Invalid username or password'
           playError()
           loading = false
           return
         }
 
-        // Persist the new device credentials
+        // Persist the new device credentials + JWT
         await keyStore.save({
           username,
           deviceID: result.deviceID,
           deviceKey: encodeHex(result.signKeyPair.secretKey),
           preKey: encodeHex(result.preKeyPair.secretKey),
+          token: result.token,
         })
 
         await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
@@ -67,7 +71,7 @@
         if (serverList.length > 0) {
           push(`/server/${serverList[0]!.serverID}/`)
         } else {
-          push('/settings')
+          push('/home')
         }
       } else {
         error = 'Could not verify credentials after login'

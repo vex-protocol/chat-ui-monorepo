@@ -4,6 +4,7 @@ export interface StoredCredentials {
   deviceID: string
   deviceKey: string  // hex-encoded 32-byte Ed25519 secret key seed
   preKey: string     // hex-encoded 32-byte preKey secret seed
+  token?: string     // JWT for session resumption (7-day expiry)
 }
 
 /**

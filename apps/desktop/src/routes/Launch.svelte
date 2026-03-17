@@ -11,7 +11,7 @@
   onMount(async () => {
     const creds = await keyStore.loadActive()
 
-    if (!creds) {
+    if (!creds || !creds.token) {
       push('/login')
       return
     }
@@ -27,7 +27,7 @@
         for (const [key, msgs] of Object.entries(groups)) groupMessages.setKey(key, msgs)
       })
       .catch(() => {})
-      .then(() => bootstrap(getServerUrl(), creds.deviceID, deviceKey, undefined, preKeySecret))
+      .then(() => bootstrap(getServerUrl(), creds.deviceID, deviceKey, creds.token, preKeySecret))
       .then(async () => {
         const c = client.get()
         if (!c) return
@@ -68,7 +68,7 @@
         if (serverList.length > 0) {
           push(`/server/${serverList[0]!.serverID}/`)
         } else {
-          push('/settings')
+          push('/home')
         }
       }
     })
