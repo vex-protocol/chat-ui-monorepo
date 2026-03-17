@@ -2,6 +2,7 @@
   import { push } from 'svelte-spa-router'
   import type { IChannel } from '@vex-chat/types'
   import { client, servers, channels as channelsStore } from './store/index.js'
+  import InviteModal from './InviteModal.svelte'
 
   let {
     serverName = '',
@@ -25,6 +26,7 @@
   let confirmDelete = $state(false)
   let deleting = $state(false)
   let deleteError = $state('')
+  let showInvite = $state(false)
 
   async function handleDeleteServer(): Promise<void> {
     if (!serverID || !$client) return
@@ -111,6 +113,9 @@
     {#if menuOpen}
       <div class="channel-bar__menu" role="menu">
         {#if !confirmDelete}
+          <button class="channel-bar__menu-item" role="menuitem" onclick={() => { showInvite = true; menuOpen = false }}>
+            Invite People
+          </button>
           <button class="channel-bar__menu-item channel-bar__menu-item--danger" role="menuitem" onclick={() => { confirmDelete = true }}>
             Delete Server
           </button>
@@ -187,6 +192,10 @@
     {/if}
   </ul>
 </nav>
+
+{#if showInvite}
+  <InviteModal {serverID} serverName={serverName} onclose={() => { showInvite = false }} />
+{/if}
 
 <style>
   .channel-bar {
