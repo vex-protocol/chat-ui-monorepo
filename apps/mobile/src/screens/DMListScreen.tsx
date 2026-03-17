@@ -11,6 +11,8 @@ import { useStore } from '@nanostores/react'
 import type { IUser, DecryptedMail } from '@vex-chat/types'
 import { $familiars, $messages, $client } from '../store'
 import { $familiars as familiarsAtom } from '@vex-chat/store'
+import { colors, typography } from '../theme'
+import { ChatHeader } from '../components/ChatHeader'
 
 export function DMListScreen({ navigation }: { navigation: any }) {
   const familiars = useStore($familiars)
@@ -93,13 +95,15 @@ export function DMListScreen({ navigation }: { navigation: any }) {
 
   return (
     <View style={styles.container}>
+      <ChatHeader title="Home" />
+
       <View style={styles.searchWrap}>
         <TextInput
           style={styles.searchInput}
           value={query}
           onChangeText={onSearch}
           placeholder="Find a user..."
-          placeholderTextColor="#666666"
+          placeholderTextColor={colors.mutedDark}
         />
       </View>
 
@@ -143,31 +147,107 @@ function hue(id: string): number {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1a1a1a' },
-  searchWrap: { padding: 8, borderBottomWidth: 1, borderBottomColor: '#2a2a2a' },
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  searchWrap: {
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+  },
   searchInput: {
-    backgroundColor: '#242424',
-    color: '#e8e8e8',
-    borderRadius: 4,
+    backgroundColor: colors.input,
+    color: colors.textSecondary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
+    borderColor: colors.borderSubtle,
   },
-  resultsList: { maxHeight: 200, borderBottomWidth: 1, borderBottomColor: '#2a2a2a' },
-  resultRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#202020' },
-  avatarSm: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  avatarSmText: { color: '#fff', fontWeight: '700', fontSize: 12 },
-  resultName: { color: '#e8e8e8', fontSize: 14 },
-  noResults: { color: '#666666', fontSize: 13, fontStyle: 'italic', paddingHorizontal: 12, paddingVertical: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderBottomWidth: 1, borderBottomColor: '#2a2a2a' },
-  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  rowContent: { flex: 1 },
-  username: { color: '#e8e8e8', fontSize: 15, fontWeight: '600' },
-  preview: { color: '#666666', fontSize: 13, marginTop: 2 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: '#666666', fontSize: 14, fontStyle: 'italic' },
-  emptyHint: { color: '#555555', fontSize: 12, marginTop: 4 },
+  resultsList: {
+    maxHeight: 200,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.surface,
+  },
+  avatarSm: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarSmText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  resultName: {
+    ...typography.button,
+    color: colors.textSecondary,
+  },
+  noResults: {
+    ...typography.body,
+    color: colors.mutedDark,
+    fontStyle: 'italic',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  rowContent: {
+    flex: 1,
+  },
+  username: {
+    ...typography.button,
+    color: colors.textSecondary,
+    fontSize: 15,
+  },
+  preview: {
+    ...typography.body,
+    color: colors.mutedDark,
+    marginTop: 2,
+  },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.mutedDark,
+    fontStyle: 'italic',
+  },
+  emptyHint: {
+    ...typography.body,
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 4,
+  },
 })
