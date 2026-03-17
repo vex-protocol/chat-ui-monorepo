@@ -13,6 +13,7 @@ import { encodeHex } from '@vex-chat/crypto'
 /** Convert a value to ISO string if it's a Date, otherwise pass through. */
 export function normalizeDate(v: unknown): string {
   if (v instanceof Date) return v.toISOString()
+  if (typeof v === 'number') return new Date(v).toISOString()
   if (typeof v === 'string') return v
   return String(v)
 }

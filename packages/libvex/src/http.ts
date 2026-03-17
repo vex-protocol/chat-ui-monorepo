@@ -16,6 +16,10 @@ async function parseBody<T>(res: Response): Promise<T> {
     const buf = await res.arrayBuffer()
     return decodeMsgpack(new Uint8Array(buf)) as T
   }
+  // Spire returns plain text (e.g. "OK") for some endpoints
+  if (!ct.includes('json')) {
+    return undefined as T
+  }
   return (await res.json()) as T
 }
 
@@ -31,6 +35,10 @@ export class HttpClient {
 
   clearToken(): void {
     this.token = undefined
+  }
+
+  getToken(): string | undefined {
+    return this.token
   }
 
   private headers(): Record<string, string> {

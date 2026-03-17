@@ -11,9 +11,9 @@
     "@types/node": "catalog:"
   },
   "dependencies": {
-    "@vex-chat/types": "workspace:*",
-    "@vex-chat/crypto": "workspace:*",
     "@msgpack/msgpack": "catalog:",
+    "@vex-chat/crypto": "workspace:*",
+    "@vex-chat/types": "workspace:*",
     "eventemitter3": "catalog:",
     "reconnecting-websocket": "catalog:",
     "uuid": "catalog:"

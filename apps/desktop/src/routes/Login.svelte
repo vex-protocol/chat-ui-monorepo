@@ -2,7 +2,7 @@
   import { push } from 'svelte-spa-router'
   import { decodeHex, encodeHex } from '@vex-chat/crypto'
   import { VexClient } from '@vex-chat/libvex'
-  import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
+  import { bootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { playUnlock, playError } from '../lib/sounds.js'
@@ -69,7 +69,13 @@
         playUnlock()
         const serverList = Object.values(serversAtom.get())
         if (serverList.length > 0) {
-          push(`/server/${serverList[0]!.serverID}/`)
+          const sid = serverList[0]!.serverID
+          const chs = channelsAtom.get()[sid] ?? []
+          if (chs.length > 0) {
+            push(`/server/${sid}/${chs[0]!.channelID}`)
+          } else {
+            push('/home')
+          }
         } else {
           push('/home')
         }

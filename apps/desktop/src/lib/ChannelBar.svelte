@@ -1,8 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import type { IChannel } from '@vex-chat/types'
-  import { client } from './store/index.js'
-  import { $channels as channelsStore } from '@vex-chat/store'
+  import { client, servers, channels as channelsStore } from './store/index.js'
 
   let {
     serverName = '',
@@ -18,6 +17,49 @@
 
   function navToChannel(channelID: string): void {
     push(`/server/${serverID}/${channelID}`)
+  }
+
+  // ── Server menu ───────────────────────────────────────────────────────────
+
+  let menuOpen = $state(false)
+  let confirmDelete = $state(false)
+  let deleting = $state(false)
+  let deleteError = $state('')
+
+  async function handleDeleteServer(): Promise<void> {
+    if (!serverID || !$client) return
+    deleting = true
+    deleteError = ''
+    try {
+      await $client.deleteServer(serverID)
+    } catch (err) {
+      deleteError = err instanceof Error ? err.message : 'Failed to delete'
+      deleting = false
+      return
+    }
+
+    // Compute next destination before modifying stores
+    const allServers = servers.get()
+    const remaining = Object.values(allServers).filter(s => s.serverID !== serverID)
+    let dest = '/home'
+    if (remaining.length > 0) {
+      const next = remaining[0]!
+      const nextChans = channelsStore.get()[next.serverID] ?? []
+      const firstChan = nextChans[0]
+      dest = firstChan ? `/server/${next.serverID}/${firstChan.channelID}` : '/home'
+    }
+
+    // Update stores
+    const { [serverID]: _, ...rest } = allServers
+    servers.set(rest)
+    const { [serverID]: __, ...restChans } = channelsStore.get()
+    channelsStore.set(restChans)
+
+    // Navigate away
+    confirmDelete = false
+    menuOpen = false
+    deleting = false
+    push(dest)
   }
 
   // ── Add channel ─────────────────────────────────────────────────────────────
@@ -61,8 +103,41 @@
 
 <nav class="channel-bar" aria-label="Channels">
   <div class="channel-bar__header">
-    <span class="channel-bar__server-name">{serverName}</span>
+    <button class="channel-bar__server-btn" onclick={() => (menuOpen = !menuOpen)} aria-label="Server options" aria-expanded={menuOpen}>
+      <span class="channel-bar__server-name">{serverName}</span>
+      <span class="channel-bar__chevron">{menuOpen ? '\u2715' : '\u25BE'}</span>
+    </button>
+
+    {#if menuOpen}
+      <div class="channel-bar__menu" role="menu">
+        {#if !confirmDelete}
+          <button class="channel-bar__menu-item channel-bar__menu-item--danger" role="menuitem" onclick={() => { confirmDelete = true }}>
+            Delete Server
+          </button>
+        {:else}
+          <div class="channel-bar__confirm">
+            <p class="channel-bar__confirm-text">Delete <strong>{serverName}</strong>?</p>
+            {#if deleteError}
+              <p class="channel-bar__delete-error">{deleteError}</p>
+            {/if}
+            <div class="channel-bar__confirm-actions">
+              <button class="channel-bar__confirm-btn channel-bar__confirm-btn--danger" onclick={handleDeleteServer} disabled={deleting}>
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+              <button class="channel-bar__confirm-btn" onclick={() => { confirmDelete = false }} disabled={deleting}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
+
+  {#if menuOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <div class="channel-bar__backdrop" role="presentation" onclick={() => { menuOpen = false; confirmDelete = false }}></div>
+  {/if}
 
   <ul class="channel-bar__list">
     <li class="channel-bar__section-label">
@@ -120,20 +195,112 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    overflow-y: auto;
     border-right: 1px solid var(--border);
+    overflow: visible;
   }
 
   .channel-bar__header {
-    padding: 12px 16px;
+    padding: 0;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
+    position: relative;
+  }
+
+  .channel-bar__server-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    text-align: left;
+    transition: background 0.1s;
+  }
+
+  .channel-bar__server-btn:hover {
+    background: var(--bg-hover);
   }
 
   .channel-bar__server-name {
     font-weight: 600;
     font-size: 15px;
     color: var(--text-primary);
+  }
+
+  .channel-bar__chevron {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .channel-bar__menu {
+    position: absolute;
+    top: 100%;
+    left: 8px;
+    right: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    z-index: 101;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  .channel-bar__menu-item {
+    width: 100%;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 13px;
+    color: var(--text-primary);
+    transition: background 0.1s;
+  }
+
+  .channel-bar__menu-item:hover { background: var(--bg-hover); }
+  .channel-bar__menu-item--danger { color: var(--danger); }
+  .channel-bar__menu-item--danger:hover { background: var(--danger); color: #fff; }
+
+  .channel-bar__confirm {
+    padding: 10px 12px;
+  }
+
+  .channel-bar__confirm-text {
+    font-size: 13px;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+
+  .channel-bar__confirm-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .channel-bar__confirm-btn {
+    flex: 1;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .channel-bar__confirm-btn--danger {
+    background: var(--danger);
+    color: #fff;
+    border: none;
+  }
+
+  .channel-bar__confirm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .channel-bar__delete-error {
+    font-size: 12px;
+    color: var(--danger);
+    margin: 0 0 6px;
+  }
+
+  .channel-bar__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
   }
 
   .channel-bar__section-label {
@@ -168,6 +335,8 @@
     display: flex;
     flex-direction: column;
     gap: 1px;
+    overflow-y: auto;
+    flex: 1;
   }
 
   .channel-bar__item {

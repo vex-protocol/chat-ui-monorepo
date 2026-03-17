@@ -1,9 +1,19 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import type { IServer } from '@vex-chat/types'
+  import type { IServer, IChannel } from '@vex-chat/types'
   import CreateServerModal from './CreateServerModal.svelte'
 
-  let { serverList = [], activeServerID = '' }: { serverList?: IServer[]; activeServerID?: string } = $props()
+  let { serverList = [], activeServerID = '', channelMap = {} }: { serverList?: IServer[]; activeServerID?: string; channelMap?: Record<string, IChannel[]> } = $props()
+
+  function navigateToServer(serverID: string): void {
+    const chans = channelMap[serverID] ?? []
+    const first = chans[0]
+    if (first) {
+      push(`/server/${serverID}/${first.channelID}`)
+    } else {
+      push(`/server/${serverID}/`)
+    }
+  }
 
   let showCreate = $state(false)
 </script>
@@ -14,7 +24,7 @@
       <li>
         <button
           class="server-bar__item {activeServerID === server.serverID ? 'server-bar__item--active' : ''}"
-          onclick={() => push(`/server/${server.serverID}/`)}
+          onclick={() => navigateToServer(server.serverID)}
           title={server.name}
           aria-label={server.name}
         >

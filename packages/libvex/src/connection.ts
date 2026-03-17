@@ -13,6 +13,7 @@
 import ReconnectingWebSocketModule from 'reconnecting-websocket'
 import { decode as decodeMsgpack, encode as encodeMsgpack } from '@msgpack/msgpack'
 import { signMessage } from '@vex-chat/crypto'
+import { v4 as uuidv4 } from 'uuid'
 import type { EventEmitter } from 'eventemitter3'
 import type { IMail } from '@vex-chat/types'
 import type { VexEvents } from './client.ts'
@@ -54,6 +55,7 @@ function buildFrame(body: Record<string, unknown>): Uint8Array {
 
 export class VexConnection {
   private rws: IRws | null = null
+  private pingInterval: ReturnType<typeof setInterval> | null = null
 
   constructor(
     private readonly wsUrl: string,
@@ -62,6 +64,7 @@ export class VexConnection {
     private readonly emitter: EventEmitter<VexEvents>,
     /** Called with the raw (encrypted) IMail frame before SessionManager decrypts it. */
     private readonly onRawMail: (mail: IMail) => void,
+    private readonly token?: string,
   ) {}
 
   connect(): void {
@@ -94,6 +97,11 @@ export class VexConnection {
         }
         if (type === 'authorized') {
           authenticated = true
+          // Send client→server pings so spire calls markUserSeen (updates lastSeen)
+          this.rws!.send(buildFrame({ transmissionID: uuidv4(), type: 'ping' }).buffer as ArrayBuffer)
+          this.pingInterval = setInterval(() => {
+            this.rws?.send(buildFrame({ transmissionID: uuidv4(), type: 'ping' }).buffer as ArrayBuffer)
+          }, 30_000)
           return
         }
         if (type === 'authErr') {
@@ -105,7 +113,7 @@ export class VexConnection {
 
       // Authenticated message handling
       if (type === 'ping') {
-        this.rws!.send(buildFrame({ type: 'pong' }).buffer as ArrayBuffer)
+        this.rws!.send(buildFrame({ transmissionID: body['transmissionID'], type: 'pong' }).buffer as ArrayBuffer)
         return
       }
 
@@ -132,11 +140,16 @@ export class VexConnection {
     })
 
     this.rws.addEventListener('open', () => {
+      // Send JWT as first message so spire can authenticate without cookies/headers
+      if (this.token) {
+        this.rws!.send(buildFrame({ transmissionID: uuidv4(), type: 'auth', token: this.token }).buffer as ArrayBuffer)
+      }
       this.emitter.emit('ready')
     })
 
     this.rws.addEventListener('close', () => {
       authenticated = false
+      if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null }
       this.emitter.emit('close')
     })
 
@@ -146,6 +159,7 @@ export class VexConnection {
   }
 
   disconnect(): void {
+    if (this.pingInterval) { clearInterval(this.pingInterval); this.pingInterval = null }
     this.rws?.close()
     this.rws = null
   }

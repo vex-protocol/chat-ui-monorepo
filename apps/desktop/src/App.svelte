@@ -83,7 +83,7 @@
   <div class="app__body">
     {#if !isAuthRoute}
       <div class="app__sidebar">
-        <ServerBar {serverList} activeServerID={activeServerID} />
+        <ServerBar {serverList} activeServerID={activeServerID} channelMap={$channels} />
 
         {#if activeServerID}
           <ChannelBar serverID={activeServerID} serverName={activeServerName} channels={activeChannels} activeChannelID={activeChannelID} />
@@ -97,7 +97,7 @@
 
     {#if !isAuthRoute}
       {#if activeServerID}
-        <MembersPanel serverID={activeServerID} />
+        <MembersPanel serverID={activeServerID} channelID={activeChannelID} />
       {:else}
         <FamiliarsList />
       {/if}

@@ -55,7 +55,11 @@ export async function registerAndLogin(
   // 2. Fetch registration token (no auth required)
   const tokenResult = await http.get<Record<string, unknown>>('/token/register')
   if (!tokenResult.ok) return { ok: false, error: tokenResult.error }
-  const tokenKey = tokenResult.data['key'] as string
+  const tokenKey = tokenResult.data?.['key']
+  if (typeof tokenKey !== 'string' || tokenKey.length < 32) {
+    console.error('[registerAndLogin] bad token response:', tokenResult.data)
+    return { ok: false, error: { code: 'SERVER_ERROR', message: `Bad token response: key=${JSON.stringify(tokenKey)}` } }
+  }
 
   // 3. Sign the token UUID bytes with the device signing key (NaCl format: sig || msg)
   const tokenBytes = uuidParse(tokenKey) as Uint8Array
