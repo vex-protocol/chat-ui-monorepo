@@ -10,6 +10,7 @@
   import Messaging from './routes/Messaging.svelte'
   import ServerChannel from './routes/ServerChannel.svelte'
   import Settings from './routes/Settings.svelte'
+  import Home from './routes/Home.svelte'
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
@@ -23,6 +24,7 @@
     '/launch':                      Launch,
     '/login':                       Login,
     '/register':                    Register,
+    '/home':                        Home,
     '/settings':                    Settings,
     '/messaging/:userID':           Messaging,
     '/server/:serverID/:channelID': ServerChannel,
