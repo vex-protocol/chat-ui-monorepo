@@ -1,9 +1,10 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { decodeHex } from '@vex-chat/crypto'
+  import { decodeHex, encodeHex } from '@vex-chat/crypto'
   import { VexClient } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom, servers as serversAtom } from '../lib/store/index.js'
-  import { getServerUrl, loadCredentials } from '../lib/config.js'
+  import { getServerUrl } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
   import { playUnlock, playError } from '../lib/sounds.js'
 
   let username = $state('')
@@ -19,35 +20,45 @@
     try {
       const SERVER_URL = getServerUrl()
 
-      // 1. Load saved device credentials
-      const creds = loadCredentials()
-      if (!creds) {
-        error = 'No device key found. Please register first.'
-        loading = false
-        return
+      // Check KeyStore for existing device credentials
+      const creds = await keyStore.load(username)
+
+      if (creds) {
+        // Existing device — login with saved keys
+        const deviceKey = decodeHex(creds.deviceKey)
+        const preKeySecret = decodeHex(creds.preKey)
+        const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
+        const result = await client.login(username, password)
+
+        if (!result.ok) {
+          error = result.error.message || 'Invalid username or password'
+          playError()
+          loading = false
+          return
+        }
+
+        await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
+      } else {
+        // No device on this machine — login and register a new device
+        const result = await VexClient.loginNewDevice(SERVER_URL, username, password, 'Desktop')
+
+        if (!result.ok) {
+          error = result.error.message || 'Invalid username or password'
+          playError()
+          loading = false
+          return
+        }
+
+        // Persist the new device credentials
+        await keyStore.save({
+          username,
+          deviceID: result.deviceID,
+          deviceKey: encodeHex(result.signKeyPair.secretKey),
+          preKey: encodeHex(result.preKeyPair.secretKey),
+        })
+
+        await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
       }
-
-      if (creds.username && creds.username !== username) {
-        error = 'Username does not match registered device.'
-        loading = false
-        return
-      }
-
-      // 2. Login via libvex (handles msgpack + response normalization)
-      const deviceKey = decodeHex(creds.deviceKey)
-      const preKeySecret = decodeHex(creds.preKey)
-      const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
-      const result = await client.login(username, password)
-
-      if (!result.ok) {
-        error = result.error.message || 'Invalid username or password'
-        playError()
-        loading = false
-        return
-      }
-
-      // 3. Bootstrap store with device key + JWT
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
 
       // Navigate into the app
       if (userAtom.get()) {

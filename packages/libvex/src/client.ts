@@ -5,8 +5,8 @@ import { HttpClient } from './http.ts'
 import { VexConnection } from './connection.ts'
 import { SessionManager } from './session.ts'
 import { fromEvent } from './iterators.ts'
-import { register, registerAndLogin, login, logout, whoami, getToken } from './auth.ts'
-import type { RegisterResult, RegisterAndLoginResult, LoginResult } from './auth.ts'
+import { register, registerAndLogin, loginNewDevice, login, logout, whoami, getToken } from './auth.ts'
+import type { RegisterResult, RegisterAndLoginResult, RegisterDeviceResult, LoginResult } from './auth.ts'
 import { sendMailEncrypted, fetchInboxDecrypted } from './mail.ts'
 import type { SendResult } from './mail.ts'
 import { listDevices, fetchKeyBundle, deleteDevice } from './devices.ts'
@@ -106,6 +106,23 @@ export class VexClient extends EventEmitter<VexEvents> {
   ): Promise<RegisterAndLoginResult> {
     const http = new HttpClient(serverUrl)
     return registerAndLogin(http, username, password, deviceName)
+  }
+
+  /**
+   * Logs in an existing user and registers a new device for them.
+   * Use this when the user has an account but no device credentials on this machine
+   * (e.g. first login on a new device, or after clearing device keys).
+   *
+   * Returns everything needed to call `VexClient.create()` and `bootstrap()`.
+   */
+  static async loginNewDevice(
+    serverUrl: string,
+    username: string,
+    password: string,
+    deviceName: string = 'Desktop',
+  ): Promise<RegisterAndLoginResult> {
+    const http = new HttpClient(serverUrl)
+    return loginNewDevice(http, username, password, deviceName)
   }
 
   /**
