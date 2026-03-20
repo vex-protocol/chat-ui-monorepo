@@ -9,4 +9,5 @@
 {"key":"compaction_enabled","value":"false"}
 {"key":"issue_prefix","value":"vex-chat"}
 {"key":"kv.memory.arch-decision-decryption-belongs-in-the-sdk-libvex","value":"ARCH DECISION: Decryption belongs in the SDK (libvex), not the apps. VexClient.on('mail') emits DecryptedMail (plaintext). IMail wire format is internal to libvex. Pattern: Signal/libsignal, Matrix/matrix-js-sdk. Key storage at rest is app-specific (KeyStore interface injected into VexClient). New bead vex-chat-7dq implements this: box.ts in packages/crypto, SessionManager in packages/libvex, DecryptedMail type in packages/types. Blocks vex-chat-oz0, 9q0, 14y."}
+{"key":"kv.memory.wire-format-old-spire-mail-uses-packed-binary","value":"WIRE FORMAT: Old spire mail uses packed binary extra field [signKey(32)|ephKey(32)|reserved(32)|AD(68)|otkIdx(6)]=170 bytes. Frame header is HMAC not ephemeral key. mail.sender is deviceID not pubkey. All crypto fields are Uint8Array not hex. New libvex uses hex strings everywhere with ephKey in mail.header and pubkey in mail.sender. spire-wire.ts adapts between formats. See docs/explanation/spire-wire-format.md"}
 {"key":"schema_version","value":"6"}
