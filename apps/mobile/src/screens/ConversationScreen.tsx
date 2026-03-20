@@ -9,7 +9,9 @@ import {
 } from 'react-native'
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
-import { $messages, $client, $user } from '../store'
+import { $messages, $user } from '../store'
+import { sendDirectMessage } from '@vex-chat/store'
+import { keychainKeyStore } from '../lib/keychain'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 import { MessageBubbleRN } from '../components/MessageBubbleRN'
@@ -19,7 +21,6 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
   const { userID, username } = route.params as { userID: string; username: string }
   const allMessages = useStore($messages)
   const messages: DecryptedMail[] = allMessages[userID] ?? []
-  const client = useStore($client)
   const user = useStore($user)
 
   const [text, setText] = useState('')
@@ -28,27 +29,22 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
 
   const sendMessage = useCallback(async () => {
     const content = text.trim()
-    if (!content || !client || !user) return
+    if (!content || !user) return
     setSending(true)
     setText('')
     setError('')
     try {
-      const devices = await client.listDevices(userID)
-      const device = devices[0]
-      if (!device) {
-        setError('Recipient has no registered devices.')
-        setSending(false)
-        return
-      }
-      const result = await client.sendMail(content, device.deviceID, userID)
+      const result = await sendDirectMessage(userID, content, {
+        keyStore: keychainKeyStore,
+      })
       if (!result.ok) {
-        setError(result.error.message)
+        setError(result.error ?? 'Failed to send')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send')
     }
     setSending(false)
-  }, [text, client, user, userID])
+  }, [text, user, userID])
 
   function renderMessage({ item }: { item: DecryptedMail }) {
     const isOwn = item.authorID === user?.userID
