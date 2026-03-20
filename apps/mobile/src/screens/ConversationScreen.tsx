@@ -11,6 +11,7 @@ import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $messages, $user } from '../store'
 import { sendDirectMessage, markRead } from '@vex-chat/store'
+import { setActiveConversation } from '../lib/notifications'
 import { keychainKeyStore } from '../lib/keychain'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
@@ -28,8 +29,17 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
     return [...thread].reverse()
   }, [allMessages, userID])
 
-  // Clear unread count when viewing this conversation
-  useEffect(() => { markRead(userID) }, [userID])
+  // Track active conversation for notification suppression + mark read
+  useEffect(() => {
+    setActiveConversation(userID)
+    markRead(userID)
+    return () => { setActiveConversation(null) }
+  }, [userID])
+
+  // Mark read whenever new messages arrive while viewing
+  useEffect(() => {
+    if (messages.length > 0) markRead(userID)
+  }, [messages.length, userID])
 
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
