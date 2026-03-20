@@ -2,7 +2,7 @@
   import { push } from 'svelte-spa-router'
   import type { IUser } from '@vex-chat/types'
   import { familiars, client } from './store/index.js'
-  import { $familiars as familiarsStore, $unreadCounts as unreadCounts } from '@vex-chat/store'
+  import { $familiars as familiarsStore, $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
   import { getServerUrl } from './config.js'
   import Avatar from './Avatar.svelte'
 

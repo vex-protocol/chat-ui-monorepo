@@ -30,7 +30,12 @@ export { shouldNotify } from './notifications.ts'
 export type { NotificationPayload } from './notifications.ts'
 
 // Unread counts
-export { $unreadCounts, $totalUnread, incrementUnread, markRead, resetAllUnread } from './unread.ts'
+export {
+  $dmUnreadCounts, $channelUnreadCounts,
+  $totalDmUnread, $totalChannelUnread,
+  incrementDmUnread, incrementChannelUnread,
+  markRead, resetAllUnread,
+} from './unread.ts'
 
 // Message utilities
 export {

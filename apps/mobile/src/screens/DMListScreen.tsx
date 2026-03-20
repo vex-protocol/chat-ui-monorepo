@@ -10,7 +10,7 @@ import {
 import { useStore } from '@nanostores/react'
 import type { IUser, DecryptedMail } from '@vex-chat/types'
 import { $familiars, $messages, $client } from '../store'
-import { $familiars as familiarsAtom, $unreadCounts } from '@vex-chat/store'
+import { $familiars as familiarsAtom, $dmUnreadCounts } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 
@@ -18,7 +18,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
   const familiars = useStore($familiars)
   const allMessages = useStore($messages)
   const client = useStore($client)
-  const unreadCounts = useStore($unreadCounts)
+  const unreadCounts = useStore($dmUnreadCounts)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<IUser[]>([])

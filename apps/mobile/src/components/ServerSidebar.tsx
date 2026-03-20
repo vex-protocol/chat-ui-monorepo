@@ -2,7 +2,7 @@ import React from 'react'
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { useStore } from '@nanostores/react'
 import { $servers } from '../store'
-import { $totalUnread } from '@vex-chat/store'
+import { $totalDmUnread } from '@vex-chat/store'
 import { colors } from '../theme'
 
 const vexLogo = require('../assets/images/vex-logo.png')
@@ -24,7 +24,7 @@ export function ServerSidebar({
 }: ServerSidebarProps) {
   const servers = useStore($servers)
   const serverList = Object.values(servers)
-  const totalUnread = useStore($totalUnread)
+  const totalUnread = useStore($totalDmUnread)
 
   return (
     <View style={styles.container}>

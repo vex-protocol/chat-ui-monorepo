@@ -8,7 +8,7 @@ import { $servers } from './servers.ts'
 import { $channels } from './channels.ts'
 import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
-import { incrementUnread } from './unread.ts'
+import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
 import { $familiars } from './familiars.ts'
 import { SENT_PREFIX } from './send-dm.ts'
 
@@ -75,7 +75,7 @@ export async function bootstrap(
         $groupMessages.setKey(mail.group, [...prev, mail])
         persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
         // Track unread (apps call markRead when conversation is focused)
-        if (me && mail.authorID !== me.userID) incrementUnread(mail.group)
+        if (me && mail.authorID !== me.userID) incrementChannelUnread(mail.group)
       }
     } else {
       // Direct message — key by the other party's userID, deduplicate
@@ -99,7 +99,7 @@ export async function bootstrap(
         persistence?.saveDmMessages($messages.get()).catch(() => {})
 
         if (!isOwnMessage) {
-          incrementUnread(threadKey)
+          incrementDmUnread(threadKey)
         }
 
         // Auto-add the other party as familiar so they appear in DM list

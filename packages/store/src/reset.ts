@@ -9,7 +9,7 @@ import { $permissions } from './permissions.ts'
 import { $devices } from './devices.ts'
 import { $onlineLists } from './onlineLists.ts'
 import { $avatarHash } from './avatarHash.ts'
-import { $unreadCounts } from './unread.ts'
+import { $dmUnreadCounts, $channelUnreadCounts } from './unread.ts'
 
 /**
  * Resets all nanostores atoms to their default values.
@@ -32,5 +32,6 @@ export function resetAll(): void {
   $devices.set({})
   $onlineLists.set({})
   $avatarHash.set(0)
-  $unreadCounts.set({})
+  $dmUnreadCounts.set({})
+  $channelUnreadCounts.set({})
 }
