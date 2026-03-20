@@ -21,6 +21,9 @@ export { $onlineLists } from './onlineLists.ts'
 export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
+// Unread counts
+export { $unreadCounts, $totalUnread, incrementUnread, markRead, resetAllUnread } from './unread.ts'
+
 // Message utilities
 export {
   chunkMessages,
