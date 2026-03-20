@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   View,
   FlatList,
@@ -25,9 +25,14 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
     serverID: string
   }
   const allGroupMessages = useStore($groupMessages)
-  const messages: DecryptedMail[] = allGroupMessages[channelID] ?? []
   const client = useStore($client)
   const user = useStore($user)
+
+  // Store keeps messages oldest-first; inverted FlatList needs newest-first
+  const messages = useMemo(() => {
+    const thread = allGroupMessages[channelID] ?? []
+    return [...thread].reverse()
+  }, [allGroupMessages, channelID])
 
   const insets = useSafeAreaInsets()
   const [text, setText] = useState('')
@@ -127,7 +132,7 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
       />
 
       <FlatList
-        data={[...messages].reverse()}
+        data={messages}
         keyExtractor={(m) => m.mailID}
         renderItem={renderMessage}
         inverted
