@@ -10,6 +10,7 @@ import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
 import { incrementUnread } from './unread.ts'
 import { $familiars } from './familiars.ts'
+import { SENT_PREFIX } from './send-dm.ts'
 
 /**
  * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
@@ -77,11 +78,23 @@ export async function bootstrap(
         if (me && mail.authorID !== me.userID) incrementUnread(mail.group)
       }
     } else {
-      // Direct message — key by the other party's userID, deduplicate by mailID
+      // Direct message — key by the other party's userID, deduplicate
       const isOwnMessage = me && mail.authorID === me.userID
       const threadKey = isOwnMessage ? mail.readerID : mail.authorID
       const prev = $messages.get()[threadKey] ?? []
-      if (!prev.some(m => m.mailID === mail.mailID)) {
+
+      // If this is a server echo of a locally-sent message, replace the local version
+      const localIdx = isOwnMessage
+        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.content === mail.content && m.authorID === mail.authorID)
+        : -1
+
+      if (localIdx !== -1) {
+        // Replace local echo with server version
+        const updated = [...prev]
+        updated[localIdx] = mail
+        $messages.setKey(threadKey, updated)
+        persistence?.saveDmMessages($messages.get()).catch(() => {})
+      } else if (!prev.some(m => m.mailID === mail.mailID)) {
         $messages.setKey(threadKey, [...prev, mail])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
 

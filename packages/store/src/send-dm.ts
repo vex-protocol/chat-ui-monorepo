@@ -1,6 +1,12 @@
-import type { KeyStore } from '@vex-chat/types'
+import { v4 as uuidv4 } from 'uuid'
+import type { DecryptedMail, KeyStore } from '@vex-chat/types'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
+import { $messages } from './messages.ts'
+
+/** Prefix for locally-echoed sent messages. If the server echoes back, the
+ *  bootstrap mail handler replaces the local version with the server version. */
+export const SENT_PREFIX = 'sent-'
 
 export interface SendDMOptions {
   /** Pre-uploaded file attachment metadata (mailType + extra JSON). */
@@ -18,11 +24,11 @@ export interface SendDMResult {
 /**
  * Sends a direct message to a user, handling the full flow:
  *   1. Sends to ALL recipient devices (not just the first)
- *   2. Forwards to sender's own other devices so sent messages appear everywhere
+ *   2. Echoes the sent message locally (tagged with "sent-" prefix)
+ *   3. Forwards to sender's own other devices so sent messages appear everywhere
  *
- * The server delivers the message back to the sender via WebSocket/mail-notify,
- * so the bootstrap mail handler in bootstrap.ts adds it to $messages automatically.
- * No local echo needed — avoids duplicates.
+ * If the server also echoes the message back, the bootstrap mail handler
+ * replaces the local echo with the server version (dedup by content+author).
  */
 export async function sendDirectMessage(
   recipientUserID: string,
@@ -54,7 +60,22 @@ export async function sendDirectMessage(
     return { ok: false, error: first?.value.error.message ?? 'Failed to send to any device' }
   }
 
-  // 2. Forward to sender's own other devices
+  // 2. Echo sent message locally (tagged so server echo can replace it)
+  const sentMail: DecryptedMail = {
+    mailID: SENT_PREFIX + uuidv4(),
+    authorID: me.userID,
+    readerID: recipientUserID,
+    group: null,
+    mailType,
+    time: new Date().toISOString(),
+    content,
+    extra,
+    forward: null,
+  }
+  const prev = $messages.get()[recipientUserID] ?? []
+  $messages.setKey(recipientUserID, [...prev, sentMail])
+
+  // 3. Forward to sender's own other devices
   if (options?.keyStore) {
     try {
       const creds = await options.keyStore.loadActive()
