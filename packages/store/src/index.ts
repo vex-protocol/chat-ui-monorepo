@@ -17,5 +17,16 @@ export { $onlineLists } from './onlineLists.ts'
 export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
+// Message utilities
+export {
+  chunkMessages,
+  parseFileExtra,
+  isImageType,
+  formatFileSize,
+  applyEmoji,
+  formatTime,
+} from './message-utils.ts'
+export type { MessageChunk, FileAttachment } from './message-utils.ts'
+
 // Reset
 export { resetAll } from './reset.ts'
