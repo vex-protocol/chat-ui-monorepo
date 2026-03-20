@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid'
 import type { DecryptedMail, KeyStore } from '@vex-chat/types'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
@@ -56,7 +57,7 @@ export async function sendDirectMessage(
 
   // 2. Echo sent message locally (server doesn't echo back to sender)
   const sentMail: DecryptedMail = {
-    mailID: crypto.randomUUID(),
+    mailID: uuidv4(),
     authorID: me.userID,
     readerID: recipientUserID,
     group: null,
