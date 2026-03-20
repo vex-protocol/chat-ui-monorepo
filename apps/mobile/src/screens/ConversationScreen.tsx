@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -20,8 +20,13 @@ import { MessageInputBar } from '../components/MessageInputBar'
 export function ConversationScreen({ route, navigation }: { route: any; navigation: any }) {
   const { userID, username } = route.params as { userID: string; username: string }
   const allMessages = useStore($messages)
-  const messages: DecryptedMail[] = allMessages[userID] ?? []
   const user = useStore($user)
+
+  // Store keeps messages oldest-first; inverted FlatList needs newest-first
+  const messages = useMemo(() => {
+    const thread = allMessages[userID] ?? []
+    return [...thread].reverse()
+  }, [allMessages, userID])
 
   // Clear unread count when viewing this conversation
   useEffect(() => { markRead(userID) }, [userID])
