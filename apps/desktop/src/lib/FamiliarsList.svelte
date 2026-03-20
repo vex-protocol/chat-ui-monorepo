@@ -72,7 +72,7 @@
     <input
       class="familiars__search"
       type="text"
-      placeholder="Find a user…"
+      placeholder="Search by exact username…"
       bind:value={query}
       oninput={onInput}
       aria-label="Search users"
