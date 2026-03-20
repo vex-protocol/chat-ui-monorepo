@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import type { IServer, IChannel } from '@vex-chat/types'
-  import { $totalUnread as totalUnread } from '@vex-chat/store'
+  import { $totalDmUnread as totalDmUnread } from '@vex-chat/store'
   import CreateServerModal from './CreateServerModal.svelte'
 
   let { serverList = [], activeServerID = '', channelMap = {} }: { serverList?: IServer[]; activeServerID?: string; channelMap?: Record<string, IChannel[]> } = $props()
@@ -29,8 +29,8 @@
         aria-label="Direct Messages"
       >
         DM
-        {#if $totalUnread > 0}
-          <span class="server-bar__badge">{$totalUnread > 99 ? '99+' : $totalUnread}</span>
+        {#if $totalDmUnread > 0}
+          <span class="server-bar__badge">{$totalDmUnread > 99 ? '99+' : $totalDmUnread}</span>
         {/if}
       </button>
     </li>
