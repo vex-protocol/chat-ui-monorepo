@@ -16,6 +16,7 @@
 export {
   // Lifecycle
   bootstrap,
+  autoLogin,
   $client,
   $keyReplaced,
 
