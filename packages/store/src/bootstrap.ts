@@ -8,6 +8,7 @@ import { $servers } from './servers.ts'
 import { $channels } from './channels.ts'
 import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
+import { incrementUnread } from './unread.ts'
 
 /**
  * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
@@ -63,21 +64,24 @@ export async function bootstrap(
 
   client.on('mail', (mail) => {
     // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
+    const me = $user.get()
     if (mail.group) {
       // Group / channel message — key by channelID, deduplicate by mailID
       const prev = $groupMessages.get()[mail.group] ?? []
       if (!prev.some(m => m.mailID === mail.mailID)) {
         $groupMessages.setKey(mail.group, [...prev, mail])
         persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
+        // Track unread (apps call markRead when conversation is focused)
+        if (me && mail.authorID !== me.userID) incrementUnread(mail.group)
       }
     } else {
       // Direct message — key by the other party's userID, deduplicate by mailID
-      const me = $user.get()
       const threadKey = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
       const prev = $messages.get()[threadKey] ?? []
       if (!prev.some(m => m.mailID === mail.mailID)) {
         $messages.setKey(threadKey, [...prev, mail])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
+        if (me && mail.authorID !== me.userID) incrementUnread(threadKey)
       }
     }
   })
