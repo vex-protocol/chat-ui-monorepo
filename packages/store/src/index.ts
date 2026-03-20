@@ -21,6 +21,10 @@ export { $onlineLists } from './onlineLists.ts'
 export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
+// Send DM
+export { sendDirectMessage } from './send-dm.ts'
+export type { SendDMOptions, SendDMResult } from './send-dm.ts'
+
 // Notification decisions
 export { shouldNotify } from './notifications.ts'
 export type { NotificationPayload } from './notifications.ts'
