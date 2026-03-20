@@ -2,7 +2,7 @@
   import { push } from 'svelte-spa-router'
   import type { IUser } from '@vex-chat/types'
   import { familiars, client } from './store/index.js'
-  import { $familiars as familiarsStore } from '@vex-chat/store'
+  import { $familiars as familiarsStore, $unreadCounts as unreadCounts } from '@vex-chat/store'
   import { getServerUrl } from './config.js'
   import Avatar from './Avatar.svelte'
 
@@ -109,6 +109,9 @@
         <button class="familiars__item" onclick={() => openDM(user)}>
           <Avatar userID={user.userID} name={user.username} size={28} {serverUrl} />
           <span class="familiars__name">{user.username}</span>
+          {#if $unreadCounts[user.userID]}
+            <span class="familiars__badge">{$unreadCounts[user.userID]}</span>
+          {/if}
         </button>
       </li>
     {/each}
@@ -221,6 +224,22 @@
   .familiars__item:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
+  }
+
+  .familiars__badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: var(--danger, #e53935);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .familiars__name,
