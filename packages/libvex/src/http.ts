@@ -1,4 +1,4 @@
-import { decode as decodeMsgpack } from '@msgpack/msgpack'
+import { decode as decodeMsgpack, encode as encodeMsgpack } from '@msgpack/msgpack'
 import { errorFromStatus } from './errors.ts'
 import type { VexError } from './errors.ts'
 
@@ -41,9 +41,20 @@ export class HttpClient {
     return this.token
   }
 
+  private deviceToken?: string
+
+  setDeviceToken(token: string): void {
+    this.deviceToken = token
+  }
+
+  getDeviceToken(): string | undefined {
+    return this.deviceToken
+  }
+
   private headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' }
     if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    if (this.deviceToken) h['X-Device-Token'] = this.deviceToken
     return h
   }
 
@@ -65,6 +76,25 @@ export class HttpClient {
         method: 'POST',
         headers: this.headers(),
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      })
+      if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
+      return { ok: true, data: await parseBody<T>(res) }
+    } catch (err) {
+      return { ok: false, error: { code: 'NETWORK_ERROR', message: String(err) } }
+    }
+  }
+
+  /** POST with msgpack-encoded body (for old spire endpoints that expect binary). */
+  async postMsgpack<T>(path: string, body: unknown): Promise<HttpResult<T>> {
+    const h: Record<string, string> = { 'Content-Type': 'application/msgpack' }
+    if (this.token) h['Authorization'] = `Bearer ${this.token}`
+    if (this.deviceToken) h['X-Device-Token'] = this.deviceToken
+    try {
+      const encoded = encodeMsgpack(body)
+      const res = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: h,
+        body: encoded,
       })
       if (!res.ok) return { ok: false, error: errorFromStatus(res.status, await res.text()) }
       return { ok: true, data: await parseBody<T>(res) }

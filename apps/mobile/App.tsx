@@ -1,15 +1,17 @@
+import 'fast-text-encoding'
 import React, { useEffect } from 'react'
 import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
 import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced, $user, $client } from './src/store'
+import { bootstrap, $keyReplaced, $user, $client, mobilePersistence } from './src/store'
 import { loadCredentials, clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
 import { requestNotificationPermission, showMessageNotification, setupNotificationHandlers } from './src/lib/notifications'
+import { colors, fontFamilies } from './src/theme'
 
 function App() {
   const keyReplaced = useStore($keyReplaced)
@@ -33,8 +35,7 @@ function App() {
         const deviceKey = decodeHex(creds.deviceKey)
         const preKeySecret = decodeHex(creds.preKey)
 
-        // Attempt bootstrap with saved credentials (no JWT — will rely on session)
-        await bootstrap(getServerUrl(), creds.deviceID, deviceKey, undefined, preKeySecret)
+        await bootstrap(getServerUrl(), creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)
       } catch {
         // Credentials invalid or session expired — user will see login screen
       }
@@ -64,18 +65,18 @@ function App() {
         theme={{
           dark: true,
           colors: {
-            primary: '#cc2a2a',
-            background: '#1a1a1a',
-            card: '#141414',
-            text: '#e8e8e8',
-            border: '#2a2a2a',
-            notification: '#e53935',
+            primary: colors.accentMuted,
+            background: colors.bg,
+            card: colors.card,
+            text: colors.textSecondary,
+            border: colors.borderSubtle,
+            notification: colors.error,
           },
           fonts: {
-            regular: { fontFamily: 'System', fontWeight: '400' },
-            medium: { fontFamily: 'System', fontWeight: '500' },
-            bold: { fontFamily: 'System', fontWeight: '700' },
-            heavy: { fontFamily: 'System', fontWeight: '900' },
+            regular: { fontFamily: fontFamilies.mono, fontWeight: '300' },
+            medium: { fontFamily: fontFamilies.body, fontWeight: '500' },
+            bold: { fontFamily: fontFamilies.heading, fontWeight: '500' },
+            heavy: { fontFamily: fontFamilies.heading, fontWeight: '500' },
           },
         }}
       >

@@ -12,7 +12,7 @@
     return $client?.fileUrl(fileID) ?? `${serverUrl}/file/${fileID}`
   }
 
-  let { messages = [] }: { messages: DecryptedMail[] } = $props()
+  let { messages = [], usernames = {} }: { messages: DecryptedMail[]; usernames?: Record<string, string> } = $props()
 
   const chunks = $derived(chunkMessages(messages))
 
@@ -59,54 +59,60 @@
   {/if}
 
   {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
-    <div class="message-chunk">
-      <div class="message-chunk__header">
-        <Avatar userID={chunk.authorID} size={36} {serverUrl} />
-        <div class="message-chunk__meta">
-          <span
-            class="message-chunk__author"
-            class:message-chunk__author--self={chunk.authorID === $user?.userID}
-          >
-            {chunk.authorID === $user?.userID ? 'You' : chunk.authorID.slice(0, 8)}
-          </span>
-          <span class="message-chunk__time">{formatTime(chunk.firstTime)}</span>
-        </div>
+    {#if chunk.messages[0]?.mailType === 'system'}
+      <div class="message-system">
+        <span class="message-system__text">{chunk.messages[0].content}</span>
       </div>
+    {:else}
+      <div class="message-chunk">
+        <div class="message-chunk__header">
+          <Avatar userID={chunk.authorID} size={36} {serverUrl} />
+          <div class="message-chunk__meta">
+            <span
+              class="message-chunk__author"
+              class:message-chunk__author--self={chunk.authorID === $user?.userID}
+            >
+              {chunk.authorID === $user?.userID ? 'You' : (usernames[chunk.authorID] ?? chunk.authorID.slice(0, 8))}
+            </span>
+            <span class="message-chunk__time">{formatTime(chunk.firstTime)}</span>
+          </div>
+        </div>
 
-      {#each chunk.messages as msg (msg.mailID)}
-        {@const fileInfo = parseFileExtra(msg.extra)}
-        <div class="message">
-          {#if fileInfo}
-            {#if isImageType(fileInfo.contentType)}
-              <img
-                src={fileUrl(fileInfo.fileID)}
-                alt={fileInfo.fileName}
-                class="message__image"
-                loading="lazy"
-              />
+        {#each chunk.messages as msg (msg.mailID)}
+          {@const fileInfo = parseFileExtra(msg.extra)}
+          <div class="message">
+            {#if fileInfo}
+              {#if isImageType(fileInfo.contentType)}
+                <img
+                  src={fileUrl(fileInfo.fileID)}
+                  alt={fileInfo.fileName}
+                  class="message__image"
+                  loading="lazy"
+                />
+              {:else}
+                <a
+                  href={fileUrl(fileInfo.fileID)}
+                  class="message__file"
+                  data-external={fileUrl(fileInfo.fileID)}
+                  download={fileInfo.fileName}
+                >
+                  <span class="message__file-icon">📄</span>
+                  <span class="message__file-info">
+                    <span class="message__file-name">{fileInfo.fileName}</span>
+                    <span class="message__file-size">{formatFileSize(fileInfo.fileSize)}</span>
+                  </span>
+                </a>
+              {/if}
+              {#if msg.content}
+                {@html renderContent(msg.content)}
+              {/if}
             {:else}
-              <a
-                href={fileUrl(fileInfo.fileID)}
-                class="message__file"
-                data-external={fileUrl(fileInfo.fileID)}
-                download={fileInfo.fileName}
-              >
-                <span class="message__file-icon">📄</span>
-                <span class="message__file-info">
-                  <span class="message__file-name">{fileInfo.fileName}</span>
-                  <span class="message__file-size">{formatFileSize(fileInfo.fileSize)}</span>
-                </span>
-              </a>
-            {/if}
-            {#if msg.content}
               {@html renderContent(msg.content)}
             {/if}
-          {:else}
-            {@html renderContent(msg.content)}
-          {/if}
-        </div>
-      {/each}
-    </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   {/each}
 </div>
 
@@ -127,6 +133,17 @@
     justify-content: center;
     color: var(--text-muted);
     font-size: 14px;
+    font-style: italic;
+  }
+
+  .message-system {
+    padding: 4px 16px;
+    text-align: center;
+  }
+
+  .message-system__text {
+    font-size: 12px;
+    color: var(--text-muted);
     font-style: italic;
   }
 

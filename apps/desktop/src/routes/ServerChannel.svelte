@@ -18,6 +18,19 @@
 
   let sending = $state(false)
   let sendError = $state('')
+  let usernames: Record<string, string> = $state({})
+
+  // Load channel members to resolve userIDs → usernames.
+  // Re-runs when channelID or channels change (serverChange notify triggers $channels update).
+  $effect(() => {
+    if (!$client || !channelID) return
+    void $channels[serverID] // reactive dep — re-fetch members when server membership changes
+    $client.listMembers(channelID).then(members => {
+      const map: Record<string, string> = {}
+      for (const m of members) map[m.userID] = m.username
+      usernames = map
+    }).catch(() => {})
+  })
 
   async function handleSend(content: string, attachment?: File) {
     if (!$client || !$user || sending) return
@@ -40,7 +53,7 @@
       }
 
       // Get all server members and their devices
-      const members = await $client.listMembers(serverID)
+      const members = await $client.listMembers(channelID)
       const creds = await keyStore.loadActive()
 
       // Collect all devices across all members (excluding sender's current device)
@@ -68,7 +81,14 @@
       )
       const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
       if (!anyOk) {
-        sendError = 'Failed to send to any device'
+        const details = results.map((r, i) => {
+          const target = deviceTargets[i]
+          if (r.status === 'rejected') return `${target.deviceID.slice(0,8)}: rejected: ${r.reason}`
+          if (!r.value.ok) return `${target.deviceID.slice(0,8)}: ${r.value.error?.code || 'UNKNOWN'}/${r.value.error?.message || 'no msg'}`
+          return null
+        }).filter(Boolean).join('; ')
+        sendError = `Failed: ${details}`
+        console.error('Send failures:', JSON.stringify(results), JSON.stringify(deviceTargets))
         return
       }
 
@@ -108,7 +128,7 @@
     </div>
   </header>
 
-  <MessageBox messages={channelMessages} />
+  <MessageBox messages={channelMessages} {usernames} />
 
   {#if sendError}
     <div class="channel-pane__error">{sendError}</div>

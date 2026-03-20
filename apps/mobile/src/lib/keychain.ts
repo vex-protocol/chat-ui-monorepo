@@ -7,6 +7,7 @@ export interface DeviceCredentials {
   deviceID: string
   deviceKey: string   // hex-encoded Ed25519 secret key
   preKey: string      // hex-encoded Ed25519 secret key
+  token?: string      // JWT auth token for HTTP calls
 }
 
 export async function saveCredentials(creds: DeviceCredentials): Promise<void> {
