@@ -14,7 +14,7 @@ export function WelcomeScreen({ navigation }: Props) {
     <ScreenLayout>
       <View style={styles.container}>
         {/* Logo */}
-        <VexLogo width={120} height={42} />
+        <VexLogo size={36} />
 
         {/* Center content */}
         <View style={styles.center}>

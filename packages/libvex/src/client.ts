@@ -1,5 +1,6 @@
 import { EventEmitter } from 'eventemitter3'
-import { generateSignKeyPair } from '@vex-chat/crypto'
+import { generateSignKeyPair, signMessage, decodeHex } from '@vex-chat/crypto'
+import { parse as uuidParse } from 'uuid'
 import type { IUser, IDevice, IKeyBundle, IServer, IChannel, IInvite, IActionToken, TokenType, DecryptedMail } from '@vex-chat/types'
 import { HttpClient } from './http.ts'
 import { VexConnection } from './connection.ts'
@@ -140,10 +141,58 @@ export class VexClient extends EventEmitter<VexEvents> {
     this.connection = new VexConnection(wsUrl, this.deviceID, this.deviceKey, this, (rawMail) => {
       if (!this.sessionManager) return
       const decrypted = this.sessionManager.decrypt(rawMail)
-      if (decrypted) this.emit('mail', decrypted)
+      if (decrypted) {
+        this.emit('mail', decrypted)
+        // Send receipt so spire deletes the message (privacy: no server-side retention)
+        try { this.connection?.sendReceipt(decodeHex(rawMail.nonce)) } catch {}
+      }
+    }, () => {
+      // Old spire mail notify — poll fetchInbox to retrieve pending messages
+      console.log('[vex] mail notify received, fetching inbox...')
+      this.fetchInbox().then(messages => {
+        console.log('[vex] fetchInbox returned', messages.length, 'messages')
+        for (const msg of messages) this.emit('mail', msg)
+      }).catch((err) => {
+        console.error('[vex] fetchInbox failed:', err)
+      })
+    }, (serverID: string, joined?: { userID: string; username: string }) => {
+      // Server membership or channels changed — forward to store
+      this.emit('serverChange', { serverID, joined } as any)
     }, this.http.getToken())
     this.connection.connect()
     await new Promise<void>((resolve) => this.once('ready', resolve))
+
+    // Obtain device token for device-level HTTP endpoints (mail retrieval)
+    await this.deviceConnect()
+  }
+
+  /**
+   * Obtains a device JWT by signing a connect action token with the device key.
+   * The JWT is stored on the HttpClient and sent as X-Device-Token on subsequent requests.
+   */
+  private async deviceConnect(): Promise<void> {
+    try {
+      // 1. Request a connect action token
+      const actionToken = await getToken(this.http, 'connect' as any)
+      // 2. Sign the token UUID with device key (nacl.sign → signature || message)
+      const tokenBytes = new Uint8Array(uuidParse(actionToken.key))
+      const signed = signMessage(tokenBytes, this.deviceKey)
+      // 3. POST /device/:id/connect with msgpack body
+      const result = await this.http.postMsgpack<{ token: string }>(
+        `/device/${this.deviceID}/connect`,
+        { signed },
+      )
+      if (result.ok && result.data?.token) {
+        this.http.setDeviceToken(result.data.token)
+      }
+    } catch (err) {
+      console.error('[vex] deviceConnect failed:', err)
+    }
+  }
+
+  /** Send a resource frame over the WebSocket (used for mail CREATE). */
+  sendResource(transmissionID: string, resourceType: string, action: string, data: unknown): void {
+    this.connection?.sendResource(transmissionID, resourceType, action, data)
   }
 
   /** Closes the WebSocket connection. */
@@ -183,8 +232,9 @@ export class VexClient extends EventEmitter<VexEvents> {
     return result
   }
 
-  /** Clears the stored JWT. */
+  /** Closes the WebSocket and clears the stored JWT. */
   async logout(): Promise<void> {
+    await this.disconnect()
     await logout(this.http)
     this.http.clearToken()
     this.currentUserID = null
@@ -233,7 +283,13 @@ export class VexClient extends EventEmitter<VexEvents> {
     }
     if (options?.mailType !== undefined) meta.mailType = options.mailType
     if (options?.extra !== undefined) meta.extra = options.extra
-    return sendMailEncrypted(this.http, this.sessionManager, content, meta)
+    return sendMailEncrypted(
+      this.http,
+      this.sessionManager,
+      content,
+      meta,
+      this.connection ? (tid, rt, action, data) => this.sendResource(tid, rt, action, data) : undefined,
+    )
   }
 
   /**
@@ -241,7 +297,10 @@ export class VexClient extends EventEmitter<VexEvents> {
    * Messages that fail to decrypt are silently skipped.
    */
   async fetchInbox(): Promise<DecryptedMail[]> {
-    return fetchInboxDecrypted(this.http, this.sessionManager, this.deviceID)
+    return fetchInboxDecrypted(this.http, this.sessionManager, this.deviceID, (nonce) => {
+      // Send receipt so spire deletes the message (privacy: no server-side retention)
+      try { this.connection?.sendReceipt(nonce) } catch {}
+    })
   }
 
   /**

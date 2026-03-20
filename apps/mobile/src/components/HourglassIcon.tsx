@@ -15,14 +15,14 @@ export function HourglassIcon({ size = 36, color = colors.accent }: HourglassIco
 
   return (
     <Svg width={s} height={s} viewBox={`0 0 ${s} ${s}`}>
-      {/* Left triangle: top-left corner → center → bottom-left corner */}
+      {/* Top triangle: top-left → top-right → center */}
       <Polygon
-        points={`${pad},${pad} ${s / 2},${s / 2} ${pad},${s - pad}`}
+        points={`${pad},${pad} ${s - pad},${pad} ${s / 2},${s / 2}`}
         fill={color}
       />
-      {/* Right triangle: top-right corner → center → bottom-right corner */}
+      {/* Bottom triangle: bottom-left → bottom-right → center */}
       <Polygon
-        points={`${s - pad},${pad} ${s / 2},${s / 2} ${s - pad},${s - pad}`}
+        points={`${pad},${s - pad} ${s - pad},${s - pad} ${s / 2},${s / 2}`}
         fill={color}
       />
     </Svg>

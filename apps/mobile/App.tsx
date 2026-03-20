@@ -1,10 +1,11 @@
+import 'fast-text-encoding'
 import React, { useEffect } from 'react'
 import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
 import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced, $user, $client } from './src/store'
+import { bootstrap, $keyReplaced, $user, $client, mobilePersistence } from './src/store'
 import { loadCredentials, clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
@@ -34,8 +35,7 @@ function App() {
         const deviceKey = decodeHex(creds.deviceKey)
         const preKeySecret = decodeHex(creds.preKey)
 
-        // Attempt bootstrap with saved credentials (no JWT — will rely on session)
-        await bootstrap(getServerUrl(), creds.deviceID, deviceKey, undefined, preKeySecret)
+        await bootstrap(getServerUrl(), creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)
       } catch {
         // Credentials invalid or session expired — user will see login screen
       }

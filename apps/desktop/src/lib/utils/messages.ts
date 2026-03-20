@@ -62,7 +62,10 @@ export function chunkMessages(messages: DecryptedMail[]): MessageChunk[] {
       : false
     const notFull = (last?.messages.length ?? 0) < MAX_CHUNK_SIZE
 
-    if (last && sameAuthor && withinGap && notFull) {
+    // System messages always get their own chunk
+    if (msg.mailType === 'system') {
+      chunks.push({ authorID: msg.authorID, messages: [msg], firstTime: msg.time })
+    } else if (last && sameAuthor && withinGap && notFull && last.messages[0]?.mailType !== 'system') {
       last.messages.push(msg)
     } else {
       chunks.push({ authorID: msg.authorID, messages: [msg], firstTime: msg.time })

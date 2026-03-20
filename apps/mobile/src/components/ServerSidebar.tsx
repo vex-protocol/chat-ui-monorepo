@@ -10,6 +10,7 @@ interface ServerSidebarProps {
   activeServerId: string | null
   onSelectServer: (serverId: string) => void
   onSelectHome: () => void
+  onAddServer: () => void
   onSettings: () => void
 }
 
@@ -17,6 +18,7 @@ export function ServerSidebar({
   activeServerId,
   onSelectServer,
   onSelectHome,
+  onAddServer,
   onSettings,
 }: ServerSidebarProps) {
   const servers = useStore($servers)
@@ -49,7 +51,7 @@ export function ServerSidebar({
         })}
 
         {/* Add server */}
-        <TouchableOpacity style={styles.addBtn}>
+        <TouchableOpacity style={styles.addBtn} onPress={onAddServer}>
           <Text style={styles.addText}>+</Text>
         </TouchableOpacity>
       </ScrollView>

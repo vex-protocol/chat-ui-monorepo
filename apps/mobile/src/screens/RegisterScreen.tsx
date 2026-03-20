@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { encodeHex } from '@vex-chat/crypto'
 import { VexClient } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { bootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 
@@ -43,16 +43,17 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
         return
       }
 
-      // Save device credentials to OS keychain
+      // Save device credentials + JWT to OS keychain
       await saveCredentials({
         username,
         deviceID: result.deviceID,
         deviceKey: encodeHex(result.signKeyPair.secretKey),
         preKey: encodeHex(result.preKeyPair.secretKey),
+        token: result.token,
       })
 
       // Bootstrap the store with the JWT from registration
-      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
+      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

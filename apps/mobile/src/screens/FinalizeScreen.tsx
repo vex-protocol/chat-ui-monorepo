@@ -3,7 +3,7 @@ import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { encodeHex } from '@vex-chat/crypto'
 import { VexClient } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { bootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 import { colors, typography } from '../theme'
@@ -69,19 +69,20 @@ export function FinalizeScreen({ navigation, route }: Props) {
         return
       }
 
-      // Save device credentials to OS keychain
+      // Save device credentials + JWT to OS keychain
       await saveCredentials({
         username,
         deviceID: result.deviceID,
         deviceKey: encodeHex(result.signKeyPair.secretKey),
         preKey: encodeHex(result.preKeyPair.secretKey),
+        token: result.token,
       })
 
       // Navigate to loading screen — bootstrap will trigger $user, which
       // causes RootNavigator to flip to AppStack
       navigation.navigate('HangTight')
 
-      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
+      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
