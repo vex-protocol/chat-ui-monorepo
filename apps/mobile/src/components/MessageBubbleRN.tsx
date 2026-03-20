@@ -21,6 +21,14 @@ function formatTime(iso: string): string {
 }
 
 export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNProps) {
+  if (message.mailType === 'system') {
+    return (
+      <View style={styles.systemContainer}>
+        <Text style={styles.systemText}>{message.content}</Text>
+      </View>
+    )
+  }
+
   return (
     <View style={styles.container}>
       {/* Avatar */}
@@ -90,5 +98,16 @@ const styles = StyleSheet.create({
   text: {
     ...typography.bodyLarge,
     color: colors.textSecondary,
+  },
+  systemContainer: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  systemText: {
+    ...typography.body,
+    color: colors.muted,
+    fontSize: 12,
+    fontStyle: 'italic',
   },
 })

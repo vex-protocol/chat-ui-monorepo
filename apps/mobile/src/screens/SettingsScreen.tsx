@@ -10,7 +10,9 @@ import {
 import { useStore } from '@nanostores/react'
 import notifee, { AndroidImportance } from '@notifee/react-native'
 import { $user, $client } from '../store'
+import { resetAll } from '@vex-chat/store'
 import { clearCredentials } from '../lib/keychain'
+import { clearMessages } from '../lib/messages'
 
 export function SettingsScreen({ navigation }: { navigation: any }) {
   const user = useStore($user)
@@ -20,11 +22,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
   async function handleLogout() {
     setLoggingOut(true)
     try {
-      await client?.disconnect()
+      await client?.logout()
     } catch { /* ignore */ }
     await clearCredentials()
-    $client.set(null)
-    $user.set(null)
+    await clearMessages()
+    resetAll()
   }
 
   function handleClearKeys() {
@@ -38,11 +40,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await client?.disconnect()
+              await client?.logout()
             } catch { /* ignore */ }
             await clearCredentials()
-            $client.set(null)
-            $user.set(null)
+            await clearMessages()
+            resetAll()
           },
         },
       ],

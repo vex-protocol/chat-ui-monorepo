@@ -32,6 +32,7 @@
     "@types/dompurify": "catalog:",
     "@types/uuid": "catalog:",
     "@vex-chat/crypto": "workspace:*",
+    "@vex-chat/libvex": "workspace:*",
     "@vex-chat/store": "workspace:*",
     "@vex-chat/types": "workspace:*",
     "dompurify": "catalog:",

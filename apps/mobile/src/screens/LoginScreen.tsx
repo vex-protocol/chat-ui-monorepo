@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { decodeHex } from '@vex-chat/crypto'
 import { VexClient } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 
@@ -53,7 +53,7 @@ export function LoginScreen({ navigation }: { navigation: any }) {
         return
       }
 
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
+      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

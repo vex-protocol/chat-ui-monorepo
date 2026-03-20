@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap } from '../store'
+import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials, clearCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 import { colors, typography } from '../theme'
@@ -41,14 +41,15 @@ export function WelcomeBackScreen({ navigation }: Props) {
     try {
       const SERVER_URL = getServerUrl()
 
-      // Auth with username — for now uses password-less flow via stored device key
-      // If the server requires password, this should navigate to a password entry
       const deviceKey = decodeHex(creds.deviceKey)
       const preKeySecret = decodeHex(creds.preKey)
 
       navigation.navigate('HangTight')
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, undefined, preKeySecret)
+      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)
+      // Success — RootNavigator auto-switches to App when $user becomes non-null
     } catch (err) {
+      // Navigate back so the user sees the error instead of being stuck on HangTight
+      if (navigation.canGoBack()) navigation.goBack()
       setError(err instanceof Error ? err.message : 'Failed to sign in')
       setLoading(false)
     }
@@ -64,7 +65,11 @@ export function WelcomeBackScreen({ navigation }: Props) {
       <BackButton />
 
       <View style={styles.content}>
-        <Text style={styles.heading}>Welcome back.</Text>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.heading}>Welcome back.</Text>
+          <Text style={styles.subtitle}>Continue where you left off</Text>
+        </View>
 
         {error ? (
           <View style={styles.errorBox}>
@@ -72,6 +77,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
           </View>
         ) : null}
 
+        {/* User card */}
         {creds ? (
           <CornerBracketBox size={10} color={colors.border}>
             <View style={styles.userCard}>
@@ -83,7 +89,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
               <View style={styles.userInfo}>
                 <Text style={styles.handle}>@{creds.username}</Text>
                 <Text style={styles.deviceId}>
-                  Device: {creds.deviceID.slice(0, 12)}...
+                  {creds.username}@vex.wtf
                 </Text>
               </View>
             </View>
@@ -92,23 +98,37 @@ export function WelcomeBackScreen({ navigation }: Props) {
           <Text style={styles.noCredsText}>No saved account found.</Text>
         )}
 
-        <VexButton
-          title="Continue"
-          onPress={handleContinue}
-          loading={loading}
-          disabled={!creds}
-          glow
-        />
+        {/* Continue button */}
+        <View style={styles.buttonRow}>
+          <VexButton
+            title="Continue"
+            onPress={handleContinue}
+            variant="outline"
+            loading={loading}
+            disabled={!creds}
+            glow
+          />
+        </View>
+      </View>
 
-        <View style={styles.links}>
-          <Text style={styles.link} onPress={handleSwitchAccount}>
-            Not you? Sign in with a different account
+      {/* Footer links */}
+      <View style={styles.footer}>
+        <View style={styles.footerSection}>
+          <Text style={styles.footerLabel}>Not you?</Text>
+          <Text style={styles.footerLink} onPress={handleSwitchAccount}>
+            Sign in with a different account
           </Text>
+        </View>
+
+        <View style={styles.divider} />
+
+        <View style={styles.footerSection}>
+          <Text style={styles.footerLabel}>New here?</Text>
           <Text
-            style={styles.link}
+            style={styles.footerLink}
             onPress={() => navigation.navigate('Initialize')}
           >
-            New here? Create an account
+            Create an account
           </Text>
         </View>
       </View>
@@ -119,12 +139,22 @@ export function WelcomeBackScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   content: {
     flex: 1,
-    marginTop: 32,
+    justifyContent: 'center',
     gap: 24,
+  },
+  header: {
+    alignItems: 'center',
+    gap: 8,
   },
   heading: {
     ...typography.heading,
     color: colors.text,
+    textAlign: 'center',
+  },
+  subtitle: {
+    ...typography.body,
+    color: colors.muted,
+    textAlign: 'center',
   },
   errorBox: {
     backgroundColor: 'rgba(229, 57, 53, 0.15)',
@@ -146,7 +176,6 @@ const styles = StyleSheet.create({
   avatar: {
     width: 48,
     height: 48,
-    borderRadius: 24,
     backgroundColor: colors.accentDark,
     alignItems: 'center',
     justifyContent: 'center',
@@ -168,18 +197,35 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.muted,
   },
+  buttonRow: {
+    alignItems: 'center',
+  },
   noCredsText: {
     ...typography.body,
     color: colors.muted,
     textAlign: 'center',
     paddingVertical: 32,
   },
-  links: {
+  footer: {
     alignItems: 'center',
     gap: 16,
+    paddingBottom: 16,
   },
-  link: {
+  footerSection: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  footerLabel: {
     ...typography.body,
     color: colors.muted,
+  },
+  footerLink: {
+    ...typography.body,
+    color: colors.accent,
+  },
+  divider: {
+    width: 80,
+    height: 1,
+    backgroundColor: colors.border,
   },
 })

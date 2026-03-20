@@ -64,6 +64,10 @@ export class VexConnection {
     private readonly emitter: EventEmitter<VexEvents>,
     /** Called with the raw (encrypted) IMail frame before SessionManager decrypts it. */
     private readonly onRawMail: (mail: IMail) => void,
+    /** Called when spire sends a mail notify with no payload — client should poll fetchInbox. */
+    private readonly onMailNotify: () => void,
+    /** Called when spire sends a serverChange notify (member join, channel create, etc.) */
+    private readonly onServerChange: (serverID: string, joined?: { userID: string; username: string }) => void,
     private readonly token?: string,
   ) {}
 
@@ -102,6 +106,7 @@ export class VexConnection {
           this.pingInterval = setInterval(() => {
             this.rws?.send(buildFrame({ transmissionID: uuidv4(), type: 'ping' }).buffer as ArrayBuffer)
           }, 30_000)
+          this.emitter.emit('ready')
           return
         }
         if (type === 'authErr') {
@@ -120,13 +125,23 @@ export class VexConnection {
       if (type === 'notify') {
         const event = body['event'] as string
         if (event === 'mail') {
-          // Old spire sends notify with no payload — client must poll via fetchInbox
-          // But if data is present, treat it as a raw mail frame
           if (body['data']) {
             this.onRawMail(body['data'] as IMail)
+          } else {
+            // Old spire sends notify with no payload — poll fetchInbox
+            this.onMailNotify()
+          }
+        } else if (event === 'serverChange') {
+          // Server membership or channels changed — data is serverID or { serverID, joined }
+          const data = body['data']
+          if (typeof data === 'string') {
+            this.onServerChange(data, undefined)
+          } else if (data && typeof data === 'object') {
+            const obj = data as Record<string, unknown>
+            const joined = obj['joined'] as { userID: string; username: string } | undefined
+            this.onServerChange(obj['serverID'] as string, joined)
           }
         }
-        // Other notify events (permission, serverChange) could be handled here
         return
       }
 
@@ -144,7 +159,7 @@ export class VexConnection {
       if (this.token) {
         this.rws!.send(buildFrame({ transmissionID: uuidv4(), type: 'auth', token: this.token }).buffer as ArrayBuffer)
       }
-      this.emitter.emit('ready')
+      // 'ready' is now emitted after the 'authorized' message, not here
     })
 
     this.rws.addEventListener('close', () => {
@@ -156,6 +171,20 @@ export class VexConnection {
     this.rws.addEventListener('error', (event: Event) => {
       this.emitter.emit('error', new Error(String(event)))
     })
+  }
+
+  /** Send a resource frame (e.g. mail CREATE) over the WebSocket. */
+  sendResource(transmissionID: string, resourceType: string, action: string, data: unknown): void {
+    if (!this.rws) return
+    const frame = buildFrame({ transmissionID, type: 'resource', resourceType, action, data })
+    this.rws.send(frame.buffer as ArrayBuffer)
+  }
+
+  /** Send a receipt to tell spire to delete a delivered message (privacy: server doesn't retain). */
+  sendReceipt(nonce: Uint8Array): void {
+    if (!this.rws) return
+    const frame = buildFrame({ transmissionID: uuidv4(), type: 'receipt', nonce })
+    this.rws.send(frame.buffer as ArrayBuffer)
   }
 
   disconnect(): void {

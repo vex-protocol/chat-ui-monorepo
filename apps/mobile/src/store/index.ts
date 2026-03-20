@@ -30,3 +30,9 @@ export {
   $devices,
   $onlineLists,
 } from '@vex-chat/store'
+export type { PersistenceCallbacks } from '@vex-chat/store'
+
+// Pre-built persistence callbacks for mobile (AsyncStorage)
+import { loadMessages, saveGroupMessages, saveDmMessages } from '../lib/messages'
+import type { PersistenceCallbacks } from '@vex-chat/store'
+export const mobilePersistence: PersistenceCallbacks = { loadMessages, saveGroupMessages, saveDmMessages }

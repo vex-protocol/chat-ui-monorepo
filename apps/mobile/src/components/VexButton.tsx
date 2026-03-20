@@ -82,9 +82,9 @@ const styles = StyleSheet.create({
   },
   glow: {
     shadowColor: colors.accent,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
+    elevation: 12,
   },
 })

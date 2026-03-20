@@ -101,6 +101,9 @@ importers:
       '@vex-chat/crypto':
         specifier: workspace:*
         version: link:../../packages/crypto
+      '@vex-chat/libvex':
+        specifier: workspace:*
+        version: link:../../packages/libvex
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -153,6 +156,9 @@ importers:
       '@notifee/react-native':
         specifier: ^9.1.8
         version: 9.1.8(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))
+      '@react-native-async-storage/async-storage':
+        specifier: ^3.0.1
+        version: 3.0.1(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       '@react-navigation/bottom-tabs':
         specifier: ^7.3.0
         version: 7.15.5(@react-navigation/native@7.1.33(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-screens@4.24.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
@@ -174,6 +180,9 @@ importers:
       '@vex-chat/types':
         specifier: workspace:*
         version: link:../../packages/types
+      fast-text-encoding:
+        specifier: ^1.0.6
+        version: 1.0.6
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -1698,6 +1707,12 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
+
+  '@react-native-async-storage/async-storage@3.0.1':
+    resolution: {integrity: sha512-VHwHb19sMg4Xh3W5M6YmJ/HSm1uh8RYFa6Dozm9o/jVYTYUgz2BmDXqXF7sum3glQaR34/hlwVc94px1sSdC2A==}
+    peerDependencies:
+      react: 19.2.3
+      react-native: '*'
 
   '@react-native-community/cli-clean@20.1.0':
     resolution: {integrity: sha512-77L4DifWfxAT8ByHnkypge7GBMYpbJAjBGV+toowt5FQSGaTBDcBHCX+FFqFRukD5fH6i8sZ41Gtw+nbfCTTIA==}
@@ -3353,6 +3368,9 @@ packages:
   fast-levenshtein@2.0.6:
     resolution: {integrity: sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw==}
 
+  fast-text-encoding@1.0.6:
+    resolution: {integrity: sha512-VhXlQgj9ioXCqGstD37E/HBeqEGV/qOD/kmbVG8h5xKBYvM1L3lR1Zn4555cQ8GkYbJa8aJSipLPndE1k6zK2w==}
+
   fast-xml-parser@4.5.4:
     resolution: {integrity: sha512-jE8ugADnYOBsu1uaoayVl1tVKAMNOXyjwvv2U6udEA2ORBhDooJDWoGxTkhd4Qn4yh59JVVt/pKXtjPwx9OguQ==}
     hasBin: true
@@ -3601,6 +3619,9 @@ packages:
   iconv-lite@0.4.24:
     resolution: {integrity: sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA==}
     engines: {node: '>=0.10.0'}
+
+  idb@8.0.3:
+    resolution: {integrity: sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg==}
 
   ieee754@1.2.1:
     resolution: {integrity: sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA==}
@@ -6947,6 +6968,12 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
+  '@react-native-async-storage/async-storage@3.0.1(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)':
+    dependencies:
+      idb: 8.0.3
+      react: 19.2.3
+      react-native: 0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)
+
   '@react-native-community/cli-clean@20.1.0':
     dependencies:
       '@react-native-community/cli-tools': 20.1.0
@@ -8882,6 +8909,8 @@ snapshots:
 
   fast-levenshtein@2.0.6: {}
 
+  fast-text-encoding@1.0.6: {}
+
   fast-xml-parser@4.5.4:
     dependencies:
       strnum: 1.1.2
@@ -9152,6 +9181,8 @@ snapshots:
   iconv-lite@0.4.24:
     dependencies:
       safer-buffer: 2.1.2
+
+  idb@8.0.3: {}
 
   ieee754@1.2.1: {}
 

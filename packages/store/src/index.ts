@@ -3,6 +3,7 @@ export { $client } from './client.ts'
 
 // Bootstrap + key-replaced flag
 export { bootstrap, $keyReplaced } from './bootstrap.ts'
+export type { PersistenceCallbacks } from './bootstrap.ts'
 
 // State atoms
 export { $user } from './user.ts'
