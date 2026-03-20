@@ -4,10 +4,11 @@ import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
-import { autoLogin, $keyReplaced, $user, $client, mobilePersistence } from './src/store'
+import { autoLogin, $keyReplaced, $user, $client, $familiars, mobilePersistence } from './src/store'
 import { keychainKeyStore } from './src/lib/keychain'
 import { clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
+import { loadFamiliars, saveFamiliars } from './src/lib/messages'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
 import { requestNotificationPermission, showMessageNotification, setupNotificationHandlers } from './src/lib/notifications'
@@ -25,10 +26,24 @@ function App() {
 
   useEffect(() => {
     ;(async () => {
+      // Load persisted familiars before bootstrap
+      const saved = await loadFamiliars()
+      for (const [id, u] of Object.entries(saved)) {
+        $familiars.setKey(id, u)
+      }
+
       await requestNotificationPermission()
       await autoLogin(keychainKeyStore, getServerUrl(), mobilePersistence)
     })()
   }, [])
+
+  // Persist familiars whenever they change
+  const familiars = useStore($familiars)
+  useEffect(() => {
+    if (Object.keys(familiars).length > 0) {
+      saveFamiliars(familiars).catch(() => {})
+    }
+  }, [familiars])
 
   // Show local notifications for incoming messages when app is backgrounded
   useEffect(() => {
