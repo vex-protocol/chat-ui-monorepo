@@ -4,9 +4,9 @@ import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
-import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced, $user, $client, mobilePersistence } from './src/store'
-import { loadCredentials, clearCredentials } from './src/lib/keychain'
+import { autoLogin, $keyReplaced, $user, $client, mobilePersistence } from './src/store'
+import { keychainKeyStore } from './src/lib/keychain'
+import { clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
@@ -24,21 +24,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    // Auto-login: try loading credentials from keychain on mount
     ;(async () => {
       await requestNotificationPermission()
-
-      const creds = await loadCredentials()
-      if (!creds) return
-
-      try {
-        const deviceKey = decodeHex(creds.deviceKey)
-        const preKeySecret = decodeHex(creds.preKey)
-
-        await bootstrap(getServerUrl(), creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)
-      } catch {
-        // Credentials invalid or session expired — user will see login screen
-      }
+      await autoLogin(keychainKeyStore, getServerUrl(), mobilePersistence)
     })()
   }, [])
 

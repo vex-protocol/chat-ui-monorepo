@@ -5,6 +5,10 @@ export { $client } from './client.ts'
 export { bootstrap, $keyReplaced } from './bootstrap.ts'
 export type { PersistenceCallbacks } from './bootstrap.ts'
 
+// Auto-login
+export { autoLogin } from './auto-login.ts'
+export type { AutoLoginResult } from './auto-login.ts'
+
 // State atoms
 export { $user } from './user.ts'
 export { $familiars } from './familiars.ts'
