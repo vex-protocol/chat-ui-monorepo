@@ -9,6 +9,7 @@ import { $channels } from './channels.ts'
 import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
 import { incrementUnread } from './unread.ts'
+import { $familiars } from './familiars.ts'
 
 /**
  * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
@@ -64,6 +65,7 @@ export async function bootstrap(
 
   client.on('mail', (mail) => {
     // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
+    console.log('[vex-store] mail received:', mail.mailID, 'from:', mail.authorID, 'group:', mail.group)
     const me = $user.get()
     if (mail.group) {
       // Group / channel message — key by channelID, deduplicate by mailID
@@ -81,7 +83,21 @@ export async function bootstrap(
       if (!prev.some(m => m.mailID === mail.mailID)) {
         $messages.setKey(threadKey, [...prev, mail])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
-        if (me && mail.authorID !== me.userID) incrementUnread(threadKey)
+        if (me && mail.authorID !== me.userID) {
+          incrementUnread(threadKey)
+          // Auto-add sender as familiar so they appear in DM list
+          if (!$familiars.get()[mail.authorID]) {
+            $familiars.setKey(mail.authorID, {
+              userID: mail.authorID,
+              username: mail.authorID.slice(0, 8),
+              lastSeen: mail.time,
+            })
+            // Try to fetch real username
+            client.getUser(mail.authorID).then(u => {
+              if (u) $familiars.setKey(mail.authorID, u)
+            }).catch(() => {})
+          }
+        }
       }
     }
   })
