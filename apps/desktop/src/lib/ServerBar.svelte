@@ -20,6 +20,19 @@
 
 <nav class="server-bar" aria-label="Servers">
   <ul class="server-bar__list">
+    <li>
+      <button
+        class="server-bar__item server-bar__item--home {!activeServerID ? 'server-bar__item--active' : ''}"
+        onclick={() => push('/home')}
+        title="Direct Messages"
+        aria-label="Direct Messages"
+      >
+        DM
+      </button>
+    </li>
+
+    <li class="server-bar__divider" role="separator"></li>
+
     {#each serverList as server (server.serverID)}
       <li>
         <button
@@ -120,6 +133,12 @@
 
   .server-bar__item--active::before {
     height: 36px;
+  }
+
+  .server-bar__item--home {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
   }
 
   .server-bar__item--add {
