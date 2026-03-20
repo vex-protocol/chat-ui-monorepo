@@ -1,6 +1,7 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { DecryptedMail } from '@vex-chat/types'
+import { formatTime } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 
 interface MessageBubbleRNProps {
@@ -13,11 +14,6 @@ function hue(id: string): number {
   let h = 0
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
   return Math.abs(h) % 360
-}
-
-function formatTime(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNProps) {
