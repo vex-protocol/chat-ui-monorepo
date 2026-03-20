@@ -102,7 +102,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
           style={styles.searchInput}
           value={query}
           onChangeText={onSearch}
-          placeholder="Find a user..."
+          placeholder="Search by exact username..."
           placeholderTextColor={colors.mutedDark}
         />
       </View>
