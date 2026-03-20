@@ -78,25 +78,28 @@ export async function bootstrap(
       }
     } else {
       // Direct message — key by the other party's userID, deduplicate by mailID
-      const threadKey = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
+      const isOwnMessage = me && mail.authorID === me.userID
+      const threadKey = isOwnMessage ? mail.readerID : mail.authorID
       const prev = $messages.get()[threadKey] ?? []
       if (!prev.some(m => m.mailID === mail.mailID)) {
         $messages.setKey(threadKey, [...prev, mail])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
-        if (me && mail.authorID !== me.userID) {
+
+        if (!isOwnMessage) {
           incrementUnread(threadKey)
-          // Auto-add sender as familiar so they appear in DM list
-          if (!$familiars.get()[mail.authorID]) {
-            $familiars.setKey(mail.authorID, {
-              userID: mail.authorID,
-              username: mail.authorID.slice(0, 8),
-              lastSeen: mail.time,
-            })
-            // Try to fetch real username
-            client.getUser(mail.authorID).then(u => {
-              if (u) $familiars.setKey(mail.authorID, u)
-            }).catch(() => {})
-          }
+        }
+
+        // Auto-add the other party as familiar so they appear in DM list
+        const otherUserID = threadKey
+        if (!$familiars.get()[otherUserID]) {
+          $familiars.setKey(otherUserID, {
+            userID: otherUserID,
+            username: otherUserID.slice(0, 8),
+            lastSeen: mail.time,
+          })
+          client.getUser(otherUserID).then(u => {
+            if (u) $familiars.setKey(otherUserID, u)
+          }).catch(() => {})
         }
       }
     }
