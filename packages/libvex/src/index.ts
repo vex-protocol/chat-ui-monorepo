@@ -6,3 +6,5 @@ export type { RegisterResult, RegisterAndLoginResult, RegisterDeviceResult, Logi
 export type { SendResult } from './mail.ts'
 export type { VexError, VexErrorCode } from './errors.ts'
 export { fromEvent } from './iterators.ts'
+export { parseVexLink } from './deeplink.ts'
+export type { VexLink } from './deeplink.ts'
