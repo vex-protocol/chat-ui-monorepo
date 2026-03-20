@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $messages, $user } from '../store'
-import { sendDirectMessage } from '@vex-chat/store'
+import { sendDirectMessage, markRead } from '@vex-chat/store'
 import { keychainKeyStore } from '../lib/keychain'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
@@ -22,6 +22,9 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
   const allMessages = useStore($messages)
   const messages: DecryptedMail[] = allMessages[userID] ?? []
   const user = useStore($user)
+
+  // Clear unread count when viewing this conversation
+  useEffect(() => { markRead(userID) }, [userID])
 
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)

@@ -10,7 +10,7 @@ import {
 import { useStore } from '@nanostores/react'
 import type { IUser, DecryptedMail } from '@vex-chat/types'
 import { $familiars, $messages, $client } from '../store'
-import { $familiars as familiarsAtom } from '@vex-chat/store'
+import { $familiars as familiarsAtom, $unreadCounts } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 
@@ -18,6 +18,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
   const familiars = useStore($familiars)
   const allMessages = useStore($messages)
   const client = useStore($client)
+  const unreadCounts = useStore($unreadCounts)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<IUser[]>([])
@@ -59,6 +60,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
 
   function renderFamiliar({ item }: { item: IUser }) {
     const last = lastMessage(item.userID)
+    const unread = unreadCounts[item.userID] ?? 0
     return (
       <TouchableOpacity
         style={styles.row}
@@ -75,6 +77,11 @@ export function DMListScreen({ navigation }: { navigation: any }) {
             </Text>
           )}
         </View>
+        {unread > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     )
   }
@@ -249,5 +256,20 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     marginTop: 4,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 'auto',
+  },
+  unreadText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 })
