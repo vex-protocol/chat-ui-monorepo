@@ -2,7 +2,7 @@
   // Route: /messaging/:userID
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client, user, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { messages, client, user, familiars, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
   import { sendDirectMessage } from '@vex-chat/store'
   import { keyStore } from '../lib/keystore.js'
 
@@ -10,6 +10,8 @@
 
   const targetUserID = $derived(params.userID ?? '')
   const threadMessages = $derived($messages[targetUserID] ?? [])
+  const targetUsername = $derived($familiars[targetUserID]?.username ?? targetUserID.slice(0, 8))
+  const usernameMap = $derived({ [targetUserID]: targetUsername })
 
   let sending = $state(false)
   let sendError = $state('')
@@ -79,7 +81,7 @@
 
 <div class="dm-pane">
   <header class="dm-pane__header">
-    <span class="dm-pane__title">@{targetUserID.slice(0, 8)}</span>
+    <span class="dm-pane__title">@{targetUsername}</span>
     <div class="dm-pane__actions">
       {#if fingerprint}
         <button
@@ -117,7 +119,7 @@
     </div>
   {/if}
 
-  <MessageBox messages={threadMessages} />
+  <MessageBox messages={threadMessages} usernames={usernameMap} />
 
   {#if sendError}
     <div class="dm-pane__error">{sendError}</div>
