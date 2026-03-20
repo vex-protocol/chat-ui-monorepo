@@ -1,6 +1,7 @@
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import type { DecryptedMail } from '@vex-chat/types'
+import { shouldNotify } from '@vex-chat/store'
 import { playNotify } from './sounds.js'
 
 /** Minimal interface needed to subscribe/unsubscribe to mail events. */
@@ -36,51 +37,34 @@ async function ensurePermission(): Promise<boolean> {
   }
 }
 
-// ── Core notify ───────────────────────────────────────────────────────────────
-
-async function notify(title: string, body: string): Promise<void> {
-  if (!getNotificationsEnabled()) return
-
-  // Don't notify while the window is focused
-  try {
-    const focused = await getCurrentWindow().isFocused()
-    if (focused) {
-      playNotify()
-      return
-    }
-  } catch {
-    // If we can't check focus, proceed with notification
-  }
-
-  playNotify()
-
-  const granted = await ensurePermission()
-  if (granted) {
-    sendNotification({ title, body: body.length > 100 ? body.slice(0, 97) + '…' : body })
-  }
-}
-
 // ── Wire up to VexClient ──────────────────────────────────────────────────────
 
 /**
- * Attaches a mail listener to the client that fires desktop notifications
- * for incoming messages not authored by the current user.
- * Returns an unsubscribe function.
- *
- * @param resolveChannelName - Optional lookup from channelID to display name.
- *   When omitted, group notifications fall back to "Group message".
+ * Attaches a mail listener that fires desktop notifications using the shared
+ * shouldNotify() decision logic. Returns an unsubscribe function.
  */
 export function setupNotifications(
   client: MailEventEmitter,
-  currentUserID: string,
+  activeConversation: () => string | null,
   resolveChannelName?: (channelID: string) => string | undefined,
 ): () => void {
-  const handler = (mail: DecryptedMail): void => {
-    if (mail.authorID === currentUserID) return  // don't notify for own messages
-    const title = mail.group
-      ? `#${resolveChannelName?.(mail.group) ?? 'channel'}`
-      : mail.authorID
-    void notify(title, mail.content)
+  const handler = async (mail: DecryptedMail): Promise<void> => {
+    let focused = false
+    try { focused = await getCurrentWindow().isFocused() } catch {}
+
+    const payload = shouldNotify(mail, activeConversation(), focused, undefined, resolveChannelName)
+    if (!payload) return
+
+    if (!getNotificationsEnabled()) return
+
+    playNotify()
+
+    if (!focused) {
+      const granted = await ensurePermission()
+      if (granted) {
+        sendNotification({ title: payload.title, body: payload.body })
+      }
+    }
   }
 
   client.on('mail', handler)

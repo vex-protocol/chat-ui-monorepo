@@ -21,6 +21,10 @@ export { $onlineLists } from './onlineLists.ts'
 export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
+// Notification decisions
+export { shouldNotify } from './notifications.ts'
+export type { NotificationPayload } from './notifications.ts'
+
 // Unread counts
 export { $unreadCounts, $totalUnread, incrementUnread, markRead, resetAllUnread } from './unread.ts'
 
