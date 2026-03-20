@@ -1,8 +1,6 @@
-import { v4 as uuidv4 } from 'uuid'
-import type { DecryptedMail, KeyStore } from '@vex-chat/types'
+import type { KeyStore } from '@vex-chat/types'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
-import { $messages } from './messages.ts'
 
 export interface SendDMOptions {
   /** Pre-uploaded file attachment metadata (mailType + extra JSON). */
@@ -20,10 +18,11 @@ export interface SendDMResult {
 /**
  * Sends a direct message to a user, handling the full flow:
  *   1. Sends to ALL recipient devices (not just the first)
- *   2. Echoes the sent message locally (server doesn't echo back to sender)
- *   3. Forwards to sender's own other devices so sent messages appear everywhere
+ *   2. Forwards to sender's own other devices so sent messages appear everywhere
  *
- * Both desktop and mobile call this instead of implementing send logic themselves.
+ * The server delivers the message back to the sender via WebSocket/mail-notify,
+ * so the bootstrap mail handler in bootstrap.ts adds it to $messages automatically.
+ * No local echo needed — avoids duplicates.
  */
 export async function sendDirectMessage(
   recipientUserID: string,
@@ -55,22 +54,7 @@ export async function sendDirectMessage(
     return { ok: false, error: first?.value.error.message ?? 'Failed to send to any device' }
   }
 
-  // 2. Echo sent message locally (server doesn't echo back to sender)
-  const sentMail: DecryptedMail = {
-    mailID: uuidv4(),
-    authorID: me.userID,
-    readerID: recipientUserID,
-    group: null,
-    mailType,
-    time: new Date().toISOString(),
-    content,
-    extra,
-    forward: null,
-  }
-  const prev = $messages.get()[recipientUserID] ?? []
-  $messages.setKey(recipientUserID, [...prev, sentMail])
-
-  // 3. Forward to sender's own other devices
+  // 2. Forward to sender's own other devices
   if (options?.keyStore) {
     try {
       const creds = await options.keyStore.loadActive()
