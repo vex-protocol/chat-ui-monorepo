@@ -26,14 +26,14 @@ function App() {
 
   useEffect(() => {
     ;(async () => {
-      // Load persisted familiars before bootstrap
+      await requestNotificationPermission()
+      await autoLogin(keychainKeyStore, getServerUrl(), mobilePersistence)
+
+      // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
       const saved = await loadFamiliars()
       for (const [id, u] of Object.entries(saved)) {
         $familiars.setKey(id, u)
       }
-
-      await requestNotificationPermission()
-      await autoLogin(keychainKeyStore, getServerUrl(), mobilePersistence)
     })()
   }, [])
 
