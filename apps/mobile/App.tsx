@@ -4,11 +4,11 @@ import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
-import { autoLogin, $keyReplaced, $user, $client, $familiars, mobilePersistence } from './src/store'
+import { autoLogin, $keyReplaced, $user, $client, $familiars, $messages, $groupMessages, mobilePersistence } from './src/store'
 import { keychainKeyStore } from './src/lib/keychain'
 import { clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
-import { loadFamiliars, saveFamiliars } from './src/lib/messages'
+import { loadFamiliars, saveFamiliars, saveDmMessages, saveGroupMessages } from './src/lib/messages'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
 import { requestNotificationPermission, showMessageNotification, setupNotificationHandlers } from './src/lib/notifications'
@@ -44,6 +44,20 @@ function App() {
       saveFamiliars(familiars).catch(() => {})
     }
   }, [familiars])
+
+  // Persist messages whenever they change
+  const allDms = useStore($messages)
+  const allGroups = useStore($groupMessages)
+  useEffect(() => {
+    if (Object.keys(allDms).length > 0) {
+      saveDmMessages(allDms).catch(() => {})
+    }
+  }, [allDms])
+  useEffect(() => {
+    if (Object.keys(allGroups).length > 0) {
+      saveGroupMessages(allGroups).catch(() => {})
+    }
+  }, [allGroups])
 
   // Show local notifications for incoming messages when app is backgrounded
   useEffect(() => {
