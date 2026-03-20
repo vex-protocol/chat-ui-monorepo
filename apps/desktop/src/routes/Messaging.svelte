@@ -3,12 +3,17 @@
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
   import { messages, client, user, familiars, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
-  import { sendDirectMessage } from '@vex-chat/store'
+  import { sendDirectMessage, markRead } from '@vex-chat/store'
   import { keyStore } from '../lib/keystore.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
   const targetUserID = $derived(params.userID ?? '')
+
+  // Clear unread count when viewing this conversation
+  $effect(() => {
+    if (targetUserID) markRead(targetUserID)
+  })
   const threadMessages = $derived($messages[targetUserID] ?? [])
   const targetUsername = $derived($familiars[targetUserID]?.username ?? targetUserID.slice(0, 8))
   const usernameMap = $derived({ [targetUserID]: targetUsername })
