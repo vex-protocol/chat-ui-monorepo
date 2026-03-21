@@ -82,3 +82,43 @@ export async function clearMessages(): Promise<void> {
     tx.onerror = () => reject(tx.error)
   })
 }
+
+// ── PersistenceCallbacks adapter ──────────────────────────────────────────────
+
+import type { PersistenceCallbacks } from '@vex-chat/store'
+
+/**
+ * Bulk-save by writing all messages for each thread to IndexedDB.
+ * PersistenceCallbacks expects (full state) → save, so we put every message.
+ */
+async function saveGroupMessages(groups: Record<string, DecryptedMail[]>): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(STORE, 'readwrite')
+  const store = tx.objectStore(STORE)
+  for (const [channelID, msgs] of Object.entries(groups)) {
+    for (const mail of msgs) store.put({ ...mail, threadKey: channelID })
+  }
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+async function saveDmMessages(dms: Record<string, DecryptedMail[]>): Promise<void> {
+  const db = await getDB()
+  const tx = db.transaction(STORE, 'readwrite')
+  const store = tx.objectStore(STORE)
+  for (const [userID, msgs] of Object.entries(dms)) {
+    for (const mail of msgs) store.put({ ...mail, threadKey: userID })
+  }
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+  })
+}
+
+export const desktopPersistence: PersistenceCallbacks = {
+  loadMessages: loadAllMessages,
+  saveGroupMessages,
+  saveDmMessages,
+}

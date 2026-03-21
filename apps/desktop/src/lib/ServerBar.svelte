@@ -1,6 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import type { IServer, IChannel } from '@vex-chat/types'
+  import { $totalDmUnread as totalDmUnread } from '@vex-chat/store'
   import CreateServerModal from './CreateServerModal.svelte'
 
   let { serverList = [], activeServerID = '', channelMap = {} }: { serverList?: IServer[]; activeServerID?: string; channelMap?: Record<string, IChannel[]> } = $props()
@@ -20,6 +21,22 @@
 
 <nav class="server-bar" aria-label="Servers">
   <ul class="server-bar__list">
+    <li>
+      <button
+        class="server-bar__item server-bar__item--home {!activeServerID ? 'server-bar__item--active' : ''}"
+        onclick={() => push('/home')}
+        title="Direct Messages"
+        aria-label="Direct Messages"
+      >
+        DM
+        {#if $totalDmUnread > 0}
+          <span class="server-bar__badge">{$totalDmUnread > 99 ? '99+' : $totalDmUnread}</span>
+        {/if}
+      </button>
+    </li>
+
+    <li class="server-bar__divider" role="separator"></li>
+
     {#each serverList as server (server.serverID)}
       <li>
         <button
@@ -122,6 +139,12 @@
     height: 36px;
   }
 
+  .server-bar__item--home {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
   .server-bar__item--add {
     font-size: 22px;
     color: var(--success);
@@ -131,6 +154,25 @@
   .server-bar__item--add:hover {
     background: var(--success);
     color: #fff;
+  }
+
+  .server-bar__badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: var(--danger, #e53935);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--bg-secondary);
+    line-height: 1;
   }
 
   .server-bar__divider {

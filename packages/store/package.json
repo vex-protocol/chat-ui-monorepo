@@ -9,12 +9,17 @@
   "dependencies": {
     "@vex-chat/types": "workspace:*",
     "@vex-chat/libvex": "workspace:*",
-    "nanostores": "catalog:"
+    "@vex-chat/crypto": "workspace:*",
+    "nanostores": "catalog:",
+    "uuid": "catalog:"
   },
   "peerDependencies": {
     "@nanostores/react": ">=0.8"
   },
   "peerDependenciesMeta": {
-    "@nanostores/react": { "optional": true }
-  }
+    "@nanostores/react": {
+      "optional": true
+    }
+  },
+  "license": "AGPL-3.0-or-later"
 }

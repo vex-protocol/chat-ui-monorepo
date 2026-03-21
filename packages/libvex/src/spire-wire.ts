@@ -2,7 +2,7 @@
  * spire-wire.ts — Wire format adapter between new libvex IMail (hex strings)
  * and old spire's WS.IMail (Uint8Array fields, packed extra).
  *
- * See docs/explanation/spire-wire-format.md for the full protocol spec.
+ * See docs/explanation/migration-from-upstream.md for the full API surface.
  */
 import { encodeHex, decodeHex } from '@vex-chat/crypto'
 import { parse as uuidParse, stringify as uuidStringify } from 'uuid'

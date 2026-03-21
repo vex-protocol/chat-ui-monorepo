@@ -10,7 +10,7 @@ import {
 import { useStore } from '@nanostores/react'
 import type { IUser, DecryptedMail } from '@vex-chat/types'
 import { $familiars, $messages, $client } from '../store'
-import { $familiars as familiarsAtom } from '@vex-chat/store'
+import { $familiars as familiarsAtom, $dmUnreadCounts, avatarHue } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 
@@ -18,6 +18,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
   const familiars = useStore($familiars)
   const allMessages = useStore($messages)
   const client = useStore($client)
+  const unreadCounts = useStore($dmUnreadCounts)
 
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<IUser[]>([])
@@ -59,12 +60,13 @@ export function DMListScreen({ navigation }: { navigation: any }) {
 
   function renderFamiliar({ item }: { item: IUser }) {
     const last = lastMessage(item.userID)
+    const unread = unreadCounts[item.userID] ?? 0
     return (
       <TouchableOpacity
         style={styles.row}
         onPress={() => openConversation(item)}
       >
-        <View style={[styles.avatar, { backgroundColor: `hsl(${hue(item.userID)}, 45%, 40%)` }]}>
+        <View style={[styles.avatar, { backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)` }]}>
           <Text style={styles.avatarText}>{item.username.slice(0, 1).toUpperCase()}</Text>
         </View>
         <View style={styles.rowContent}>
@@ -75,6 +77,11 @@ export function DMListScreen({ navigation }: { navigation: any }) {
             </Text>
           )}
         </View>
+        {unread > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>{unread > 99 ? '99+' : unread}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     )
   }
@@ -85,7 +92,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         style={styles.resultRow}
         onPress={() => openConversation(item)}
       >
-        <View style={[styles.avatarSm, { backgroundColor: `hsl(${hue(item.userID)}, 45%, 40%)` }]}>
+        <View style={[styles.avatarSm, { backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)` }]}>
           <Text style={styles.avatarSmText}>{item.username.slice(0, 1).toUpperCase()}</Text>
         </View>
         <Text style={styles.resultName}>{item.username}</Text>
@@ -102,7 +109,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
           style={styles.searchInput}
           value={query}
           onChangeText={onSearch}
-          placeholder="Find a user..."
+          placeholder="Search by exact username..."
           placeholderTextColor={colors.mutedDark}
         />
       </View>
@@ -140,11 +147,6 @@ export function DMListScreen({ navigation }: { navigation: any }) {
   )
 }
 
-function hue(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return Math.abs(h) % 360
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -249,5 +251,20 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 11,
     marginTop: 4,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 'auto',
+  },
+  unreadText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
 })

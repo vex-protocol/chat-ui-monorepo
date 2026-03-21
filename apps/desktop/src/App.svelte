@@ -14,7 +14,7 @@
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
-  import { user, keyReplaced, servers, channels, client } from './lib/store/index.js'
+  import { user, keyReplaced, servers, channels, client, familiars } from './lib/store/index.js'
   import { setupNotifications } from './lib/notifications.js'
   import { setupTray } from './lib/tray.js'
   import { setupDeepLinks } from './lib/deeplink.js'
@@ -51,12 +51,27 @@
     }
   })
 
+  // Active conversation key derived from URL (userID for DMs, channelID for channels)
+  const activeConversationKey = $derived(
+    $location.startsWith('/messaging/') ? ($location.split('/')[2] ?? null)
+    : $location.startsWith('/server/') ? ($location.split('/')[3] ?? null)
+    : null
+  )
+
   // Wire desktop notifications and tray unread tracking
   $effect(() => {
     const c = $client
     const u = $user
     if (!c || !u) return
-    const unNotify = setupNotifications(c, u.userID)
+    const unNotify = setupNotifications(c, () => activeConversationKey, (userID: string) => {
+      return $familiars[userID]?.username
+    }, (channelID: string) => {
+      for (const [serverID, chs] of Object.entries($channels)) {
+        const ch = chs.find((c: { channelID: string }) => c.channelID === channelID)
+        if (ch) return { channelName: ch.name, serverName: $servers[serverID]?.name ?? 'server' }
+      }
+      return undefined
+    })
     const unTray = setupTray(c, u.userID)
     return () => { unNotify(); unTray() }
   })

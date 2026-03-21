@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { avatarHue } from '@vex-chat/store'
+
   interface Props {
     userID: string
     serverUrl: string
@@ -24,13 +26,6 @@
     if (displayName) return displayName.slice(0, 2).toUpperCase()
     return id.slice(0, 2).toUpperCase()
   }
-
-  // Deterministic hue from userID string
-  function hue(id: string): number {
-    let h = 0
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) & 0xffffffff
-    return Math.abs(h) % 360
-  }
 </script>
 
 {#if !failed}
@@ -46,7 +41,7 @@
 {:else}
   <div
     class="avatar avatar--fallback"
-    style="width:{size}px;height:{size}px;font-size:{Math.round(size * 0.4)}px;background:hsl({hue(userID)},45%,40%)"
+    style="width:{size}px;height:{size}px;font-size:{Math.round(size * 0.4)}px;background:hsl({avatarHue(userID)},45%,40%)"
     aria-label={name ?? userID}
   >
     {initials(userID, name)}
