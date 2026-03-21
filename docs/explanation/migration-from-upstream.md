@@ -272,16 +272,16 @@ These endpoints have the same HTTP method, path, and semantics:
 
 The server stays in its own repo. These improvements are tracked separately.
 
-| Aspect | Current spire | Target |
+| Aspect | Status | Notes |
 |---|---|---|
-| **Password hashing** | PBKDF2 (1000 iterations, SHA-512) | argon2id (Tier 1 — security) |
-| **JWT secret** | Reuses SPK | Dedicated JWT_SECRET (Tier 1) |
-| **Logging** | Tokens/IDs in plaintext logs | Redacted / removed (Tier 1) |
-| **Crypto** | TweetNaCl | @noble/curves (Tier 2) |
-| **Validation** | Manual checks in route handlers | Zod schemas (Tier 2) |
-| **ORM** | Knex (query builder) | Kysely (Tier 3) |
-| **Module system** | CommonJS | ESM (Tier 3) |
-| **Error handling** | Stack traces sent to clients | Generic error messages (Tier 2) |
+| **Password hashing** | **Done** — argon2id with lazy PBKDF2 migration | Old hashes auto-upgrade on login |
+| **Crypto** | **Done** — @noble/curves replaces TweetNaCl | Ed25519 signing via `naclCompat.ts` |
+| **JWT secret** | Still reuses SPK | Consider dedicated JWT_SECRET |
+| **Logging** | Winston — tokens/IDs may appear in logs | Consider redaction |
+| **Validation** | Manual checks in route handlers | Consider Zod schemas |
+| **ORM** | Knex (query builder) | Consider Kysely for type safety |
+| **Module system** | CommonJS | Consider ESM |
+| **Error handling** | Stack traces may leak to clients | Consider generic error messages |
 
 ---
 

@@ -18,9 +18,10 @@ Every message is encrypted on your device before it leaves. The server stores on
 |---|---|
 | `apps/desktop` | Desktop client — Tauri 2.0 + Svelte |
 | `apps/mobile` | Mobile client — React Native |
+| `packages/libvex` | Framework-agnostic client SDK (WebSocket, auth, messaging, E2E encryption) |
+| `packages/store` | Shared state management (nanostores atoms) + business logic |
 | `packages/types` | Shared TypeScript interfaces and enums |
-| `packages/core` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
-| `packages/crypto` | NaCl encryption, key management |
+| `packages/crypto` | Ed25519/X25519 signing, DH, secretbox encryption (`@noble/curves`) |
 | `packages/ui` | Mitosis design primitives → Svelte + React |
 
 The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire).
