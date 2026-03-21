@@ -17,6 +17,9 @@
     "@nanostores/react": ">=0.8"
   },
   "peerDependenciesMeta": {
-    "@nanostores/react": { "optional": true }
-  }
+    "@nanostores/react": {
+      "optional": true
+    }
+  },
+  "license": "AGPL-3.0-or-later"
 }
