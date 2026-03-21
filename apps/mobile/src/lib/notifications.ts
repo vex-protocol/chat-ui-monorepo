@@ -2,7 +2,7 @@ import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import { AppState } from 'react-native'
 import type { DecryptedMail } from '@vex-chat/types'
 import { shouldNotify } from '@vex-chat/store'
-import { $familiars, $channels, $servers } from '../store'
+import { $familiars, $channels, $servers, $client } from '../store'
 import { navigateToConversation } from '../navigation/navigationRef'
 
 const CHANNEL_ID = 'vex-messages'
@@ -36,13 +36,22 @@ export async function showMessageNotification(mail: DecryptedMail): Promise<void
   const appFocused = AppState.currentState === 'active'
   const familiars = $familiars.get()
 
+  // Resolve author name: check familiars first, then fetch from server
+  let authorName = familiars[mail.authorID]?.username
+  if (!authorName) {
+    try {
+      const user = await $client.get()?.getUser(mail.authorID)
+      if (user) authorName = user.username
+    } catch {}
+  }
+
   const channels = $channels.get()
   const servers = $servers.get()
   const payload = shouldNotify(
     mail,
     activeConversation,
     appFocused,
-    (id) => familiars[id]?.username,
+    (id) => id === mail.authorID && authorName ? authorName : familiars[id]?.username,
     (channelID) => {
       for (const [serverID, chs] of Object.entries(channels)) {
         const ch = chs.find(c => c.channelID === channelID)
