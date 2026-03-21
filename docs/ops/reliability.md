@@ -261,7 +261,7 @@ Our target deployment is one Linux box running Spire + SQLite. No Kubernetes, no
 
 **Disabled instrumentations:** `fs`, `dns`, `net` — these generate high-volume, low-value spans that don't serve any SLI.
 
-**Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects `trace_id` and `span_id` into Pino log lines. No log data is exported — Pino writes to stdout as before, now enriched with trace context for local log-trace correlation. No `LoggerProvider` is configured. See [ADR-003](../architecture/adr-003-tracing-over-logging.md) for the full rationale.
+**Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects `trace_id` and `span_id` into Pino log lines. No log data is exported — Pino writes to stdout as before, now enriched with trace context for local log-trace correlation. No `LoggerProvider` is configured. See [ADR-002](../architecture/adr-002-tracing-over-logging.md) for the full rationale.
 
 **Error handling:** Errors are attached to spans, not shipped as logs. The error middleware calls `span.recordException(err)` and `span.setStatus(ERROR)` on the active span. The exception event rides with the trace through the existing pipeline. Pino still logs the error to stdout for local visibility (with trace_id auto-injected). No separate log exporter or log pipeline exists.
 

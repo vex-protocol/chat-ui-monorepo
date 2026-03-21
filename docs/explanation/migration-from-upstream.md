@@ -390,4 +390,152 @@ Features that existed in the old repos but are not yet in the monorepo:
 
 ---
 
+## Spire API Surface (Full Reference)
+
+> Detailed HTTP route tables, WebSocket protocol, and wire format for the old spire server (v0.8.0, Express 4).
+
+### Wire Format: MessagePack
+
+Old spire uses **msgpack-lite** for most HTTP responses and all WebSocket frames. The `packages/libvex` SDK expects **JSON** HTTP responses. The SDK's `http.ts` module and `wire.ts` normalization layer bridge these differences — no spire changes needed.
+
+### Data Format Differences
+
+> All gaps are bridged by `packages/libvex/src/wire.ts` (normalization) and `packages/libvex/src/http.ts` (msgpack decoding).
+
+| Field | Spire (msgpack) | libvex types | Gap |
+|---|---|---|---|
+| `IUser.lastSeen` | `Date` object | `string` (ISO 8601) | msgpack encodes native Date; SDK expects string |
+| `IDevice.lastLogin` | `string` | `string \| null` | Old stores empty string; new allows null |
+| `IDevice.deleted` | `boolean` present | field absent | New types removed `deleted` field |
+| `IMail.sender` | `string` (deviceID) | `string` (hex signKey, 64 chars) | **Critical** — different semantics |
+| `IMail.cipher` | `Uint8Array` (msgpack binary) | `string` (hex) | Encoding mismatch |
+| `IMail.nonce` | `Uint8Array` | `string` (hex, 48 chars) | Encoding mismatch |
+| `IMail.header` | `Uint8Array` (32 bytes) | `string` (hex, 64 chars) | Encoding mismatch |
+| `IMail.extra` | `Uint8Array` | `string \| null` (hex) | Encoding + nullability |
+| `IMail.group` | `Uint8Array \| null` | `string \| null` | Encoding mismatch |
+| `IMail.mailType` | `number` | `string` | Type mismatch |
+| `IKeyBundle.signKey` | `Uint8Array` | `string` (hex) | Encoding mismatch |
+| `IKeyBundle.preKey` | `{ publicKey: Uint8Array, signature: Uint8Array, index }` | `{ publicKey: string, signature: string, index }` | Uint8Array → hex |
+| `IServer.icon` | `string?` (optional) | `string` (always present) | Old may omit; new defaults to `""` |
+| Login response | `{ user: { userID, username, lastSeen }, token }` | `{ token, userID, username, lastSeen }` | Nested vs flat |
+
+### HTTP Routes — Full Surface
+
+#### Auth
+
+| Method | Path | Auth | Request | Response | Notes |
+|---|---|---|---|---|---|
+| `POST` | `/auth` | none | `{ username, password }` JSON | msgpack `{ user, token }` | Sets `auth` cookie (7d) |
+| `POST` | `/register` | none | `{ username, password, signed, signKey, preKey, preKeySignature, preKeyIndex, deviceName }` JSON | msgpack ICensoredUser | Validates register token + NaCl sig |
+| `GET` | `/token/:type` | JWT (except `register`) | — | msgpack `{ key, time, scope }` | 10-min single-use UUID |
+| `POST` | `/whoami` | JWT | — | msgpack `{ user, exp, token }` | |
+| `POST` | `/goodbye` | JWT | — | 200 | Clears auth cookie |
+
+#### Users
+
+| Method | Path | Auth | Response | Notes |
+|---|---|---|---|---|
+| `GET` | `/user/:id` | none | msgpack `{ userID, username, lastSeen }` | Looks up by userID or username |
+| `GET` | `/user/:id/devices` | JWT | msgpack IDevice[] | |
+| `GET` | `/user/:id/permissions` | JWT | msgpack IPermission[] | |
+| `GET` | `/user/:id/servers` | JWT | msgpack IServer[] | |
+| `POST` | `/user/:id/devices` | JWT | msgpack IDevice | Validates device token + NaCl sig. 470 on dup signKey |
+| `DELETE` | `/user/:userID/devices/:deviceID` | JWT | 200 | Soft-delete. Blocks if last device |
+
+#### Devices & Keys
+
+| Method | Path | Auth | Response | Notes |
+|---|---|---|---|---|
+| `GET` | `/device/:id` | JWT | msgpack IDevice | Lookup by deviceID or signKey |
+| `POST` | `/device/:id/keyBundle` | JWT | msgpack `{ signKey, preKey, otk? }` | Consumes OTK |
+| `POST` | `/device/:id/connect` | JWT | 200 | Sets `device` cookie (7d). Validates connect token |
+| `GET` | `/device/:id/otk/count` | device cookie | msgpack `{ count }` | |
+| `POST` | `/device/:id/otk` | JWT | 200 | Body: msgpack IPreKeys[]. Validates first sig |
+| `POST` | `/device/:id/mail` | device cookie | msgpack `[header, mail, time][]` | Encrypted mail tuples |
+| `POST` | `/deviceList` | JWT | msgpack IDevice[] | Body: JSON string[] (userIDs) |
+
+#### Servers & Channels
+
+| Method | Path | Auth | Response | Notes |
+|---|---|---|---|---|
+| `GET` | `/server/:id` | none | msgpack IServer | |
+| `POST` | `/server/:name` | JWT | msgpack IServer | `:name` is base64-encoded. Creates "general" channel + owner perm (100) |
+| `DELETE` | `/server/:id` | JWT | 200 | Requires powerLevel > 50 |
+| `GET` | `/server/:id/channels` | JWT | msgpack IChannel[] | Requires server permission |
+| `POST` | `/server/:id/channels` | JWT | msgpack IChannel | Requires powerLevel > 50. Notifies users |
+| `GET` | `/channel/:id` | JWT | msgpack IChannel | |
+| `DELETE` | `/channel/:id` | JWT | 200 | Requires powerLevel > 50 |
+| `GET` | `/server/:id/permissions` | JWT | msgpack IPermission[] | Requires server permission |
+| `DELETE` | `/permission/:id` | JWT | 200 | Self-delete or higher powerLevel |
+
+#### Invites
+
+| Method | Path | Auth | Response | Notes |
+|---|---|---|---|---|
+| `POST` | `/server/:id/invites` | JWT | msgpack IInvite | Requires powerLevel > 25 |
+| `GET` | `/server/:id/invites` | JWT | msgpack IInvite[] | Requires powerLevel > 25. Filters expired |
+| `GET` | `/invite/:id` | none | msgpack IInvite | |
+| `PATCH` | `/invite/:id` | JWT | msgpack IPermission | Validates expiration. Creates perm (powerLevel 0) |
+
+#### Mail, Files, Avatars, Emoji
+
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| `POST` | `/mail` | JWT + device | Body: msgpack `{ header, mail }`. Notifies recipient |
+| `GET` | `/file/:id` | JWT | Binary stream |
+| `POST` | `/file/` | device cookie | Multipart form |
+| `GET` | `/avatar/:userID` | none | Cached 1yr |
+| `POST` | `/avatar/:userID` | device cookie | Multipart form |
+| `GET` | `/emoji/:id` | JWT | Cached 1yr |
+| `POST` | `/emoji/:serverID` | device cookie | Multipart. Max 256KB. powerLevel > 25 |
+
+### WebSocket Protocol (/socket)
+
+**Frame format:** `[32-byte header (Uint8Array)][msgpack-encoded body]`
+
+**Connection flow:**
+1. Client opens WS with `auth` + `device` cookies
+2. Server sends `challenge`: `{ transmissionID, type: "challenge", challenge: Uint8Array(16) }`
+3. Client responds: `{ transmissionID, type: "response", signed: nacl.sign(challenge, deviceSecretKey) }`
+4. Server verifies sig. Sends `authorized` or `authErr`
+5. Ping/pong every 5s. Disconnect on timeout.
+
+**Message types:**
+
+| Type | Direction | Fields | Notes |
+|---|---|---|---|
+| `challenge` | S→C | `challenge: Uint8Array(16)` | UUID v4 bytes |
+| `response` | C→S | `signed: Uint8Array` | NaCl-signed challenge |
+| `authorized` | S→C | — | Auth success |
+| `authErr` | S→C | `error: SocketAuthErrors` | BadSignature, InvalidToken, UserNotRegistered |
+| `ping` | S→C | — | Every 5s |
+| `pong` | C→S | — | Must reply within 5s |
+| `resource` | C→S | `resourceType, action, data` | Only `mail/CREATE` supported |
+| `receipt` | C→S | `nonce: Uint8Array` | Deletes mail by nonce |
+| `notify` | S→C | `event, data?` | Server push: `mail`, `permission`, `serverChange` |
+
+### Authentication: Cookie vs Bearer
+
+Old spire uses two HTTP cookies (`auth` + `device`, 7-day, same-site none). New libvex sends `Authorization: Bearer <token>` header. The SDK's `http.ts` handles this by setting cookies when talking to old spire.
+
+### Power Levels
+
+```
+INVITE: 25    — create/list invites, upload emoji
+CREATE: 50    — create channels
+DELETE: 50    — delete channels/servers/permissions
+Owner:  100   — all operations
+Member: 0     — read-only (joined via invite)
+```
+
+### SDK ↔ Spire Compatibility
+
+| SDK method | Status | Notes |
+|---|---|---|
+| `searchUsers(query)` | **Graceful fallback** | Route doesn't exist; SDK falls back to exact username lookup |
+| `joinServerViaInvite(id)` | **Fixed** | SDK uses `PATCH /invite/:id` |
+| `deleteInvite(s, id)` | **Throws** | Route doesn't exist; SDK throws with clear message |
+
+---
+
 See also: [desktop-reimplementation.md](desktop-reimplementation.md) for Electron → Tauri component mapping, [vex-overview.md](../vex-overview.md) for the original protocol reference.

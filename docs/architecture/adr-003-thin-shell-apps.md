@@ -1,4 +1,4 @@
-# ADR-005: Thin-Shell Apps — Maximizing Logic Reuse Across Desktop and Mobile
+# ADR-003: Thin-Shell Apps — Maximizing Logic Reuse Across Desktop and Mobile
 
 **Status:** Accepted (Phases 1–5 implemented 2026-03-20)
 **Date:** 2026-03-20
