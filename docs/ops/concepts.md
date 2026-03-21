@@ -1,6 +1,6 @@
 # Core Concepts
 
-The thinking behind how we plan Vex. Based on Jeff Patton's user story mapping (2005), adapted for a privacy-first team that uses git for strategy, Linear for execution, and beads for implementation.
+The thinking behind how we plan Vex. Based on Jeff Patton's user story mapping (2005), adapted for a privacy-first team that uses git for strategy, Linear for execution.
 
 > *"Shared documents aren't shared understanding."* — Jeff Patton
 
@@ -209,7 +209,7 @@ A story map is a living document. Without attention, it becomes stale and loses 
 - Team members cannot "tell the story" by walking the backbone left to right
 - New work is planned without referencing the map
 - The map no longer matches what is actually in the product
-- Stories are created in Linear/beads that have no home on the map
+- Stories are created in Linear that have no home on the map
 
 ### Onboarding with the Map
 
@@ -227,9 +227,8 @@ A new team member reads the story map in three steps:
 |---|---|---|---|
 | **Strategy** | `docs/ops/` (journeys, roadmap, personas) | Git | Slowly. Updated when we ship, discover, or reprioritise |
 | **Execution** | Linear (issues, bugs, sprints) | Linear | Regularly. Technical scope, acceptance criteria, PR links |
-| **Implementation** | bd/beads (granular tasks) | Git (`.beads/`) | Constantly. Daily status, agent workflows, dependency tracking |
 
-A single roadmap item may spawn multiple Linear issues. A single Linear issue may spawn multiple beads. Strategy flows down; status flows up.
+A single roadmap item may spawn multiple Linear issues. Strategy flows down; status flows up.
 
 ### Why Git for Strategy?
 

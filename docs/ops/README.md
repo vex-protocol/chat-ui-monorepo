@@ -25,7 +25,6 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 |---|---|---|---|
 | **Strategy** | `docs/ops/` (this folder) | Journeys, roadmap, priorities, release goals | Slowly — when we ship, discover, or reprioritise |
 | **Execution** | Linear | Issues, bugs, PRs, sprint tracking, technical details | Regularly — weekly |
-| **Implementation** | bd/beads (`.beads/`) | Granular tasks, agent workflows, dependency tracking | Constantly — daily |
 
 **Strategy answers:** What are we building? Why? In what order? What does the user experience look like?
 

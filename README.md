@@ -114,6 +114,6 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 
 ## Contributing
 
-1. Check available work: `bd ready`
-2. Create a branch, make changes
-3. Run relevant package tests before committing
+
+1. Create a branch, make changes
+2. Run relevant package tests before committing

@@ -90,7 +90,6 @@ Error budget healthy (>50%)          Error budget critical (<20%)
 ─────────────────────────            ─────────────────────────────
 roadmap.md: ship from Now            roadmap.md: reliability items jump to Now
 Linear: feature issues active         Linear: feature issues paused
-beads: normal velocity                beads: reliability work only
 ```
 
 Reliability work does not need to be pre-planned in `roadmap.md`. It activates on demand when burn rate alerts fire. Think of it as a standing "reliability lane" that takes priority over feature work when the data says so.
@@ -492,7 +491,6 @@ Skip the full Google SRE ceremony. A 2-person team needs the essentials, not the
 | **Roadmap** (`roadmap.md`) | Reliability items enter Now when error budget policy triggers. Items in Done can regress back to Now if SLOs reveal breakage |
 | **Journeys** (`journeys.md`) | SLIs map to journeys — message delivery = Journey 4/5, key exchange = Journey 4, API availability = all journeys |
 | **Linear** | Burn rate ticket alerts create Linear issues. Feature freeze pauses feature issues |
-| **Beads** | Reliability work tracked as beads like any other implementation work |
 
 ```
 Single Box
@@ -509,7 +507,7 @@ UptimeRobot ──── /health ping ────> Alert if down               
                                                                     │
                                                           ┌─────────┼─────────┐
                                                           v         v         v
-                                                      roadmap.md  Linear    beads
+                                                      roadmap.md  Linear
 ```
 
 ---
