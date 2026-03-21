@@ -14,7 +14,7 @@
 
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
-  import { user, keyReplaced, servers, channels, client } from './lib/store/index.js'
+  import { user, keyReplaced, servers, channels, client, familiars } from './lib/store/index.js'
   import { setupNotifications } from './lib/notifications.js'
   import { setupTray } from './lib/tray.js'
   import { setupDeepLinks } from './lib/deeplink.js'
@@ -63,7 +63,9 @@
     const c = $client
     const u = $user
     if (!c || !u) return
-    const unNotify = setupNotifications(c, () => activeConversationKey, (channelID: string) => {
+    const unNotify = setupNotifications(c, () => activeConversationKey, (userID: string) => {
+      return $familiars[userID]?.username
+    }, (channelID: string) => {
       for (const [serverID, chs] of Object.entries($channels)) {
         const ch = chs.find((c: { channelID: string }) => c.channelID === channelID)
         if (ch) return { channelName: ch.name, serverName: $servers[serverID]?.name ?? 'server' }
