@@ -75,8 +75,8 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | Doc | What it covers |
 |---|---|
 | [`adr-001-monorepo-consolidation.md`](docs/architecture/adr-001-monorepo-consolidation.md) | Why five repos became one monorepo, every technology replacement, trade-offs accepted |
-| [`adr-003-tracing-over-logging.md`](docs/architecture/adr-003-tracing-over-logging.md) | Why OTel tracing instead of log shipping — privacy-first observability with 13 attributes and zero PII |
-| [`adr-004-website-reimplementation.md`](docs/architecture/adr-004-website-reimplementation.md) | Reimplement vex.wtf: SvelteKit static site, SSR deep links, SEO, Vercel |
+| [`adr-002-tracing-over-logging.md`](docs/architecture/adr-002-tracing-over-logging.md) | Why OTel tracing instead of log shipping — privacy-first observability with 13 attributes and zero PII |
+| [`adr-003-thin-shell-apps.md`](docs/architecture/adr-003-thin-shell-apps.md) | Maximizing logic reuse: apps as thin view-layer shells over shared packages |
 
 **`docs/explanation/`** — why decisions were made, strategy and rationale
 
@@ -87,7 +87,7 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | [`design-system.md`](docs/explanation/design-system.md) | Figma ↔ Storybook pipeline, Mitosis component strategy |
 | [`desktop-reimplementation.md`](docs/explanation/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
 | [`react-native-monorepo.md`](docs/explanation/react-native-monorepo.md) | Metro + pnpm configuration for React Native in the monorepo |
-| [`migration-from-upstream.md`](docs/explanation/migration-from-upstream.md) | API mapping from original vex-chat repos to monorepo |
+| [`migration-from-upstream.md`](docs/explanation/migration-from-upstream.md) | API mapping from original repos to monorepo + full spire API surface reference |
 | [`infrastructure.md`](docs/explanation/infrastructure.md) | Provider selection, deployment strategy, cost analysis |
 | [`scalability.md`](docs/explanation/scalability.md) | Performance strategy: SQLite-first, connection pooling, scaling path |
 

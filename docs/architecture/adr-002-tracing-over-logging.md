@@ -1,4 +1,4 @@
-# ADR-003: OpenTelemetry tracing without logging for observability
+# ADR-002: OpenTelemetry tracing without logging for observability
 
 ## Status
 
