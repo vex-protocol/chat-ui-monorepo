@@ -59,8 +59,9 @@ export function setupNotifications(
 
     if (!getNotificationsEnabled()) return
 
-    // If the title is a truncated UUID (no username resolved), try fetching from server
-    if (!resolveAuthorName?.(mail.authorID)) {
+    // If author name wasn't resolved (or is just a truncated UUID), fetch from server
+    const knownName = resolveAuthorName?.(mail.authorID)
+    if (!knownName || knownName === mail.authorID.slice(0, 8)) {
       try {
         const user = await client.getUser(mail.authorID)
         if (user) {
