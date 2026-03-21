@@ -18,6 +18,7 @@
 {"created_at":"2026-03-04T19:18:59Z","created_by":"dgill","depends_on_id":"vex-chat-aae","issue_id":"vex-chat-14y","type":"blocks"}
 {"created_at":"2026-03-04T14:06:17Z","created_by":"dgill","depends_on_id":"vex-chat-oz0","issue_id":"vex-chat-14y","type":"blocks"}
 {"created_at":"2026-03-04T13:56:58Z","created_by":"dgill","depends_on_id":"vex-chat-vyp","issue_id":"vex-chat-14y","type":"blocks"}
+{"created_at":"2026-03-20T18:19:01Z","created_by":"dgill","depends_on_id":"vex-chat-dg5","issue_id":"vex-chat-1bo3","type":"blocks"}
 {"created_at":"2026-03-16T16:55:22Z","created_by":"dgill","depends_on_id":"vex-chat-02c","issue_id":"vex-chat-2pd","type":"blocks"}
 {"created_at":"2026-03-16T16:55:23Z","created_by":"dgill","depends_on_id":"vex-chat-dhz","issue_id":"vex-chat-2pd","type":"blocks"}
 {"created_at":"2026-03-16T17:02:08Z","created_by":"dgill","depends_on_id":"vex-chat-2pd","issue_id":"vex-chat-2pd.1","type":"parent-child"}
@@ -71,6 +72,7 @@
 {"created_at":"2026-03-04T19:18:59Z","created_by":"dgill","depends_on_id":"vex-chat-aae","issue_id":"vex-chat-9q0","type":"blocks"}
 {"created_at":"2026-03-04T14:06:17Z","created_by":"dgill","depends_on_id":"vex-chat-oz0","issue_id":"vex-chat-9q0","type":"blocks"}
 {"created_at":"2026-03-04T13:56:58Z","created_by":"dgill","depends_on_id":"vex-chat-vyp","issue_id":"vex-chat-9q0","type":"blocks"}
+{"created_at":"2026-03-20T18:19:02Z","created_by":"dgill","depends_on_id":"vex-chat-dg5","issue_id":"vex-chat-9vc6","type":"blocks"}
 {"created_at":"2026-03-05T21:39:33Z","created_by":"dgill","depends_on_id":"vex-chat-duy","issue_id":"vex-chat-a2k","type":"blocks"}
 {"created_at":"2026-03-16T17:01:38Z","created_by":"dgill","depends_on_id":"vex-chat-a53","issue_id":"vex-chat-a53.1","type":"parent-child"}
 {"created_at":"2026-03-16T17:01:39Z","created_by":"dgill","depends_on_id":"vex-chat-a53","issue_id":"vex-chat-a53.2","type":"parent-child"}
@@ -121,6 +123,7 @@
 {"created_at":"2026-03-04T14:16:07Z","created_by":"dgill","depends_on_id":"vex-chat-v4g","issue_id":"vex-chat-dtk","type":"blocks"}
 {"created_at":"2026-03-03T11:40:23Z","created_by":"dgill","depends_on_id":"vex-chat-ekb","issue_id":"vex-chat-dw8","type":"blocks"}
 {"created_at":"2026-03-03T11:15:59Z","created_by":"dgill","depends_on_id":"vex-chat-ez9","issue_id":"vex-chat-dz9","type":"blocks"}
+{"created_at":"2026-03-20T18:19:01Z","created_by":"dgill","depends_on_id":"vex-chat-dg5","issue_id":"vex-chat-eb9q","type":"blocks"}
 {"created_at":"2026-03-03T11:16:00Z","created_by":"dgill","depends_on_id":"vex-chat-4me","issue_id":"vex-chat-ecq","type":"blocks"}
 {"created_at":"2026-03-04T14:05:30Z","created_by":"dgill","depends_on_id":"vex-chat-ch1","issue_id":"vex-chat-ect","type":"blocks"}
 {"created_at":"2026-03-04T14:06:23Z","created_by":"dgill","depends_on_id":"vex-chat-vyp","issue_id":"vex-chat-ect","type":"blocks"}
@@ -156,6 +159,7 @@
 {"created_at":"2026-03-04T12:41:08Z","created_by":"dgill","depends_on_id":"vex-chat-bth","issue_id":"vex-chat-mjy","type":"blocks"}
 {"created_at":"2026-03-04T12:41:09Z","created_by":"dgill","depends_on_id":"vex-chat-p4g","issue_id":"vex-chat-mjy","type":"blocks"}
 {"created_at":"2026-03-05T16:11:34Z","created_by":"dgill","depends_on_id":"vex-chat-4hn","issue_id":"vex-chat-ohm","type":"blocks"}
+{"created_at":"2026-03-20T18:19:16Z","created_by":"dgill","depends_on_id":"vex-chat-dg5","issue_id":"vex-chat-okfc","type":"blocks"}
 {"created_at":"2026-03-16T16:55:18Z","created_by":"dgill","depends_on_id":"vex-chat-02c","issue_id":"vex-chat-os7","type":"blocks"}
 {"created_at":"2026-03-16T16:55:19Z","created_by":"dgill","depends_on_id":"vex-chat-dhz","issue_id":"vex-chat-os7","type":"blocks"}
 {"created_at":"2026-03-16T17:01:57Z","created_by":"dgill","depends_on_id":"vex-chat-os7","issue_id":"vex-chat-os7.1","type":"parent-child"}
@@ -195,6 +199,7 @@
 {"created_at":"2026-03-17T00:05:30Z","created_by":"dgill","depends_on_id":"vex-chat-v5o","issue_id":"vex-chat-v5o.7","type":"parent-child"}
 {"created_at":"2026-03-17T00:05:37Z","created_by":"dgill","depends_on_id":"vex-chat-v5o","issue_id":"vex-chat-v5o.8","type":"parent-child"}
 {"created_at":"2026-03-17T00:05:42Z","created_by":"dgill","depends_on_id":"vex-chat-v5o","issue_id":"vex-chat-v5o.9","type":"parent-child"}
+{"created_at":"2026-03-20T18:19:18Z","created_by":"dgill","depends_on_id":"vex-chat-dg5","issue_id":"vex-chat-vcun","type":"blocks"}
 {"created_at":"2026-03-04T14:15:30Z","created_by":"dgill","depends_on_id":"vex-chat-6m0","issue_id":"vex-chat-vyp","type":"blocks"}
 {"created_at":"2026-03-04T14:05:30Z","created_by":"dgill","depends_on_id":"vex-chat-ch1","issue_id":"vex-chat-vyp","type":"blocks"}
 {"created_at":"2026-03-04T11:37:19Z","created_by":"dgill","depends_on_id":"vex-chat-p81","issue_id":"vex-chat-wy4","type":"blocks"}
