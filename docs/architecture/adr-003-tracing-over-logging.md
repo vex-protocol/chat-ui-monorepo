@@ -72,9 +72,9 @@ With database access, an attacker additionally gets: all public key material (pr
 
 **The message ciphertext itself was protected by E2E encryption.** But the metadata — who communicated with whom, when, how often, from which devices — was fully exposed in plaintext log files. For a privacy-focused app, this is the critical failure: E2E encryption protects content, but uncontrolled logging leaks the metadata that intelligence agencies actually care about.
 
-### The new Spire already improved logging
+### Spire's current logging improvements
 
-The rewritten Spire (current monorepo) uses Pino with explicit redaction of `req.headers.authorization`, `req.headers.cookie`, `password`, `passwordHash`, `token`, `accessToken`, `refreshToken`, `secret`, and `apiKey` (see `utils/logger.ts`). Error responses return generic messages, not stack traces. This is a significant improvement.
+Spire uses Pino with explicit redaction of `req.headers.authorization`, `req.headers.cookie`, `password`, `passwordHash`, `token`, `accessToken`, `refreshToken`, `secret`, and `apiKey` (see `utils/logger.ts`). Error responses return generic messages, not stack traces. This is a significant improvement over the original logging.
 
 But Pino structured HTTP logs still contain:
 

@@ -11,7 +11,7 @@ Detailed API-level comparison between the original standalone repos (`libvex-js`
 | `libvex-js` (`@vex-chat/libvex` v0.21) | `packages/libvex` | Flat methods instead of sub-objects; caller resolves devices; `@noble/curves` replaces `tweetnacl` |
 | `types-js` (`@vex-chat/types`) | `packages/types` | Dates as ISO strings instead of `Date` objects; `DecryptedMail` replaces `IMessage` |
 | `crypto-js` (`@vex-chat/crypto` v0.7) | `packages/crypto` | `@noble/curves` + `@noble/hashes` replace `tweetnacl` + `ed2curve` + `futoin-hkdf` |
-| `spire` (standalone Express) | Own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) | Stays standalone; incremental improvements per [`old-spire-migration-path.md`](old-spire-migration-path.md) |
+| `spire` (standalone Express) | Own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) | Stays standalone |
 | `vex-desktop` (Electron + React) | `apps/desktop` (Tauri + Svelte) | See `desktop-reimplementation.md` |
 | -- | `packages/store` | New -- nanostores atoms, shared across desktop and mobile |
 | -- | `packages/ui` | New -- Mitosis design primitives compiled to Svelte + React |
@@ -207,7 +207,7 @@ Key differences:
 
 ## Spire Routes Comparison
 
-All routes are present in both old and new spire unless noted.
+Routes implemented in the current spire server.
 
 ### Identical Routes
 
@@ -270,7 +270,7 @@ These endpoints have the same HTTP method, path, and semantics:
 
 ### Planned Server Improvements
 
-The server stays in its own repo. These improvements are ported incrementally — see [`old-spire-migration-path.md`](old-spire-migration-path.md) for priority tiers.
+The server stays in its own repo. These improvements are tracked separately.
 
 | Aspect | Current spire | Target |
 |---|---|---|
