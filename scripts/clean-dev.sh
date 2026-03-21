@@ -13,6 +13,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SPIRE_DIR="$(cd "$REPO_ROOT/.." 2>/dev/null && pwd)/spire"
 SPIRE_DB="$SPIRE_DIR/spire.sqlite"
 TAURI_DATA="$HOME/Library/Application Support/com.vex-chat.app"
+TAURI_WEBVIEW="$HOME/Library/WebKit/app/WebsiteData"
+TAURI_LOGS="$HOME/Library/Logs/com.vex-chat.app"
 
 echo ""
 echo -e "${YELLOW}=== Vex Dev Clean ===${NC}"
@@ -40,13 +42,23 @@ else
   echo "  Skipped — no database file at $SPIRE_DB"
 fi
 
-# 3. Desktop keystore + app data
-echo -e "${YELLOW}[3/5] Clearing desktop keystore and app data...${NC}"
+# 3. Desktop keystore + app data + WebView storage (localStorage, IndexedDB)
+echo -e "${YELLOW}[3/5] Clearing desktop app data...${NC}"
 if [ -d "$TAURI_DATA" ]; then
   rm -rf "$TAURI_DATA"
-  echo -e "${GREEN}  ✓ Deleted $TAURI_DATA${NC}"
+  echo -e "${GREEN}  ✓ Deleted keystore ($TAURI_DATA)${NC}"
 else
-  echo "  Skipped — $TAURI_DATA not found"
+  echo "  Skipped — keystore not found"
+fi
+if [ -d "$TAURI_WEBVIEW" ]; then
+  rm -rf "$TAURI_WEBVIEW"
+  echo -e "${GREEN}  ✓ Deleted WebView data — localStorage, IndexedDB ($TAURI_WEBVIEW)${NC}"
+else
+  echo "  Skipped — WebView data not found"
+fi
+if [ -d "$TAURI_LOGS" ]; then
+  rm -rf "$TAURI_LOGS"
+  echo -e "${GREEN}  ✓ Deleted logs ($TAURI_LOGS)${NC}"
 fi
 
 # 4. Fresh pnpm install
@@ -68,5 +80,5 @@ else
 fi
 
 echo ""
-echo -e "${GREEN}Done.${NC} IndexedDB (vex-messages) is cleared when the Tauri app data is removed."
+echo -e "${GREEN}Done.${NC}"
 echo ""
