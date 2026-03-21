@@ -14,6 +14,19 @@ export type VexLink =
   | { type: 'server'; serverID: string }
   | { type: 'unknown'; raw: string }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Extracts an invite UUID from a raw string.
+ * Accepts full URLs (e.g., https://vex.chat/invite/<uuid>) or bare UUIDs.
+ * Returns the UUID if valid, null otherwise.
+ */
+export function parseInviteID(raw: string): string | null {
+  const trimmed = raw.trim()
+  const last = trimmed.split('/').pop() ?? ''
+  return UUID_RE.test(last) ? last : null
+}
+
 export function parseVexLink(url: string): VexLink {
   let parsed: URL
   try {

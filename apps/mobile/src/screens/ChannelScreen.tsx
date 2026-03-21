@@ -1,19 +1,16 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
-  View,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  useWindowDimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $groupMessages, $client, $user } from '../store'
-import { markRead } from '@vex-chat/store'
-import { loadCredentials } from '../lib/keychain'
-import { saveGroupMessages } from '../lib/messages'
+import { markRead, sendGroupMessage } from '@vex-chat/store'
+import { keychainKeyStore } from '../lib/keychain'
 import { setActiveConversation } from '../lib/notifications'
 import { colors } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
@@ -65,62 +62,22 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
 
   const sendMessage = useCallback(async () => {
     const content = text.trim()
-    if (!content || !client || !user) return
+    if (!content || !user) return
     setSending(true)
     setSendError('')
     setText('')
     try {
-      const creds = await loadCredentials()
-
-      // Get all channel members and their devices
-      const members = await client.listMembers(channelID)
-      const deviceTargets: { deviceID: string; userID: string }[] = []
-      for (const member of members) {
-        const devices = await client.listDevices(member.userID)
-        for (const d of devices) {
-          // Skip sender's own current device
-          if (member.userID === user.userID && creds && d.deviceID === creds.deviceID) continue
-          deviceTargets.push({ deviceID: d.deviceID, userID: member.userID })
-        }
+      const result = await sendGroupMessage(channelID, content, {
+        keyStore: keychainKeyStore,
+      })
+      if (!result.ok) {
+        setSendError(result.error ?? 'Failed to send')
       }
-
-      if (deviceTargets.length === 0) {
-        setSendError('No devices to send to.')
-        setSending(false)
-        return
-      }
-
-      const sendOpts = { group: channelID }
-      const results = await Promise.allSettled(
-        deviceTargets.map(t => client.sendMail(content, t.deviceID, t.userID, sendOpts)),
-      )
-      const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
-      if (!anyOk) {
-        setSendError('Failed to send message')
-        setSending(false)
-        return
-      }
-
-      // Show sent message locally
-      const sentMail: DecryptedMail = {
-        mailID: `local-${Date.now()}`,
-        authorID: user.userID,
-        readerID: user.userID,
-        group: channelID,
-        mailType: 'text',
-        time: new Date().toISOString(),
-        content,
-        extra: null,
-        forward: null,
-      }
-      const prev = $groupMessages.get()[channelID] ?? []
-      $groupMessages.setKey(channelID, [...prev, sentMail])
-      saveGroupMessages($groupMessages.get()).catch(() => {})
     } catch (err) {
       setSendError(err instanceof Error ? err.message : 'Failed to send')
     }
     setSending(false)
-  }, [text, client, user, channelID, serverID])
+  }, [text, user, channelID])
 
   function renderMessage({ item }: { item: DecryptedMail }) {
     const isOwn = item.authorID === user?.userID

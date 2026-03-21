@@ -1,19 +1,13 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { DecryptedMail } from '@vex-chat/types'
-import { formatTime } from '@vex-chat/store'
+import { formatTime, avatarHue } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 
 interface MessageBubbleRNProps {
   message: DecryptedMail
   isOwn: boolean
   authorName: string
-}
-
-function hue(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return Math.abs(h) % 360
 }
 
 export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNProps) {
@@ -28,7 +22,7 @@ export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNP
   return (
     <View style={styles.container}>
       {/* Avatar */}
-      <View style={[styles.avatar, { backgroundColor: `hsl(${hue(message.authorID)}, 45%, 40%)` }]}>
+      <View style={[styles.avatar, { backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)` }]}>
         <Text style={styles.avatarText}>
           {authorName.charAt(0).toUpperCase()}
         </Text>

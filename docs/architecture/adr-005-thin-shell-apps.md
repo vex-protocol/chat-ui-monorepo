@@ -1,6 +1,6 @@
 # ADR-005: Thin-Shell Apps — Maximizing Logic Reuse Across Desktop and Mobile
 
-**Status:** Proposed
+**Status:** Accepted (Phases 1–5 implemented 2026-03-20)
 **Date:** 2026-03-20
 **Deciders:** @dgill
 **Supersedes:** None
@@ -148,9 +148,9 @@ need them — desktop for tray badges, mobile for tab badges and app icon badges
 
 ## Proposed Changes
 
-### Phase 1: Extract Message Utilities into Store
+### Phase 1: Extract Message Utilities into Store ✅
 
-Create `packages/store/src/message-utils.ts`:
+Created `packages/store/src/message-utils.ts`:
 
 ```typescript
 import type { DecryptedMail } from '@vex-chat/types'
@@ -195,9 +195,9 @@ export function isSingleEmoji(content: string): boolean { /* ... */ }
 
 But the pure logic (emoji detection, URL extraction, mention parsing) moves to shared.
 
-### Phase 2: Extract Auth Flow Orchestration into Store
+### Phase 2: Extract Auth Flow Orchestration into Store ✅
 
-Add `packages/store/src/auto-login.ts`:
+Created `packages/store/src/auto-login.ts`:
 
 ```typescript
 import type { KeyStore } from '@vex-chat/types'
@@ -242,9 +242,9 @@ if (result.ok) navigateToHome()
 else if (result.keyReplaced) navigateToLogin()
 ```
 
-### Phase 3: Extract Deep Link Parsing into libvex
+### Phase 3: Extract Deep Link Parsing into libvex ✅
 
-Add `packages/libvex/src/deeplink.ts`:
+Created `packages/libvex/src/deeplink.ts`:
 
 ```typescript
 export type VexLink =
@@ -260,41 +260,44 @@ export type VexLink =
 export function parseVexLink(url: string): VexLink { /* ... */ }
 ```
 
-### Phase 4: Add Unread Counts to Store
+### Phase 4: Add Unread Counts to Store ✅
 
-Add `packages/store/src/unread.ts`:
+Implemented in `packages/store/src/unread.ts` with separate DM and channel tracking:
 
 ```typescript
 import { map, computed } from 'nanostores'
 
-/** Unread message count per conversation key (userID for DMs, channelID for groups). */
-export const $unreadCounts = map<Record<string, number>>({})
+/** Unread DM counts, keyed by userID. */
+export const $dmUnreadCounts = map<Record<string, number>>({})
 
-/** Total unread count across all conversations. */
-export const $totalUnread = computed($unreadCounts, (counts) =>
+/** Unread channel counts, keyed by channelID. */
+export const $channelUnreadCounts = map<Record<string, number>>({})
+
+/** Total unread DMs. */
+export const $totalDmUnread = computed($dmUnreadCounts, (counts) =>
   Object.values(counts).reduce((sum, n) => sum + n, 0)
 )
 
-export function markRead(conversationKey: string): void {
-  $unreadCounts.setKey(conversationKey, 0)
-}
+/** Total unread channel messages. */
+export const $totalChannelUnread = computed($channelUnreadCounts, (counts) =>
+  Object.values(counts).reduce((sum, n) => sum + n, 0)
+)
 
-export function incrementUnread(conversationKey: string): void {
-  const prev = $unreadCounts.get()[conversationKey] ?? 0
-  $unreadCounts.setKey(conversationKey, prev + 1)
-}
+export function incrementDmUnread(userID: string): void { /* ... */ }
+export function incrementChannelUnread(channelID: string): void { /* ... */ }
+export function markRead(conversationKey: string): void { /* checks both maps */ }
+export function resetAllUnread(): void { /* ... */ }
 ```
 
-Wire into `bootstrap()` mail handler — increment unread when a message arrives for a
-conversation that isn't currently focused.
+Wired into `bootstrap()` mail handler. Screens call `markRead()` on focus.
 
 **Platform consumption:**
-- Desktop: `$totalUnread` → tray badge count
-- Mobile: `$totalUnread` → app icon badge + tab bar badge
+- Desktop: `$totalDmUnread` → home button badge, per-contact badges in FamiliarsList
+- Mobile: `$totalDmUnread` → home button badge, per-contact badges in DMListScreen
 
-### Phase 5: Extract Notification Decision Logic
+### Phase 5: Extract Notification Decision Logic ✅
 
-Add `packages/store/src/notifications.ts`:
+Implemented in `packages/store/src/notifications.ts`:
 
 ```typescript
 import type { DecryptedMail } from '@vex-chat/types'
@@ -305,31 +308,33 @@ export interface NotificationPayload {
   body: string
   conversationKey: string
   mailID: string
+  authorID: string
+  /** Set for group messages — the channelID. */
+  group: string | null
 }
 
 /**
  * Determines whether a received message should trigger a notification.
  * Returns a payload if yes, null if no.
  *
- * Platform apps handle the actual notification display.
+ * Platform apps handle the actual notification display:
+ *   - Desktop: Tauri sendNotification + playNotify sound
+ *   - Mobile: Notifee displayNotification
+ *
+ * @param resolveAuthorName  - Optional lookup from userID to display name
+ * @param resolveChannelInfo - Optional lookup from channelID to channel+server names
  */
 export function shouldNotify(
   mail: DecryptedMail,
   activeConversation: string | null,
   appFocused: boolean,
+  resolveAuthorName?: (userID: string) => string | undefined,
+  resolveChannelInfo?: (channelID: string) => { channelName: string; serverName: string } | undefined,
 ): NotificationPayload | null {
-  const me = $user.get()
-  if (!me) return null
-  if (mail.authorID === me.userID) return null        // own message
-  if (mail.mailType === 'system') return null          // system messages
-  const key = mail.group ?? mail.authorID
-  if (appFocused && activeConversation === key) return null  // already looking at it
-  return {
-    title: mail.group ? `#channel` : mail.authorID,
-    body: mail.content.slice(0, 200),
-    conversationKey: key,
-    mailID: mail.mailID,
-  }
+  // Suppresses: own messages, system messages, active conversation when focused
+  // Group title format: "username (#channelName, serverName)"
+  // DM title format: "username"
+  // Body truncated to 100 chars
 }
 ```
 
@@ -363,17 +368,19 @@ After all phases, the layer diagram looks like this:
 ||  $user | $messages | $groupMessages        ||
 ||  $servers | $channels | $permissions       ||
 ||  $devices | $familiars | $onlineLists      ||
-||  $unreadCounts | $totalUnread              ||
+||  $dmUnreadCounts | $channelUnreadCounts    ||
+||  $totalDmUnread | $totalChannelUnread      ||
 ||  $verifiedKeys | $keyReplaced              ||
 ||  ──────────────────────────────────────    ||
 ||  bootstrap()     - SDK init + event wiring ||
 ||  autoLogin()     - credential → session    ||
 ||  resetAll()      - logout cleanup          ||
+||  sendDirectMessage() - DM orchestration    ||
 ||  shouldNotify()  - notification decisions  ||
 ||  chunkMessages() - message grouping        ||
 ||  parseFileExtra() - attachment parsing     ||
-||  formatMessageTime() - timestamp display   ||
-||  incrementUnread() / markRead()            ||
+||  formatTime()    - timestamp display       ||
+||  incrementDmUnread() / markRead()          ||
 +==============================================+
                      |
 +==============================================+
@@ -433,17 +440,18 @@ After all phases, the layer diagram looks like this:
 
 ### What Moves to Shared Packages
 
-| Logic | Current Location | Target Location | Type |
-|-------|-----------------|-----------------|------|
-| Message chunking | desktop/utils/messages.ts | store/message-utils.ts | Pure function |
-| File attachment parsing | desktop/utils/messages.ts | store/message-utils.ts | Pure function |
-| Timestamp formatting | desktop/utils/messages.ts | store/message-utils.ts | Pure function |
-| Emoji detection | desktop/utils/messages.ts | store/message-utils.ts | Pure function |
-| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/auto-login.ts | Async function |
-| Deep link URL parsing | desktop/deeplink.ts | libvex/deeplink.ts | Pure function |
-| Unread count tracking | desktop/tray.ts (partial) | store/unread.ts | Nanostore atoms |
-| Notification decisions | desktop/notifications.ts | store/notifications.ts | Pure function |
-| Server URL config shape | desktop/config.ts, mobile/config.ts | store/config.ts | Atom + helpers |
+| Logic | Current Location | Target Location | Type | Status |
+|-------|-----------------|-----------------|------|--------|
+| Message chunking | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
+| File attachment parsing | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
+| Timestamp formatting | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
+| Emoji detection | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
+| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/auto-login.ts | Async function | ✅ Done |
+| Deep link URL parsing | desktop/deeplink.ts | libvex/deeplink.ts | Pure function | ✅ Done |
+| Unread count tracking | desktop/tray.ts (partial) | store/unread.ts | Nanostore atoms | ✅ Done (split DM/channel) |
+| Notification decisions | desktop/notifications.ts | store/notifications.ts | Pure function | ✅ Done (with author/channel resolution) |
+| DM send orchestration | — (new) | store/send-dm.ts | Async function | ✅ Done |
+| Server URL config shape | desktop/config.ts, mobile/config.ts | store/config.ts | Atom + helpers | Deferred |
 
 ---
 
@@ -492,16 +500,18 @@ inject implementations from the app layer.
 
 ## Implementation Priority
 
-| Phase | Effort | Impact | Description |
-|-------|--------|--------|-------------|
-| 1 | Small | High | Extract message utilities (chunkMessages, parseFileExtra, formatTime) |
-| 2 | Small | High | Extract auto-login orchestration |
-| 3 | Tiny | Medium | Extract deep link parsing |
-| 4 | Small | Medium | Add unread counts to store |
-| 5 | Small | Medium | Extract notification decision logic |
+| Phase | Effort | Impact | Description | Status |
+|-------|--------|--------|-------------|--------|
+| 1 | Small | High | Extract message utilities (chunkMessages, parseFileExtra, formatTime) | ✅ Done |
+| 2 | Small | High | Extract auto-login orchestration | ✅ Done |
+| 3 | Tiny | Medium | Extract deep link parsing | ✅ Done |
+| 4 | Small | Medium | Add unread counts to store (split DM/channel) | ✅ Done |
+| 5 | Small | Medium | Extract notification decision logic (with author/channel resolution) | ✅ Done |
 
-All phases are independent and can be done in any order. Each is a straightforward
-extract-and-delegate refactor with no architectural risk.
+All five phases completed 2026-03-20. Remaining extraction opportunities identified in post-implementation audit:
+- `sendGroupMessage()` — group send orchestration still inline in both apps
+- `avatarHue()` — pure hash function duplicated 4×
+- `parseInviteID()` — invite URL parsing duplicated 2×
 
 ---
 

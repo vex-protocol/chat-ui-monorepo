@@ -22,8 +22,12 @@ export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
 // Send DM
-export { sendDirectMessage } from './send-dm.ts'
+export { sendDirectMessage, SENT_PREFIX } from './send-dm.ts'
 export type { SendDMOptions, SendDMResult } from './send-dm.ts'
+
+// Send group message
+export { sendGroupMessage } from './send-group-message.ts'
+export type { SendGroupMessageOptions, SendGroupMessageResult } from './send-group-message.ts'
 
 // Notification decisions
 export { shouldNotify } from './notifications.ts'
@@ -39,6 +43,7 @@ export {
 
 // Message utilities
 export {
+  avatarHue,
   chunkMessages,
   parseFileExtra,
   isImageType,
