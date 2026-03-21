@@ -113,7 +113,7 @@ vex-chat/
 
 - **Incremental migration path.** This is a full rewrite, not a gradual port. Features must be reimplemented before they're available. There is no hybrid period where old and new coexist.
 
-- **MySQL support.** The old spire supported MySQL for production deployments. The new spire uses better-sqlite3 exclusively. Self-hosters who ran MySQL must migrate.
+- **MySQL support.** The old spire supported MySQL for production deployments. Current spire uses SQLite exclusively. Self-hosters who ran MySQL must migrate.
 
 - **MessagePack wire format.** The binary protocol is replaced with JSON over WebSocket. At Vex's scale (<1K concurrent users), the bandwidth difference is negligible, but it's a protocol-breaking change.
 

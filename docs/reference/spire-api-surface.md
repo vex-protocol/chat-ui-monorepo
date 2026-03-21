@@ -245,6 +245,5 @@ Member: 0     — read-only (joined via invite)
 
 ---
 
-See also: [old-spire-migration-path.md](../explanation/old-spire-migration-path.md) for
-what's worth porting, [auth-comparison.md](../explanation/auth-comparison.md) for auth
+See also: [auth-comparison.md](../explanation/auth-comparison.md) for auth
 design decisions, [vex-overview.md](../vex-overview.md) for the cryptographic protocol.

@@ -2,7 +2,7 @@
 
 > For background on the Vex platform and its cryptographic protocol, see [`vex-overview.md`](../vex-overview.md).
 
-Comparison of authentication in the current [vex-chat/spire](https://github.com/vex-chat/spire) server (`src/Spire.ts`, `src/Database.ts`) vs planned improvements. The server lives in its own repo — these improvements are ported incrementally per [`old-spire-migration-path.md`](old-spire-migration-path.md).
+Comparison of authentication in the current [vex-chat/spire](https://github.com/vex-chat/spire) server (`src/Spire.ts`, `src/Database.ts`) vs planned improvements.
 
 ---
 

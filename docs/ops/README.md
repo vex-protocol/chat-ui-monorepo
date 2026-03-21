@@ -15,10 +15,7 @@ How Vex Heavy Industries plans and ships — without paying for planning tools.
 | `journeys-features.md` | Journeys 7–16: verification, servers, groups, files, devices, settings, logout |
 | `roadmap.md` | Now/Next/Later roadmap. The big picture: what we're building, in what order, and why |
 | `concepts.md` | Story mapping methodology, core concepts, and glossary |
-| `ai-agents.md` | AI agent roster — principles, roles, and next steps |
-| `ai-agent-pm.md` | Role: Product Manager agent |
-| `ai-agent-scrum.md` | Role: Scrum / Standup agent |
-| `ai-agent-chaos.md` | Role: Chaos Engineer agent |
+| `writing-linear-issues.md` | How to write Linear issues — format templates for QA, design, and engineering |
 | `reliability.md` | SLOs, error budgets, observability stack (OpenTelemetry + Honeycomb), and enforcement policy |
 | `personas.md` | User archetypes (when we have research data) |
 

@@ -87,8 +87,8 @@ client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
 2. `client.listServers()` → populate `$servers`
 3. `client.listChannels(serverID)` for each server → populate `$channels` (parallel)
 
-**Pending new spire endpoints:**
-- `$familiars` — needs `GET /users/me/familiars`
+**Pending server endpoints:**
+- `$familiars` — needs `GET /users/me/familiars` (currently populated on first DM)
 - `$devices` — needs familiars list first, then `GET /user/:id/devices` per familiar
 - `$messages` (DM history) — needs `GET /messages/:userID`
 - `$groupMessages` (channel history) — needs `GET /channel/:id/messages`

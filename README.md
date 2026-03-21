@@ -23,7 +23,7 @@ Every message is encrypted on your device before it leaves. The server stores on
 | `packages/crypto` | NaCl encryption, key management |
 | `packages/ui` | Mitosis design primitives → Svelte + React |
 
-The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire). See [`old-spire-migration-path.md`](docs/explanation/old-spire-migration-path.md) for the integration plan.
+The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire).
 
 ---
 
@@ -60,10 +60,6 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 
 ## Documentation
 
-| Doc | What it covers |
-|---|---|
-| [`AGENTS.md`](AGENTS.md) | Implementation rules — start here before contributing |
-
 **`docs/reference/`** — structured info, API tables, configuration
 
 | Doc | What it covers |
@@ -79,7 +75,6 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | Doc | What it covers |
 |---|---|
 | [`adr-001-monorepo-consolidation.md`](docs/architecture/adr-001-monorepo-consolidation.md) | Why five repos became one monorepo, every technology replacement, trade-offs accepted |
-| [`adr-002-agpl-selective-publishing.md`](docs/architecture/adr-002-agpl-selective-publishing.md) | AGPL v3 licensing with selective publishing |
 | [`adr-003-tracing-over-logging.md`](docs/architecture/adr-003-tracing-over-logging.md) | Why OTel tracing instead of log shipping — privacy-first observability with 13 attributes and zero PII |
 | [`adr-004-website-reimplementation.md`](docs/architecture/adr-004-website-reimplementation.md) | Reimplement vex.wtf: SvelteKit static site, SSR deep links, SEO, Vercel |
 
@@ -88,7 +83,6 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | Doc | What it covers |
 |---|---|
 | [`auth-comparison.md`](docs/explanation/auth-comparison.md) | Auth design decisions: NaCl device keys, registration flow, JWT strategy |
-| [`old-spire-migration-path.md`](docs/explanation/old-spire-migration-path.md) | What's worth porting from the new spire rewrite to old spire |
 | [`platform-strategy.md`](docs/explanation/platform-strategy.md) | Cross-platform monorepo: Tauri desktop, React Native mobile, shared packages |
 | [`design-system.md`](docs/explanation/design-system.md) | Figma ↔ Storybook pipeline, Mitosis component strategy |
 | [`desktop-reimplementation.md`](docs/explanation/desktop-reimplementation.md) | Electron → Tauri migration decisions and component mapping |
@@ -108,14 +102,12 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | [`journeys.md`](docs/ops/journeys.md) | User journey inventory and feature coverage matrix |
 | [`roadmap.md`](docs/ops/roadmap.md) | Now/Next/Later roadmap with priorities and release goals |
 | [`concepts.md`](docs/ops/concepts.md) | Story mapping methodology and glossary |
-| [`ai-agents.md`](docs/ops/ai-agents.md) | AI agent roles for a small team: PM, scrum, and chaos engineer |
 | [`reliability.md`](docs/ops/reliability.md) | SLOs, error budgets, observability (OpenTelemetry + Honeycomb) |
 
 **Recommended reading order for new contributors:**
 1. This README
 2. `docs/vex-overview.md` — understand what we're building and why
-3. `AGENTS.md` — implementation rules you must follow
-4. `docs/reference/packages.md` — understand the shared package layer
+3. `docs/reference/packages.md` — understand the shared package layer
 
 ---
 
