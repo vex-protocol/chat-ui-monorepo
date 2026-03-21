@@ -23,14 +23,14 @@ export interface NotificationPayload {
  * @param activeConversation  - The conversation key the user is currently viewing (null if none)
  * @param appFocused          - Whether the app window/screen is in the foreground
  * @param resolveAuthorName   - Optional lookup from userID to display name
- * @param resolveChannelName  - Optional lookup from channelID to display name
+ * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
  */
 export function shouldNotify(
   mail: DecryptedMail,
   activeConversation: string | null,
   appFocused: boolean,
   resolveAuthorName?: (userID: string) => string | undefined,
-  resolveChannelName?: (channelID: string) => string | undefined,
+  resolveChannelInfo?: (channelID: string) => { channelName: string; serverName: string } | undefined,
 ): NotificationPayload | null {
   const me = $user.get()
   if (!me) return null
@@ -42,9 +42,15 @@ export function shouldNotify(
 
   const authorName = resolveAuthorName?.(mail.authorID) ?? mail.authorID.slice(0, 8)
 
-  const title = mail.group
-    ? `${authorName} in #${resolveChannelName?.(mail.group) ?? 'channel'}`
-    : authorName
+  let title: string
+  if (mail.group) {
+    const info = resolveChannelInfo?.(mail.group)
+    title = info
+      ? `${authorName} (#${info.channelName}, ${info.serverName})`
+      : `${authorName} (#channel)`
+  } else {
+    title = authorName
+  }
 
   const body = mail.content.length > 100
     ? mail.content.slice(0, 97) + '...'

@@ -37,15 +37,16 @@ export async function showMessageNotification(mail: DecryptedMail): Promise<void
   const familiars = $familiars.get()
 
   const channels = $channels.get()
+  const servers = $servers.get()
   const payload = shouldNotify(
     mail,
     activeConversation,
     appFocused,
     (id) => familiars[id]?.username,
     (channelID) => {
-      for (const chs of Object.values(channels)) {
+      for (const [serverID, chs] of Object.entries(channels)) {
         const ch = chs.find(c => c.channelID === channelID)
-        if (ch) return ch.name
+        if (ch) return { channelName: ch.name, serverName: servers[serverID]?.name ?? 'server' }
       }
       return undefined
     },

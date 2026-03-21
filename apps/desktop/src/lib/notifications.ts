@@ -46,13 +46,13 @@ async function ensurePermission(): Promise<boolean> {
 export function setupNotifications(
   client: MailEventEmitter,
   activeConversation: () => string | null,
-  resolveChannelName?: (channelID: string) => string | undefined,
+  resolveChannelInfo?: (channelID: string) => { channelName: string; serverName: string } | undefined,
 ): () => void {
   const handler = async (mail: DecryptedMail): Promise<void> => {
     let focused = false
     try { focused = await getCurrentWindow().isFocused() } catch {}
 
-    const payload = shouldNotify(mail, activeConversation(), focused, undefined, resolveChannelName)
+    const payload = shouldNotify(mail, activeConversation(), focused, undefined, resolveChannelInfo)
     if (!payload) return
 
     if (!getNotificationsEnabled()) return
