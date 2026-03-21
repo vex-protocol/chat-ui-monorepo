@@ -63,7 +63,13 @@
     const c = $client
     const u = $user
     if (!c || !u) return
-    const unNotify = setupNotifications(c, () => activeConversationKey)
+    const unNotify = setupNotifications(c, () => activeConversationKey, (channelID: string) => {
+      for (const [serverID, chs] of Object.entries($channels)) {
+        const ch = chs.find((c: { channelID: string }) => c.channelID === channelID)
+        if (ch) return { channelName: ch.name, serverName: $servers[serverID]?.name ?? 'server' }
+      }
+      return undefined
+    })
     const unTray = setupTray(c, u.userID)
     return () => { unNotify(); unTray() }
   })

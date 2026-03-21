@@ -19,9 +19,9 @@ End-to-end journey maps for the Vex platform. Each journey documents what the us
 | 5 | Receive Direct Message | Any user | Someone sends them a message | Implemented (real-time) | [journeys-core.md](journeys-core.md#5-receive-direct-message) |
 | 6 | Search & Add Contact | Any user | "I want to find someone" | Implemented (desktop, mobile) | [journeys-core.md](journeys-core.md#6-search--add-contact) |
 | 7 | Verify Conversation | Security-conscious user | "Is this really them?" | Implemented (desktop) | [journeys-features.md](journeys-features.md#7-verify-conversation) |
-| 8 | Create Server | Group organiser | "I want a group space" | Implemented (desktop) | [journeys-features.md](journeys-features.md#8-create-server) |
-| 9 | Join Server via Invite | Invited user | Receives invite link | Implemented | [journeys-features.md](journeys-features.md#9-join-server-via-invite) |
-| 10 | Send Group Message | Server member | "I want to post in a channel" | Implemented (desktop) | [journeys-features.md](journeys-features.md#10-send-group-message) |
+| 8 | Create Server | Group organiser | "I want a group space" | Implemented (desktop, mobile) | [journeys-features.md](journeys-features.md#8-create-server) |
+| 9 | Join Server via Invite | Invited user | Receives invite link | Implemented (desktop, mobile) | [journeys-features.md](journeys-features.md#9-join-server-via-invite) |
+| 10 | Send Group Message | Server member | "I want to post in a channel" | Implemented (desktop, mobile) | [journeys-features.md](journeys-features.md#10-send-group-message) |
 | 11 | Manage Server & Channels | Server admin | "I need to organise my server" | Partial | [journeys-features.md](journeys-features.md#11-manage-server--channels) |
 | 12 | Share a File | Any user | "I want to send a file" | Implemented (desktop) | [journeys-features.md](journeys-features.md#12-share-a-file) |
 | 13 | Set Avatar | Any user | "I want a profile picture" | Implemented (desktop) | [journeys-features.md](journeys-features.md#13-set-avatar) |
@@ -50,14 +50,17 @@ A complete comparison of what shipped in the old client versus what's available 
 - Multi-device fan-out (sends to all recipient devices)
 - Message forwarding to sender's own devices
 - Group messaging (member list endpoint + ServerChannel fan-out)
-- Local message persistence (IndexedDB — survives app restart)
+- Local message persistence (IndexedDB desktop, AsyncStorage mobile — survives app restart)
+- Unread badges (DM and channel, separated — desktop + mobile)
+- Notification suppression when conversation is active (desktop + mobile)
+- Channel notification format: "username (#channel, server)" (desktop + mobile)
 - Sound effects (4 synthesised effects: unlock, lock, notify, error — Web Audio API, no binary assets)
 
 ### Partially Ported (gaps)
 
 | Feature | What's Done | What's Missing |
 |---------|-------------|----------------|
-| Settings | Basic avatar + theme | No sound toggle, notifications, DM toggle, purge |
+| Settings | Basic avatar + theme + sound toggle + notification toggle (desktop) | No DM toggle, purge |
 | Device management | SDK has `listDevices()` + `deleteDevice()`, Settings UI lists devices with delete | No "add device" flow (multi-device registration not exposed) |
 | Online presence | `$onlineLists` atom exists | Not wired to any endpoint or UI |
 

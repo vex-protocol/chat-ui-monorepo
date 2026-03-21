@@ -10,7 +10,7 @@ import {
 import { useStore } from '@nanostores/react'
 import type { IUser, DecryptedMail } from '@vex-chat/types'
 import { $familiars, $messages, $client } from '../store'
-import { $familiars as familiarsAtom, $dmUnreadCounts } from '@vex-chat/store'
+import { $familiars as familiarsAtom, $dmUnreadCounts, avatarHue } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 
@@ -66,7 +66,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         style={styles.row}
         onPress={() => openConversation(item)}
       >
-        <View style={[styles.avatar, { backgroundColor: `hsl(${hue(item.userID)}, 45%, 40%)` }]}>
+        <View style={[styles.avatar, { backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)` }]}>
           <Text style={styles.avatarText}>{item.username.slice(0, 1).toUpperCase()}</Text>
         </View>
         <View style={styles.rowContent}>
@@ -92,7 +92,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         style={styles.resultRow}
         onPress={() => openConversation(item)}
       >
-        <View style={[styles.avatarSm, { backgroundColor: `hsl(${hue(item.userID)}, 45%, 40%)` }]}>
+        <View style={[styles.avatarSm, { backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)` }]}>
           <Text style={styles.avatarSmText}>{item.username.slice(0, 1).toUpperCase()}</Text>
         </View>
         <Text style={styles.resultName}>{item.username}</Text>
@@ -147,11 +147,6 @@ export function DMListScreen({ navigation }: { navigation: any }) {
   )
 }
 
-function hue(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return Math.abs(h) % 360
-}
 
 const styles = StyleSheet.create({
   container: {

@@ -8,15 +8,7 @@ import { ScreenLayout } from '../components/ScreenLayout'
 import { BackButton } from '../components/BackButton'
 import { VexButton } from '../components/VexButton'
 import { CornerBracketBox } from '../components/CornerBracketBox'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function parseInviteID(raw: string): string | null {
-  const trimmed = raw.trim()
-  // Accept full URLs or bare UUIDs
-  const last = trimmed.split('/').pop() ?? ''
-  return UUID_RE.test(last) ? last : null
-}
+import { parseInviteID } from '@vex-chat/libvex'
 
 export function JoinGroupScreen() {
   const navigation = useNavigation()

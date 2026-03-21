@@ -1,5 +1,14 @@
 import type { DecryptedMail } from '@vex-chat/types'
 
+// ── Avatar hue ───────────────────────────────────────────────────────────────
+
+/** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
+export function avatarHue(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return Math.abs(h) % 360
+}
+
 // ── File attachment parsing ──────────────────────────────────────────────────
 
 export interface FileAttachment {
