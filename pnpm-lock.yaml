@@ -31,8 +31,8 @@ catalogs:
       specifier: ^10.0.0
       version: 10.0.0
     dompurify:
-      specifier: ^3.2.6
-      version: 3.3.1
+      specifier: ^3.3.2
+      version: 3.3.3
     eventemitter3:
       specifier: ^5.0.4
       version: 5.0.4
@@ -112,7 +112,7 @@ importers:
         version: link:../../packages/types
       dompurify:
         specifier: 'catalog:'
-        version: 3.3.1
+        version: 3.3.3
       marked:
         specifier: 'catalog:'
         version: 15.0.12
@@ -3131,8 +3131,8 @@ packages:
     resolution: {integrity: sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==}
     engines: {node: '>= 4'}
 
-  dompurify@3.3.1:
-    resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
+  dompurify@3.3.3:
+    resolution: {integrity: sha512-Oj6pzI2+RqBfFG+qOaOLbFXLQ90ARpcGG6UePL82bJLtdsa6CYJD7nmiU8MW9nQNOtCHV3lZ/Bzq1X0QYbBZCA==}
 
   domutils@2.8.0:
     resolution: {integrity: sha512-w96Cjofp72M5IIhpjgobBimYEfoPjx1Vx0BSX9P30WBdZW2WIKU0T1Bd0kz2eNZ9ikjKgHbEyKx8BB6H1L3h3A==}
@@ -7920,7 +7920,7 @@ snapshots:
 
   '@types/dompurify@3.2.0':
     dependencies:
-      dompurify: 3.3.1
+      dompurify: 3.3.3
 
   '@types/estree@1.0.8': {}
 
@@ -8607,7 +8607,7 @@ snapshots:
     dependencies:
       domelementtype: 2.3.0
 
-  dompurify@3.3.1:
+  dompurify@3.3.3:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
