@@ -7,6 +7,8 @@ export interface NotificationPayload {
   conversationKey: string
   mailID: string
   authorID: string
+  /** Set for group messages — the channelID. */
+  group: string | null
 }
 
 /**
@@ -38,13 +40,15 @@ export function shouldNotify(
   const conversationKey = mail.group ?? mail.authorID
   if (appFocused && activeConversation === conversationKey) return null
 
+  const authorName = resolveAuthorName?.(mail.authorID) ?? mail.authorID.slice(0, 8)
+
   const title = mail.group
-    ? `#${resolveChannelName?.(mail.group) ?? 'channel'}`
-    : resolveAuthorName?.(mail.authorID) ?? mail.authorID
+    ? `${authorName} in #${resolveChannelName?.(mail.group) ?? 'channel'}`
+    : authorName
 
   const body = mail.content.length > 100
     ? mail.content.slice(0, 97) + '...'
     : mail.content
 
-  return { title, body, conversationKey, mailID: mail.mailID, authorID: mail.authorID }
+  return { title, body, conversationKey, mailID: mail.mailID, authorID: mail.authorID, group: mail.group }
 }
