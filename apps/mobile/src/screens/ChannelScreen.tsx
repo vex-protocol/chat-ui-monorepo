@@ -11,8 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
 import { $groupMessages, $client, $user } from '../store'
+import { markRead } from '@vex-chat/store'
 import { loadCredentials } from '../lib/keychain'
 import { saveGroupMessages } from '../lib/messages'
+import { setActiveConversation } from '../lib/notifications'
 import { colors } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 import { MessageBubbleRN } from '../components/MessageBubbleRN'
@@ -33,6 +35,17 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
     const thread = allGroupMessages[channelID] ?? []
     return [...thread].reverse()
   }, [allGroupMessages, channelID])
+
+  // Track active channel for notification suppression + mark read
+  useEffect(() => {
+    setActiveConversation(channelID)
+    markRead(channelID)
+    return () => { setActiveConversation(null) }
+  }, [channelID])
+
+  useEffect(() => {
+    if (messages.length > 0) markRead(channelID)
+  }, [messages.length, channelID])
 
   const insets = useSafeAreaInsets()
   const [text, setText] = useState('')
