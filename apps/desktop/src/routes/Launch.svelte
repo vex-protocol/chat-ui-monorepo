@@ -2,7 +2,8 @@
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
-  import { autoLogin, $messages, $groupMessages } from '@vex-chat/store'
+  import { autoLogin } from '@vex-chat/store'
+  import { messagesAtom as messagesAtom, groupMessagesAtom as groupMessagesAtom } from '@vex-chat/store'
   import { servers as serversAtom, channels as channelsAtom, user } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
@@ -37,7 +38,7 @@
     // listen() fires only on changes (not initial value), and IndexedDB put is idempotent.
     const currentUserID = u.userID
     const savedMailIDs = new Set<string>()
-    $messages.listen((dms) => {
+    messagesAtom.listen((dms) => {
       for (const msgs of Object.values(dms)) {
         for (const mail of msgs) {
           if (!savedMailIDs.has(mail.mailID)) {
@@ -47,7 +48,7 @@
         }
       }
     })
-    $groupMessages.listen((groups) => {
+    groupMessagesAtom.listen((groups) => {
       for (const msgs of Object.values(groups)) {
         for (const mail of msgs) {
           if (!savedMailIDs.has(mail.mailID)) {
