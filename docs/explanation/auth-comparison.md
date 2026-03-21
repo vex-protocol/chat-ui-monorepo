@@ -1,27 +1,25 @@
-# Auth: Upstream vs Planned Improvements
+# Auth: Spire Authentication Design
 
 > For background on the Vex platform and its cryptographic protocol, see [`vex-overview.md`](../vex-overview.md).
 
-Comparison of authentication in the current [vex-chat/spire](https://github.com/vex-chat/spire) server (`src/Spire.ts`, `src/Database.ts`) vs planned improvements.
+Authentication design in the [vex-chat/spire](https://github.com/vex-chat/spire) server (`src/Spire.ts`, `src/Database.ts`).
 
 ---
 
 ## Password Hashing
 
-| | Current | Target |
+Spire supports dual-algorithm password hashing with lazy migration:
+
+| | Legacy (v1) | Current (v2) |
 |---|---|---|
 | Algorithm | PBKDF2-SHA512, 1000 iterations, 32-byte output | **argon2id** (m=19MiB, t=2, p=1) |
 | Library | `pbkdf2` npm package (sync) | `argon2` npm package (async) |
 | Salt source | `xMakeNonce()` from `@vex-chat/crypto` — 24-byte NaCl nonce | Embedded by argon2 (random per hash) |
 | Output encoding | hex string | PHC format string (`$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`) |
 
-**Upstream code** (`Database.ts:848`):
-```ts
-export const hashPassword = (password: string, salt: Uint8Array) =>
-    pbkdf2.pbkdf2Sync(password, salt, ITERATIONS, 32, "sha512");
-```
+**Lazy migration:** When a user with a PBKDF2 hash (v1) logs in successfully, spire automatically re-hashes their password with argon2id (v2) and updates the stored hash. The `hashVersion` column tracks which algorithm each user's hash uses. Over time, all active users migrate to argon2id without any manual intervention.
 
-The upstream implementation is synchronous, blocks the event loop, and uses 1000 PBKDF2 iterations — **210× below the OWASP 2025 minimum of 210,000** for PBKDF2-SHA512. We use argon2id, the OWASP-preferred algorithm for new projects, which is memory-hard (resists GPU/ASIC attacks) and handles salt generation internally.
+The legacy PBKDF2 implementation uses 1000 iterations — **210x below the OWASP 2025 minimum of 210,000** for PBKDF2-SHA512. Argon2id is the OWASP-preferred algorithm for new projects, which is memory-hard (resists GPU/ASIC attacks) and handles salt generation internally.
 
 ---
 
@@ -116,7 +114,7 @@ If single-use tokens are needed in the future, a small Redis/DB-backed token rev
 | Token redemption | Client NaCl-signs the token UUID with their device signing key; server verifies signature | Client presents JWT token directly |
 | userID source | `uuid.stringify(regKey)` — derived from the NaCl-signed registration token | Fresh `uuid.v4()` |
 | Device creation | Bundled into registration — creates user + device + preKeys atomically | Separate (`/devices` endpoint) |
-| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Kysely throws; we catch and translate |
+| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Knex catches constraint violations; we translate |
 
 **Upstream registration payload** (`XTypes.HTTP.IRegistrationPayload`):
 ```ts
@@ -158,12 +156,12 @@ Authentication is cookie-based. The `protect` middleware is a separate guard tha
 
 ## Database Layer
 
-| | Current | Target |
-|---|---|---|
-| Query builder | Knex | Kysely |
-| Default DB | MySQL | SQLite (configurable → PostgreSQL) |
-| Schema management | `if (!hasTable) createTable` inline in `Database.init()` | Versioned Kysely migrations (`001_` → `011_`) |
-| Type safety | Runtime types from `@vex-chat/types` | Compile-time `Database` interface in `src/db/types.ts` |
+| | Current |
+|---|---|
+| Query builder | Knex |
+| Default DB | SQLite (also supports MySQL) |
+| Schema management | `if (!hasTable) createTable` inline in `Database.init()` |
+| Type safety | Runtime types from `@vex-chat/types` |
 
 The upstream `Database` class creates tables on startup if they don't exist — there is a `migrations/` directory in the repo but the production code doesn't use it (the `init()` method handles DDL inline). This means schema changes require manual `ALTER TABLE` in production.
 
@@ -173,19 +171,18 @@ The upstream `Database` class creates tables on startup if they don't exist — 
 
 This project is **privacy-first**. We match the upstream privacy model exactly. The table below reflects decisions for the planned improvements to the spire server (in its own repo).
 
-| Concern | Current | Target | Status |
+| Concern | Spire (current) | Client SDK | Notes |
 |---|---|---|---|
-| Token storage | In-memory single-use UUID array | In-memory single-use UUID array (`createTokenStore()`) | **Aligned** |
-| Token reuse | Single-use, consumed on validation | Single-use, consumed on validation | **Aligned** |
-| Token redemption | Requires NaCl device signature | Requires NaCl device signature | **Aligned** |
-| userID | `uuid.stringify(nacl.sign.open(signed, signKey))` — client-derived | Same | **Aligned** |
-| Registration | NaCl sig + device + preKey bundled atomically | Same | **Aligned** |
-| JWT secret | `process.env.SPK` (NaCl key reused) | `process.env.JWT_SECRET` (dedicated secret) | **Improved** — key hygiene |
-| JWT payload | `{ user: { userID, username, lastSeen } }` nested | Same censoredUser structure | **Aligned** |
-| JWT library | `jsonwebtoken` (CJS) | `jose` (ESM-native) | **ESM constraint** — same semantics |
-| Transport | HTTP cookie `auth` | Bearer token header | **Divergence** — more REST-conventional, easier to test |
-| Async hashing | Sync `pbkdf2Sync` (blocks event loop) | Async `crypto.pbkdf2` | **Improved** — non-blocking |
-| DB | Knex + MySQL | Kysely + SQLite/PG | **Improved** — compile-time type safety |
+| Token storage | In-memory single-use UUID array | Presents token from server | **Aligned** |
+| Token reuse | Single-use, consumed on validation | Single-use | **Aligned** |
+| Token redemption | Requires NaCl device signature | Signs with device key | **Aligned** |
+| userID | `uuid.stringify(nacl.sign.open(signed, signKey))` — client-derived | Receives from server | **Aligned** |
+| Registration | NaCl sig + device + preKey bundled atomically | Sends bundled payload | **Aligned** |
+| JWT secret | `process.env.SPK` (NaCl key reused) | N/A | Key hygiene concern — consider dedicated `JWT_SECRET` |
+| JWT library | `jsonwebtoken` (CJS) | N/A (receives JWT) | |
+| Transport | HTTP cookie `auth` + `Authorization` header | Bearer token header | SDK sends Bearer; spire accepts both |
+| Password hashing | PBKDF2 + argon2id (lazy migration) | N/A (server-only) | Old hashes upgraded on login |
+| DB | Knex + SQLite/MySQL | N/A | |
 
 ### Notes on divergences
 

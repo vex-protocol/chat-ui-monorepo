@@ -29,6 +29,7 @@ Important but not scoped. May never ship if priorities change. That's fine.
 | P4 | Account deletion | 15 | Privacy feature, needs design |
 | P4 | Custom emoji | 10, 11 | Nice-to-have, large effort |
 | P4 | Moderation tools (kick/ban) | 11 | Needed when servers grow |
+| P4 | Spire modernization (Kysely, Zod, ESM) | — | Tech debt; current Express 4 + Knex works |
 
 ---
 
@@ -40,7 +41,6 @@ Pruned periodically.
 
 | What | Shipped |
 |---|---|
-| Spire server reimplementation (Kysely, Zod, Vitest, ESM) | v0.1 |
 | App shell: routing, layout, window chrome | v0.1 |
 | Auth UI: login, register, key management | v0.1 |
 | App bootstrap sequence | v0.1 |
