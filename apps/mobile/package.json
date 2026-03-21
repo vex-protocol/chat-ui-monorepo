@@ -48,5 +48,6 @@
   },
   "engines": {
     "node": ">= 22.11.0"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }

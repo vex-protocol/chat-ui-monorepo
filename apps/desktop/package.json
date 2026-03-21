@@ -39,5 +39,6 @@
     "marked": "catalog:",
     "svelte-spa-router": "^4.0.1",
     "uuid": "catalog:"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }

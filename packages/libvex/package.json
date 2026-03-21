@@ -17,5 +17,6 @@
     "eventemitter3": "catalog:",
     "reconnecting-websocket": "catalog:",
     "uuid": "catalog:"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }
