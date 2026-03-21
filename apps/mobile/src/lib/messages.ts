@@ -10,6 +10,7 @@ import type { DecryptedMail } from '@vex-chat/types'
 
 const GROUP_KEY = 'vex:groupMessages'
 const DM_KEY = 'vex:dmMessages'
+const FAMILIARS_KEY = 'vex:familiars'
 
 export async function saveGroupMessages(groups: Record<string, DecryptedMail[]>): Promise<void> {
   await AsyncStorage.setItem(GROUP_KEY, JSON.stringify(groups))
@@ -38,4 +39,17 @@ export async function clearMessages(): Promise<void> {
     AsyncStorage.removeItem(GROUP_KEY),
     AsyncStorage.removeItem(DM_KEY),
   ])
+}
+
+// ── Familiars persistence ─────────────────────────────────────────────────────
+
+import type { IUser } from '@vex-chat/types'
+
+export async function saveFamiliars(familiars: Record<string, IUser>): Promise<void> {
+  await AsyncStorage.setItem(FAMILIARS_KEY, JSON.stringify(familiars))
+}
+
+export async function loadFamiliars(): Promise<Record<string, IUser>> {
+  const raw = await AsyncStorage.getItem(FAMILIARS_KEY)
+  return raw ? JSON.parse(raw) : {}
 }

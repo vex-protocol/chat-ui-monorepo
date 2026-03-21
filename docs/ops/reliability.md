@@ -261,7 +261,7 @@ Our target deployment is one Linux box running Spire + SQLite. No Kubernetes, no
 
 **Disabled instrumentations:** `fs`, `dns`, `net` — these generate high-volume, low-value spans that don't serve any SLI.
 
-**Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects `trace_id` and `span_id` into Pino log lines. No log data is exported — Pino writes to stdout as before, now enriched with trace context for local log-trace correlation. No `LoggerProvider` is configured. See [ADR-003](../architecture/adr-003-tracing-over-logging.md) for the full rationale.
+**Pino integration:** `@opentelemetry/instrumentation-pino` with `disableLogSending: true` injects `trace_id` and `span_id` into Pino log lines. No log data is exported — Pino writes to stdout as before, now enriched with trace context for local log-trace correlation. No `LoggerProvider` is configured. See [ADR-002](../architecture/adr-002-tracing-over-logging.md) for the full rationale.
 
 **Error handling:** Errors are attached to spans, not shipped as logs. The error middleware calls `span.recordException(err)` and `span.setStatus(ERROR)` on the active span. The exception event rides with the trace through the existing pipeline. Pino still logs the error to stdout for local visibility (with trace_id auto-injected). No separate log exporter or log pipeline exists.
 
@@ -294,7 +294,7 @@ Note: `@opentelemetry/host-metrics` does not collect disk or filesystem metrics 
 
 No off-the-shelf OTel package provides SQLite health metrics. We build it using better-sqlite3's `.pragma()` method and the OTel metrics API.
 
-**Query duration:** Kysely's built-in `log` callback provides `queryDurationMillis` after every query. Feed this into an OTel histogram (`vex.db.query_duration`). No extra dependency needed — Kysely already has this hook.
+**Query duration:** Knex emits `query-response` events with duration data. Feed this into an OTel histogram (`vex.db.query_duration`). No extra dependency needed — Knex already has this hook.
 
 **Health metrics** (polled every 30–60 seconds via OTel observable gauges):
 
@@ -309,7 +309,7 @@ No off-the-shelf OTel package provides SQLite health metrics. We build it using 
 
 The WAL size is the most important single metric. If it grows without bound, checkpointing is failing — likely due to long-running read transactions holding the WAL open. This directly threatens data integrity.
 
-**What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Kysely's `log` callback gives us query duration without exposing query text.
+**What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Knex's event system gives us query duration without exposing query text.
 
 ### Instrumentation Points in Spire
 
@@ -491,7 +491,6 @@ Skip the full Google SRE ceremony. A 2-person team needs the essentials, not the
 |---|---|
 | **Roadmap** (`roadmap.md`) | Reliability items enter Now when error budget policy triggers. Items in Done can regress back to Now if SLOs reveal breakage |
 | **Journeys** (`journeys.md`) | SLIs map to journeys — message delivery = Journey 4/5, key exchange = Journey 4, API availability = all journeys |
-| **Chaos Engineering** (`ai-agent-chaos.md`) | Chaos experiments validate that the system degrades gracefully. SLOs measure whether it actually does in production |
 | **Linear** | Burn rate ticket alerts create Linear issues. Feature freeze pauses feature issues |
 | **Beads** | Reliability work tracked as beads like any other implementation work |
 

@@ -13,5 +13,6 @@
     "@noble/curves": "catalog:",
     "@noble/hashes": "catalog:",
     "@noble/ciphers": "catalog:"
-  }
+  },
+  "license": "AGPL-3.0-or-later"
 }

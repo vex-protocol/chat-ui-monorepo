@@ -95,7 +95,7 @@ packages/crypto/src/
 | `encryptSecretBox` / `decryptSecretBox` | `box.ts` | libvex only |
 | `generateNonce` | `box.ts` | libvex only |
 
-**Stays in spire only:** `hashPassword` / `verifyPassword` (server-only, currently PBKDF2 — see [`old-spire-migration-path.md`](../explanation/old-spire-migration-path.md) for planned argon2id migration).
+**Stays in spire only:** `hashPassword` / `verifyPassword` (server-only, argon2id).
 
 ### Library rationale
 
@@ -164,8 +164,6 @@ apps/mobile  ─┬── @vex-chat/store + @nanostores/react              │
 ## Spire Integration
 
 The spire server lives in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) and consumes `@vex-chat/crypto` via npm. When updating the crypto package, publish to npm so spire can pick up changes.
-
-See [`old-spire-migration-path.md`](../explanation/old-spire-migration-path.md) for the planned incremental migration of spire's internals.
 
 ---
 

@@ -45,7 +45,7 @@ Consolidate everything into a single pnpm monorepo (`vex-chat`) and reimplement 
 ```
 vex-chat/
 ├── apps/
-│   ├── spire/          # Server: Express 5, Kysely, better-sqlite3, Zod v4
+│   ├── spire/          # Server (own repo, not in monorepo): Express 4, Knex, SQLite
 │   ├── desktop/        # Desktop: Tauri 2.0 + Svelte 5
 │   └── mobile/         # Mobile: React Native 0.84
 ├── packages/
@@ -78,6 +78,8 @@ vex-chat/
 | **Testing** | Jest (0 tests) | Vitest (255+ tests) | Faster, native ESM, in-memory SQLite test helpers |
 | **Package manager** | npm (per-repo) | pnpm 10 workspaces | Strict deps, workspace protocol, catalog for shared versions |
 | **Build** | Webpack 5 + Babel | Vite 7 + tsc | Native ESM, faster dev server, simpler config |
+
+> **Note:** The server-side replacements (Express 5, Kysely, Pino, Zod, Vitest) were planned but not implemented. Spire remains in its own repo using Express 4, Knex, Winston, and CJS. The client-side replacements (Tauri, Svelte, nanostores, @noble/curves, Mitosis) all shipped. See `docs/ops/roadmap.md` Later section for spire modernization status.
 
 ### Architectural changes
 
@@ -113,7 +115,7 @@ vex-chat/
 
 - **Incremental migration path.** This is a full rewrite, not a gradual port. Features must be reimplemented before they're available. There is no hybrid period where old and new coexist.
 
-- **MySQL support.** The old spire supported MySQL for production deployments. The new spire uses better-sqlite3 exclusively. Self-hosters who ran MySQL must migrate.
+- **MySQL support.** The old spire supported MySQL for production deployments. Current spire uses SQLite exclusively. Self-hosters who ran MySQL must migrate.
 
 - **MessagePack wire format.** The binary protocol is replaced with JSON over WebSocket. At Vex's scale (<1K concurrent users), the bandwidth difference is negligible, but it's a protocol-breaking change.
 
@@ -135,8 +137,7 @@ vex-chat/
 - **Mobile client exists.** React Native app shares `libvex`, `store`, `types`, and `crypto` packages. No code duplication.
 - **Cross-platform UI components.** Mitosis compiles design system components to both Svelte (desktop) and React (mobile) from a single source.
 - **Audited cryptography.** @noble/curves and @noble/hashes are Cure53-audited with active maintenance.
-- **Type-safe database.** Kysely catches SQL errors at compile time. No more runtime `knex('users').where('nonexistent', id)` failures.
-- **Living API documentation.** OpenAPI spec auto-generated from Zod schemas, linted by Spectral.
+- **Type-safe shared packages.** TypeScript catches API mismatches at compile time across all shared packages.
 - **Enforced architecture.** eslint-plugin-boundaries prevents dependency violations. Layer rules are lint errors, not conventions.
 
 ### Negative
@@ -149,7 +150,7 @@ vex-chat/
 
 - Old repos preserved at `~/Public/vex-desktop`, `~/Public/spire`, `~/Public/libvex-js` for reference during reimplementation.
 - Beads issue tracker captures every feature gap and dependency between implementation tasks.
-- SQLite → PostgreSQL migration path is straightforward via Kysely's dialect system if horizontal scaling is ever needed.
+- SQLite → PostgreSQL migration path is straightforward via Knex's multi-dialect support if horizontal scaling is ever needed.
 
 ## Revisit Triggers
 

@@ -4,8 +4,7 @@ export const navigationRef = createNavigationContainerRef()
 
 export function navigateToConversation(userID: string, username: string): void {
   if (!navigationRef.isReady()) return
-  // Navigate into the DMs tab, then to the Conversation screen
-  ;(navigationRef as any).navigate('DMs', {
+  ;(navigationRef as any).navigate('App', {
     screen: 'Conversation',
     params: { userID, username },
   })

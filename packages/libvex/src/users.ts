@@ -15,10 +15,17 @@ export async function isUsernameTaken(http: HttpClient, username: string): Promi
 }
 
 /**
- * Search users by username. Old spire has no search endpoint —
- * returns an empty array gracefully.
+ * Search users by username. Old spire has no search endpoint,
+ * so we fall back to an exact username lookup via GET /user/:username.
  */
-export async function searchUsers(_http: HttpClient, _query: string): Promise<IUser[]> {
-  // Old spire does not have GET /users/search — return empty rather than error
+export async function searchUsers(http: HttpClient, query: string): Promise<IUser[]> {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+
+  // Try exact username lookup (the only endpoint old spire supports)
+  const result = await http.get<Record<string, unknown>>(`/user/${trimmed}`)
+  if (result.ok && result.data) {
+    return [normalizeUser(result.data)]
+  }
   return []
 }

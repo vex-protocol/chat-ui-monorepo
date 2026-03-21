@@ -8,6 +8,9 @@ import { $servers } from './servers.ts'
 import { $channels } from './channels.ts'
 import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
+import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
+import { $familiars } from './familiars.ts'
+import { SENT_PREFIX } from './send-dm.ts'
 
 /**
  * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
@@ -63,21 +66,54 @@ export async function bootstrap(
 
   client.on('mail', (mail) => {
     // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
+    console.log('[vex-store] mail received:', mail.mailID, 'from:', mail.authorID, 'group:', mail.group)
+    const me = $user.get()
     if (mail.group) {
       // Group / channel message — key by channelID, deduplicate by mailID
       const prev = $groupMessages.get()[mail.group] ?? []
       if (!prev.some(m => m.mailID === mail.mailID)) {
         $groupMessages.setKey(mail.group, [...prev, mail])
         persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
+        // Track unread (apps call markRead when conversation is focused)
+        if (me && mail.authorID !== me.userID) incrementChannelUnread(mail.group)
       }
     } else {
-      // Direct message — key by the other party's userID, deduplicate by mailID
-      const me = $user.get()
-      const threadKey = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
+      // Direct message — key by the other party's userID, deduplicate
+      const isOwnMessage = me && mail.authorID === me.userID
+      const threadKey = isOwnMessage ? mail.readerID : mail.authorID
       const prev = $messages.get()[threadKey] ?? []
-      if (!prev.some(m => m.mailID === mail.mailID)) {
+
+      // If this is a server echo of a locally-sent message, replace the local version
+      const localIdx = isOwnMessage
+        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.content === mail.content && m.authorID === mail.authorID)
+        : -1
+
+      if (localIdx !== -1) {
+        // Replace local echo with server version
+        const updated = [...prev]
+        updated[localIdx] = mail
+        $messages.setKey(threadKey, updated)
+        persistence?.saveDmMessages($messages.get()).catch(() => {})
+      } else if (!prev.some(m => m.mailID === mail.mailID)) {
         $messages.setKey(threadKey, [...prev, mail])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
+
+        if (!isOwnMessage) {
+          incrementDmUnread(threadKey)
+        }
+
+        // Auto-add the other party as familiar so they appear in DM list
+        const otherUserID = threadKey
+        if (!$familiars.get()[otherUserID]) {
+          $familiars.setKey(otherUserID, {
+            userID: otherUserID,
+            username: otherUserID.slice(0, 8),
+            lastSeen: mail.time,
+          })
+          client.getUser(otherUserID).then(u => {
+            if (u) $familiars.setKey(otherUserID, u)
+          }).catch(() => {})
+        }
       }
     }
   })

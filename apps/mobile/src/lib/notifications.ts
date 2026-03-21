@@ -1,12 +1,19 @@
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import { AppState } from 'react-native'
 import type { DecryptedMail } from '@vex-chat/types'
-import { $user, $familiars } from '../store'
+import { shouldNotify } from '@vex-chat/store'
+import { $familiars, $channels, $servers, $client } from '../store'
 import { navigateToConversation } from '../navigation/navigationRef'
 
 const CHANNEL_ID = 'vex-messages'
 
 let channelReady = false
+let activeConversation: string | null = null
+
+/** Call from screens to track which conversation the user is viewing. */
+export function setActiveConversation(key: string | null): void {
+  activeConversation = key
+}
 
 async function ensureChannel(): Promise<void> {
   if (channelReady) return
@@ -26,28 +33,43 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export async function showMessageNotification(mail: DecryptedMail): Promise<void> {
-  // Don't notify for own messages
-  const me = $user.get()
-  if (me && mail.authorID === me.userID) return
+  const appFocused = AppState.currentState === 'active'
+  const familiars = $familiars.get()
 
-  // Don't notify when app is in foreground (user is looking at it)
-  if (AppState.currentState === 'active') return
+  // Resolve author name: check familiars first, then fetch from server
+  let authorName = familiars[mail.authorID]?.username
+  if (!authorName) {
+    try {
+      const user = await $client.get()?.getUser(mail.authorID)
+      if (user) authorName = user.username
+    } catch {}
+  }
+
+  const channels = $channels.get()
+  const servers = $servers.get()
+  const payload = shouldNotify(
+    mail,
+    activeConversation,
+    appFocused,
+    (id) => id === mail.authorID && authorName ? authorName : familiars[id]?.username,
+    (channelID) => {
+      for (const [serverID, chs] of Object.entries(channels)) {
+        const ch = chs.find(c => c.channelID === channelID)
+        if (ch) return { channelName: ch.name, serverName: servers[serverID]?.name ?? 'server' }
+      }
+      return undefined
+    },
+  )
+  if (!payload) return
 
   await ensureChannel()
 
-  const familiars = $familiars.get()
-  const author = familiars[mail.authorID]
-  const title = author?.username ?? 'New message'
-  const body = mail.content.length > 100
-    ? mail.content.slice(0, 100) + '...'
-    : mail.content
-
   await notifee.displayNotification({
-    title,
-    body,
+    title: payload.title,
+    body: payload.body,
     data: {
-      authorID: mail.authorID,
-      username: author?.username ?? mail.authorID,
+      authorID: payload.authorID,
+      username: payload.title,
     },
     android: {
       channelId: CHANNEL_ID,

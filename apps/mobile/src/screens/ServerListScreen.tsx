@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { useStore } from '@nanostores/react'
 import type { IServer } from '@vex-chat/types'
 import { $servers } from '../store'
+import { avatarHue } from '@vex-chat/store'
 
 export function ServerListScreen({ navigation }: { navigation: any }) {
   const servers = useStore($servers)
@@ -14,7 +15,7 @@ export function ServerListScreen({ navigation }: { navigation: any }) {
         style={styles.row}
         onPress={() => navigation.navigate('ChannelList', { serverID: item.serverID, serverName: item.name })}
       >
-        <View style={[styles.icon, { backgroundColor: `hsl(${hue(item.serverID)}, 45%, 40%)` }]}>
+        <View style={[styles.icon, { backgroundColor: `hsl(${avatarHue(item.serverID)}, 45%, 40%)` }]}>
           <Text style={styles.iconText}>{item.icon || item.name.slice(0, 1).toUpperCase()}</Text>
         </View>
         <Text style={styles.name}>{item.name}</Text>
@@ -39,11 +40,6 @@ export function ServerListScreen({ navigation }: { navigation: any }) {
   )
 }
 
-function hue(id: string): number {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
-  return Math.abs(h) % 360
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#1a1a1a' },

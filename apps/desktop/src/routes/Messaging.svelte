@@ -2,15 +2,21 @@
   // Route: /messaging/:userID
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client, user, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { messages, client, user, familiars, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { sendDirectMessage, markRead } from '@vex-chat/store'
   import { keyStore } from '../lib/keystore.js'
-  import { saveMessage } from '../lib/persistence.js'
-  import type { DecryptedMail } from '@vex-chat/types'
 
   let { params }: { params: Record<string, string> } = $props()
 
   const targetUserID = $derived(params.userID ?? '')
+
+  // Clear unread count when viewing this conversation
+  $effect(() => {
+    if (targetUserID) markRead(targetUserID)
+  })
   const threadMessages = $derived($messages[targetUserID] ?? [])
+  const targetUsername = $derived($familiars[targetUserID]?.username ?? targetUserID.slice(0, 8))
+  const usernameMap = $derived({ [targetUserID]: targetUsername })
 
   let sending = $state(false)
   let sendError = $state('')
@@ -62,53 +68,13 @@
         })
       }
 
-      const devices = await $client.listDevices(targetUserID)
-      if (devices.length === 0) {
-        sendError = 'Recipient has no registered devices.'
-        return
-      }
-
-      const sendOpts = { mailType, extra }
-
-      // Send to ALL recipient devices
-      const results = await Promise.allSettled(
-        devices.map(d => $client!.sendMail(content, d.deviceID, targetUserID, sendOpts)),
-      )
-      const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
-      if (!anyOk) {
-        const first = results.find(r => r.status === 'fulfilled' && !r.value.ok) as
-          | PromiseFulfilledResult<{ ok: false; error: { message: string } }>
-          | undefined
-        sendError = first?.value.error.message ?? 'Failed to send to any device'
-        return
-      }
-
-      // Show sent message on sender's device (server doesn't echo back to sender)
-      const sentMail: DecryptedMail = {
-        mailID: crypto.randomUUID(),
-        authorID: $user!.userID,
-        readerID: targetUserID,
-        group: null,
+      const result = await sendDirectMessage(targetUserID, content, {
         mailType,
-        time: new Date().toISOString(),
-        content,
         extra,
-        forward: null,
-      }
-      const prev = $messages[targetUserID] ?? []
-      messages.setKey(targetUserID, [...prev, sentMail])
-      saveMessage(sentMail, $user!.userID).catch(() => {})
-
-      // Forward to sender's own other devices so sent messages appear everywhere
-      const creds = await keyStore.loadActive()
-      if ($user && creds) {
-        const myDevices = await $client.listDevices($user.userID)
-        const otherDevices = myDevices.filter(d => d.deviceID !== creds.deviceID)
-        if (otherDevices.length > 0) {
-          await Promise.allSettled(
-            otherDevices.map(d => $client!.sendMail(content, d.deviceID, targetUserID, sendOpts)),
-          )
-        }
+        keyStore,
+      })
+      if (!result.ok) {
+        sendError = result.error ?? 'Failed to send'
       }
     } catch (err) {
       sendError = err instanceof Error ? err.message : 'Failed to send'
@@ -120,7 +86,7 @@
 
 <div class="dm-pane">
   <header class="dm-pane__header">
-    <span class="dm-pane__title">@{targetUserID.slice(0, 8)}</span>
+    <span class="dm-pane__title">@{targetUsername}</span>
     <div class="dm-pane__actions">
       {#if fingerprint}
         <button
@@ -158,7 +124,7 @@
     </div>
   {/if}
 
-  <MessageBox messages={threadMessages} />
+  <MessageBox messages={threadMessages} usernames={usernameMap} />
 
   {#if sendError}
     <div class="dm-pane__error">{sendError}</div>

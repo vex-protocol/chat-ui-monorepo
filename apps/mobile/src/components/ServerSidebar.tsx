@@ -2,6 +2,7 @@ import React from 'react'
 import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native'
 import { useStore } from '@nanostores/react'
 import { $servers } from '../store'
+import { $totalDmUnread } from '@vex-chat/store'
 import { colors } from '../theme'
 
 const vexLogo = require('../assets/images/vex-logo.png')
@@ -23,12 +24,20 @@ export function ServerSidebar({
 }: ServerSidebarProps) {
   const servers = useStore($servers)
   const serverList = Object.values(servers)
+  const totalUnread = useStore($totalDmUnread)
 
   return (
     <View style={styles.container}>
       {/* Home / Vex icon */}
       <TouchableOpacity onPress={onSelectHome} style={styles.homeBtn}>
         <Image source={vexLogo} style={styles.logo} resizeMode="contain" />
+        {totalUnread > 0 && (
+          <View style={styles.homeBadge}>
+            <Text style={styles.homeBadgeText}>
+              {totalUnread > 99 ? '99+' : totalUnread}
+            </Text>
+          </View>
+        )}
       </TouchableOpacity>
 
       <View style={styles.divider} />
@@ -79,6 +88,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
+  },
+  homeBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  homeBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   logo: {
     width: 28,

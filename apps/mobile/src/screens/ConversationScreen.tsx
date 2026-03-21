@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import {
   View,
   Text,
@@ -9,7 +9,10 @@ import {
 } from 'react-native'
 import { useStore } from '@nanostores/react'
 import type { DecryptedMail } from '@vex-chat/types'
-import { $messages, $client, $user } from '../store'
+import { $messages, $user } from '../store'
+import { sendDirectMessage, markRead } from '@vex-chat/store'
+import { setActiveConversation } from '../lib/notifications'
+import { keychainKeyStore } from '../lib/keychain'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 import { MessageBubbleRN } from '../components/MessageBubbleRN'
@@ -18,9 +21,25 @@ import { MessageInputBar } from '../components/MessageInputBar'
 export function ConversationScreen({ route, navigation }: { route: any; navigation: any }) {
   const { userID, username } = route.params as { userID: string; username: string }
   const allMessages = useStore($messages)
-  const messages: DecryptedMail[] = allMessages[userID] ?? []
-  const client = useStore($client)
   const user = useStore($user)
+
+  // Store keeps messages oldest-first; inverted FlatList needs newest-first
+  const messages = useMemo(() => {
+    const thread = allMessages[userID] ?? []
+    return [...thread].reverse()
+  }, [allMessages, userID])
+
+  // Track active conversation for notification suppression + mark read
+  useEffect(() => {
+    setActiveConversation(userID)
+    markRead(userID)
+    return () => { setActiveConversation(null) }
+  }, [userID])
+
+  // Mark read whenever new messages arrive while viewing
+  useEffect(() => {
+    if (messages.length > 0) markRead(userID)
+  }, [messages.length, userID])
 
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
@@ -28,27 +47,22 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
 
   const sendMessage = useCallback(async () => {
     const content = text.trim()
-    if (!content || !client || !user) return
+    if (!content || !user) return
     setSending(true)
     setText('')
     setError('')
     try {
-      const devices = await client.listDevices(userID)
-      const device = devices[0]
-      if (!device) {
-        setError('Recipient has no registered devices.')
-        setSending(false)
-        return
-      }
-      const result = await client.sendMail(content, device.deviceID, userID)
+      const result = await sendDirectMessage(userID, content, {
+        keyStore: keychainKeyStore,
+      })
       if (!result.ok) {
-        setError(result.error.message)
+        setError(result.error ?? 'Failed to send')
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send')
     }
     setSending(false)
-  }, [text, client, user, userID])
+  }, [text, user, userID])
 
   function renderMessage({ item }: { item: DecryptedMail }) {
     const isOwn = item.authorID === user?.userID

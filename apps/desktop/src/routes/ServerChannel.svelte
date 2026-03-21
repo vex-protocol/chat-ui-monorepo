@@ -4,8 +4,7 @@
   import ChatInput from '../lib/ChatInput.svelte'
   import { groupMessages, client, channels, user } from '../lib/store/index.js'
   import { keyStore } from '../lib/keystore.js'
-  import { saveMessage } from '../lib/persistence.js'
-  import type { DecryptedMail } from '@vex-chat/types'
+  import { sendGroupMessage } from '@vex-chat/store'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -38,8 +37,8 @@
     sendError = ''
     try {
       // Upload attachment first if present
-      let mailType = 'text'
-      let extra: string | null = null
+      let mailType: string | undefined
+      let extra: string | null | undefined
       if (attachment) {
         const buf = new Uint8Array(await attachment.arrayBuffer())
         const { fileID } = await $client.uploadFile(buf, attachment.type)
@@ -52,61 +51,14 @@
         })
       }
 
-      // Get all server members and their devices
-      const members = await $client.listMembers(channelID)
-      const creds = await keyStore.loadActive()
-
-      // Collect all devices across all members (excluding sender's current device)
-      const deviceTargets: { deviceID: string; userID: string }[] = []
-      for (const member of members) {
-        const devices = await $client.listDevices(member.userID)
-        for (const d of devices) {
-          if (member.userID === $user.userID && creds && d.deviceID === creds.deviceID) continue
-          deviceTargets.push({ deviceID: d.deviceID, userID: member.userID })
-        }
-      }
-
-      if (deviceTargets.length === 0) {
-        sendError = 'No devices to send to.'
-        return
-      }
-
-      const sendOpts = { group: channelID, mailType, extra }
-
-      // Fan out to all devices with { group: channelID }
-      const results = await Promise.allSettled(
-        deviceTargets.map(t =>
-          $client!.sendMail(content, t.deviceID, t.userID, sendOpts),
-        ),
-      )
-      const anyOk = results.some(r => r.status === 'fulfilled' && r.value.ok)
-      if (!anyOk) {
-        const details = results.map((r, i) => {
-          const target = deviceTargets[i]
-          if (r.status === 'rejected') return `${target.deviceID.slice(0,8)}: rejected: ${r.reason}`
-          if (!r.value.ok) return `${target.deviceID.slice(0,8)}: ${r.value.error?.code || 'UNKNOWN'}/${r.value.error?.message || 'no msg'}`
-          return null
-        }).filter(Boolean).join('; ')
-        sendError = `Failed: ${details}`
-        console.error('Send failures:', JSON.stringify(results), JSON.stringify(deviceTargets))
-        return
-      }
-
-      // Show sent message on sender's device
-      const sentMail: DecryptedMail = {
-        mailID: crypto.randomUUID(),
-        authorID: $user.userID,
-        readerID: $user.userID,
-        group: channelID,
+      const result = await sendGroupMessage(channelID, content, {
         mailType,
-        time: new Date().toISOString(),
-        content,
         extra,
-        forward: null,
+        keyStore,
+      })
+      if (!result.ok) {
+        sendError = result.error ?? 'Failed to send'
       }
-      const prev = $groupMessages[channelID] ?? []
-      groupMessages.setKey(channelID, [...prev, sentMail])
-      saveMessage(sentMail, $user.userID).catch(() => {})
     } catch (err) {
       sendError = err instanceof Error ? err.message : 'Failed to send'
     } finally {
