@@ -8,6 +8,7 @@ import { playNotify } from './sounds.js'
 interface MailEventEmitter {
   on(event: 'mail', handler: (mail: DecryptedMail) => void): void
   off(event: 'mail', handler: (mail: DecryptedMail) => void): void
+  getUser(userID: string): Promise<{ username: string } | null>
 }
 
 // ── Preference ────────────────────────────────────────────────────────────────
@@ -57,6 +58,24 @@ export function setupNotifications(
     if (!payload) return
 
     if (!getNotificationsEnabled()) return
+
+    // If the title is a truncated UUID (no username resolved), try fetching from server
+    if (!resolveAuthorName?.(mail.authorID)) {
+      try {
+        const user = await client.getUser(mail.authorID)
+        if (user) {
+          const name = user.username
+          if (mail.group) {
+            const info = resolveChannelInfo?.(mail.group)
+            payload.title = info
+              ? `${name} (#${info.channelName}, ${info.serverName})`
+              : `${name} (#channel)`
+          } else {
+            payload.title = name
+          }
+        }
+      } catch {}
+    }
 
     playNotify()
 
