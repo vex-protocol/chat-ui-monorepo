@@ -111,6 +111,12 @@ export async function registerAndBootstrap(
       return { ok: false, error: regErr?.message ?? 'Registration failed' }
     }
 
+    // login() sets the auth cookie needed by connect()
+    const loginErr = await client.login(username, password)
+    if (loginErr) {
+      return { ok: false, error: 'Registered but login failed: ' + loginErr.message }
+    }
+
     // connect() populates device details (needed for keyStore.save)
     await client.connect()
 
