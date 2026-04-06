@@ -29,7 +29,7 @@ export async function bootstrap(
   // Clear stale state from any previous session
   resetAll()
 
-  const storage = preset.createStorage('vex-client.db', privateKey, preset.adapters.logger)
+  const storage = await preset.createStorage('vex-client.db', privateKey, preset.adapters.logger)
   const client = await Client.create(privateKey, { ...options, adapters: preset.adapters } as any, storage)
   $client.set(client)
 
