@@ -3,7 +3,8 @@ import { StatusBar } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
-import { autoLogin, $keyReplaced, $user, $client, $familiars, $messages, $groupMessages, mobilePersistence } from './src/store'
+import { autoLogin, $keyReplaced, $user, $client, $familiars, $messages, $groupMessages } from './src/store'
+import { expoPreset } from '@vex-chat/libvex/preset/expo'
 import { keychainKeyStore } from './src/lib/keychain'
 import { clearCredentials } from './src/lib/keychain'
 import { getServerUrl } from './src/lib/config'
@@ -27,7 +28,7 @@ function App() {
     ;(async () => {
       await requestNotificationPermission()
       const SERVER_URL = getServerUrl()
-      await autoLogin(keychainKeyStore, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
+      await autoLogin(keychainKeyStore, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
 
       // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
       const saved = await loadFamiliars()

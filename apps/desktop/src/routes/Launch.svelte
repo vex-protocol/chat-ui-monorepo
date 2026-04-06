@@ -2,36 +2,18 @@
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
-  import { autoLogin } from '@vex-chat/store'
-  import { browserAdapters } from '@vex-chat/libvex'
-  import { createTauriStorage } from '@vex-chat/libvex/storage/tauri'
-  import type { ILogger } from '@vex-chat/libvex'
+  import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
+  import { autoLogin } from '../lib/store/index.js'
   import { servers as serversAtom, channels as channelsAtom, user } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
 
-  const desktopLogger: ILogger = {
-    info: (msg: string) => console.log(msg),
-    warn: (msg: string) => console.warn(msg),
-    error: (msg: string) => console.error(msg),
-    debug: (msg: string) => console.debug(msg),
-  }
-
   onMount(async () => {
     const SERVER_URL = getServerUrl()
-    const opts = {
+    const result = await autoLogin(keyStore, tauriPreset(), {
       host: SERVER_URL,
       unsafeHttp: SERVER_URL.startsWith('http:'),
-      adapters: browserAdapters(),
-    }
-
-    // Load credentials to create storage with the right key
-    const creds = await keyStore.load()
-    const storage = creds
-      ? createTauriStorage('vex-client.db', creds.deviceKey, desktopLogger, opts)
-      : undefined
-
-    const result = await autoLogin(keyStore, opts, undefined, storage)
+    })
 
     if (!result.ok) {
       push('/login')

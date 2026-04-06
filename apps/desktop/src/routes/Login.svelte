@@ -1,7 +1,8 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import { Client } from '@vex-chat/libvex'
-  import { desktopBootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
+  import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
+  import { bootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { playUnlock, playError } from '../lib/sounds.js'
@@ -35,7 +36,7 @@
         }
 
         await client.connect()
-        await desktopBootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        await bootstrap(creds.deviceKey, tauriPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
       } else {
         // No device on this machine — generate key, create client, register + login
         const privateKey = Client.generateSecretKey()
@@ -58,7 +59,7 @@
         })
 
         await client.connect()
-        await desktopBootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        await bootstrap(privateKey, tauriPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
       }
 
       // Navigate into the app

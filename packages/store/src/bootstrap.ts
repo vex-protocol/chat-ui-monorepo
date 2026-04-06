@@ -1,5 +1,5 @@
 import { Client } from '@vex-chat/libvex'
-import type { IMessage, IClientOptions, IStorage } from '@vex-chat/libvex'
+import type { IMessage, IClientOptions, IStorage, PlatformPreset } from '@vex-chat/libvex'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
 import { $messages, $groupMessages } from './messages.ts'
@@ -11,39 +11,26 @@ import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
 import { $familiars } from './familiars.ts'
 import { SENT_PREFIX } from './send-dm.ts'
 
-/**
- * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
- * Passed into bootstrap() so the store package stays platform-agnostic.
- */
-export interface PersistenceCallbacks {
-  /** Load previously persisted messages from local storage. */
-  loadMessages: () => Promise<{ dms: Record<string, IMessage[]>; groups: Record<string, IMessage[]> }>
-  /** Persist the current message state to local storage. */
-  saveGroupMessages: (groups: Record<string, IMessage[]>) => Promise<void>
-  saveDmMessages: (dms: Record<string, IMessage[]>) => Promise<void>
-}
 
 /**
  * Initialises the Client, wires real-time events, connects to the server,
  * then runs the bootstrap waterfall to populate initial state.
  *
  * @param privateKey   - Hex-encoded Ed25519 secret key for the device
- * @param options      - Client options (host, logLevel, adapters, storage, etc.)
- *                       Pass `adapters` for non-Node platforms (reactNativeAdapters, browserAdapters).
- *                       Defaults to nodeAdapters + createNodeStorage when omitted.
- * @param persistence  - Optional platform-specific persistence callbacks
- * @param storage      - Optional IStorage implementation. Defaults to Node SQLite when omitted.
+ * @param preset       - Platform preset (adapters + storage factory). Use:
+ *                       `nodePreset()`, `expoPreset()`, `tauriPreset()`, or `testPreset()`
+ * @param options      - Client options (host, logLevel, etc.)
  */
 export async function bootstrap(
   privateKey: string,
-  options?: IClientOptions,
-  persistence?: PersistenceCallbacks,
-  storage?: IStorage,
+  preset: PlatformPreset,
+  options?: { host?: string; unsafeHttp?: boolean; logLevel?: string; inMemoryDb?: boolean },
 ): Promise<void> {
   // Clear stale state from any previous session
   resetAll()
 
-  const client = await Client.create(privateKey, options, storage)
+  const storage = preset.createStorage('vex-client.db', privateKey, preset.adapters.logger)
+  const client = await Client.create(privateKey, { ...options, adapters: preset.adapters } as any, storage)
   $client.set(client)
 
   // Wire real-time events before connecting so nothing is missed
@@ -55,7 +42,7 @@ export async function bootstrap(
       const prev = $groupMessages.get()[msg.group] ?? []
       if (!prev.some(m => m.mailID === msg.mailID)) {
         $groupMessages.setKey(msg.group, [...prev, msg])
-        persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
+        // Messages persist via IStorage (SQLite) — no manual save needed
         if (me && msg.authorID !== me.userID) incrementChannelUnread(msg.group)
       }
     } else {
@@ -72,10 +59,10 @@ export async function bootstrap(
         const updated = [...prev]
         updated[localIdx] = msg
         $messages.setKey(threadKey, updated)
-        persistence?.saveDmMessages($messages.get()).catch(() => {})
+        // Messages persist via IStorage (SQLite) — no manual save needed
       } else if (!prev.some(m => m.mailID === msg.mailID)) {
         $messages.setKey(threadKey, [...prev, msg])
-        persistence?.saveDmMessages($messages.get()).catch(() => {})
+        // Messages persist via IStorage (SQLite) — no manual save needed
 
         if (!isOwnMessage) {
           incrementDmUnread(threadKey)
@@ -97,21 +84,6 @@ export async function bootstrap(
     }
   })
 
-  // 4. Load locally persisted messages (instant — no network required).
-  if (persistence) {
-    try {
-      const saved = await persistence.loadMessages()
-      for (const [key, msgs] of Object.entries(saved.groups)) {
-        $groupMessages.setKey(key, msgs)
-      }
-      for (const [key, msgs] of Object.entries(saved.dms)) {
-        $messages.setKey(key, msgs)
-      }
-    } catch {
-      // Non-fatal — messages just won't be pre-populated
-    }
-  }
-
-  // Client.connect() handles login, inbox fetch, and mail decryption internally.
+  // Messages load from IStorage (SQLite) via Client internally.
   // The 'message' event fires for each decrypted message (inbox + real-time).
 }

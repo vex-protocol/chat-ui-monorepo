@@ -11,7 +11,8 @@ import {
   ScrollView,
 } from 'react-native'
 import { Client } from '@vex-chat/libvex'
-import { mobileBootstrap, mobilePersistence } from '../store'
+import { bootstrap } from '../store'
+import { expoPreset } from '@vex-chat/libvex/preset/expo'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 
@@ -53,7 +54,7 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
       })
 
       // Bootstrap the store
-      await mobileBootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
+      await bootstrap(privateKey, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
