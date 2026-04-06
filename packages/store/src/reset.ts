@@ -1,5 +1,5 @@
 import { $client } from './client.ts'
-import { $keyReplaced } from './bootstrap.ts'
+import { $keyReplaced } from './key-replaced.ts'
 import { $user } from './user.ts'
 import { $familiars } from './familiars.ts'
 import { $messages, $groupMessages } from './messages.ts'

@@ -2,7 +2,8 @@
 export { $client } from './client.ts'
 
 // Bootstrap + key-replaced flag
-export { bootstrap, $keyReplaced } from './bootstrap.ts'
+export { bootstrap } from './bootstrap.ts'
+export { $keyReplaced } from './key-replaced.ts'
 export type { PersistenceCallbacks } from './bootstrap.ts'
 
 // Auto-login

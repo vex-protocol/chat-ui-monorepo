@@ -1,5 +1,6 @@
 import type { KeyStore } from '@vex-chat/libvex'
-import { bootstrap, $keyReplaced } from './bootstrap.ts'
+import { bootstrap } from './bootstrap.ts'
+import { $keyReplaced } from './key-replaced.ts'
 import type { PersistenceCallbacks } from './bootstrap.ts'
 
 export interface AutoLoginResult {

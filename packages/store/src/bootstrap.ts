@@ -1,4 +1,3 @@
-import { atom } from 'nanostores'
 import { Client } from '@vex-chat/libvex'
 import type { IMessage } from '@vex-chat/libvex'
 import { $client } from './client.ts'
@@ -23,12 +22,6 @@ export interface PersistenceCallbacks {
   saveGroupMessages: (groups: Record<string, IMessage[]>) => Promise<void>
   saveDmMessages: (dms: Record<string, IMessage[]>) => Promise<void>
 }
-
-/**
- * Set to true if the server returned HTTP 470 (corrupt key file).
- * The app should navigate to login and prompt the user to re-register their device.
- */
-export const $keyReplaced = atom<boolean>(false)
 
 /**
  * Initialises the Client, wires real-time events, connects to the server,
