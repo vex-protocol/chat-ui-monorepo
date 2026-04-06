@@ -356,9 +356,6 @@ importers:
       expo-sqlite:
         specifier: ^55.0.13
         version: 55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
-      fast-text-encoding:
-        specifier: ^1.0.6
-        version: 1.0.6
       react:
         specifier: 19.2.3
         version: 19.2.3
@@ -4121,9 +4118,6 @@ packages:
 
   fast-levenshtein@2.0.6:
     resolution: {integrity: sha512-DCXu6Ifhqcks7TZKY3Hxp3y6qphY5SJZmrWMDrKcERSOXWQdMhU9Ig/PYrzyw/ul9jOIyh0N4M0tbC5hodg8dw==}
-
-  fast-text-encoding@1.0.6:
-    resolution: {integrity: sha512-VhXlQgj9ioXCqGstD37E/HBeqEGV/qOD/kmbVG8h5xKBYvM1L3lR1Zn4555cQ8GkYbJa8aJSipLPndE1k6zK2w==}
 
   fast-xml-parser@4.5.6:
     resolution: {integrity: sha512-Yd4vkROfJf8AuJrDIVMVmYfULKmIJszVsMv7Vo71aocsKgFxpdlpSHXSaInvyYfgw2PRuObQSW2GFpVMUjxu9A==}
@@ -10526,7 +10520,7 @@ snapshots:
       resolve-from: 5.0.0
     optionalDependencies:
       '@babel/runtime': 7.29.2
-      expo: 55.0.11(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@18.3.1(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@6.0.2)
+      expo: 55.0.11(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@18.3.1(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
     transitivePeerDependencies:
       - '@babel/core'
       - supports-color
@@ -11560,7 +11554,7 @@ snapshots:
 
   expo-keep-awake@55.0.6(expo@55.0.11)(react@19.2.3):
     dependencies:
-      expo: 55.0.11(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@18.3.1(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@6.0.2)
+      expo: 55.0.11(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@18.3.1(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)(typescript@5.9.3)
       react: 19.2.3
 
   expo-modules-autolinking@55.0.14(typescript@5.9.3):
@@ -11714,8 +11708,6 @@ snapshots:
   fast-json-stable-stringify@2.1.0: {}
 
   fast-levenshtein@2.0.6: {}
-
-  fast-text-encoding@1.0.6: {}
 
   fast-xml-parser@4.5.6:
     dependencies:
