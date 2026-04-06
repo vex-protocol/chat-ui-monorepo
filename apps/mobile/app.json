@@ -18,8 +18,7 @@
       "permissions": ["INTERNET", "POST_NOTIFICATIONS"]
     },
     "plugins": [
-      "expo-secure-store",
-      "@notifee/react-native"
+      "expo-secure-store"
     ]
   }
 }
