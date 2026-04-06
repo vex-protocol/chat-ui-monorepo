@@ -12,6 +12,12 @@ export default defineConfig({
     // Tauri's WebView has no `process` global. Provide a shim.
     'process.env': '{}',
   },
+  resolve: {
+    // Ensure Vite uses browser builds of packages like axios (which has
+    // separate Node/browser entry points). Without this, symlinked workspace
+    // deps may resolve to the Node entry point.
+    conditions: ['browser', 'import', 'default'],
+  },
   // Tauri expects a fixed port and doesn't need the browser to open
   server: {
     port: 5180,
