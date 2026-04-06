@@ -28,7 +28,6 @@
     "@tauri-apps/plugin-opener": "^2.5.3",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-sql": "^2.4.0",
-    "@tauri-apps/plugin-store": "^2.4.2",
     "@tauri-apps/plugin-updater": "^2.10.0",
     "@types/uuid": "catalog:",
     "@vex-chat/libvex": "workspace:*",
@@ -36,6 +35,7 @@
     "dompurify": "catalog:",
     "marked": "catalog:",
     "svelte-spa-router": "^4.0.1",
+    "tauri-plugin-keyring-api": "^0.1.1",
     "uuid": "catalog:"
   },
   "license": "AGPL-3.0-or-later"

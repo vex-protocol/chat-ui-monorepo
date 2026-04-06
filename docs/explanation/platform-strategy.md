@@ -186,7 +186,7 @@ Apps implement `KeyStore` backed by whatever their platform provides:
 | Platform | KeyStore backing |
 |---|---|
 | **Mobile** | `expo-secure-store` (iOS Keychain / Android Keystore) — hardware-backed, biometric-gated |
-| **Desktop (Tauri)** | Tauri Stronghold or `tauri-plugin-keyring` — OS-native credential stores |
+| **Desktop (Tauri)** | `tauri-plugin-keyring` — macOS Keychain, Windows Credential Manager, Linux Secret Service |
 | **Browser / website** | SqliteStorage (future: wa-sqlite Kysely dialect), or skip client-side persistence |
 | **Bots / CLI** | File-backed via `@vex-chat/libvex/keystore/node` (`saveKeyFile`/`loadKeyFile`) |
 | **Tests** | `@vex-chat/libvex/keystore/memory` (no disk I/O) |

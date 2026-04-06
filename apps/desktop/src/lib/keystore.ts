@@ -1,51 +1,58 @@
-import { load } from '@tauri-apps/plugin-store'
 import type { KeyStore, StoredCredentials } from '@vex-chat/libvex'
 
-const STORE_FILE = 'keystore.json'
-const ACTIVE_KEY = '__active__'
+const SERVICE = 'com.vex-chat.desktop'
+const ACTIVE_USER_KEY = '__vex_active_user__'
 
 /**
- * KeyStore backed by @tauri-apps/plugin-store.
+ * KeyStore backed by OS native credential stores via tauri-plugin-keyring.
  *
- * Writes to $APPDATA/com.vex-chat.desktop/keystore.json — a plain JSON
- * file that survives WebView resets and "Clear site data". Each username
- * gets its own key in the store; `__active__` tracks the last-used account.
+ * macOS: Keychain Services
+ * Windows: Credential Manager
+ * Linux: Secret Service (GNOME Keyring / KWallet)
+ *
+ * Credentials are stored as JSON strings in the OS keychain, keyed by
+ * service name + username. The active user is tracked separately.
  */
-class TauriKeyStore implements KeyStore {
-  private storePromise: ReturnType<typeof load> | null = null
+class KeyringKeyStore implements KeyStore {
+  private keyring: typeof import('tauri-plugin-keyring-api') | null = null
 
-  private getStore() {
-    if (!this.storePromise) {
-      this.storePromise = load(STORE_FILE, { autoSave: true })
+  private async getKeyring() {
+    if (!this.keyring) {
+      this.keyring = await import('tauri-plugin-keyring-api')
     }
-    return this.storePromise
+    return this.keyring
   }
 
-  async load(username: string): Promise<StoredCredentials | null> {
-    const store = await this.getStore()
-    return (await store.get<StoredCredentials>(username)) ?? null
+  async load(username?: string): Promise<StoredCredentials | null> {
+    const kr = await this.getKeyring()
+    const user = username ?? await this.getActiveUser(kr)
+    if (!user) return null
+    const raw = await kr.getPassword(SERVICE, user)
+    if (!raw) return null
+    try { return JSON.parse(raw) as StoredCredentials } catch { return null }
   }
 
   async loadActive(): Promise<StoredCredentials | null> {
-    const store = await this.getStore()
-    const username = await store.get<string>(ACTIVE_KEY)
-    if (!username) return null
-    return (await store.get<StoredCredentials>(username)) ?? null
+    return this.load()
   }
 
   async save(creds: StoredCredentials): Promise<void> {
-    const store = await this.getStore()
-    await store.set(creds.username, creds)
-    await store.set(ACTIVE_KEY, creds.username)
+    const kr = await this.getKeyring()
+    await kr.setPassword(SERVICE, creds.username, JSON.stringify(creds))
+    await kr.setPassword(SERVICE, ACTIVE_USER_KEY, creds.username)
   }
 
   async clear(username: string): Promise<void> {
-    const store = await this.getStore()
-    await store.delete(username)
-    const active = await store.get<string>(ACTIVE_KEY)
+    const kr = await this.getKeyring()
+    try { await kr.deletePassword(SERVICE, username) } catch { /* may not exist */ }
+    const active = await this.getActiveUser(kr)
     if (active === username) {
-      await store.delete(ACTIVE_KEY)
+      try { await kr.deletePassword(SERVICE, ACTIVE_USER_KEY) } catch { /* ok */ }
     }
+  }
+
+  private async getActiveUser(kr: typeof import('tauri-plugin-keyring-api')): Promise<string | null> {
+    try { return await kr.getPassword(SERVICE, ACTIVE_USER_KEY) } catch { return null }
   }
 }
 
@@ -55,16 +62,16 @@ const LS_PREFIX = 'vex-ks-'
 const LS_ACTIVE = 'vex-active-user'
 
 class LocalStorageKeyStore implements KeyStore {
-  async load(username: string): Promise<StoredCredentials | null> {
-    const raw = localStorage.getItem(LS_PREFIX + username)
+  async load(username?: string): Promise<StoredCredentials | null> {
+    const user = username ?? localStorage.getItem(LS_ACTIVE)
+    if (!user) return null
+    const raw = localStorage.getItem(LS_PREFIX + user)
     if (!raw) return null
     try { return JSON.parse(raw) as StoredCredentials } catch { return null }
   }
 
   async loadActive(): Promise<StoredCredentials | null> {
-    const username = localStorage.getItem(LS_ACTIVE)
-    if (!username) return null
-    return this.load(username)
+    return this.load()
   }
 
   async save(creds: StoredCredentials): Promise<void> {
@@ -82,7 +89,8 @@ class LocalStorageKeyStore implements KeyStore {
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
-/** Uses Tauri plugin-store when running inside Tauri, falls back to localStorage in dev browser. */
-export const keyStore: KeyStore = '__TAURI_INTERNALS__' in window
-  ? new TauriKeyStore()
-  : new LocalStorageKeyStore()
+/** Uses OS keychain via tauri-plugin-keyring in Tauri, falls back to localStorage in dev browser. */
+export const keyStore: KeyStore & { loadActive(): Promise<StoredCredentials | null> } =
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+    ? new KeyringKeyStore()
+    : new LocalStorageKeyStore()
