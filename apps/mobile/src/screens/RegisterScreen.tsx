@@ -10,11 +10,10 @@ import {
   Platform,
   ScrollView,
 } from 'react-native'
-import { Client } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { registerAndBootstrap } from '../store'
 import { expoPreset } from '@vex-chat/libvex/preset/expo'
-import { saveCredentials } from '../lib/keychain'
-import { getServerUrl } from '../lib/config'
+import { keychainKeyStore } from '../lib/keychain'
+import { getServerOptions } from '../lib/config'
 
 export function RegisterScreen({ navigation }: { navigation: any }) {
   const [username, setUsername] = useState('')
@@ -33,28 +32,19 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
     setError('')
 
     try {
-      const SERVER_URL = getServerUrl()
+      const result = await registerAndBootstrap(
+        username,
+        password,
+        expoPreset(),
+        getServerOptions(),
+        keychainKeyStore,
+      )
 
-      // Generate key, create client, register
-      const privateKey = Client.generateSecretKey()
-      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
-      const [user, regErr] = await client.register(username, password)
-
-      if (regErr || !user) {
-        setError(regErr?.message || 'Registration failed')
+      if (!result.ok) {
+        setError(result.error || 'Registration failed')
         setLoading(false)
         return
       }
-
-      // Save hex device key to OS keychain
-      await saveCredentials({
-        username,
-        deviceID: client.me.device().deviceID,
-        deviceKey: privateKey,
-      })
-
-      // Bootstrap the store
-      await bootstrap(privateKey, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

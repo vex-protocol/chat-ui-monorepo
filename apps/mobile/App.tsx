@@ -5,9 +5,8 @@ import { NavigationContainer } from '@react-navigation/native'
 import { useStore } from '@nanostores/react'
 import { autoLogin, $keyReplaced, $user, $client, $familiars, $messages, $groupMessages } from './src/store'
 import { expoPreset } from '@vex-chat/libvex/preset/expo'
-import { keychainKeyStore } from './src/lib/keychain'
-import { clearCredentials } from './src/lib/keychain'
-import { getServerUrl } from './src/lib/config'
+import { keychainKeyStore, clearCredentials } from './src/lib/keychain'
+import { getServerOptions } from './src/lib/config'
 import { loadFamiliars, saveFamiliars, saveDmMessages, saveGroupMessages } from './src/lib/messages'
 import { RootNavigator } from './src/navigation/RootNavigator'
 import { navigationRef } from './src/navigation/navigationRef'
@@ -27,8 +26,7 @@ function App() {
   useEffect(() => {
     ;(async () => {
       await requestNotificationPermission()
-      const SERVER_URL = getServerUrl()
-      await autoLogin(keychainKeyStore, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      await autoLogin(keychainKeyStore, expoPreset(), getServerOptions())
 
       // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
       const saved = await loadFamiliars()

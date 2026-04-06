@@ -9,11 +9,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { Client } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { loginAndBootstrap } from '../store'
 import { expoPreset } from '@vex-chat/libvex/preset/expo'
-import { loadCredentials } from '../lib/keychain'
-import { getServerUrl } from '../lib/config'
+import { keychainKeyStore } from '../lib/keychain'
+import { getServerOptions } from '../lib/config'
 
 export function LoginScreen({ navigation }: { navigation: any }) {
   const [username, setUsername] = useState('')
@@ -26,33 +25,19 @@ export function LoginScreen({ navigation }: { navigation: any }) {
     setError('')
 
     try {
-      const SERVER_URL = getServerUrl()
+      const result = await loginAndBootstrap(
+        username,
+        password,
+        expoPreset(),
+        getServerOptions(),
+        keychainKeyStore,
+      )
 
-      const creds = await loadCredentials()
-      if (!creds) {
-        setError('No device key found. Please register first.')
+      if (!result.ok) {
+        setError(result.error || 'Invalid username or password')
         setLoading(false)
         return
       }
-
-      if (creds.username && creds.username !== username) {
-        setError('Username does not match registered device.')
-        setLoading(false)
-        return
-      }
-
-      // Login via libvex — Client takes hex private key directly
-      const client = await Client.create(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
-      const err = await client.login(username, password)
-
-      if (err) {
-        setError(err.message || 'Invalid username or password')
-        setLoading(false)
-        return
-      }
-
-      await client.connect()
-      await bootstrap(creds.deviceKey, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

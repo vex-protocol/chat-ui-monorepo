@@ -5,9 +5,12 @@
  * import atoms from here and subscribe via useStore() from @nanostores/react.
  */
 export {
-  // Lifecycle
-  bootstrap,
+  // Auth flows
+  registerAndBootstrap,
+  loginAndBootstrap,
   autoLogin,
+
+  // Client / key-replaced flag
   $client,
   $keyReplaced,
 
@@ -22,3 +25,5 @@ export {
   $devices,
   $onlineLists,
 } from '@vex-chat/store'
+
+export type { ServerOptions, AuthResult } from '@vex-chat/store'

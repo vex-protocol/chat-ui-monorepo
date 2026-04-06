@@ -3,17 +3,12 @@
   import { push } from 'svelte-spa-router'
   import Loading from '../lib/Loading.svelte'
   import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-  import { autoLogin } from '../lib/store/index.js'
-  import { servers as serversAtom, channels as channelsAtom, user } from '../lib/store/index.js'
-  import { getServerUrl } from '../lib/config.js'
+  import { autoLogin, servers as serversAtom, channels as channelsAtom, user } from '../lib/store/index.js'
+  import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
 
   onMount(async () => {
-    const SERVER_URL = getServerUrl()
-    const result = await autoLogin(keyStore, tauriPreset(), {
-      host: SERVER_URL,
-      unsafeHttp: SERVER_URL.startsWith('http:'),
-    })
+    const result = await autoLogin(keyStore, tauriPreset(), getServerOptions())
 
     if (!result.ok) {
       push('/login')
@@ -23,7 +18,6 @@
     const u = user.get()
     if (!u) { push('/login'); return }
 
-    // Navigate to first server/channel or home
     const serverList = Object.values(serversAtom.get())
     if (serverList.length > 0) {
       const sid = serverList[0]!.serverID
@@ -44,11 +38,5 @@
 </div>
 
 <style>
-  .launch {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-primary);
-  }
+  .launch { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); }
 </style>

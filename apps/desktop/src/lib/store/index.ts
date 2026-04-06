@@ -1,7 +1,4 @@
 // Re-export all atoms without the $ prefix so Svelte's reactive $ syntax works cleanly.
-// Usage: import { user, messages } from '$lib/store'
-//        In template: {$user?.username}  {#each $messages[id] ?? [] as mail}
-
 export {
   $messages as messages,
   $groupMessages as groupMessages,
@@ -17,5 +14,5 @@ export {
   $avatarHash as avatarHash,
 } from '@vex-chat/store'
 
-export { bootstrap, autoLogin, resetAll, markVerified, unmarkVerified, isVerified } from '@vex-chat/store'
+export { registerAndBootstrap, loginAndBootstrap, autoLogin, resetAll, markVerified, unmarkVerified, isVerified } from '@vex-chat/store'
 export { $verifiedKeys as verifiedKeys } from '@vex-chat/store'

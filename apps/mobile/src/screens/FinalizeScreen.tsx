@@ -1,11 +1,10 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { Client } from '@vex-chat/libvex'
-import { bootstrap } from '../store'
+import { registerAndBootstrap } from '../store'
 import { expoPreset } from '@vex-chat/libvex/preset/expo'
-import { saveCredentials } from '../lib/keychain'
-import { getServerUrl } from '../lib/config'
+import { keychainKeyStore } from '../lib/keychain'
+import { getServerOptions } from '../lib/config'
 import { colors, typography } from '../theme'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { BackButton } from '../components/BackButton'
@@ -61,28 +60,24 @@ export function FinalizeScreen({ navigation, route }: Props) {
     setError('')
 
     try {
-      const SERVER_URL = getServerUrl()
+      navigation.navigate('HangTight')
 
-      const privateKey = Client.generateSecretKey()
-      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
-      const [user, regErr] = await client.register(username, password)
+      const result = await registerAndBootstrap(
+        username,
+        password,
+        expoPreset(),
+        getServerOptions(),
+        keychainKeyStore,
+      )
 
-      if (regErr || !user) {
-        setError(regErr?.message || 'Registration failed')
+      if (!result.ok) {
+        if (navigation.canGoBack()) navigation.goBack()
+        setError(result.error || 'Registration failed')
         setLoading(false)
         return
       }
-
-      await saveCredentials({
-        username,
-        deviceID: client.me.device().deviceID,
-        deviceKey: privateKey,
-      })
-
-      navigation.navigate('HangTight')
-
-      await bootstrap(privateKey, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
     } catch (err) {
+      if (navigation.canGoBack()) navigation.goBack()
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
     }

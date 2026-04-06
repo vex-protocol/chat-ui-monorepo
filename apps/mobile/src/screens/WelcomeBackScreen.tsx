@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { bootstrap } from '../store'
+import { autoLogin } from '../store'
 import { expoPreset } from '@vex-chat/libvex/preset/expo'
-import { loadCredentials, clearCredentials } from '../lib/keychain'
-import { getServerUrl } from '../lib/config'
+import { loadCredentials, clearCredentials, keychainKeyStore } from '../lib/keychain'
+import { getServerOptions } from '../lib/config'
 import { colors, typography } from '../theme'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { BackButton } from '../components/BackButton'
@@ -39,10 +39,16 @@ export function WelcomeBackScreen({ navigation }: Props) {
     setError('')
 
     try {
-      const SERVER_URL = getServerUrl()
-
       navigation.navigate('HangTight')
-      await bootstrap(creds.deviceKey, expoPreset(), { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+
+      const result = await autoLogin(keychainKeyStore, expoPreset(), getServerOptions())
+
+      if (!result.ok) {
+        if (navigation.canGoBack()) navigation.goBack()
+        setError(result.error || 'Failed to sign in')
+        setLoading(false)
+        return
+      }
       // Success — RootNavigator auto-switches to App when $user becomes non-null
     } catch (err) {
       // Navigate back so the user sees the error instead of being stuck on HangTight

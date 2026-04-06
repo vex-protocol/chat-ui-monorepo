@@ -1,13 +1,10 @@
 // Client singleton
 export { $client } from './client.ts'
 
-// Bootstrap + key-replaced flag
-export { bootstrap } from './bootstrap.ts'
+// Auth flows (register, login, auto-login — each creates Client + wires events + connects)
+export { registerAndBootstrap, loginAndBootstrap, autoLogin } from './bootstrap.ts'
+export type { ServerOptions, AuthResult } from './bootstrap.ts'
 export { $keyReplaced } from './key-replaced.ts'
-
-// Auto-login
-export { autoLogin } from './auto-login.ts'
-export type { AutoLoginResult } from './auto-login.ts'
 
 // State atoms
 export { $user } from './user.ts'
