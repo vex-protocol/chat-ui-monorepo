@@ -35,7 +35,7 @@ export async function bootstrap(
 
   // Wire real-time events before connecting so nothing is missed
   client.on('message', (msg: IMessage) => {
-    console.log('[vex-store] message received:', msg.mailID, 'from:', msg.authorID, 'group:', msg.group)
+    preset.adapters.logger.debug('[vex-store] message: ' + msg.mailID + ' from: ' + msg.authorID)
     const me = $user.get()
     if (msg.group) {
       // Group / channel message — key by channelID, deduplicate by mailID
