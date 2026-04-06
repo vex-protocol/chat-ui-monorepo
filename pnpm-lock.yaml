@@ -132,9 +132,6 @@ importers:
       better-sqlite3:
         specifier: ^11.0.0
         version: 11.10.0
-      btoa:
-        specifier: ^1.2.1
-        version: 1.2.1
       eventemitter3:
         specifier: ^5.0.4
         version: 5.0.4
@@ -166,9 +163,6 @@ importers:
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
-      '@types/btoa':
-        specifier: ^1.2.3
-        version: 1.2.5
       '@types/ed2curve':
         specifier: ^0.2.4
         version: 0.2.4
@@ -2783,9 +2777,6 @@ packages:
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
 
-  '@types/btoa@1.2.5':
-    resolution: {integrity: sha512-BItINdjZRlcGdI2efwK4bwxY5vEAT0SnIVfMOZVT18wp4900F1Lurqk/9PNdF9hMP1zgFmWbjVEtAsQKVcbqxA==}
-
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
@@ -3326,11 +3317,6 @@ packages:
 
   bser@2.1.1:
     resolution: {integrity: sha512-gQxTNE/GAfIIrmHLUE3oJyp5FO6HRBfhjnw4/wMmA63ZGDJnWBmgY/lyQBpnDUkGmAhbSe39tx2d/iTOAfglwQ==}
-
-  btoa@1.2.1:
-    resolution: {integrity: sha512-SB4/MIGlsiVkMcHmT+pSmIPoNDoHg+7cMzmt3Uxt628MTz2487DKSqK/fuhFBrkuqrYv5UCEnACpF4dTFNKc/g==}
-    engines: {node: '>= 0.4.0'}
-    hasBin: true
 
   buffer-crc32@1.0.0:
     resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
@@ -9991,10 +9977,6 @@ snapshots:
     dependencies:
       '@types/node': 24.12.2
 
-  '@types/btoa@1.2.5':
-    dependencies:
-      '@types/node': 24.12.2
-
   '@types/chai@5.2.3':
     dependencies:
       '@types/deep-eql': 4.0.2
@@ -10262,7 +10244,6 @@ snapshots:
       '@vex-chat/crypto': file:../crypto-js(@vex-chat/types@file:../types-js(tweetnacl@1.0.3))(typescript@5.9.3)
       '@vex-chat/types': file:../types-js(tweetnacl@1.0.3)
       axios: 1.14.0(debug@4.4.3)
-      btoa: 1.2.1
       eventemitter3: 5.0.4
       kysely: 0.28.15
       msgpackr: 1.11.8
@@ -10704,8 +10685,6 @@ snapshots:
   bser@2.1.1:
     dependencies:
       node-int64: 0.4.0
-
-  btoa@1.2.1: {}
 
   buffer-crc32@1.0.0: {}
 

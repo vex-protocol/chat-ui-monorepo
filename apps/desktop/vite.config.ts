@@ -8,9 +8,11 @@ const spire = { target: SPIRE_URL, changeOrigin: true } as const
 export default defineConfig({
   plugins: [svelte()],
   define: {
-    // Some npm packages access process.env at runtime (axios, etc.).
-    // Tauri's WebView has no `process` global. Provide a shim.
+    // Tauri's WebView has no `process` global. Shim it so packages
+    // that check `process.env` or `typeof process` work correctly.
     'process.env': '{}',
+    'process.versions': '{}',
+    'process.platform': '"browser"',
   },
   resolve: {
     conditions: ['browser', 'import', 'default'],
