@@ -1,5 +1,5 @@
 import { Client } from '@vex-chat/libvex'
-import type { IMessage } from '@vex-chat/libvex'
+import type { IMessage, IClientOptions, IStorage } from '@vex-chat/libvex'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
 import { $messages, $groupMessages } from './messages.ts'
@@ -28,23 +28,22 @@ export interface PersistenceCallbacks {
  * then runs the bootstrap waterfall to populate initial state.
  *
  * @param privateKey   - Hex-encoded Ed25519 secret key for the device
- * @param options      - Client options (host, logLevel, adapters, etc.)
+ * @param options      - Client options (host, logLevel, adapters, storage, etc.)
+ *                       Pass `adapters` for non-Node platforms (reactNativeAdapters, browserAdapters).
+ *                       Defaults to nodeAdapters + createNodeStorage when omitted.
  * @param persistence  - Optional platform-specific persistence callbacks
+ * @param storage      - Optional IStorage implementation. Defaults to Node SQLite when omitted.
  */
 export async function bootstrap(
   privateKey: string,
-  options: {
-    host?: string
-    unsafeHttp?: boolean
-    inMemoryDb?: boolean
-    logLevel?: string
-  },
+  options?: IClientOptions,
   persistence?: PersistenceCallbacks,
+  storage?: IStorage,
 ): Promise<void> {
   // Clear stale state from any previous session
   resetAll()
 
-  const client = await Client.create(privateKey, options as any)
+  const client = await Client.create(privateKey, options, storage)
   $client.set(client)
 
   // Wire real-time events before connecting so nothing is missed

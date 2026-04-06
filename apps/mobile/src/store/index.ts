@@ -37,3 +37,20 @@ export type { PersistenceCallbacks } from '@vex-chat/store'
 import { loadMessages, saveGroupMessages, saveDmMessages } from '../lib/messages'
 import type { PersistenceCallbacks } from '@vex-chat/store'
 export const mobilePersistence: PersistenceCallbacks = { loadMessages, saveGroupMessages, saveDmMessages }
+
+// Mobile-specific bootstrap: injects RN adapters + MemoryStorage so the store
+// never dynamically imports Node-only modules (ws, better-sqlite3).
+import { reactNativeAdapters } from '@vex-chat/libvex'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
+import type { IClientOptions } from '@vex-chat/libvex'
+
+export async function mobileBootstrap(
+  privateKey: string,
+  options: Omit<IClientOptions, 'adapters'> & { host?: string; unsafeHttp?: boolean },
+  persistence?: PersistenceCallbacks,
+): Promise<void> {
+  return bootstrap(privateKey, {
+    ...options,
+    adapters: reactNativeAdapters(),
+  }, persistence, new MemoryStorage())
+}

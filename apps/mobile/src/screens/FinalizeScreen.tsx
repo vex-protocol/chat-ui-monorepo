@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { Client } from '@vex-chat/libvex'
-import { bootstrap, mobilePersistence } from '../store'
+import { mobileBootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 import { colors, typography } from '../theme'
@@ -78,7 +78,7 @@ export function FinalizeScreen({ navigation, route }: Props) {
 
       navigation.navigate('HangTight')
 
-      await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
+      await mobileBootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

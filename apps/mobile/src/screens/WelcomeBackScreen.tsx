@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { bootstrap, mobilePersistence } from '../store'
+import { mobileBootstrap, mobilePersistence } from '../store'
 import { loadCredentials, clearCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 import { colors, typography } from '../theme'
@@ -41,7 +41,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
       const SERVER_URL = getServerUrl()
 
       navigation.navigate('HangTight')
-      await bootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
+      await mobileBootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
       // Success — RootNavigator auto-switches to App when $user becomes non-null
     } catch (err) {
       // Navigate back so the user sees the error instead of being stuck on HangTight

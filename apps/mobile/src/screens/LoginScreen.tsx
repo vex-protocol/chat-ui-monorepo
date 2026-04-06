@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native'
 import { Client } from '@vex-chat/libvex'
-import { bootstrap, mobilePersistence } from '../store'
+import { mobileBootstrap, mobilePersistence } from '../store'
 import { loadCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
 
@@ -51,7 +51,7 @@ export function LoginScreen({ navigation }: { navigation: any }) {
       }
 
       await client.connect()
-      await bootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
+      await mobileBootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
