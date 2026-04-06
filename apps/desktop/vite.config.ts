@@ -16,6 +16,9 @@ export default defineConfig({
   },
   resolve: {
     conditions: ['browser', 'import', 'default'],
+    // Ensure the "browser" field in package.json is respected for all deps
+    // (pino uses this to redirect to browser.js instead of Node pino.js)
+    mainFields: ['browser', 'module', 'jsnext:main', 'jsnext'],
   },
   // Tauri expects a fixed port and doesn't need the browser to open
   server: {
