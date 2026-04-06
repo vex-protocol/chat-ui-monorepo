@@ -17,7 +17,7 @@ Meanwhile, the canonical standalone sibling repos at `/Users/dgill/Public/{libve
 **`libvex-js@master`** (v1.0.0-rc.0, TS 6, pure ESM, Vitest):
 - Monolithic 3172-line `Client` class with full protocol implementation
 - Event-driven architecture (9 events: `ready`, `connected`, `message`, `session`, `permission`, etc.)
-- `IStorage` interface with SQLite+Knex implementation
+- `IStorage` interface with SQLite+Kysely implementation
 - 359-line integration test suite covering register → login → connect → messaging → files
 - Hardcoded `import WebSocket from "ws"` and Winston logger — needs adapter injection for browser/RN
 - An earlier `feat/platform-adapters` prototype was validated and deleted; the pattern will be recreated fresh from master
@@ -93,7 +93,7 @@ The sibling repos stay at **4 packages** (`types` + `crypto` + `libvex` + monore
 @vex-chat/libvex/adapters/browser     → browserAdapters (globalThis.WebSocket)
 @vex-chat/libvex/adapters/native      → reactNativeAdapters
 @vex-chat/libvex/adapters/test        → inMemoryAdapters, MockWebSocket, silentLogger — existing
-@vex-chat/libvex/storage/node         → SQLite+Knex Storage — existing (src/Storage.ts)
+@vex-chat/libvex/storage/node         → SQLite+Kysely Storage — existing (src/Storage.ts)
 @vex-chat/libvex/storage/web          → IndexedDB Storage
 @vex-chat/libvex/storage/native       → AsyncStorage Storage
 @vex-chat/libvex/storage/memory       → in-memory Storage for tests
@@ -299,7 +299,7 @@ Adds adapters, storage backends, keystore reference implementations, and the bot
 **Added to `@vex-chat/types`:**
 - `src/keystore.ts` — `KeyStore` + `StoredCredentials` interfaces (pure types, zero runtime)
 
-Existing `src/Storage.ts` (SQLite + Knex) stays as the Node default under `@vex-chat/libvex/storage/node`.
+Existing `src/Storage.ts` (SQLite + Kysely) stays as the Node default under `@vex-chat/libvex/storage/node`.
 
 **Exports map:**
 

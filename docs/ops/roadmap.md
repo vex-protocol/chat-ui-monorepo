@@ -29,7 +29,7 @@ Important but not scoped. May never ship if priorities change. That's fine.
 | P4 | Account deletion | 15 | Privacy feature, needs design |
 | P4 | Custom emoji | 10, 11 | Nice-to-have, large effort |
 | P4 | Moderation tools (kick/ban) | 11 | Needed when servers grow |
-| P4 | Spire modernization (Kysely, Zod, ESM) | — | Tech debt; current Express 4 + Knex works |
+| P4 | Spire modernization (Zod, ESM, Pino) | — | Tech debt; Kysely migration done, Express 4 + Winston remains |
 
 ---
 

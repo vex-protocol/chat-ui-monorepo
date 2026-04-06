@@ -2,7 +2,7 @@
 
 ## Current Architecture
 
-Spire is a single-process Node.js server (Express 4 + `express-ws`) backed by SQLite via Knex. It serves both HTTP REST endpoints and a WebSocket endpoint on the same port (`16777`). All state lives either in SQLite on disk or in two in-process `Map` objects.
+Spire is a single-process Node.js server (Express 4 + `express-ws`) backed by SQLite via Kysely. It serves both HTTP REST endpoints and a WebSocket endpoint on the same port (`16777`). All state lives either in SQLite on disk or in two in-process `Map` objects.
 
 ### State Inventory
 
@@ -267,7 +267,7 @@ This is where you'd normally hear "switch to Postgres." But there's a SQLite-nat
 - Sub-100ms replication to local replicas
 - No FUSE, no filesystem tricks — just a different DB driver
 
-This is the lowest-friction path to multi-server SQLite. Replace `better-sqlite3` with `@libsql/client` and update the Knex configuration. All existing queries work unchanged because libSQL is SQLite-compatible.
+This is the lowest-friction path to multi-server SQLite. Replace `better-sqlite3` with `@libsql/client` and swap the Kysely dialect. All existing queries work unchanged because libSQL is SQLite-compatible.
 
 #### Cross-Server Concerns
 
@@ -287,7 +287,7 @@ Regardless of which SQLite distribution option you pick, you still need:
 
 At this point (50,000+ concurrent users, heavy write load), the SQLite write serialization becomes the real bottleneck. *Now* you consider:
 
-- **PostgreSQL**: Add a `DB_TYPE=postgres` path. Knex supports Postgres natively — add the `pg` driver and configure the connection. Connection pooling handles concurrent writes.
+- **PostgreSQL**: Add a `DB_TYPE=postgres` path. Kysely supports Postgres natively — add the `pg` driver and configure the `PostgresDialect`. Connection pooling handles concurrent writes.
 - **Redis**: If not already added for pub/sub, add it now for token store + session cache + rate limiting.
 - **Kubernetes**: Only if you need auto-scaling, rolling deploys, and you have the ops team to run it. Otherwise, a few well-provisioned VMs behind a load balancer work fine.
 

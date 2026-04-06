@@ -294,7 +294,7 @@ Note: `@opentelemetry/host-metrics` does not collect disk or filesystem metrics 
 
 No off-the-shelf OTel package provides SQLite health metrics. We build it using better-sqlite3's `.pragma()` method and the OTel metrics API.
 
-**Query duration:** Knex emits `query-response` events with duration data. Feed this into an OTel histogram (`vex.db.query_duration`). No extra dependency needed — Knex already has this hook.
+**Query duration:** Kysely supports a `log` callback in its constructor config that receives query timing data. Feed this into an OTel histogram (`vex.db.query_duration`). No extra dependency needed.
 
 **Health metrics** (polled every 30–60 seconds via OTel observable gauges):
 
@@ -309,7 +309,7 @@ No off-the-shelf OTel package provides SQLite health metrics. We build it using 
 
 The WAL size is the most important single metric. If it grows without bound, checkpointing is failing — likely due to long-running read transactions holding the WAL open. This directly threatens data integrity.
 
-**What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Knex's event system gives us query duration without exposing query text.
+**What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Kysely's log callback gives us query duration without exposing query text.
 
 ### Instrumentation Points in Spire
 

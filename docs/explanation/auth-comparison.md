@@ -114,7 +114,7 @@ If single-use tokens are needed in the future, a small Redis/DB-backed token rev
 | Token redemption | Client NaCl-signs the token UUID with their device signing key; server verifies signature | Client presents JWT token directly |
 | userID source | `uuid.stringify(regKey)` — derived from the NaCl-signed registration token | Fresh `uuid.v4()` |
 | Device creation | Bundled into registration — creates user + device + preKeys atomically | Separate (`/devices` endpoint) |
-| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Knex catches constraint violations; we translate |
+| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Kysely catches constraint violations; we translate |
 
 **Upstream registration payload** (`XTypes.HTTP.IRegistrationPayload`):
 ```ts
@@ -158,7 +158,7 @@ Authentication is cookie-based. The `protect` middleware is a separate guard tha
 
 | | Current |
 |---|---|
-| Query builder | Knex |
+| Query builder | Kysely |
 | Default DB | SQLite (also supports MySQL) |
 | Schema management | `if (!hasTable) createTable` inline in `Database.init()` |
 | Type safety | Runtime types from `@vex-chat/types` |
@@ -182,7 +182,7 @@ This project is **privacy-first**. We match the upstream privacy model exactly. 
 | JWT library | `jsonwebtoken` (CJS) | N/A (receives JWT) | |
 | Transport | HTTP cookie `auth` + `Authorization` header | Bearer token header | SDK sends Bearer; spire accepts both |
 | Password hashing | PBKDF2 + argon2id (lazy migration) | N/A (server-only) | Old hashes upgraded on login |
-| DB | Knex + SQLite/MySQL | N/A | |
+| DB | Kysely + SQLite/MySQL | N/A | |
 
 ### Notes on divergences
 

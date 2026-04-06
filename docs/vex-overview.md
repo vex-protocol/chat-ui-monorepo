@@ -41,7 +41,7 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
 | `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
 
-The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Knex, @noble/curves, argon2id, SQLite/MySQL.
+The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Kysely, @noble/curves, argon2id, SQLite/MySQL.
 
 See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 

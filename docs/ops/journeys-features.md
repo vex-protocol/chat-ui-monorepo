@@ -93,7 +93,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 
 ### Pain Points
 
-- ~~**Race condition.**~~ Fixed — `POST /invite/:id/join` now wraps `isInviteValid`, `hasPermission`, and `createPermission` in a single Knex transaction.
+- ~~**Race condition.**~~ Fixed — `POST /invite/:id/join` now wraps `isInviteValid`, `hasPermission`, and `createPermission` in a single Kysely transaction.
 - **No deep-link on mobile.** Mobile app doesn't handle `vex://` URLs yet.
 - **No invite preview UI.** Both old and new desktop clients auto-join without showing the server name first.
 

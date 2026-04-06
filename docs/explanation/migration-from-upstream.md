@@ -279,7 +279,7 @@ The server stays in its own repo. These improvements are tracked separately.
 | **JWT secret** | Still reuses SPK | Consider dedicated JWT_SECRET |
 | **Logging** | Winston — tokens/IDs may appear in logs | Consider redaction |
 | **Validation** | Manual checks in route handlers | Consider Zod schemas |
-| **ORM** | Knex (query builder) | Consider Kysely for type safety |
+| **ORM** | Kysely (type-safe SQL) | Migrated from Knex — done |
 | **Module system** | CommonJS | Consider ESM |
 | **Error handling** | Stack traces may leak to clients | Consider generic error messages |
 
