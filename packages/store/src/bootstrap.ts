@@ -111,13 +111,14 @@ export async function registerAndBootstrap(
       return { ok: false, error: regErr?.message ?? 'Registration failed' }
     }
 
+    // connect() populates device details (needed for keyStore.save)
+    await client.connect()
+
     await keyStore.save({
       username,
       deviceID: client.me.device().deviceID,
       deviceKey: privateKey,
     })
-
-    await client.connect()
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Unknown error' }
@@ -147,6 +148,9 @@ export async function loginAndBootstrap(
       return { ok: false, error: 'Invalid username or password' }
     }
 
+    // connect() populates device details
+    await client.connect()
+
     if (!creds) {
       // First login on this machine — register a new device
       await client.devices.register()
@@ -156,8 +160,6 @@ export async function loginAndBootstrap(
         deviceKey: privateKey,
       })
     }
-
-    await client.connect()
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Unknown error' }
