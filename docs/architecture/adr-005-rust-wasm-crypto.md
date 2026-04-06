@@ -15,15 +15,15 @@ A more ambitious alternative exists: **replace crypto-js entirely with a Rust cr
 
 ### Why this is viable now
 
-**Hermes v1 ships native WebAssembly support.** React Native 0.84 (February 2026) includes Hermes v1 by default with `WebAssembly.instantiate()` available in the JS runtime. **vex-chat's mobile app is already on RN 0.84.1** — the WASM path is available today.
+**Hermes v1 ships native WebAssembly support.** React Native 0.84+ includes Hermes v1 by default with `WebAssembly.instantiate()` available in the JS runtime. vex-chat's mobile app is currently on **Expo SDK 55 (RN 0.83.2)** which does NOT include Hermes v1. Upgrade to **Expo SDK 56 (RN 0.85, expected May/June 2026)** will enable native WASM.
 
-| Runtime | WASM support |
-|---|---|
-| Node.js 24 | Native (V8), production-grade |
-| Browsers (Chrome/Safari/Firefox) | Native, since 2017 |
-| Hermes v1 (RN 0.84+) | Native, new as of Feb 2026 |
-| Expo SDK 55 (RN 0.83) | Not yet — need SDK 56 or manual RN upgrade |
-| Expo SDK 56 (expected RN 0.84) | Will include Hermes v1 |
+| Runtime | WASM support | Status for vex-chat |
+|---|---|---|
+| Node.js 24 | Native (V8), production-grade | Available now |
+| Browsers (Chrome/Safari/Firefox) | Native, since 2017 | Available now (desktop Tauri WebView) |
+| Hermes v1 (RN 0.84+) | Native, new as of Feb 2026 | **Not yet** — requires Expo SDK 56 upgrade |
+| Expo SDK 55 (RN 0.83) | No native WASM | **Current** — use `wasm2js` fallback |
+| Expo SDK 56 (RN 0.85, expected May/June 2026) | Will include Hermes v1 | **Future** — enables native WASM on mobile |
 
 **Fallback options for older runtimes:**
 - **Polygen** (Callstack) — compiles `.wasm` → C at build time, runs as native module. iOS only for now.
@@ -259,7 +259,7 @@ export async function xHMAC(msg: Uint8Array, sk: Uint8Array): Promise<Uint8Array
 | **Constant-time ops** | Not guaranteed in JS (JIT can optimize away) | `subtle` crate provides ct comparison |
 | **Test strategy** | Existing 14 Vitest tests stay as-is | Rust unit tests + JS integration tests against same vectors |
 | **Future path** | Dead end — crypto stays JS forever | Foundation for Rust protocol core (Option C) |
-| **Hermes/RN compat** | Works (pure JS) | Works (Hermes v1 native WASM on RN 0.84) |
+| **Hermes/RN compat** | Works (pure JS) | Requires Hermes v1 (Expo SDK 56 / RN 0.85+); `wasm2js` fallback for SDK 55 |
 | **Build complexity** | Zero (just JS) | Rust toolchain + wasm-pack + CI cross-compile |
 
 ---
@@ -286,12 +286,13 @@ export async function xHMAC(msg: Uint8Array, sk: Uint8Array): Promise<Uint8Array
 
 ## Expo Integration Path
 
-Since vex-chat mobile is on RN 0.84.1 with Hermes v1:
+vex-chat mobile is currently on **Expo SDK 55 (RN 0.83.2)** — Hermes v1 is NOT yet available. Upgrade to SDK 56 (RN 0.85, expected May/June 2026) enables native WASM.
 
 1. **Build:** `wasm-pack build --target web --release` produces `vex_crypto_bg.wasm` + JS glue
 2. **Bundle:** Metro can bundle `.wasm` files as assets. The JS glue calls `WebAssembly.instantiate()`
 3. **Load:** At app startup (before `Client.create()`), call `await init()` to load the WASM module
-4. **Fallback:** For Expo SDK 55 (RN 0.83, no Hermes v1), use `wasm2js` to compile to pure JS — loses perf but keeps compatibility
+4. **Current (SDK 55):** Use `wasm2js` to compile `.wasm` → pure JS — loses perf but works without Hermes v1
+5. **Future (SDK 56+):** Native `WebAssembly.instantiate()` via Hermes v1 — full performance
 
 For Tauri desktop: `.wasm` loads natively in the WebView (WebKit/Chromium both support WASM since 2017).
 

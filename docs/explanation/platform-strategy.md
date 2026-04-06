@@ -90,6 +90,8 @@ Expected shared code: **~70% by line count**.
 
 ## Platform Adapter Injection
 
+> **Status (2026-04-06):** `nodeAdapters()` and `inMemoryAdapters()` (test) are implemented. `browserAdapters()` and `reactNativeAdapters()` are scaffolded (`null` in exports map) but not yet implemented — see ADR-004 Phase B. Storage backends (IndexedDB, AsyncStorage) and keystore impls are also Phase B.
+
 `@vex-chat/libvex` is a single SDK that runs on Node, browsers, and React Native. Platform differences (WebSocket implementation, logger, persistence) are **injected at construction time** via `Client.create()`, not hard-coded into separate builds.
 
 ```

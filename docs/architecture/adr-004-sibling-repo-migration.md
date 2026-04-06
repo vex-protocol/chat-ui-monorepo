@@ -199,17 +199,19 @@ export async function resumeSession(
 
 ## Plan
 
-### Phase A — Prepare sibling repos (`feat/platform-adapters` from master)
+### Phase A — Prepare sibling repos (DONE)
 
-All modernization branches (`feature/unified-deps`) are already merged to master. Create a single `feat/platform-adapters` branch from master in each repo that needs changes. All existing tests must pass with zero test file modifications.
+All work on `feat/platform-adapters` branches, fresh from master.
 
-**A.1 — types-js:** Add `KeyStore` + `StoredCredentials` interfaces (~15 lines). No tests exist, nothing to break.
+**A.1 — types-js (DONE):** Added `KeyStore` + `StoredCredentials` interfaces. Split `IUser` into `IUser` (public) + `IUserRecord` (DB, server-only).
 
-**A.2 — crypto-js:** Replace `node:crypto` with `@noble/hashes` (see Phase A.5 below). Guard `node:fs` behind dynamic import.
+**A.2 — crypto-js (DONE):** Replaced `node:crypto` with `@noble/hashes` (sha512, hmac, hkdf, pbkdf2, getRandomValues). Guarded `node:fs` behind dynamic import. All 18 tests pass.
 
-**A.3 — libvex-js:** Implement adapter injection from scratch (see Phase B below).
+**A.3 — libvex-js (DONE):** Implemented `IClientAdapters` + `ILogger` interfaces, `nodeAdapters()` factory with dynamic `import("ws")`, `inMemoryAdapters()` + `MockWebSocket` test harness. `Client.create()` composition root defaults to `nodeAdapters()`. Moved crypto+types from peer deps to regular deps (discord.js pattern). Re-exports app-facing types. All 12 integration tests pass.
 
-**All repos:** Delete `.yalc/` directories and `yalc.lock` files. Client repos are linked via pnpm workspace (see Phase C). Spire is not workspace-linked — it runs standalone for integration testing.
+**A.4 — spire (DONE):** Removed yalc, adopted `IUserRecord` for DB operations, deleted `ICensoredUser`. `censorUser()` returns public `IUser`. All 3 tests pass.
+
+**All repos:** Deleted `.yalc/` directories and `yalc.lock` files. Sibling repos use `file:` protocol in devDependencies for standalone npm development. Client repos linked to monorepo via pnpm workspace.
 
 ### Phase A.5 — crypto-js pure-JS migration (prerequisite for browser/RN)
 
@@ -272,9 +274,9 @@ All modernization branches (`feature/unified-deps`) are already merged to master
 
 **Optional future commit:** swap `bip39` → `@scure/bip39` (same author as `@noble/*`, Uint8Array-native, drops transitive Buffer polyfill). Separate decision — `xMnemonic.ts` test is a byte-level mnemonic check, passes if entropy → mnemonic mapping stays BIP-39 standard.
 
-### Phase B — Fill the `null` adapter exports in libvex-js
+### Phase B — Fill the `null` adapter exports in libvex-js (NOT DONE)
 
-**Unblocked by Phase A.5** — crypto-js is now pure JS at the module-resolution layer.
+**Unblocked by Phase A** — crypto-js is now pure JS, adapter injection scaffold exists.
 
 Adds adapters, storage backends, keystore reference implementations, and the bot subsystem as subpath exports. See "Packaging Strategy" and "Identity Persistence Architecture" sections above for rationale.
 
@@ -338,7 +340,7 @@ Node-only subpaths (`/adapters/node`, `/storage/node`, `/keystore/node`) use the
 - `inMemoryKeyStore` basic contract tests
 - `CommandRouter` prefix-dispatch tests using `inMemoryAdapters` + fake mail stream
 
-### Phase C — Migrate vex-chat to consume the siblings
+### Phase C — Migrate vex-chat to consume the siblings (DONE)
 
 **Step 1 — delete internal packages:**
 ```
@@ -467,7 +469,7 @@ Migrated `apps/mobile` from bare RN 0.84.1 to **Expo SDK 55 Prebuild (CNG)** wit
 
 **Upgrade path:** When Expo SDK 56 goes stable (May/June 2026), upgrade to RN 0.85 + SDK 56 to regain Hermes v1 as default engine.
 
-### Phase E — Docs & bootstrap tooling
+### Phase E — Docs & bootstrap tooling (NOT DONE)
 
 1. Update `docs/explanation/platform-strategy.md` — replace monorepo-internal `packages/*` references with sibling-repo consumption via adapter injection
 2. Add `scripts/bootstrap.sh` to vex-chat that checks for `../libvex-js`, `../crypto-js`, `../types-js` siblings and clones them from GitHub if missing, then runs `pnpm install`. Optionally clone `../spire` for local integration testing.
