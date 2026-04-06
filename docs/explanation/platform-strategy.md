@@ -9,7 +9,7 @@ Vex is a cross-platform chat application targeting desktop and mobile.
 | Platform | Shell | UI Framework | Notes |
 |---|---|---|---|
 | Desktop | **Tauri 2.0** | **Svelte** | Replaces the original Electron+React `vex-desktop` ([ADR-001](../architecture/adr-001-monorepo-consolidation.md)) |
-| Mobile | **React Native** | React Native | Best native performance for chat (scrolling, gestures, real-time) |
+| Mobile | **Expo (Prebuild)** | React Native | Expo SDK + CNG for config plugins and EAS builds; keeps native modules ([ADR-004](../architecture/adr-004-sibling-repo-migration.md)) |
 
 ### Why Tauri + Svelte for desktop
 
@@ -30,45 +30,57 @@ Svelte components use DOM elements + CSS. React Native uses `View` + `StyleSheet
 
 ---
 
-## Monorepo Structure
+## Repository Topology
+
+The SDK layer lives in **standalone sibling repos**, not inside vex-chat. The monorepo contains only apps + genuinely shared vex-chat-specific packages.
 
 ```
-packages/
-  types/          — shared TypeScript interfaces, enums, constants (@vex-chat/types)
-  crypto/         — NaCl encryption logic (@vex-chat/crypto)
-  libvex/         — client SDK: WebSocket, auth, mail, devices, servers (@vex-chat/libvex)
-  store/          — nanostores atoms: state slices + bootstrap + VexClient event wiring (@vex-chat/store)
-  ui/             — Mitosis design primitives (.lite.tsx) (@vex-chat/ui)
-    output/svelte/ — compiled Svelte components (used by desktop)
-    output/react/  — compiled React components (used by mobile)
-    stories/       — Storybook stories for all primitives
-apps/
-  desktop/        — Tauri + Svelte; @vex-chat/store atoms + @nanostores/svelte + packages/ui/output/svelte
-  mobile/         — React Native (bare); @vex-chat/store atoms + @nanostores/react + packages/ui/output/react
+/Users/dgill/Public/
+├── vex-chat/                    (this monorepo — apps + store + ui)
+│   packages/
+│     store/                     — nanostores atoms; Client event wiring (@vex-chat/store)
+│     ui/                        — Mitosis design primitives (.lite.tsx) (@vex-chat/ui)
+│       output/svelte/           — compiled Svelte components (desktop)
+│       output/react/            — compiled React components (mobile)
+│       stories/                 — Storybook
+│   apps/
+│     desktop/                   — Tauri + Svelte; browser adapters + IndexedDB storage
+│     mobile/                    — Expo + React Native; native adapters + AsyncStorage storage
+│     website/                   — SvelteKit; browser adapters + IndexedDB storage
+│
+├── libvex-js/                   — Client SDK (@vex-chat/libvex) — [github.com/vex-chat/libvex-js]
+├── crypto-js/                   — Crypto primitives (@vex-chat/crypto) — [github.com/vex-chat/crypto-js]
+├── types-js/                    — Shared types (@vex-chat/types)  — [github.com/vex-chat/types-js]
+└── spire/                       — Server                           — [github.com/vex-chat/spire]
 ```
 
-Use **Turborepo** or **Nx** for monorepo orchestration (build ordering, caching, task pipelines).
+**Linkage during development:** siblings are added to `pnpm-workspace.yaml` as external workspace members (`'../crypto-js'`, `'../types-js'`, `'../libvex-js'`, `'../spire'`). A single `pnpm install` from the vex-chat root resolves all inter-repo `workspace:*` dependencies via symlinks — no publish step required between edits. Sibling repos keep their own `package-lock.json` for standalone CI.
+
+See [ADR-004](../architecture/adr-004-sibling-repo-migration.md) for the migration rationale and ADR-001 for the original monorepo consolidation.
 
 ---
 
 ## What Gets Shared
 
-### 100% shared (framework-agnostic TypeScript)
+### 100% shared via sibling repos (framework-agnostic TypeScript)
 
-- **types** — all interfaces, enums, API payload shapes
-- **crypto** — NaCl encryption, key management, session establishment
-- **libvex** — client SDK (WebSocket, auth, message protocol) — returns typed discriminated union results; no client-side pre-validation needed
-- **store** — nanostores atoms per state slice; wraps VexClient events via `onMount`, runs the bootstrap sequence. Apps install `@nanostores/svelte` or `@nanostores/react` for framework binding — no custom adapter code
+- **@vex-chat/types** — all interfaces, enums, API payload shapes (single `src/index.ts`, 34 exports)
+- **@vex-chat/crypto** — NaCl encryption primitives (tweetnacl + ed2curve + msgpackr), `XUtils`, `xDH`, `xHMAC`, `xKDF`, `xMakeNonce`, `XKeyConvert`
+- **@vex-chat/libvex** — `Client` SDK (WebSocket auth, mail, sessions, devices, servers, channels, files). Portable across node / browser / react-native via **adapter injection** (see below)
+
+### 100% shared in monorepo (vex-chat-specific)
+
+- **@vex-chat/store** — nanostores atoms per state slice; `bootstrap()` wires `Client` events to atoms; apps install `@nanostores/svelte` or `@nanostores/react` for framework binding
 
 ### Shared via Mitosis compilation
 
-- **ui** — design system primitives (Button, Avatar, Badge, TextInput, MessageBubble, ChannelListItem). Written once as `.lite.tsx`, compiled to Svelte and React. See `docs/design-system.md`.
+- **@vex-chat/ui** — design system primitives (Button, Avatar, Badge, TextInput, MessageBubble, ChannelListItem). Written once as `.lite.tsx`, compiled to Svelte and React. See `docs/design-system.md`.
 
 ### NOT shared (written per-platform)
 
 - Screen-level layouts and navigation
 - Animations and gestures
-- Platform-specific storage (Tauri filesystem API vs AsyncStorage)
+- Platform adapter + storage wiring (see below — picks which `Client.create()` adapter set to pass)
 - Push notification registration
 - Navigation chrome
 
@@ -76,12 +88,143 @@ Expected shared code: **~70% by line count**.
 
 ---
 
-## State Management Pattern
+## Platform Adapter Injection
 
-`packages/store` defines nanostores atoms per state slice. `bootstrap()` wires VexClient real-time events directly to atoms and populates initial state from HTTP. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
+`@vex-chat/libvex` is a single SDK that runs on Node, browsers, and React Native. Platform differences (WebSocket implementation, logger, persistence) are **injected at construction time** via `Client.create()`, not hard-coded into separate builds.
 
 ```
-VexClient (@vex-chat/libvex)
+                    Client (monolithic, platform-agnostic)
+                           │
+                           │ accepts at create() time:
+                           ▼
+           ┌──────────────────────────────────────┐
+           │  IClientAdapters { logger, WebSocket }│
+           │  IStorage { sessions, prekeys, mail } │
+           └──────────────────────────────────────┘
+                           │
+         ┌─────────────────┼──────────────────┐
+         ▼                 ▼                  ▼
+  nodeAdapters()    browserAdapters()   reactNativeAdapters()
+  + SQLite storage  + IndexedDB storage + AsyncStorage storage
+  (spire, tests)    (desktop, website)  (mobile)
+```
+
+The `exports` map in `@vex-chat/libvex/package.json` uses **conditions** (`node`/`browser`/`react-native`) so bundlers tree-shake adapters they don't need. A React Native bundle never sees the `ws` library; a browser bundle never sees `better-sqlite3`.
+
+**Construction per platform:**
+
+```ts
+// apps/mobile — React Native + Expo
+import { Client } from '@vex-chat/libvex'
+import { reactNativeAdapters } from '@vex-chat/libvex/adapters/native'
+import { AsyncStorageBackend } from '@vex-chat/libvex/storage/native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+
+const client = await Client.create(privateKey, {
+  adapters: await reactNativeAdapters(),
+  storage: new AsyncStorageBackend(AsyncStorage),
+})
+```
+
+```ts
+// apps/desktop — Tauri + Svelte (runs in WebView)
+import { Client } from '@vex-chat/libvex'
+import { browserAdapters } from '@vex-chat/libvex/adapters/browser'
+import { IndexedDBBackend } from '@vex-chat/libvex/storage/web'
+
+const client = await Client.create(privateKey, {
+  adapters: await browserAdapters(),
+  storage: new IndexedDBBackend('vex-client'),
+})
+```
+
+```ts
+// Tests / spire / CLI tools — Node
+import { Client } from '@vex-chat/libvex'
+// nodeAdapters() is the default when no adapters are provided
+const client = await Client.create(privateKey, { storage: new Storage(':memory:') })
+```
+
+```ts
+// Unit tests — in-memory
+import { Client, inMemoryAdapters } from '@vex-chat/libvex'
+const client = await Client.create(privateKey, {
+  adapters: inMemoryAdapters(capturingLogger()),
+  storage: new Storage(':memory:'),
+})
+```
+
+The `Client` public API (`register`, `login`, `connect`, `messages.send`, `messages.retrieve`, `servers.*`, `channels.*`, events) is identical across platforms.
+
+---
+
+## Identity Persistence
+
+`Client` does **not** own credential persistence — apps do. The SDK takes a `privateKey: string` and doesn't care how you got it. This keeps `Client` focused on the protocol, keeps biometric/keychain UX under app control, and respects the fact that **identity keys belong in OS keychains** (hardware-backed, biometric-gated) while protocol session state belongs in local DBs.
+
+### The `KeyStore` contract (from `@vex-chat/types`)
+
+```ts
+export interface StoredCredentials {
+  username: string
+  deviceID: string
+  deviceKey: string   // hex Ed25519 secret
+  preKey?: string
+  token?: string
+}
+export interface KeyStore {
+  load(username?: string): Promise<StoredCredentials | null>
+  save(creds: StoredCredentials): Promise<void>
+  clear(username: string): Promise<void>
+}
+```
+
+Apps implement `KeyStore` backed by whatever their platform provides:
+
+| Platform | KeyStore backing |
+|---|---|
+| **Mobile** | `react-native-keychain` (iOS Keychain / Android Keystore) — hardware-backed, biometric-gated |
+| **Desktop (Tauri)** | Tauri Stronghold or `tauri-plugin-keyring` — OS-native credential stores |
+| **Browser / website** | IndexedDB + SubtleCrypto, or skip client-side persistence |
+| **Bots / CLI** | File-backed via `@vex-chat/libvex/keystore/node` (`saveKeyFile`/`loadKeyFile`) |
+| **Tests** | `@vex-chat/libvex/keystore/memory` (no disk I/O) |
+
+### Session bootstrap pattern
+
+```ts
+// App composition root
+const creds = await keystore.load()
+
+if (creds) {
+  // Resume — SDK takes the raw hex key, doesn't know about keystores
+  const client = await Client.create(creds.deviceKey, { adapters, storage })
+  await client.connect()
+} else {
+  // First launch — register, then persist
+  const privateKey = Client.generateSecretKey()
+  const client = await Client.create(privateKey, { adapters, storage })
+  const result = await client.register(username, password)
+  await keystore.save({
+    username,
+    deviceID: result.deviceID,
+    deviceKey: privateKey,
+    preKey: client.keyring.preKey,
+  })
+}
+```
+
+The app owns the flow: load → construct → connect, or generate → register → save. `Client` is identity-agnostic; biometric prompts fire when the app calls `keystore.load()`, not hidden inside the SDK.
+
+**Why not inject `KeyStore` into `Client`?** Different concerns (protocol vs persistence), different lifecycles (runtime vs boot-time), different backends (DB vs OS keychain), and different security postures. Industry precedent supports this split: matrix-js-sdk, Twilio, Slack, and Discord all pass credentials as primitives rather than injecting stores. See [ADR-004](../architecture/adr-004-sibling-repo-migration.md#identity-persistence-architecture) for the full reasoning.
+
+---
+
+## State Management Pattern
+
+`packages/store` defines nanostores atoms per state slice. `bootstrap()` wires `Client` real-time events directly to atoms and populates initial state from HTTP. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
+
+```
+Client (@vex-chat/libvex)
     └── event source for
 nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
     │   wired in bootstrap() — events update atoms directly
@@ -95,8 +238,8 @@ nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
 |---|---|---|
 | `$user` | `atom<IUser \| null>` | login / whoami |
 | `$familiars` | `map<Record<string, IUser>>` | bootstrap (when familiars API exists) |
-| `$messages` | `map<Record<string, IMail[]>>` | bootstrap, incoming mail (DM) |
-| `$groupMessages` | `map<Record<string, IMail[]>>` | bootstrap, incoming mail (group) |
+| `$messages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming message (DM) |
+| `$groupMessages` | `map<Record<string, IMessage[]>>` | bootstrap, incoming message (group) |
 | `$servers` | `map<Record<string, IServer>>` | bootstrap, serverChange event |
 | `$channels` | `map<Record<string, IChannel[]>>` | bootstrap per server |
 | `$permissions` | `map<Record<string, IPermission>>` | bootstrap per server |
@@ -109,28 +252,34 @@ nanostores atoms (@vex-chat/store)   ← $messages, $servers, $user, etc.
 
 ```ts
 // packages/store/src/bootstrap.ts
-export async function bootstrap(serverUrl, deviceID, deviceKey) {
-  const client = VexClient.create(serverUrl, deviceID, deviceKey)
+import { Client } from '@vex-chat/libvex'
+
+export async function bootstrap(privateKey, options, storage) {
+  const client = await Client.create(privateKey, options, storage)
   $client.set(client)
 
-  client.on('authed', (user) => $user.set(user))
-  client.on('mail', (mail) => {
-    if (mail.group) {
-      const prev = $groupMessages.get()[mail.group] ?? []
-      $groupMessages.setKey(mail.group, [...prev, mail])
+  client.on('connected', (user) => $user.set(user))
+  client.on('message', (msg) => {
+    // msg: IMessage — Client decrypts internally; msg.message is plaintext, msg.decrypted is the flag
+    if (!msg.decrypted) return // skip mail we couldn't decrypt
+    if (msg.group) {
+      const prev = $groupMessages.get()[msg.group] ?? []
+      $groupMessages.setKey(msg.group, [...prev, msg])
     } else {
       const me = $user.get()
-      const key = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
+      const key = me && msg.authorID === me.userID ? msg.readerID : msg.authorID
       const prev = $messages.get()[key] ?? []
-      $messages.setKey(key, [...prev, mail])
+      $messages.setKey(key, [...prev, msg])
     }
   })
-  client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
+  client.on('permission', (perm) => { /* ... */ })
 
   await client.connect()
   // ... waterfall HTTP fetch populates $user, $servers, $channels
 }
 ```
+
+`Client` already decrypts inside the SDK (`Client.readMail()` runs X3DH and `nacl.secretbox.open` inline) and emits `"message"` with `IMessage { decrypted: boolean, message: string, ... }`. The store layer receives plaintext and fans it out to atoms.
 
 **Logout lifecycle:** `resetAll()` (exported from `@vex-chat/store`) sets every atom back to its default value. Call it on logout before clearing localStorage credentials to prevent stale data from leaking to the next user session. `$verifiedKeys` is intentionally NOT reset — verified fingerprints are device-scoped and persist across accounts.
 
@@ -161,22 +310,23 @@ const messages = useStore($messages)
 
 > **Why nanostores?** 265–800 bytes. Zero dependencies. nanostores atoms implement the Svelte store contract (`.subscribe()`) so no adapter package is needed for Svelte — atoms work directly with the `$` reactive syntax. `@nanostores/react` provides `useStore()` backed by `useSyncExternalStore`. Used by Astro for cross-framework state. Eliminates the custom EventEmitter VexStore class and hand-rolled adapter boilerplate entirely.
 
-> **No client-side pre-validation.** `VexClient` methods return typed discriminated union results (`{ ok: false, code: 'USERNAME_TAKEN' }`). The UI renders these directly. Duplicating server rules client-side creates drift — avoided by design.
+> **No client-side pre-validation.** `Client` methods throw typed errors or return discriminated results. The UI renders these directly. Duplicating server rules client-side creates drift — avoided by design.
 
 ---
 
 ## Relationship to Original vex-chat Repos
 
-| Original repo | New equivalent | Notes |
+| Original repo | Current role | Notes |
 |---|---|---|
-| `types-js` | `packages/types` | Same role, modernized |
-| `crypto-js` | `packages/crypto` | Same role |
-| `libvex-js` | `packages/libvex` | Client SDK, framework-agnostic |
-| `spire` | Own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) | Stays standalone; incremental improvements |
+| [`types-js`](https://github.com/vex-chat/types-js) | `@vex-chat/types` (sibling) | Modernized to TS 6 + pure ESM; 34 shared type exports |
+| [`crypto-js`](https://github.com/vex-chat/crypto-js) | `@vex-chat/crypto` (sibling) | Modernized to TS 6 + ESM + Vitest; still tweetnacl-backed |
+| [`libvex-js`](https://github.com/vex-chat/libvex-js) | `@vex-chat/libvex` (sibling) | Client SDK; **adapter injection for node/browser/react-native** ([ADR-004](../architecture/adr-004-sibling-repo-migration.md)) |
+| [`spire`](https://github.com/vex-chat/spire) | Server (sibling) | TS 6 + runs TypeScript natively (no build step) |
 | `vex-desktop` (Electron+React) | `apps/desktop` (Tauri+Svelte) | New shell + framework |
-| — | `apps/mobile` (React Native) | New — mobile client |
+| — | `apps/mobile` (Expo + RN) | New — mobile client, Prebuild workflow |
+| — | `apps/website` (SvelteKit) | New — marketing / download site |
 | — | `packages/ui` (Mitosis) | New — shared design primitives |
-| — | `packages/store` | New — framework-agnostic state |
+| — | `packages/store` | New — framework-agnostic state (nanostores) |
 
 ---
 
