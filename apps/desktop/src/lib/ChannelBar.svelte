@@ -1,6 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import type { IChannel } from '@vex-chat/types'
+  import type { IChannel } from '@vex-chat/libvex'
   import { client, servers, channels as channelsStore } from './store/index.js'
   import InviteModal from './InviteModal.svelte'
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
 import { useStore } from '@nanostores/react'
-import type { IChannel } from '@vex-chat/types'
+import type { IChannel } from '@vex-chat/libvex'
 import { $channels } from '../store'
 
 export function ChannelListScreen({ route, navigation }: { route: any; navigation: any }) {

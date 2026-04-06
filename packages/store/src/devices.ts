@@ -1,5 +1,5 @@
 import { map } from 'nanostores'
-import type { IDevice } from '@vex-chat/types'
+import type { IDevice } from '@vex-chat/libvex'
 
 /**
  * Devices per user, keyed by ownerID (userID).

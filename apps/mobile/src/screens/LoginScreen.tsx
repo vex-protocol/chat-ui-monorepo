@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { XUtils } from '@vex-chat/crypto'
 import { Client } from '@vex-chat/libvex'
 import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials } from '../lib/keychain'
@@ -41,19 +40,18 @@ export function LoginScreen({ navigation }: { navigation: any }) {
         return
       }
 
-      // Login via libvex (handles msgpack + response normalization)
-      const deviceKey = XUtils.decodeHex(creds.deviceKey)
-      const preKeySecret = XUtils.decodeHex(creds.preKey)
-      const client = Client.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
-      const result = await client.login(username, password)
+      // Login via libvex — Client takes hex private key directly
+      const client = await Client.create(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      const err = await client.login(username, password)
 
-      if (!result.ok) {
-        setError(result.error.message || 'Invalid username or password')
+      if (err) {
+        setError(err.message || 'Invalid username or password')
         setLoading(false)
         return
       }
 
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret, mobilePersistence)
+      await client.connect()
+      await bootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

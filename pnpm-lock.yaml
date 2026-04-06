@@ -123,6 +123,12 @@ importers:
       '@extrahash/sleep':
         specifier: ^1.0.0
         version: 1.0.1
+      '@vex-chat/crypto':
+        specifier: file:../crypto-js
+        version: link:../crypto-js
+      '@vex-chat/types':
+        specifier: file:../types-js
+        version: link:../types-js
       axios:
         specifier: ^1.7.0
         version: 1.14.0(debug@4.4.3)
@@ -184,12 +190,6 @@ importers:
       '@types/ws':
         specifier: ^8.5.10
         version: 8.18.1
-      '@vex-chat/crypto':
-        specifier: file:../crypto-js
-        version: link:../crypto-js
-      '@vex-chat/types':
-        specifier: file:../types-js
-        version: link:../types-js
       dotenv:
         specifier: ^8.2.0
         version: 8.6.0
@@ -277,18 +277,12 @@ importers:
       '@types/uuid':
         specifier: 'catalog:'
         version: 10.0.0
-      '@vex-chat/crypto':
-        specifier: workspace:*
-        version: link:../../../crypto-js
       '@vex-chat/libvex':
         specifier: workspace:*
         version: link:../../../libvex-js
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@vex-chat/types':
-        specifier: workspace:*
-        version: link:../../../types-js
       dompurify:
         specifier: 'catalog:'
         version: 3.3.3
@@ -347,18 +341,12 @@ importers:
       '@react-navigation/native-stack':
         specifier: ^7.3.0
         version: 7.14.10(@react-navigation/native@7.2.2(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-safe-area-context@5.7.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-screens@4.24.0(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.84.1(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
-      '@vex-chat/crypto':
-        specifier: workspace:*
-        version: link:../../../crypto-js
       '@vex-chat/libvex':
         specifier: workspace:*
         version: link:../../../libvex-js
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
-      '@vex-chat/types':
-        specifier: workspace:*
-        version: link:../../../types-js
       fast-text-encoding:
         specifier: ^1.0.6
         version: 1.0.6
@@ -428,10 +416,6 @@ importers:
         version: 5.9.3
 
   apps/website:
-    dependencies:
-      '@vex-chat/types':
-        specifier: workspace:*
-        version: link:../../../types-js
     devDependencies:
       '@sveltejs/adapter-vercel':
         specifier: ^5.7.4
@@ -469,15 +453,9 @@ importers:
       '@nanostores/react':
         specifier: '>=0.8'
         version: 1.1.0(nanostores@0.11.4)(react@19.2.3)
-      '@vex-chat/crypto':
-        specifier: workspace:*
-        version: link:../../../crypto-js
       '@vex-chat/libvex':
         specifier: workspace:*
         version: link:../../../libvex-js
-      '@vex-chat/types':
-        specifier: workspace:*
-        version: link:../../../types-js
       nanostores:
         specifier: 'catalog:'
         version: 0.11.4

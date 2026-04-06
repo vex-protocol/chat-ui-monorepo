@@ -1,5 +1,5 @@
 import { map } from 'nanostores'
-import type { IPermission } from '@vex-chat/types'
+import type { IPermission } from '@vex-chat/libvex'
 
 /**
  * Permissions keyed by permissionID.

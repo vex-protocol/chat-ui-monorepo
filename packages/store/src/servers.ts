@@ -1,5 +1,5 @@
 import { map } from 'nanostores'
-import type { IServer } from '@vex-chat/types'
+import type { IServer } from '@vex-chat/libvex'
 
 /**
  * Servers the current user is a member of, keyed by serverID.

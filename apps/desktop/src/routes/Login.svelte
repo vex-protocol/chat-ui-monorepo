@@ -1,6 +1,5 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { XUtils } from '@vex-chat/crypto'
   import { Client } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
@@ -24,44 +23,42 @@
       const creds = await keyStore.load(username)
 
       if (creds) {
-        // Existing device — login with saved keys
-        const deviceKey = XUtils.decodeHex(creds.deviceKey)
-        const preKeySecret = XUtils.decodeHex(creds.preKey)
-        const client = Client.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
-        const result = await client.login(username, password)
+        // Existing device — login with saved hex key
+        const client = await Client.create(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        const err = await client.login(username, password)
 
-        if (!result.ok) {
+        if (err) {
           error = 'Invalid username or password'
           playError()
           loading = false
           return
         }
 
-        // Update stored token for session resumption
-        await keyStore.save({ ...creds, token: result.token })
-
-        await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
+        await client.connect()
+        await bootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
       } else {
-        // No device on this machine — login and register a new device
-        const result = await Client.loginNewDevice(SERVER_URL, username, password, 'Desktop')
+        // No device on this machine — generate key, create client, register + login
+        const privateKey = Client.generateSecretKey()
+        const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        const loginErr = await client.login(username, password)
 
-        if (!result.ok) {
+        if (loginErr) {
           error = 'Invalid username or password'
           playError()
           loading = false
           return
         }
 
-        // Persist the new device credentials + JWT
+        // Register new device, persist hex key
+        await client.devices.register()
         await keyStore.save({
           username,
-          deviceID: result.deviceID,
-          deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
-          preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
-          token: result.token,
+          deviceID: client.me.device().deviceID,
+          deviceKey: privateKey,
         })
 
-        await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
+        await client.connect()
+        await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
       }
 
       // Navigate into the app

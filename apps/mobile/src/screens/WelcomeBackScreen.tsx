@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { XUtils } from '@vex-chat/crypto'
 import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials, clearCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -41,11 +40,8 @@ export function WelcomeBackScreen({ navigation }: Props) {
     try {
       const SERVER_URL = getServerUrl()
 
-      const deviceKey = XUtils.decodeHex(creds.deviceKey)
-      const preKeySecret = XUtils.decodeHex(creds.preKey)
-
       navigation.navigate('HangTight')
-      await bootstrap(SERVER_URL, creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)
+      await bootstrap(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
       // Success — RootNavigator auto-switches to App when $user becomes non-null
     } catch (err) {
       // Navigate back so the user sees the error instead of being stuck on HangTight

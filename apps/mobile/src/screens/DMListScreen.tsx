@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import { useStore } from '@nanostores/react'
-import type { IUser } from '@vex-chat/types'
+import type { IUser } from '@vex-chat/libvex'
 import type { IMessage } from '@vex-chat/libvex'
 import { $familiars, $messages, $client } from '../store'
 import { $familiars as familiarsAtom, $dmUnreadCounts, avatarHue } from '@vex-chat/store'

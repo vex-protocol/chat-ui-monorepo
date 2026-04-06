@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native'
 import { useStore } from '@nanostores/react'
-import type { IServer } from '@vex-chat/types'
+import type { IServer } from '@vex-chat/libvex'
 import { $servers } from '../store'
 import { avatarHue } from '@vex-chat/store'
 

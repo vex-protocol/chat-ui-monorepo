@@ -1,6 +1,6 @@
 <script lang="ts">
   import { client } from './store/index.js'
-  import type { IInvite } from '@vex-chat/types'
+  import type { IInvite } from '@vex-chat/libvex'
 
   let { serverID = '', serverName = '', onclose }: { serverID?: string; serverName?: string; onclose: () => void } = $props()
 

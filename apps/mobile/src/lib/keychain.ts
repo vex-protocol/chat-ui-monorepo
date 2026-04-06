@@ -1,5 +1,5 @@
 import * as Keychain from 'react-native-keychain'
-import type { KeyStore, StoredCredentials } from '@vex-chat/types'
+import type { KeyStore, StoredCredentials } from '@vex-chat/libvex'
 
 const SERVICE_NAME = 'com.vex-chat.device-credentials'
 

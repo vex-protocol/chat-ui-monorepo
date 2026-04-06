@@ -1,5 +1,5 @@
 import { map } from 'nanostores'
-import type { IChannel } from '@vex-chat/types'
+import type { IChannel } from '@vex-chat/libvex'
 
 /**
  * Channels per server, keyed by serverID.

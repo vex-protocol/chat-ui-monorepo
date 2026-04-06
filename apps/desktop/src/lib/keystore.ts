@@ -1,5 +1,5 @@
 import { load } from '@tauri-apps/plugin-store'
-import type { KeyStore, StoredCredentials } from '@vex-chat/types'
+import type { KeyStore, StoredCredentials } from '@vex-chat/libvex'
 
 const STORE_FILE = 'keystore.json'
 const ACTIVE_KEY = '__active__'

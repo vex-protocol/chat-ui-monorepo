@@ -1,6 +1,5 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { XUtils } from '@vex-chat/crypto'
   import { Client } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
@@ -108,26 +107,26 @@
     try {
       const SERVER_URL = getServerUrl()
 
-      const result = await Client.registerAndLogin(SERVER_URL, username, password, 'Desktop')
+      const privateKey = Client.generateSecretKey()
+      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      const [user, regErr] = await client.register(username, password)
 
-      if (!result.ok) {
-        errors = { form: result.error.message || `Registration failed (${result.error.code})` }
+      if (regErr || !user) {
+        errors = { form: regErr?.message || 'Registration failed' }
         playError()
         loading = false
         return
       }
 
-      // Persist device credentials + JWT via KeyStore
+      // Persist hex device key via KeyStore
       await keyStore.save({
         username,
-        deviceID: result.deviceID,
-        deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
-        preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
-        token: result.token,
+        deviceID: client.me.device().deviceID,
+        deviceKey: privateKey,
       })
 
-      // Bootstrap the store with the JWT from registration
-      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey)
+      // Bootstrap the store
+      await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
 
       if (userAtom.get()) {
         playUnlock()

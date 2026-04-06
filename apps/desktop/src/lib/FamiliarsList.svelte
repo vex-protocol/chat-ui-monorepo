@@ -1,6 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import type { IUser } from '@vex-chat/types'
+  import type { IUser } from '@vex-chat/libvex'
   import { familiars, client } from './store/index.js'
   import { $familiars as familiarsStore, $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
   import { getServerUrl } from './config.js'

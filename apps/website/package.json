@@ -10,7 +10,6 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "@vex-chat/types": "workspace:*"
   },
   "devDependencies": {
     "@sveltejs/adapter-vercel": "^5.7.4",

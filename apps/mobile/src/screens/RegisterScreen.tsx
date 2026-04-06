@@ -10,7 +10,6 @@ import {
   Platform,
   ScrollView,
 } from 'react-native'
-import { XUtils } from '@vex-chat/crypto'
 import { Client } from '@vex-chat/libvex'
 import { bootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
@@ -35,25 +34,26 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
     try {
       const SERVER_URL = getServerUrl()
 
-      const result = await Client.registerAndLogin(SERVER_URL, username, password, 'Mobile')
+      // Generate key, create client, register
+      const privateKey = Client.generateSecretKey()
+      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      const [user, regErr] = await client.register(username, password)
 
-      if (!result.ok) {
-        setError(result.error.message || `Registration failed (${result.error.code})`)
+      if (regErr || !user) {
+        setError(regErr?.message || 'Registration failed')
         setLoading(false)
         return
       }
 
-      // Save device credentials + JWT to OS keychain
+      // Save hex device key to OS keychain
       await saveCredentials({
         username,
-        deviceID: result.deviceID,
-        deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
-        preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
-        token: result.token,
+        deviceID: client.me.device().deviceID,
+        deviceKey: privateKey,
       })
 
-      // Bootstrap the store with the JWT from registration
-      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey, mobilePersistence)
+      // Bootstrap the store
+      await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

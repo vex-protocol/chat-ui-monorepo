@@ -1,7 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { XUtils } from '@vex-chat/crypto'
 import { Client } from '@vex-chat/libvex'
 import { bootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
@@ -61,28 +60,25 @@ export function FinalizeScreen({ navigation, route }: Props) {
     try {
       const SERVER_URL = getServerUrl()
 
-      const result = await Client.registerAndLogin(SERVER_URL, username, password, 'Mobile')
+      const privateKey = Client.generateSecretKey()
+      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      const [user, regErr] = await client.register(username, password)
 
-      if (!result.ok) {
-        setError(result.error.message || `Registration failed (${result.error.code})`)
+      if (regErr || !user) {
+        setError(regErr?.message || 'Registration failed')
         setLoading(false)
         return
       }
 
-      // Save device credentials + JWT to OS keychain
       await saveCredentials({
         username,
-        deviceID: result.deviceID,
-        deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
-        preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
-        token: result.token,
+        deviceID: client.me.device().deviceID,
+        deviceKey: privateKey,
       })
 
-      // Navigate to loading screen — bootstrap will trigger $user, which
-      // causes RootNavigator to flip to AppStack
       navigation.navigate('HangTight')
 
-      await bootstrap(SERVER_URL, result.deviceID, result.signKeyPair.secretKey, result.token, result.preKeyPair.secretKey, mobilePersistence)
+      await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)

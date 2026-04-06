@@ -4,13 +4,12 @@
   import { client, user } from '../lib/store/index.js'
   import { getServerUrl, setServerUrl, clearSession } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
-  import { XUtils } from '@vex-chat/crypto'
   import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
   import { avatarHash } from '../lib/store/index.js'
   import Avatar from '../lib/Avatar.svelte'
   import { checkForUpdates, applyUpdate, type UpdateStatus } from '../lib/updater.js'
-  import type { IDevice } from '@vex-chat/types'
+  import type { IDevice } from '@vex-chat/libvex'
 
   // ── Devices ────────────────────────────────────────────────────────────────
 
@@ -82,12 +81,10 @@
 
   // ── Account info ────────────────────────────────────────────────────────────
 
-  let creds: import('@vex-chat/types').StoredCredentials | null = $state(null)
+  let creds: import('@vex-chat/libvex').StoredCredentials | null = $state(null)
   let fingerprint = $derived(
     creds?.deviceKey
-      ? XUtils.encodeHex(new Uint8Array(
-          Array.from({ length: 8 }, (_, i) => parseInt(creds!.deviceKey.slice(i * 2, i * 2 + 2), 16))
-        )).toUpperCase()
+      ? creds.deviceKey.slice(0, 16).toUpperCase()
       : 'N/A'
   )
 

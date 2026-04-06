@@ -7,9 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@vex-chat/types": "workspace:*",
     "@vex-chat/libvex": "workspace:*",
-    "@vex-chat/crypto": "workspace:*",
     "nanostores": "catalog:",
     "uuid": "catalog:"
   },

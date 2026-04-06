@@ -1,4 +1,4 @@
-import type { KeyStore } from '@vex-chat/types'
+import type { KeyStore } from '@vex-chat/libvex'
 import { bootstrap, $keyReplaced } from './bootstrap.ts'
 import type { PersistenceCallbacks } from './bootstrap.ts'
 
