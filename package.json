@@ -2,6 +2,7 @@
   "name": "vex-chat",
   "version": "1.0.0",
   "private": "true",
+  "type": "module",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
     "prepare": "husky"
@@ -17,7 +18,10 @@
       "react": "19.2.3"
     },
     "onlyBuiltDependencies": [
-      "sharp"
+      "sharp",
+      "better-sqlite3",
+      "esbuild",
+      "msgpackr-extract"
     ]
   },
   "license": "AGPL-3.0-or-later"

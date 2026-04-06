@@ -2,6 +2,7 @@
   "name": "@vex-chat/mobile",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "android": "expo run:android",
     "ios": "expo run:ios",
