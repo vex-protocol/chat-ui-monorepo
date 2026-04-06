@@ -23,9 +23,12 @@
       // Check KeyStore for existing device credentials
       const creds = await keyStore.load(username)
 
+      const preset = tauriPreset()
+
       if (creds) {
         // Existing device — login with saved hex key
-        const client = await Client.create(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        const storage = await preset.createStorage('vex-client.db', creds.deviceKey, preset.adapters.logger)
+        const client = await Client.create(creds.deviceKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:'), adapters: preset.adapters }, storage)
         const err = await client.login(username, password)
 
         if (err) {
@@ -40,7 +43,8 @@
       } else {
         // No device on this machine — generate key, create client, register + login
         const privateKey = Client.generateSecretKey()
-        const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+        const storage = await preset.createStorage('vex-client.db', privateKey, preset.adapters.logger)
+        const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:'), adapters: preset.adapters }, storage)
         const loginErr = await client.login(username, password)
 
         if (loginErr) {

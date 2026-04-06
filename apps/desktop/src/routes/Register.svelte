@@ -109,7 +109,9 @@
       const SERVER_URL = getServerUrl()
 
       const privateKey = Client.generateSecretKey()
-      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      const preset = tauriPreset()
+      const storage = await preset.createStorage('vex-client.db', privateKey, preset.adapters.logger)
+      const client = await Client.create(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:'), adapters: preset.adapters }, storage)
       const [user, regErr] = await client.register(username, password)
 
       if (regErr || !user) {
