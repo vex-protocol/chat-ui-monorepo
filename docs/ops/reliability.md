@@ -275,7 +275,7 @@ Collected in-process alongside traces. No Collector required.
 
 | Metric | Type | Why it matters |
 |---|---|---|
-| `nodejs.eventloop.delay.p99` | Gauge | Event loop saturation — if this climbs, the server is overloaded |
+| `nodejs.eventloop.delay.p99` | Gauge | Event loop saturation — if this climbs, the server is overloaded. Known blocker: `pbkdf2Sync` in `Database.ts:hashPassword()` blocks ~50-100ms per login. |
 | `nodejs.eventloop.utilization` | Gauge | Ratio 0.0–1.0. Approaching 1.0 = no headroom |
 | `v8js.memory.heap.used` | Gauge | Growing over time = memory leak |
 | `v8js.gc.duration` | Histogram | Long/frequent GC pauses degrade latency |
@@ -310,6 +310,15 @@ No off-the-shelf OTel package provides SQLite health metrics. We build it using 
 The WAL size is the most important single metric. If it grows without bound, checkpointing is failing — likely due to long-running read transactions holding the WAL open. This directly threatens data integrity.
 
 **What we do NOT use:** `opentelemetry-plugin-better-sqlite3` (community tracing package, 3 stars). It auto-instruments driver methods with spans, but captures `db.statement` (the full SQL query) as a span attribute — a privacy concern. Kysely's log callback gives us query duration without exposing query text.
+
+### Known Reliability Risks (Audit 2026-04-06)
+
+| Risk | Location | Impact | Fix |
+|---|---|---|---|
+| `pbkdf2Sync` blocks event loop | `Database.ts:hashPassword()` | ~50-100ms block per login, zero requests served | Replace with async `crypto.pbkdf2()`, then migrate to argon2id |
+| Fire-and-forget file writes | `server/index.ts:678`, `file.ts:82`, `avatar.ts:64` | `fs.writeFile()` with callback, response sent before write completes. Server crash = data loss. | Use `await fs.promises.writeFile()` |
+| `execSync("git rev-parse ...")` | `Spire.ts:70` | ~10-100ms block at startup only | Low priority — startup code |
+| `fs.readFileSync` / `existsSync` / `mkdirSync` | `Spire.ts:45-58`, `server/index.ts:102` | <1ms each, startup only | Low priority — startup code |
 
 ### Instrumentation Points in Spire
 

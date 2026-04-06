@@ -274,7 +274,7 @@ The server stays in its own repo. These improvements are tracked separately.
 
 | Aspect | Status | Notes |
 |---|---|---|
-| **Password hashing** | **Done** — argon2id with lazy PBKDF2 migration | Old hashes auto-upgrade on login |
+| **Password hashing** | Spire still uses `pbkdf2Sync` (1000 iterations) — **blocks event loop ~50-100ms per call**. Planned: async pbkdf2 then argon2id migration. | `pbkdf2Sync` → async `pbkdf2` is the immediate fix; argon2id with lazy migration is the end state |
 | **Crypto** | **Done** — @noble/curves replaces TweetNaCl | Ed25519 signing via `naclCompat.ts` |
 | **JWT secret** | Still reuses SPK | Consider dedicated JWT_SECRET |
 | **Logging** | Winston — tokens/IDs may appear in logs | Consider redaction |

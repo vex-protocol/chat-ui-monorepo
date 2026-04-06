@@ -160,10 +160,10 @@ Authentication is cookie-based. The `protect` middleware is a separate guard tha
 |---|---|
 | Query builder | Kysely |
 | Default DB | SQLite (also supports MySQL) |
-| Schema management | `if (!hasTable) createTable` inline in `Database.init()` |
+| Schema management | Kysely `Migrator` + `FileMigrationProvider` — migrations in `src/migrations/`, run on startup via `migrateToLatest()` |
 | Type safety | Runtime types from `@vex-chat/types` |
 
-The upstream `Database` class creates tables on startup if they don't exist — there is a `migrations/` directory in the repo but the production code doesn't use it (the `init()` method handles DDL inline). This means schema changes require manual `ALTER TABLE` in production.
+Schema management now uses Kysely's `Migrator` with `FileMigrationProvider`. Migrations live in `src/migrations/` and run automatically on startup via `migrateToLatest()`. The initial migration is the existing schema verbatim; future changes are new migration files.
 
 ---
 

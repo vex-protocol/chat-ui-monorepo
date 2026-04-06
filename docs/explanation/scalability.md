@@ -33,15 +33,15 @@ The WebSocket layer handles device authentication (Ed25519 challenge-response) a
 
 - **WebSocket auth**: Ed25519 verify via `@noble/curves` — ~0.1ms, pure JS, negligible.
 - **JWT verification**: HS256 HMAC via `jose` — negligible.
-- **SQLite reads**: `better-sqlite3` is synchronous and runs in-process with no network round-trip. Single-reader queries return in microseconds for small datasets.
+- **SQLite reads**: `better-sqlite3` is synchronous and runs in-process with no network round-trip. Single-reader queries return in microseconds for small datasets. Note: all Kysely `.execute()` calls block the event loop, but indexed queries complete in <0.1ms — negligible until thousands of concurrent requests.
 - **WebSocket send to known device**: O(1) Map lookup + `ws.send()`.
 
 ### Where It Slows Down
 
 | Bottleneck | Impact | Mitigation |
 |---|---|---|
-| **argon2id on login/register** | ~50–100ms, allocates 19 MiB per call. Runs on libuv thread pool (4 threads default). Concurrent logins queue behind the thread pool. | Global rate limiter (500 req / 15 min). Increase `UV_THREADPOOL_SIZE` if login throughput matters. |
-| **SQLite single-writer lock** | All writes serialize globally. Under write-heavy load (many messages), writes queue behind each other. Reads are unaffected (WAL mode would help if enabled). | Acceptable for low-to-moderate load. WAL mode (`PRAGMA journal_mode=WAL`) would allow concurrent reads during writes. |
+| **Password hashing on login/register** | Spire currently uses `pbkdf2Sync` (1000 iterations) which blocks the event loop for ~50-100ms per call — zero requests served during that time. Planned migration to async argon2id (libuv thread pool). | Replace `pbkdf2Sync` with async `crypto.pbkdf2()` as an immediate fix, then migrate to argon2id. Rate limit login endpoints. |
+| **SQLite single-writer lock** | All writes serialize globally. Under write-heavy load (many messages), writes queue behind each other. Reads are unaffected (WAL mode). | **Done** — WAL mode + production PRAGMAs (cache_size=64MB, mmap_size=8GB, busy_timeout=5s) applied at connection open via `createSqliteDb()` helper. |
 | **No live push** | Recipients must poll `GET /mail/:deviceID`. Every poll is a DB read + delete. Frequent polling from many clients amplifies read load unnecessarily. | Wire the `onMail` WebSocket callback to push to online recipients, falling back to store-and-forward for offline devices. |
 | **Mail table growth** | If recipients don't fetch mail, rows accumulate indefinitely. No TTL or expiry on mail rows. | Add a periodic cleanup job or a `created_at` column with TTL-based expiry. |
 
@@ -51,7 +51,7 @@ For a SQLite-backed single-process server:
 
 - **Concurrent WebSocket connections**: ~10,000–50,000 (limited by file descriptors and memory; each `ws` connection is lightweight)
 - **Message throughput (writes)**: ~1,000–5,000 inserts/sec with WAL mode, ~100–500/sec without (write serialization)
-- **Concurrent logins**: ~40/sec (4 libuv threads × ~100ms per argon2id call)
+- **Concurrent logins**: Currently limited by `pbkdf2Sync` blocking the event loop (~10/sec single-threaded). With async argon2id on libuv thread pool: ~40/sec (4 threads × ~100ms per call), ~160/sec with `UV_THREADPOOL_SIZE=16`.
 - **HTTP request throughput**: ~5,000–10,000 req/sec for read-only endpoints (Express + SQLite reads)
 
 These numbers are adequate for hundreds to low thousands of active users. SQLite with WAL mode on modern hardware is far more capable than most people assume.
@@ -66,18 +66,28 @@ The goal is to extract maximum performance from a single server before adding in
 
 **Zero new infrastructure. Just make what exists work properly.**
 
-#### 1a. Enable WAL Mode
+#### 1a. Enable WAL Mode — DONE
 
 SQLite's default journal mode serializes all access. WAL (Write-Ahead Logging) allows concurrent readers during writes and increases write throughput 5–10x.
 
 ```typescript
-// In createDb, after connection
-db.executeQuery(sql`PRAGMA journal_mode=WAL`.compile(db));
-db.executeQuery(sql`PRAGMA synchronous=NORMAL`.compile(db)); // safe with WAL
-db.executeQuery(sql`PRAGMA busy_timeout=5000`.compile(db));   // wait 5s on contention instead of failing
+// In spire/src/Database.ts — createSqliteDb() helper
+function createSqliteDb(filename: string): BetterSqlite3.Database {
+    const db = new BetterSqlite3(filename);
+    db.pragma("journal_mode = WAL");
+    db.pragma("synchronous = NORMAL");
+    db.pragma("busy_timeout = 5000");
+    db.pragma("cache_size = -64000");    // 64 MB page cache
+    db.pragma("mmap_size = 8589934592"); // 8 GB memory-map
+    db.pragma("temp_store = memory");
+    db.pragma("foreign_keys = ON");
+    return db;
+}
 ```
 
 With WAL + `synchronous=NORMAL`, SQLite on an SSD can sustain **5,000–10,000 writes/sec** while serving unlimited concurrent reads. This alone pushes the ceiling from hundreds to thousands of active users.
+
+> **Event loop note**: `better-sqlite3` is synchronous — every Kysely `.execute()` blocks the main thread. With these PRAGMAs and proper indexes, queries complete in <0.1ms (invisible). If p99 query latency ever exceeds 5ms, move DB operations to a Worker Thread. The `@libsql/client` driver (`@libsql/kysely-libsql` dialect) is a drop-in async alternative if needed.
 
 #### 1b. Wire WebSocket Live Push
 
@@ -104,13 +114,29 @@ This eliminates the DB write *and* the DB read for every message between online 
 
 This is exactly what Signal does: WebSocket push for online, store-and-forward for offline, push notification as wake signal.
 
-#### 1c. Increase libuv Thread Pool
+#### 1c. Fix `pbkdf2Sync` Event Loop Blocking
+
+Spire currently uses `crypto.pbkdf2Sync()` in `Database.ts:hashPassword()` — this blocks the entire event loop for ~50-100ms per login/register. **This is the single biggest event loop blocker in spire.**
+
+**Immediate fix**: Replace with async `crypto.pbkdf2()`:
+```typescript
+import { pbkdf2 } from "node:crypto";
+import { promisify } from "node:util";
+const pbkdf2Async = promisify(pbkdf2);
+
+export const hashPassword = (password: string, salt: Uint8Array) =>
+    pbkdf2Async(password, salt, ITERATIONS, 32, "sha512");
+```
+
+**Long-term**: Migrate to argon2id (memory-hard, OWASP recommended). argon2id runs on the libuv thread pool rather than the main thread.
+
+#### 1d. Increase libuv Thread Pool
 
 ```bash
 UV_THREADPOOL_SIZE=16 node dist/run.js
 ```
 
-Default is 4 threads. argon2id runs on this pool. With 16 threads, concurrent login throughput goes from ~40/sec to ~160/sec.
+Default is 4 threads. Async password hashing (argon2id or async pbkdf2) runs on this pool. With 16 threads, concurrent login throughput goes from ~40/sec to ~160/sec.
 
 #### 1d. Add Mail TTL
 
