@@ -39,5 +39,8 @@
     "tauri-plugin-keyring-api": "^0.1.1",
     "uuid": "catalog:"
   },
+  "dependenciesMeta": {
+    "@vex-chat/libvex": { "injected": true }
+  },
   "license": "AGPL-3.0-or-later"
 }

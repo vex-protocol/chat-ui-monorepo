@@ -13,12 +13,7 @@ export default defineConfig({
     'process.env': '{}',
   },
   resolve: {
-    // Ensure Vite uses browser builds of packages like axios.
     conditions: ['browser', 'import', 'default'],
-    // Don't follow symlinks into sibling repo node_modules — prevents
-    // Vite from resolving Node-only optional deps (winston, ws, etc.)
-    // that are installed in libvex-js but not needed for the browser.
-    preserveSymlinks: true,
   },
   // Tauri expects a fixed port and doesn't need the browser to open
   server: {
