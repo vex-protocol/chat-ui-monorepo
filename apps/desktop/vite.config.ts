@@ -7,6 +7,11 @@ const spire = { target: SPIRE_URL, changeOrigin: true } as const
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [svelte()],
+  define: {
+    // Some npm packages access process.env at runtime (axios, etc.).
+    // Tauri's WebView has no `process` global. Provide a shim.
+    'process.env': '{}',
+  },
   // Tauri expects a fixed port and doesn't need the browser to open
   server: {
     port: 5180,
