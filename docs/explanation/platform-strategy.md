@@ -90,7 +90,7 @@ Expected shared code: **~70% by line count**.
 
 ## Platform Adapter Injection
 
-> **Status (2026-04-06):** `nodeAdapters()` and `inMemoryAdapters()` (test) are implemented. `browserAdapters()` and `reactNativeAdapters()` are scaffolded (`null` in exports map) but not yet implemented — see ADR-004 Phase B. Storage backends (IndexedDB, AsyncStorage) and keystore impls are also Phase B.
+> **Status (2026-04-06):** All transport adapters (`nodeAdapters`, `browserAdapters`, `reactNativeAdapters`, `inMemoryAdapters`) are implemented. `Client.ts` is fully platform-agnostic — no Node built-in imports (`events` → `eventemitter3`, `chalk` removed, `node:os`/`node:perf_hooks` → cross-platform equivalents). Metro bundles the SDK without polyfills. Storage: `SqliteStorage` (platform-agnostic, accepts `Kysely<DB>`), `MemoryStorage`, and `createNodeStorage` (better-sqlite3 factory) are implemented. Expo-sqlite and wa-sqlite storage backends are future work.
 
 `@vex-chat/libvex` is a single SDK that runs on Node, browsers, and React Native. Platform differences (WebSocket implementation, logger, persistence) are **injected at construction time** via `Client.create()`, not hard-coded into separate builds.
 
@@ -107,53 +107,53 @@ Expected shared code: **~70% by line count**.
          ┌─────────────────┼──────────────────┐
          ▼                 ▼                  ▼
   nodeAdapters()    browserAdapters()   reactNativeAdapters()
-  + SQLite storage  + IndexedDB storage + AsyncStorage storage
-  (spire, tests)    (desktop, website)  (mobile)
+  + SqliteStorage   + MemoryStorage     + MemoryStorage
+  (Node/CLI/tests)  (desktop, website)  (mobile)
+  via storage/node  (future: wa-sqlite) (future: expo-sqlite)
 ```
 
-The `exports` map in `@vex-chat/libvex/package.json` uses **conditions** (`node`/`browser`/`react-native`) so bundlers tree-shake adapters they don't need. A React Native bundle never sees the `ws` library; a browser bundle never sees `better-sqlite3`.
+The `exports` map in `@vex-chat/libvex/package.json` uses **subpath exports** with **conditions** (`node`) so bundlers tree-shake platform-specific code. A React Native bundle never sees the `ws` library; a browser bundle never sees `better-sqlite3`. Node-only subpaths (`transport/node`, `storage/node`, `keystore/node`) are not in the barrel — they must be imported explicitly via subpath.
 
 **Construction per platform:**
 
 ```ts
 // apps/mobile — React Native + Expo
 import { Client } from '@vex-chat/libvex'
-import { reactNativeAdapters } from '@vex-chat/libvex/adapters/native'
-import { AsyncStorageBackend } from '@vex-chat/libvex/storage/native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { reactNativeAdapters } from '@vex-chat/libvex/transport/native'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
 
 const client = await Client.create(privateKey, {
-  adapters: await reactNativeAdapters(),
-  storage: new AsyncStorageBackend(AsyncStorage),
-})
+  adapters: reactNativeAdapters(),
+}, new MemoryStorage())
 ```
 
 ```ts
 // apps/desktop — Tauri + Svelte (runs in WebView)
 import { Client } from '@vex-chat/libvex'
-import { browserAdapters } from '@vex-chat/libvex/adapters/browser'
-import { IndexedDBBackend } from '@vex-chat/libvex/storage/web'
+import { browserAdapters } from '@vex-chat/libvex/transport/browser'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
 
 const client = await Client.create(privateKey, {
-  adapters: await browserAdapters(),
-  storage: new IndexedDBBackend('vex-client'),
-})
+  adapters: browserAdapters(),
+}, new MemoryStorage())
 ```
 
 ```ts
 // Tests / spire / CLI tools — Node
 import { Client } from '@vex-chat/libvex'
-// nodeAdapters() is the default when no adapters are provided
-const client = await Client.create(privateKey, { storage: new Storage(':memory:') })
+// nodeAdapters() + createNodeStorage() are the defaults when nothing is provided
+const client = await Client.create(privateKey)
 ```
 
 ```ts
 // Unit tests — in-memory
-import { Client, inMemoryAdapters } from '@vex-chat/libvex'
+import { Client } from '@vex-chat/libvex'
+import { inMemoryAdapters } from '@vex-chat/libvex/transport/test'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
+
 const client = await Client.create(privateKey, {
   adapters: inMemoryAdapters(capturingLogger()),
-  storage: new Storage(':memory:'),
-})
+}, new MemoryStorage())
 ```
 
 The `Client` public API (`register`, `login`, `connect`, `messages.send`, `messages.retrieve`, `servers.*`, `channels.*`, events) is identical across platforms.
@@ -185,7 +185,7 @@ Apps implement `KeyStore` backed by whatever their platform provides:
 
 | Platform | KeyStore backing |
 |---|---|
-| **Mobile** | `react-native-keychain` (iOS Keychain / Android Keystore) — hardware-backed, biometric-gated |
+| **Mobile** | `expo-secure-store` (iOS Keychain / Android Keystore) — hardware-backed, biometric-gated |
 | **Desktop (Tauri)** | Tauri Stronghold or `tauri-plugin-keyring` — OS-native credential stores |
 | **Browser / website** | IndexedDB + SubtleCrypto, or skip client-side persistence |
 | **Bots / CLI** | File-backed via `@vex-chat/libvex/keystore/node` (`saveKeyFile`/`loadKeyFile`) |
@@ -218,6 +218,42 @@ if (creds) {
 The app owns the flow: load → construct → connect, or generate → register → save. `Client` is identity-agnostic; biometric prompts fire when the app calls `keystore.load()`, not hidden inside the SDK.
 
 **Why not inject `KeyStore` into `Client`?** Different concerns (protocol vs persistence), different lifecycles (runtime vs boot-time), different backends (DB vs OS keychain), and different security postures. Industry precedent supports this split: matrix-js-sdk, Twilio, Slack, and Discord all pass credentials as primitives rather than injecting stores. See [ADR-004](../architecture/adr-004-sibling-repo-migration.md#identity-persistence-architecture) for the full reasoning.
+
+---
+
+## Mobile Development: Expo Go vs Development Builds
+
+`apps/mobile` uses **Expo Prebuild (CNG)** — `ios/` and `android/` directories are gitignored and generated by `npx expo prebuild`.
+
+| | Expo Go | Development Build |
+|---|---|---|
+| **What it is** | Pre-built app on your phone/simulator with a fixed set of Expo-bundled native modules | Custom app binary compiled from your project, including ALL native dependencies |
+| **Native modules** | Only modules included in Expo SDK (camera, location, etc.) | Everything in your `package.json` (notifee, expo-secure-store, etc.) |
+| **Packages like @notifee/react-native** | Crashes ("native module not found") | Works |
+| **Build time** | Zero (app already installed) | ~2-5 min first build, then incremental |
+| **JS iteration speed** | Instant hot reload | Same (after first build) |
+| **Xcode/Android Studio required** | No | Yes (for iOS simulator / device) |
+
+**Workflow:**
+
+```bash
+cd apps/mobile
+
+# Quick JS-only testing (limited — no custom native modules)
+npx expo start          # Opens in Expo Go
+
+# Full native testing (recommended)
+npx expo prebuild       # Generates ios/ and android/ from app.json + plugins
+npx expo run:ios        # Builds and launches on iOS simulator
+npx expo run:android    # Builds and launches on Android emulator
+```
+
+After the first native build, `npx expo start` with the "development build" option hot-reloads just as fast as Expo Go, but with all native modules available.
+
+**When to use which:**
+- **Expo Go**: Quick iteration on pure-JS UI changes, layout, navigation. No custom native modules.
+- **Development build**: Testing anything involving notifications (notifee), secure storage (expo-secure-store), or any native dependency not in Expo Go.
+- **Production**: EAS Build (`eas build`) or local `npx expo prebuild --clean && xcodebuild`.
 
 ---
 

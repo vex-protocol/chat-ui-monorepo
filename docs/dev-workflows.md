@@ -55,36 +55,47 @@ pnpm --filter @vex-chat/desktop check
 
 ---
 
-## Mobile (React Native)
+## Mobile (Expo + React Native)
 
-Native iOS and Android client.
+Native iOS and Android client via Expo Prebuild (CNG). `ios/` and `android/` directories are gitignored — generated from `app.json` + config plugins.
 
 ### Prerequisites
 
-- macOS for iOS: Xcode 15+, CocoaPods
-- Android: Android SDK, NDK, emulator or device
+- macOS for iOS: Xcode 16+
+- Android: Android SDK, emulator or device
+- `npx expo prebuild` generates native projects from config
 
-### First-time iOS setup
-
-```bash
-pnpm --filter @vex-chat/mobile pod-install
-```
-
-### Run dev
+### First-time setup
 
 ```bash
-pnpm --filter @vex-chat/mobile ios       # iOS simulator
-pnpm --filter @vex-chat/mobile android   # Android emulator
-pnpm --filter @vex-chat/mobile dev       # auto-selects (iOS on macOS, Android otherwise)
+cd apps/mobile
+npx expo prebuild          # generates ios/ and android/
 ```
+
+### Development build (recommended)
+
+```bash
+npx expo run:ios           # builds native + launches on iOS simulator
+npx expo run:android       # builds native + launches on Android emulator
+```
+
+After the first build (~2-5 min), subsequent launches are fast. JS changes hot-reload instantly.
+
+### Expo Go (quick JS-only testing)
+
+```bash
+npx expo start             # opens in Expo Go on device/simulator
+```
+
+Expo Go has a fixed set of native modules. Packages with custom native code (`@notifee/react-native`, etc.) will crash in Expo Go — use a development build instead. See `docs/explanation/platform-strategy.md` for the full Expo Go vs dev build comparison.
 
 ### Metro bundler (standalone)
 
 ```bash
-pnpm --filter @vex-chat/mobile start
+npx expo start --dev-client   # connects to an existing development build
 ```
 
-Useful if the app needs to reconnect to the bundler.
+Useful if the app needs to reconnect to the bundler after the native binary is already running.
 
 ---
 
