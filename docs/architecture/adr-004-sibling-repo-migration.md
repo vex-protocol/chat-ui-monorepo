@@ -209,9 +209,7 @@ All modernization branches (`feature/unified-deps`) are already merged to master
 
 **A.3 — libvex-js:** Implement adapter injection from scratch (see Phase B below).
 
-**A.4 — spire:** No code changes. Only cleanup (see below).
-
-**All repos:** Delete `.yalc/` directories and `yalc.lock` files. Linking is now handled by pnpm workspace (see Phase C).
+**All repos:** Delete `.yalc/` directories and `yalc.lock` files. Client repos are linked via pnpm workspace (see Phase C). Spire is not workspace-linked — it runs standalone for integration testing.
 
 ### Phase A.5 — crypto-js pure-JS migration (prerequisite for browser/RN)
 
@@ -358,10 +356,11 @@ packages:
   - '../crypto-js'
   - '../types-js'
   - '../libvex-js'
-  - '../spire'
 ```
 
 Then `pnpm install` from the vex-chat root resolves all `workspace:*` dependencies to sibling directories via symlinks. No publish or push step between edits — changes in sibling source are immediately visible after `npm run build` in the sibling repo.
+
+Spire is **not** included in the pnpm workspace — it's a server, not consumed by the monorepo apps. It runs standalone for local integration testing.
 
 Sibling repos keep their own `package-lock.json` for standalone CI. The pnpm workspace lockfile is only used during local development.
 
@@ -480,7 +479,7 @@ Migrate `apps/mobile` from bare RN 0.84.1 to Expo Prebuild (CNG + Expo SDK).
 ### Phase E — Docs & bootstrap tooling
 
 1. Update `docs/explanation/platform-strategy.md` — replace monorepo-internal `packages/*` references with sibling-repo consumption via adapter injection
-2. Add `scripts/bootstrap.sh` to vex-chat that checks for `../libvex-js`, `../crypto-js`, `../types-js`, `../spire` siblings and clones them from GitHub if missing, then runs `pnpm install`
+2. Add `scripts/bootstrap.sh` to vex-chat that checks for `../libvex-js`, `../crypto-js`, `../types-js` siblings and clones them from GitHub if missing, then runs `pnpm install`. Optionally clone `../spire` for local integration testing.
 3. Update root `README.md` with fresh-clone instructions (clone all 5 repos, `pnpm install` from vex-chat root)
 4. Mark `packages/ui` and `packages/store` as the only remaining monorepo packages
 
@@ -543,7 +542,7 @@ Migrate `apps/mobile` from bare RN 0.84.1 to Expo Prebuild (CNG + Expo SDK).
 
 ### Resolved by ADR
 
-- **Linkage mechanism** — pnpm workspace. Add sibling repos to `pnpm-workspace.yaml` as external members (`'../crypto-js'`, etc.). No yalc. `pnpm install` from vex-chat root resolves all inter-repo deps via symlinks. Switch to npm registry versions once stable.
+- **Linkage mechanism** — pnpm workspace. Add client sibling repos to `pnpm-workspace.yaml` as external members (`'../crypto-js'`, `'../types-js'`, `'../libvex-js'`). Spire is not workspace-linked (server, not consumed by apps). No yalc. `pnpm install` from vex-chat root resolves all inter-repo deps via symlinks. Switch to npm registry versions once stable.
 - **Feature branch strategy** — single `feat/platform-adapters` branch from master across all repos that need changes. No reuse of prior prototype branches.
 - **Storage backends** — live in libvex-js as subpath exports (`/storage/{node,web,native,memory}`). Discoverability + test harness reuse outweigh per-app isolation.
 - **Utility helpers** — `parseVexLink`/`parseInviteID`/`fromEvent` as additive libvex-js exports. Matches existing export convention.

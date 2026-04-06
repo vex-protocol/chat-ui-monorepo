@@ -1,6 +1,9 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - '../crypto-js'
+  - '../types-js'
+  - '../libvex-js'
 
 onlyBuiltDependencies:
   - argon2

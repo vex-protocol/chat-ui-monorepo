@@ -54,7 +54,7 @@ The SDK layer lives in **standalone sibling repos**, not inside vex-chat. The mo
 └── spire/                       — Server                           — [github.com/vex-chat/spire]
 ```
 
-**Linkage during development:** siblings are added to `pnpm-workspace.yaml` as external workspace members (`'../crypto-js'`, `'../types-js'`, `'../libvex-js'`, `'../spire'`). A single `pnpm install` from the vex-chat root resolves all inter-repo `workspace:*` dependencies via symlinks — no publish step required between edits. Sibling repos keep their own `package-lock.json` for standalone CI.
+**Linkage during development:** client SDK siblings are added to `pnpm-workspace.yaml` as external workspace members (`'../crypto-js'`, `'../types-js'`, `'../libvex-js'`). A single `pnpm install` from the vex-chat root resolves all inter-repo `workspace:*` dependencies via symlinks — no publish step required between edits. Sibling repos keep their own `package-lock.json` for standalone CI. Spire (server) is not workspace-linked — it runs standalone for integration testing.
 
 See [ADR-004](../architecture/adr-004-sibling-repo-migration.md) for the migration rationale and ADR-001 for the original monorepo consolidation.
 
