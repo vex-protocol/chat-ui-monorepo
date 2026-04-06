@@ -43,7 +43,7 @@ export async function clearMessages(): Promise<void> {
 
 // ── Familiars persistence ─────────────────────────────────────────────────────
 
-import type { IUser } from '@vex-chat/libvex'
+import type { IUser } from '@vex-chat/types'
 
 export async function saveFamiliars(familiars: Record<string, IUser>): Promise<void> {
   await AsyncStorage.setItem(FAMILIARS_KEY, JSON.stringify(familiars))

@@ -3,7 +3,7 @@
   import { client } from './store/index.js'
   import { getServerUrl } from './config.js'
   import Avatar from './Avatar.svelte'
-  import type { IUser } from '@vex-chat/libvex'
+  import type { IUser } from '@vex-chat/types'
 
   let { serverID = '', channelID = '' }: { serverID?: string; channelID?: string } = $props()
 

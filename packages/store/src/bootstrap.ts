@@ -95,7 +95,7 @@ export async function bootstrap(
           $familiars.setKey(otherUserID, {
             userID: otherUserID,
             username: otherUserID.slice(0, 8),
-            lastSeen: Date.now(),
+            lastSeen: new Date(),
           })
           client.users.retrieve(otherUserID).then(([u]) => {
             if (u) $familiars.setKey(otherUserID, u)
