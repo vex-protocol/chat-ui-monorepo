@@ -44,9 +44,9 @@ The SDK layer lives in **standalone sibling repos**, not inside vex-chat. The mo
 │       output/react/            — compiled React components (mobile)
 │       stories/                 — Storybook
 │   apps/
-│     desktop/                   — Tauri + Svelte; browser adapters + IndexedDB storage
-│     mobile/                    — Expo + React Native; native adapters + AsyncStorage storage
-│     website/                   — SvelteKit; browser adapters + IndexedDB storage
+│     desktop/                   — Tauri + Svelte; browser transport + SqliteStorage (future: tauri-plugin-sql)
+│     mobile/                    — Expo + React Native; native transport + SqliteStorage (future: expo-sqlite)
+│     website/                   — SvelteKit; browser transport + MemoryStorage
 │
 ├── libvex-js/                   — Client SDK (@vex-chat/libvex) — [github.com/vex-chat/libvex-js]
 ├── crypto-js/                   — Crypto primitives (@vex-chat/crypto) — [github.com/vex-chat/crypto-js]
@@ -187,7 +187,7 @@ Apps implement `KeyStore` backed by whatever their platform provides:
 |---|---|
 | **Mobile** | `expo-secure-store` (iOS Keychain / Android Keystore) — hardware-backed, biometric-gated |
 | **Desktop (Tauri)** | Tauri Stronghold or `tauri-plugin-keyring` — OS-native credential stores |
-| **Browser / website** | IndexedDB + SubtleCrypto, or skip client-side persistence |
+| **Browser / website** | SqliteStorage (future: wa-sqlite Kysely dialect), or skip client-side persistence |
 | **Bots / CLI** | File-backed via `@vex-chat/libvex/keystore/node` (`saveKeyFile`/`loadKeyFile`) |
 | **Tests** | `@vex-chat/libvex/keystore/memory` (no disk I/O) |
 
@@ -368,4 +368,4 @@ const messages = useStore($messages)
 
 ---
 
-See also: [packages.md](../reference/packages.md) for package APIs and dependency graph, [design-system.md](design-system.md) for the Mitosis component pipeline, [desktop-reimplementation.md](desktop-reimplementation.md) for the Electron → Tauri migration.
+See also: [packages.md](../reference/packages.md) for package APIs and dependency graph, [design-system.md](design-system.md) for the Mitosis component pipeline.

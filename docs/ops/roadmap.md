@@ -2,13 +2,15 @@
 
 What we're building, in what order, and why. This is the strategy layer — the big picture. Technical issues and day-to-day execution live in Linear.
 
-> Review every 6 weeks or when a release ships. Last updated: March 2026.
+> Review every 6 weeks or when a release ships. Last updated: April 2026.
 
 ---
 
 ## Now — Active
 
-No active work. See Later for future candidates.
+| Priority | What | Notes |
+|---|---|---|
+| P1 | `feat/platform-adapters` branch | Sibling-repo migration (ADR-004): transport adapters, SqliteStorage, Expo Prebuild. Active across vex-chat + libvex-js + crypto-js + types-js. |
 
 ---
 
@@ -29,7 +31,7 @@ Important but not scoped. May never ship if priorities change. That's fine.
 | P4 | Account deletion | 15 | Privacy feature, needs design |
 | P4 | Custom emoji | 10, 11 | Nice-to-have, large effort |
 | P4 | Moderation tools (kick/ban) | 11 | Needed when servers grow |
-| P4 | Spire modernization (Zod, ESM, Pino) | — | Tech debt; Kysely migration done, Express 4 + Winston remains |
+| P4 | Spire modernization (Zod, ESM, Pino) | — | Tech debt; Express 4 + Winston remains |
 
 ---
 
@@ -59,7 +61,8 @@ Pruned periodically.
 | Auth rate limiting (10/15min on login and register) | v0.2 |
 | Logout state cleanup (resetAll() clears all nanostores atoms) | v0.2 |
 | Invite join atomicity (wrapped in transaction) | v0.2 |
-| Local message persistence (IndexedDB, load/save/clear lifecycle) | v0.3 |
+| Local message persistence (SqliteStorage via IStorage, load/save/clear lifecycle) | v0.3 |
 | Group messaging UI (GET /server/:id/members + ServerChannel fan-out) | v0.3 |
 | File/image attachments (ChatInput picker, MessageBox inline rendering, upload + send) | v0.3 |
 | Device management (DELETE route + SDK method + Settings UI with list/delete) | v0.3 |
+| Spire Kysely migration (Knex → Kysely query builder) | v0.3 |

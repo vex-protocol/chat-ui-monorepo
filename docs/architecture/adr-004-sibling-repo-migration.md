@@ -89,14 +89,13 @@ The sibling repos stay at **4 packages** (`types` + `crypto` + `libvex` + monore
 
 ```
 @vex-chat/libvex                      → Client, IStorage, IClientAdapters, IMessage
-@vex-chat/libvex/adapters/node        → nodeAdapters (ws-backed) — existing
-@vex-chat/libvex/adapters/browser     → browserAdapters (globalThis.WebSocket)
-@vex-chat/libvex/adapters/native      → reactNativeAdapters
-@vex-chat/libvex/adapters/test        → inMemoryAdapters, MockWebSocket, silentLogger — existing
-@vex-chat/libvex/storage/node         → SQLite+Kysely Storage — existing (src/Storage.ts)
-@vex-chat/libvex/storage/web          → IndexedDB Storage
-@vex-chat/libvex/storage/native       → AsyncStorage Storage
-@vex-chat/libvex/storage/memory       → in-memory Storage for tests
+@vex-chat/libvex/transport/node        → nodeAdapters (ws-backed) — existing
+@vex-chat/libvex/transport/browser     → browserAdapters (globalThis.WebSocket)
+@vex-chat/libvex/transport/native      → reactNativeAdapters
+@vex-chat/libvex/transport/test        → inMemoryAdapters, MockWebSocket, silentLogger — existing
+@vex-chat/libvex/storage/node         → SqliteStorage + createNodeStorage (better-sqlite3 + Kysely)
+@vex-chat/libvex/storage/memory       → MemoryStorage for tests
+(future: expo-sqlite and wa-sqlite/tauri-plugin-sql Kysely dialects for SqliteStorage)
 @vex-chat/libvex/keystore/node        → file-backed KeyStore (Node condition; wraps saveKeyFile)
 @vex-chat/libvex/keystore/memory      → in-memory KeyStore for tests
 @vex-chat/libvex/bot                  → CommandRouter, fromEvent
@@ -284,11 +283,9 @@ Adds adapters, storage backends, keystore reference implementations, and the bot
 
 | New file | Purpose |
 |---|---|
-| `src/adapters/browser.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
-| `src/adapters/native.ts` | `reactNativeAdapters()` → `{ logger: rnLogger, WebSocket: globalThis.WebSocket }` |
-| `src/storage/web.ts` | IndexedDB-backed `IStorage` — for desktop Tauri WebView and website |
-| `src/storage/native.ts` | AsyncStorage-backed `IStorage` — for mobile |
-| `src/storage/memory.ts` | in-memory `IStorage` — for unit tests |
+| `src/transport/browser.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
+| `src/transport/native.ts` | `reactNativeAdapters()` → `{ logger: rnLogger, WebSocket: globalThis.WebSocket }` |
+| `src/storage/memory.ts` | `MemoryStorage` — in-memory `IStorage` for unit tests |
 | `src/keystore/node.ts` | `nodeKeyStore(path, password)` — file-backed, wraps `saveKeyFile`/`loadKeyFile` (Node condition only) |
 | `src/keystore/memory.ts` | `inMemoryKeyStore()` — for unit tests, ~10 LOC |
 | `src/bot/router.ts` | `CommandRouter` — prefix-based mail dispatcher (salvaged from monorepo `packages/libvex/src/bot`) |
@@ -310,17 +307,15 @@ Existing `src/Storage.ts` (SQLite + Kysely) stays as the Node default under `@ve
     "import": "./dist/index.js",
     "default": "./dist/index.js"
   },
-  "./adapters/node": {
-    "node": "./dist/adapters/node.js"
+  "./transport/node": {
+    "node": "./dist/transport/node.js"
   },
-  "./adapters/browser": "./dist/adapters/browser.js",
-  "./adapters/native": "./dist/adapters/native.js",
-  "./adapters/test": "./dist/adapters/test.js",
+  "./transport/browser": "./dist/transport/browser.js",
+  "./transport/native": "./dist/transport/native.js",
+  "./transport/test": "./dist/transport/test.js",
   "./storage/node": {
     "node": "./dist/storage/node.js"
   },
-  "./storage/web": "./dist/storage/web.js",
-  "./storage/native": "./dist/storage/native.js",
   "./storage/memory": "./dist/storage/memory.js",
   "./keystore/node": {
     "node": "./dist/keystore/node.js"
@@ -330,12 +325,12 @@ Existing `src/Storage.ts` (SQLite + Kysely) stays as the Node default under `@ve
 }
 ```
 
-Node-only subpaths (`/adapters/node`, `/storage/node`, `/keystore/node`) use the `node` condition — browser/RN bundlers resolving them would error at import time (correct behavior: these would fail at runtime anyway since they need `ws`/`better-sqlite3`/`fs`).
+Node-only subpaths (`/transport/node`, `/storage/node`, `/keystore/node`) use the `node` condition — browser/RN bundlers resolving them would error at import time (correct behavior: these would fail at runtime anyway since they need `ws`/`better-sqlite3`/`fs`).
 
 **Tests to add:**
 - Browser adapter wiring (JSDOM env)
 - Native adapter wiring (react-native mocks)
-- IStorage round-trip tests for web/native/memory backends
+- IStorage round-trip tests for memory backend
 - `nodeKeyStore` save→load round-trip (uses temp file)
 - `inMemoryKeyStore` basic contract tests
 - `CommandRouter` prefix-dispatch tests using `inMemoryAdapters` + fake mail stream
@@ -397,12 +392,12 @@ export const keychainKeyStore: KeyStore = {
 ```ts
 // apps/mobile/App.tsx — session bootstrap
 import { Client } from '@vex-chat/libvex'
-import { reactNativeAdapters } from '@vex-chat/libvex/adapters/native'
-import { AsyncStorageBackend } from '@vex-chat/libvex/storage/native'
+import { reactNativeAdapters } from '@vex-chat/libvex/transport/native'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
 import { keychainKeyStore } from './lib/keychain'
 
 const adapters = await reactNativeAdapters()
-const storage = new AsyncStorageBackend(asyncStorage)
+const storage = new MemoryStorage()  // future: SqliteStorage with expo-sqlite Kysely dialect
 const creds = await keychainKeyStore.load()
 
 const client = creds
@@ -418,15 +413,15 @@ export const strongholdKeyStore: KeyStore = { /* Tauri Stronghold-backed */ }
 
 // apps/desktop/src/lib/client.ts
 import { Client } from '@vex-chat/libvex'
-import { browserAdapters } from '@vex-chat/libvex/adapters/browser'
-import { IndexedDBBackend } from '@vex-chat/libvex/storage/web'
+import { browserAdapters } from '@vex-chat/libvex/transport/browser'
+import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
 import { strongholdKeyStore } from './stronghold-keystore'
 
 const creds = await strongholdKeyStore.load()
 const client = creds
   ? await Client.create(creds.deviceKey, {
       adapters: await browserAdapters(),
-      storage: new IndexedDBBackend('vex-client'),
+      storage: new MemoryStorage(),  // future: SqliteStorage with tauri-plugin-sql Kysely dialect
     })
   : null
 ```
@@ -537,7 +532,7 @@ Migrated `apps/mobile` from bare RN 0.84.1 to **Expo SDK 55 Prebuild (CNG)** wit
 
 - **Linkage mechanism** — pnpm workspace. Add client sibling repos to `pnpm-workspace.yaml` as external members (`'../crypto-js'`, `'../types-js'`, `'../libvex-js'`). Spire is not workspace-linked (server, not consumed by apps). No yalc. `pnpm install` from vex-chat root resolves all inter-repo deps via symlinks. Switch to npm registry versions once stable.
 - **Feature branch strategy** — single `feat/platform-adapters` branch from master across all repos that need changes. No reuse of prior prototype branches.
-- **Storage backends** — live in libvex-js as subpath exports (`/storage/{node,web,native,memory}`). Discoverability + test harness reuse outweigh per-app isolation.
+- **Storage backends** — `SqliteStorage` (platform-agnostic, accepts `Kysely<DB>`) + `MemoryStorage` live in libvex-js as subpath exports (`/storage/{node,memory}`). Platform-specific Kysely dialects (better-sqlite3, expo-sqlite, tauri-plugin-sql) are injected at construction time.
 - **Utility helpers** — `parseVexLink`/`parseInviteID`/`fromEvent` as additive libvex-js exports. Matches existing export convention.
 - **KeyStore ownership** — app-level, not SDK-level. `Client` never sees `KeyStore`. Apps load credentials and pass `privateKey` to `Client.create()`.
 - **New packages** — none. 4 packages stays. Subpath exports for all adapter/storage/keystore/bot/test families.

@@ -6,150 +6,60 @@ Canonical reference for `packages/*` — the shared TypeScript libraries that po
 
 ## Overview
 
-Five packages form the shared layer consumed by all Vex clients (desktop, mobile, third-party developers):
+Two packages remain in the monorepo (`store`, `ui`). Three were migrated to standalone sibling repos (`@vex-chat/types` -> `../types-js`, `@vex-chat/crypto` -> `../crypto-js`, `@vex-chat/libvex` -> `../libvex-js`) linked via pnpm workspace.
 
-| Package | npm name | Purpose | Detail |
-|---|---|---|---|
-| `packages/types` | `@vex-chat/types` | Shared protocol interfaces — no runtime deps, no build step | Below |
-| `packages/crypto` | `@vex-chat/crypto` | NaCl signing, hex encoding, X3DH session crypto | Below |
-| `packages/libvex` | `@vex-chat/libvex` | Framework-agnostic client SDK (fetch + WebSocket) | [packages-libvex.md](packages-libvex.md) |
-| `packages/store` | `@vex-chat/store` | nanostores atoms: state slices + bootstrap + VexClient event wiring | [packages-store-ui.md](packages-store-ui.md) |
-| `packages/ui` | `@vex-chat/ui` | Mitosis design primitives compiled to Svelte + React | [packages-store-ui.md](packages-store-ui.md) |
+| Package | npm name | Location | Purpose | Detail |
+|---|---|---|---|---|
+| `packages/store` | `@vex-chat/store` | monorepo | nanostores atoms: state slices + bootstrap + Client event wiring | [packages-store-ui.md](packages-store-ui.md) |
+| `packages/ui` | `@vex-chat/ui` | monorepo | Mitosis design primitives compiled to Svelte + React | [packages-store-ui.md](packages-store-ui.md) |
+| `../types-js` | `@vex-chat/types` | sibling repo | Shared protocol interfaces — no runtime deps, no build step | Below |
+| `../crypto-js` | `@vex-chat/crypto` | sibling repo | NaCl signing, hex encoding, X3DH session crypto | Below |
+| `../libvex-js` | `@vex-chat/libvex` | sibling repo | Framework-agnostic client SDK (fetch + WebSocket) | See libvex-js repo |
 
-All are `private: true` workspace packages consumed via `"workspace:*"` deps in `pnpm-workspace.yaml`.
-
----
-
-## `packages/types` — `@vex-chat/types`
-
-**No runtime dependencies. No build step. Source-first.**
-
-TypeScript interfaces only — the wire format contract between server and clients. Consuming packages import directly from `./src/index.ts` via the `exports` field.
-
-### Files
-
-```
-packages/types/src/
-  index.ts      — barrel export
-  user.ts       — IUser, IRegistrationPayload, ILoginBody
-  device.ts     — IDevice, IDevicePayload, IKeyBundle, IPreKey, IOneTimeKey
-  mail.ts       — IMail (wire format — internal to libvex, never exposed to apps)
-                  DecryptedMail (what apps see: mailID, authorID, readerID, group,
-                                 mailType, time, content: string, extra, forward)
-  server.ts     — IServer, IChannel, IPermission, IInvite
-  token.ts      — TokenType, ALL_TOKEN_TYPES, IActionToken, ITokenStore
-```
-
-### Design rules
-
-- **No DB-specific fields.** `deleted: number` stays in spire's `Database.ts`, not here.
-- **No classes, no enums at runtime.** Use `const` objects + `as const` for enum-like values so tree-shaking works.
-- **No validation schemas here.** Spire owns its own validation. These interfaces are the canonical shape.
-
-### `package.json` shape
-
-```json
-{
-  "name": "@vex-chat/types",
-  "private": true,
-  "type": "module",
-  "exports": { ".": "./src/index.ts" }
-}
-```
+`store` and `ui` are `private: true` workspace packages. The sibling repos (`types-js`, `crypto-js`, `libvex-js`) are linked into the pnpm workspace but live outside the monorepo.
 
 ---
 
-## `packages/crypto` — `@vex-chat/crypto`
+## Sibling Repos — `@vex-chat/types`, `@vex-chat/crypto`, `@vex-chat/libvex`
 
-**Dependency on `@noble/curves` + `@noble/hashes` always. `@noble/ciphers` only for `box.ts`.**
+These three packages were migrated out of the monorepo into standalone sibling repos. They are linked into the pnpm workspace so monorepo packages can still import them as `"workspace:*"` deps. See each repo for file layouts, design rules, and package.json details:
 
-Provides hex encoding, NaCl signature verification, and client-side primitives (signing, X3DH session setup, authenticated encryption). Consumed by libvex (workspace) and by the spire server (via npm).
-
-### Files
-
-```
-packages/crypto/src/
-  index.ts       — barrel export
-  encoding.ts    — decodeHex, encodeHex
-  nacl.ts        — verifyNaClSignature, verifyDetached
-                   signMessage, signDetached, generateSignKeyPair
-  session.ts     — ed25519↔x25519 conversions, generateDHKeyPair, dh(), deriveSessionKey (HKDF-SHA256)
-  box.ts         — encryptBox, decryptBox (X25519 + XSalsa20-Poly1305, NaCl box semantics)
-                   encryptSecretBox, decryptSecretBox (symmetric, NaCl secretbox semantics)
-                   generateNonce() — 24 random bytes
-```
-
-### What lives where
-
-| Function | File | Used by |
+| Package | Sibling repo | Purpose |
 |---|---|---|
-| `decodeHex` / `encodeHex` | `encoding.ts` | spire, libvex |
-| `verifyNaClSignature` | `nacl.ts` | spire (auth routes) |
-| `verifyDetached` | `nacl.ts` | spire (ws handshake) |
-| `signMessage` / `signDetached` | `nacl.ts` | libvex |
-| `generateSignKeyPair` | `nacl.ts` | libvex |
-| `convertPublicKey` / `convertSecretKey` / `convertKeyPair` | `session.ts` | libvex only |
-| `generateDHKeyPair` / `dh` | `session.ts` | libvex only |
-| `deriveSessionKey` (HKDF-SHA256) | `session.ts` | libvex only |
-| `encryptBox` / `decryptBox` | `box.ts` | libvex only |
-| `encryptSecretBox` / `decryptSecretBox` | `box.ts` | libvex only |
-| `generateNonce` | `box.ts` | libvex only |
-
-**Stays in spire only:** `hashPassword` / `verifyPassword` (server-only, argon2id).
-
-### Library rationale
-
-| Old | New | Why |
-|---|---|---|
-| `tweetnacl` (CJS, 6yr old) | `@noble/curves/ed25519` | ESM-native, Cure53 audited Sept 2024, 9.7M weekly downloads |
-| `ed2curve` (CJS UMD, broken named exports in ESM) | `ed25519.utils.toMontgomery` / `toMontgomerySecret` | Built into `@noble/curves` — no separate package |
-| `futoin-hkdf` (CJS) | `@noble/hashes/hkdf` | ESM-native, zero deps, 29.9M weekly downloads |
-
-### `package.json` shape
-
-```json
-{
-  "name": "@vex-chat/crypto",
-  "private": true,
-  "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": {
-    "@noble/curves": "catalog:",
-    "@noble/hashes": "catalog:"
-  }
-}
-```
+| `@vex-chat/types` | `../types-js` | Shared protocol interfaces — no runtime deps, no build step |
+| `@vex-chat/crypto` | `../crypto-js` | NaCl signing, hex encoding, X3DH session crypto |
+| `@vex-chat/libvex` | `../libvex-js` | Framework-agnostic client SDK (fetch + WebSocket) |
 
 ---
 
 ## Dependency Graph
 
 ```
-packages/types  ◄──────────────────────────────────────────────────┐
-packages/crypto ◄────────────────────────────────────────┐         │
-                                                          │         │
-packages/libvex ─────── @vex-chat/types ◄────────────────┘         │
-                └─────── @vex-chat/crypto                           │
-                                                                    │
-packages/store ──────── @vex-chat/types + @vex-chat/libvex         │
-                                                                    │
-packages/ui     ─────── (no runtime deps)                           │
-                                                                    │
-spire (own repo) ──────────────────────── @vex-chat/crypto (npm)    │
-                                                                    │
-apps/desktop ─┬── @vex-chat/store  (atoms are native Svelte stores) │
-              └── @vex-chat/ui (/svelte/*)                          │
-                                                                    │
-apps/mobile  ─┬── @vex-chat/store + @nanostores/react              │
-              └── @vex-chat/ui (/react/*)              ◄────────────┘
+Sibling repos (external, linked via pnpm workspace):
+  ../types-js   (@vex-chat/types)   ◄───────────────────────────────┐
+  ../crypto-js  (@vex-chat/crypto)  ◄──────────────────────┐        │
+  ../libvex-js  (@vex-chat/libvex)  ─── types + crypto ◄──┘        │
+                                                                     │
+Monorepo packages:                                                   │
+  packages/store ──────── @vex-chat/types + @vex-chat/libvex        │
+  packages/ui     ─────── (no runtime deps)                          │
+                                                                     │
+External:                                                            │
+  spire (own repo) ──────────────────────── @vex-chat/crypto (npm)   │
+                                                                     │
+  apps/desktop ─┬── @vex-chat/store  (atoms are native Svelte stores)│
+                └── @vex-chat/ui (/svelte/*)                         │
+                                                                     │
+  apps/mobile  ─┬── @vex-chat/store + @nanostores/react             │
+                └── @vex-chat/ui (/react/*)              ◄───────────┘
 ```
 
-- `packages/types` — zero runtime deps
-- `packages/crypto` — `@noble/curves` + `@noble/hashes` only; no Node.js `Buffer` dependency
-- `packages/libvex` — types + crypto + `eventemitter3` + `reconnecting-websocket`
+- `../types-js` (`@vex-chat/types`) — zero runtime deps (sibling repo)
+- `../crypto-js` (`@vex-chat/crypto`) — `@noble/curves` + `@noble/hashes` only; no Node.js `Buffer` dependency (sibling repo)
+- `../libvex-js` (`@vex-chat/libvex`) — types + crypto + `eventemitter3` + `reconnecting-websocket` (sibling repo)
 - `packages/store` — types + libvex + `nanostores`; apps/mobile optionally installs `@nanostores/react`; Svelte needs no adapter
 - `packages/ui` — no runtime deps; Mitosis is a devDep only
-- `spire` (own repo) — imports `@vex-chat/crypto` via npm (server has no state management needs)
+- `spire` (own repo, NOT in the pnpm workspace) — imports `@vex-chat/crypto` via npm (server has no state management needs)
 
 ---
 
@@ -175,4 +85,4 @@ pnpm -r exec tsc --noEmit            # zero errors across workspace
 
 ---
 
-See also: [packages-libvex.md](packages-libvex.md) for the VexClient SDK API, [packages-store-ui.md](packages-store-ui.md) for the state layer and design system.
+See also: [packages-store-ui.md](packages-store-ui.md) for the state layer and design system.

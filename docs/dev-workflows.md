@@ -185,14 +185,21 @@ Starts three servers:
 
 ## Shared Packages
 
-These have no build step — apps import TypeScript source directly.
+These have no build step -- apps import TypeScript source directly.
+
+**Monorepo packages:**
 
 | Package | Purpose | Used by |
 |---|---|---|
-| `packages/types` | Shared TypeScript interfaces | all apps + packages |
-| `packages/crypto` | Ed25519, X3DH, NaCl encryption | desktop, mobile, libvex (also consumed by spire via npm) |
-| `packages/libvex` | VexClient SDK (WebSocket, auth, messaging) | desktop, mobile, store |
 | `packages/store` | Nanostores reactive state | desktop, mobile |
+
+**Sibling repos (linked via pnpm workspace):**
+
+| Repo | npm name | Purpose | Used by |
+|---|---|---|---|
+| `../types-js` | `@vex-chat/types` | Shared TypeScript interfaces | all apps + packages |
+| `../crypto-js` | `@vex-chat/crypto` | Ed25519, X3DH, NaCl encryption | libvex (also consumed by spire via npm) |
+| `../libvex-js` | `@vex-chat/libvex` | Client SDK (WebSocket, auth, messaging) | store, desktop, mobile |
 
 ---
 
@@ -234,13 +241,18 @@ Push to `main` → Vercel auto-deploys.
 ## Dependency Graph
 
 ```
-apps/desktop ─── packages/store ─── packages/libvex ─── packages/crypto
-                      │                                       │
-                      └──────── packages/types ◄──────────────┘
+apps/desktop ─── packages/store ─── ../libvex-js ─── ../crypto-js
+                      │                                    │
+                      └──────── ../types-js ◄──────────────┘
 apps/mobile ──── packages/store
-apps/website ─── packages/types
+apps/website ─── ../types-js
 packages/ui ──── (standalone, compiles to React + Svelte)
 
-External:
+Sibling repos (linked via pnpm workspace):
+../types-js   (@vex-chat/types)
+../crypto-js  (@vex-chat/crypto)
+../libvex-js  (@vex-chat/libvex)
+
+External (NOT in pnpm workspace):
 spire (own repo) ── @vex-chat/crypto (via npm)
 ```

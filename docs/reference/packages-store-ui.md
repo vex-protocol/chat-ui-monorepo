@@ -1,18 +1,18 @@
 # `packages/store` and `packages/ui`
 
-The state management layer and design system primitives that connect `VexClient` to app UIs.
+The state management layer and design system primitives that connect `Client` to app UIs.
 
 ---
 
 ## `packages/store` — `@vex-chat/store`
 
-Nanostores atoms per state slice. Wraps `VexClient` from `@vex-chat/libvex` — `bootstrap()` wires real-time events directly to atoms and runs the waterfall HTTP fetch. Apps never import `VexClient` directly — they import atoms. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
+Nanostores atoms per state slice. Wraps `Client` from `@vex-chat/libvex` — `bootstrap()` wires real-time events directly to atoms and runs the waterfall HTTP fetch. Apps never import `Client` directly — they import atoms. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
 
 ### Responsibility split
 
 | Layer | Owns |
 |---|---|
-| `@vex-chat/libvex` (VexClient) | Network I/O: HTTP requests, WebSocket frames, NaCl handshake, discriminated union results |
+| `@vex-chat/libvex` (Client) | Network I/O: HTTP requests, WebSocket frames, NaCl handshake, discriminated union results |
 | `@vex-chat/store` (nanostores atoms) | Runtime state: nanostores atoms per slice, event wiring in `bootstrap()`, waterfall HTTP fetch |
 | Svelte (native) | `$atomName` reactive syntax — no adapter needed; nanostores atoms implement `.subscribe()` |
 | `@nanostores/react` | Framework binding for apps/mobile — `useStore($atom)` in React Native components |
@@ -22,7 +22,7 @@ Nanostores atoms per state slice. Wraps `VexClient` from `@vex-chat/libvex` — 
 ```
 packages/store/src/
   index.ts         — barrel: all atoms + bootstrap() + resetAll() + $keyReplaced
-  client.ts        — $client atom<VexClient | null>
+  client.ts        — $client atom<Client | null>
   bootstrap.ts     — bootstrap(serverUrl, deviceID, deviceKey): create client, wire events, connect, waterfall fetch
   reset.ts         — resetAll(): resets all atoms to defaults on logout
   user.ts          — $user atom<IUser | null>
@@ -35,6 +35,14 @@ packages/store/src/
   onlineLists.ts   — $onlineLists map
   avatarHash.ts    — $avatarHash atom<number> (cache-busting counter for avatar uploads)
   verifiedKeys.ts  — $verifiedKeys atom<Set<string>> (localStorage-persisted) + markVerified/unmarkVerified/isVerified
+  auto-login.ts    — auto-login logic from stored credentials
+  deeplink.ts      — deep link handling
+  key-replaced.ts  — $keyReplaced atom + detection logic
+  message-utils.ts — message helper utilities
+  notifications.ts — notification wiring
+  send-dm.ts       — send DM action
+  send-group-message.ts — send group message action
+  unread.ts        — unread count tracking
 ```
 
 ### State atoms
@@ -45,8 +53,8 @@ All state is nanostores `atom()` or `map()` — plain values, no framework react
 |---|---|---|
 | `$user` | `atom<IUser \| null>` | — |
 | `$familiars` | `map<Record<string, IUser>>` | userID |
-| `$messages` | `map<Record<string, DecryptedMail[]>>` | other party's userID |
-| `$groupMessages` | `map<Record<string, DecryptedMail[]>>` | channelID |
+| `$messages` | `map<Record<string, IMessage[]>>` | other party's userID |
+| `$groupMessages` | `map<Record<string, IMessage[]>>` | channelID |
 | `$servers` | `map<Record<string, IServer>>` | serverID |
 | `$channels` | `map<Record<string, IChannel[]>>` | serverID |
 | `$permissions` | `map<Record<string, IPermission>>` | permissionID |
@@ -64,15 +72,15 @@ Events are wired in `bootstrap()` after creating the client, before `client.conn
 import { map } from 'nanostores'
 import { $client } from './client'
 
-client.on('mail', (mail) => {
-  if (mail.group) {
-    const prev = $groupMessages.get()[mail.group] ?? []
-    $groupMessages.setKey(mail.group, [...prev, mail])
+client.on('message', (msg) => {
+  if (msg.group) {
+    const prev = $groupMessages.get()[msg.group] ?? []
+    $groupMessages.setKey(msg.group, [...prev, msg])
   } else {
     const me = $user.get()
-    const key = me && mail.authorID === me.userID ? mail.readerID : mail.authorID
+    const key = me && msg.authorID === me.userID ? msg.readerID : msg.authorID
     const prev = $messages.get()[key] ?? []
-    $messages.setKey(key, [...prev, mail])
+    $messages.setKey(key, [...prev, msg])
   }
 })
 client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
@@ -80,12 +88,12 @@ client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
 
 ### Bootstrap sequence
 
-`bootstrap(serverUrl, deviceID, deviceKey)` in `bootstrap.ts` creates the `VexClient`, wires events, connects, then fetches initial state. Events are wired **before** `connect()` so nothing is missed.
+`bootstrap(serverUrl, deviceID, deviceKey)` in `bootstrap.ts` creates the `Client`, wires events, connects, then fetches initial state. Events are wired **before** `connect()` so nothing is missed.
 
 **Currently implemented** (matched to spire's existing endpoints):
-1. `client.whoami()` → set `$user`
-2. `client.listServers()` → populate `$servers`
-3. `client.listChannels(serverID)` for each server → populate `$channels` (parallel)
+1. `client.users.me()` → set `$user`
+2. `client.servers.list()` → populate `$servers`
+3. `client.channels.list(serverID)` for each server → populate `$channels` (parallel)
 
 **Pending server endpoints:**
 - `$familiars` — needs `GET /users/me/familiars` (currently populated on first DM)
@@ -142,7 +150,7 @@ export { $messages as messages, $user as user, $servers as servers } from '@vex-
 }
 ```
 
-`@nanostores/react` is an optional peer dep — only `apps/mobile` installs it. Svelte needs no adapter.
+`@vex-chat/types` and `@vex-chat/libvex` resolve to the sibling repos (`../types-js`, `../libvex-js`) linked via pnpm workspace. `@nanostores/react` is an optional peer dep — only `apps/mobile` installs it. Svelte needs no adapter.
 
 ---
 
@@ -247,4 +255,4 @@ Compiled output is committed to the repo so consuming apps don't need to run the
 
 ---
 
-See also: [packages.md](packages.md) for the full dependency graph, [packages-libvex.md](packages-libvex.md) for the SDK that feeds the store, [design-system.md](../explanation/design-system.md) for the Figma-to-code pipeline.
+See also: [packages.md](packages.md) for the full dependency graph, [design-system.md](../explanation/design-system.md) for the Figma-to-code pipeline.

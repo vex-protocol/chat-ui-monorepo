@@ -34,14 +34,21 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | Package | Replaces | Description |
 |---|---|---|
 | `apps/desktop` | `vex-desktop` | Tauri 2.0 + Svelte (replaces Electron+React) |
-| `apps/mobile` | — | React Native mobile client (new) |
-| `packages/types` | `types-js` | Shared TypeScript interfaces and enums |
-| `packages/libvex` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
-| `packages/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
-| `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
-| `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
+| `apps/mobile` | -- | React Native mobile client (new) |
+| `packages/store` | -- | Framework-agnostic state containers (nanostores atoms) |
+| `packages/ui` | -- | Mitosis design primitives, compiled to Svelte + React |
 
-The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Kysely, @noble/curves, argon2id, SQLite/MySQL.
+### Sibling repos (linked via pnpm workspace)
+
+| Repo | npm name | Replaces | Description |
+|---|---|---|---|
+| `../types-js` | `@vex-chat/types` | `types-js` | Shared TypeScript interfaces and enums |
+| `../crypto-js` | `@vex-chat/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
+| `../libvex-js` | `@vex-chat/libvex` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
+
+These were originally in `packages/` but migrated to standalone sibling repos. They are linked into the pnpm workspace so monorepo packages can import them as `"workspace:*"` deps.
+
+The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Kysely, @noble/curves, argon2id, SQLite/MySQL. Spire is NOT in the pnpm workspace.
 
 See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
