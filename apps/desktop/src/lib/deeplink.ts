@@ -1,6 +1,6 @@
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link'
 import { push } from 'svelte-spa-router'
-import { parseVexLink } from '@vex-chat/libvex'
+import { parseVexLink } from '@vex-chat/store'
 
 function handleDeepLink(url: string): void {
   const link = parseVexLink(url)

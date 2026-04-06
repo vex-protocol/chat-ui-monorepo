@@ -8,7 +8,7 @@ import {
   StyleSheet,
 } from 'react-native'
 import { useStore } from '@nanostores/react'
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 import { $messages, $user } from '../store'
 import { sendDirectMessage, markRead } from '@vex-chat/store'
 import { setActiveConversation } from '../lib/notifications'
@@ -64,7 +64,7 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
     setSending(false)
   }, [text, user, userID])
 
-  function renderMessage({ item }: { item: DecryptedMail }) {
+  function renderMessage({ item }: { item: IMessage }) {
     const isOwn = item.authorID === user?.userID
     return (
       <MessageBubbleRN

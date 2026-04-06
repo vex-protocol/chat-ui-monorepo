@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { View, Text, StyleSheet } from 'react-native'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
-import { decodeHex } from '@vex-chat/crypto'
+import { XUtils } from '@vex-chat/crypto'
 import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials, clearCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -41,8 +41,8 @@ export function WelcomeBackScreen({ navigation }: Props) {
     try {
       const SERVER_URL = getServerUrl()
 
-      const deviceKey = decodeHex(creds.deviceKey)
-      const preKeySecret = decodeHex(creds.preKey)
+      const deviceKey = XUtils.decodeHex(creds.deviceKey)
+      const preKeySecret = XUtils.decodeHex(creds.preKey)
 
       navigation.navigate('HangTight')
       await bootstrap(SERVER_URL, creds.deviceID, deviceKey, creds.token, preKeySecret, mobilePersistence)

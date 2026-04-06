@@ -7,7 +7,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useStore } from '@nanostores/react'
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 import { $groupMessages, $client, $user } from '../store'
 import { markRead, sendGroupMessage } from '@vex-chat/store'
 import { keychainKeyStore } from '../lib/keychain'
@@ -79,7 +79,7 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
     setSending(false)
   }, [text, user, channelID])
 
-  function renderMessage({ item }: { item: DecryptedMail }) {
+  function renderMessage({ item }: { item: IMessage }) {
     const isOwn = item.authorID === user?.userID
     return (
       <MessageBubbleRN

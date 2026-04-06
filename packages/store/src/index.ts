@@ -53,5 +53,9 @@ export {
 } from './message-utils.ts'
 export type { MessageChunk, FileAttachment } from './message-utils.ts'
 
+// Deep link parsing
+export { parseVexLink, parseInviteID } from './deeplink.ts'
+export type { VexLink } from './deeplink.ts'
+
 // Reset
 export { resetAll } from './reset.ts'

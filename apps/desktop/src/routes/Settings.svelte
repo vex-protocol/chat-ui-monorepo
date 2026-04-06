@@ -4,7 +4,7 @@
   import { client, user } from '../lib/store/index.js'
   import { getServerUrl, setServerUrl, clearSession } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
-  import { encodeHex } from '@vex-chat/crypto'
+  import { XUtils } from '@vex-chat/crypto'
   import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
   import { avatarHash } from '../lib/store/index.js'
@@ -85,7 +85,7 @@
   let creds: import('@vex-chat/types').StoredCredentials | null = $state(null)
   let fingerprint = $derived(
     creds?.deviceKey
-      ? encodeHex(new Uint8Array(
+      ? XUtils.encodeHex(new Uint8Array(
           Array.from({ length: 8 }, (_, i) => parseInt(creds!.deviceKey.slice(i * 2, i * 2 + 2), 16))
         )).toUpperCase()
       : 'N/A'

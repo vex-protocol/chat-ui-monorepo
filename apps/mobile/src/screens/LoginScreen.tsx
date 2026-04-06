@@ -9,8 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
-import { decodeHex } from '@vex-chat/crypto'
-import { VexClient } from '@vex-chat/libvex'
+import { XUtils } from '@vex-chat/crypto'
+import { Client } from '@vex-chat/libvex'
 import { bootstrap, mobilePersistence } from '../store'
 import { loadCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -42,9 +42,9 @@ export function LoginScreen({ navigation }: { navigation: any }) {
       }
 
       // Login via libvex (handles msgpack + response normalization)
-      const deviceKey = decodeHex(creds.deviceKey)
-      const preKeySecret = decodeHex(creds.preKey)
-      const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
+      const deviceKey = XUtils.decodeHex(creds.deviceKey)
+      const preKeySecret = XUtils.decodeHex(creds.preKey)
+      const client = Client.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
       const result = await client.login(username, password)
 
       if (!result.ok) {

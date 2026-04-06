@@ -1,6 +1,6 @@
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import { AppState } from 'react-native'
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 import { shouldNotify } from '@vex-chat/store'
 import { $familiars, $channels, $servers, $client } from '../store'
 import { navigateToConversation } from '../navigation/navigationRef'
@@ -32,7 +32,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
   return settings.authorizationStatus >= 1
 }
 
-export async function showMessageNotification(mail: DecryptedMail): Promise<void> {
+export async function showMessageNotification(mail: IMessage): Promise<void> {
   const appFocused = AppState.currentState === 'active'
   const familiars = $familiars.get()
 

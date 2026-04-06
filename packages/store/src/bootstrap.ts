@@ -1,6 +1,6 @@
 import { atom } from 'nanostores'
-import { VexClient } from '@vex-chat/libvex'
-import type { DecryptedMail } from '@vex-chat/types'
+import { Client } from '@vex-chat/libvex'
+import type { IMessage } from '@vex-chat/libvex'
 import { $client } from './client.ts'
 import { $user } from './user.ts'
 import { $messages, $groupMessages } from './messages.ts'
@@ -18,10 +18,10 @@ import { SENT_PREFIX } from './send-dm.ts'
  */
 export interface PersistenceCallbacks {
   /** Load previously persisted messages from local storage. */
-  loadMessages: () => Promise<{ dms: Record<string, DecryptedMail[]>; groups: Record<string, DecryptedMail[]> }>
+  loadMessages: () => Promise<{ dms: Record<string, IMessage[]>; groups: Record<string, IMessage[]> }>
   /** Persist the current message state to local storage. */
-  saveGroupMessages: (groups: Record<string, DecryptedMail[]>) => Promise<void>
-  saveDmMessages: (dms: Record<string, DecryptedMail[]>) => Promise<void>
+  saveGroupMessages: (groups: Record<string, IMessage[]>) => Promise<void>
+  saveDmMessages: (dms: Record<string, IMessage[]>) => Promise<void>
 }
 
 /**
@@ -31,86 +31,73 @@ export interface PersistenceCallbacks {
 export const $keyReplaced = atom<boolean>(false)
 
 /**
- * Initialises the VexClient, wires real-time events, connects to the server,
- * then runs the bootstrap waterfall to populate initial state from HTTP.
+ * Initialises the Client, wires real-time events, connects to the server,
+ * then runs the bootstrap waterfall to populate initial state.
  *
- * Call this once during app startup before rendering any components that read
- * atoms. Calling it a second time replaces the previous client.
- *
- * @param serverUrl    - Base HTTP URL of the Vex server (e.g. 'https://chat.example.com')
- * @param deviceID     - UUID of the registered device
- * @param deviceKey    - Ed25519 secret key seed for the device (32 bytes)
- * @param authToken    - Optional JWT to pre-seed the client (from login/register response)
- * @param preKeySecret - Ed25519 secret key seed of the registered preKey (32 bytes).
- *                       Required to decrypt incoming messages via SessionManager.
+ * @param privateKey   - Hex-encoded Ed25519 secret key for the device
+ * @param options      - Client options (host, logLevel, adapters, etc.)
+ * @param persistence  - Optional platform-specific persistence callbacks
  */
 export async function bootstrap(
-  serverUrl: string,
-  deviceID: string,
-  deviceKey: Uint8Array,
-  authToken?: string,
-  preKeySecret?: Uint8Array,
+  privateKey: string,
+  options: {
+    host?: string
+    unsafeHttp?: boolean
+    inMemoryDb?: boolean
+    logLevel?: string
+  },
   persistence?: PersistenceCallbacks,
 ): Promise<void> {
-  // Clear stale state from any previous session (prevents data leaking between accounts)
+  // Clear stale state from any previous session
   resetAll()
 
-  const client = VexClient.create(serverUrl, deviceID, deviceKey, preKeySecret)
-  if (authToken) client.setAuthToken(authToken)
+  const client = await Client.create(privateKey, options as any)
   $client.set(client)
 
   // Wire real-time events before connecting so nothing is missed
-  client.on('authed', (user) => {
-    $user.set(user)
-  })
-
-  client.on('mail', (mail) => {
-    // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
-    console.log('[vex-store] mail received:', mail.mailID, 'from:', mail.authorID, 'group:', mail.group)
+  client.on('message', (msg: IMessage) => {
+    console.log('[vex-store] message received:', msg.mailID, 'from:', msg.authorID, 'group:', msg.group)
     const me = $user.get()
-    if (mail.group) {
+    if (msg.group) {
       // Group / channel message — key by channelID, deduplicate by mailID
-      const prev = $groupMessages.get()[mail.group] ?? []
-      if (!prev.some(m => m.mailID === mail.mailID)) {
-        $groupMessages.setKey(mail.group, [...prev, mail])
+      const prev = $groupMessages.get()[msg.group] ?? []
+      if (!prev.some(m => m.mailID === msg.mailID)) {
+        $groupMessages.setKey(msg.group, [...prev, msg])
         persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
-        // Track unread (apps call markRead when conversation is focused)
-        if (me && mail.authorID !== me.userID) incrementChannelUnread(mail.group)
+        if (me && msg.authorID !== me.userID) incrementChannelUnread(msg.group)
       }
     } else {
       // Direct message — key by the other party's userID, deduplicate
-      const isOwnMessage = me && mail.authorID === me.userID
-      const threadKey = isOwnMessage ? mail.readerID : mail.authorID
+      const isOwnMessage = me && msg.authorID === me.userID
+      const threadKey = isOwnMessage ? msg.readerID : msg.authorID
       const prev = $messages.get()[threadKey] ?? []
 
-      // If this is a server echo of a locally-sent message, replace the local version
       const localIdx = isOwnMessage
-        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.content === mail.content && m.authorID === mail.authorID)
+        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.message === msg.message && m.authorID === msg.authorID)
         : -1
 
       if (localIdx !== -1) {
-        // Replace local echo with server version
         const updated = [...prev]
-        updated[localIdx] = mail
+        updated[localIdx] = msg
         $messages.setKey(threadKey, updated)
         persistence?.saveDmMessages($messages.get()).catch(() => {})
-      } else if (!prev.some(m => m.mailID === mail.mailID)) {
-        $messages.setKey(threadKey, [...prev, mail])
+      } else if (!prev.some(m => m.mailID === msg.mailID)) {
+        $messages.setKey(threadKey, [...prev, msg])
         persistence?.saveDmMessages($messages.get()).catch(() => {})
 
         if (!isOwnMessage) {
           incrementDmUnread(threadKey)
         }
 
-        // Auto-add the other party as familiar so they appear in DM list
+        // Auto-add the other party as familiar
         const otherUserID = threadKey
         if (!$familiars.get()[otherUserID]) {
           $familiars.setKey(otherUserID, {
             userID: otherUserID,
             username: otherUserID.slice(0, 8),
-            lastSeen: mail.time,
+            lastSeen: Date.now(),
           })
-          client.getUser(otherUserID).then(u => {
+          client.users.retrieve(otherUserID).then(([u]) => {
             if (u) $familiars.setKey(otherUserID, u)
           }).catch(() => {})
         }
@@ -118,65 +105,7 @@ export async function bootstrap(
     }
   })
 
-  client.on('serverChange', (server: any) => {
-    const serverID = server.serverID as string
-    const joined = server.joined as { userID: string; username: string } | undefined
-
-    // Re-fetch channels for this server (handles new members, new channels, etc.)
-    client.listChannels(serverID).then(channels => {
-      $channels.setKey(serverID, channels)
-
-      // Insert a "X joined the server" system message into the first channel
-      if (joined && channels.length > 0) {
-        const channelID = channels[0]!.channelID
-        const sysMail: DecryptedMail = {
-          mailID: `system-join-${joined.userID}-${Date.now()}`,
-          authorID: joined.userID,
-          readerID: '',
-          group: channelID,
-          mailType: 'system',
-          time: new Date().toISOString(),
-          content: `${joined.username} has joined the server`,
-          extra: null,
-          forward: null,
-        }
-        const prev = $groupMessages.get()[channelID] ?? []
-        $groupMessages.setKey(channelID, [...prev, sysMail])
-        persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
-      }
-    }).catch(() => {})
-  })
-
-  await client.connect()
-
-  // ── Waterfall: populate initial state ──────────────────────────────────────
-
-  // 1. Current user — throws if not authenticated, letting the caller redirect.
-  const user = await client.whoami()
-  $user.set(user)
-
-  // 2. Servers
-  const servers = await client.listServers()
-  for (const server of servers) {
-    $servers.setKey(server.serverID, server)
-  }
-
-  // 3. Channels + permissions per server (parallel per server)
-  await Promise.all(
-    servers.map(async (server) => {
-      const [channels] = await Promise.all([
-        client.listChannels(server.serverID),
-        // TODO: populate $permissions once a GET /user/me/permissions endpoint exists
-        // client.listPermissions(server.serverID).then(perms => { ... })
-      ])
-      $channels.setKey(server.serverID, channels)
-    }),
-  )
-
-  // TODO: populate $familiars + $devices once familiars endpoint exists
-
   // 4. Load locally persisted messages (instant — no network required).
-  //    Privacy model: spire deletes messages after receipt, so local storage is authoritative.
   if (persistence) {
     try {
       const saved = await persistence.loadMessages()
@@ -191,13 +120,6 @@ export async function bootstrap(
     }
   }
 
-  // 5. Fetch any messages received while offline (not yet receipted).
-  //    After decrypt, VexClient sends a receipt → spire deletes the message.
-  //    The mail event handler above saves to local storage before the receipt is sent.
-  try {
-    const pending = await client.fetchInbox()
-    for (const msg of pending) client.emit('mail', msg)
-  } catch {
-    // Non-fatal — real-time messages will still arrive via WebSocket
-  }
+  // Client.connect() handles login, inbox fetch, and mail decryption internally.
+  // The 'message' event fires for each decrypted message (inbox + real-time).
 }

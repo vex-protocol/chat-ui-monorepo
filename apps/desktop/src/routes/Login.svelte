@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { decodeHex, encodeHex } from '@vex-chat/crypto'
-  import { VexClient } from '@vex-chat/libvex'
+  import { XUtils } from '@vex-chat/crypto'
+  import { Client } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
@@ -25,9 +25,9 @@
 
       if (creds) {
         // Existing device — login with saved keys
-        const deviceKey = decodeHex(creds.deviceKey)
-        const preKeySecret = decodeHex(creds.preKey)
-        const client = VexClient.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
+        const deviceKey = XUtils.decodeHex(creds.deviceKey)
+        const preKeySecret = XUtils.decodeHex(creds.preKey)
+        const client = Client.create(SERVER_URL, creds.deviceID, deviceKey, preKeySecret)
         const result = await client.login(username, password)
 
         if (!result.ok) {
@@ -43,7 +43,7 @@
         await bootstrap(SERVER_URL, creds.deviceID, deviceKey, result.token, preKeySecret)
       } else {
         // No device on this machine — login and register a new device
-        const result = await VexClient.loginNewDevice(SERVER_URL, username, password, 'Desktop')
+        const result = await Client.loginNewDevice(SERVER_URL, username, password, 'Desktop')
 
         if (!result.ok) {
           error = 'Invalid username or password'
@@ -56,8 +56,8 @@
         await keyStore.save({
           username,
           deviceID: result.deviceID,
-          deviceKey: encodeHex(result.signKeyPair.secretKey),
-          preKey: encodeHex(result.preKeyPair.secretKey),
+          deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
+          preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
           token: result.token,
         })
 

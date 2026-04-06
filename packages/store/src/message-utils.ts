@@ -1,4 +1,4 @@
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -43,8 +43,8 @@ export function formatFileSize(bytes: number): string {
 
 export interface MessageChunk {
   authorID: string
-  messages: DecryptedMail[]
-  firstTime: string
+  messages: IMessage[]
+  firstTime: Date
 }
 
 const CHUNK_GAP_MS = 5 * 60 * 1000 // 5 minutes
@@ -54,8 +54,8 @@ const MAX_CHUNK_SIZE = 100
  * Groups messages by sender into display chunks.
  * Starts a new chunk on: different sender, >5 min gap, or 100 message cap.
  */
-export function chunkMessages(messages: DecryptedMail[]): MessageChunk[] {
-  const sorted = [...messages].sort((a, b) => a.time.localeCompare(b.time))
+export function chunkMessages(messages: IMessage[]): MessageChunk[] {
+  const sorted = [...messages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
   const chunks: MessageChunk[] = []
 
   for (const msg of sorted) {
@@ -64,17 +64,14 @@ export function chunkMessages(messages: DecryptedMail[]): MessageChunk[] {
 
     const sameAuthor = last?.authorID === msg.authorID
     const withinGap = lastMsg
-      ? Date.parse(msg.time) - Date.parse(lastMsg.time) < CHUNK_GAP_MS
+      ? msg.timestamp.getTime() - lastMsg.timestamp.getTime() < CHUNK_GAP_MS
       : false
     const notFull = (last?.messages.length ?? 0) < MAX_CHUNK_SIZE
 
-    // System messages always get their own chunk
-    if (msg.mailType === 'system') {
-      chunks.push({ authorID: msg.authorID, messages: [msg], firstTime: msg.time })
-    } else if (last && sameAuthor && withinGap && notFull && last.messages[0]?.mailType !== 'system') {
+    if (last && sameAuthor && withinGap && notFull) {
       last.messages.push(msg)
     } else {
-      chunks.push({ authorID: msg.authorID, messages: [msg], firstTime: msg.time })
+      chunks.push({ authorID: msg.authorID, messages: [msg], firstTime: msg.timestamp })
     }
   }
 
@@ -100,14 +97,13 @@ export function applyEmoji(text: string): string {
 // ── Date formatting ─────────────────────────────────────────────────────────
 
 /**
- * Formats an ISO timestamp for display.
+ * Formats a Date for display.
  * Same day → "HH:mm". Earlier → "MMM D HH:mm".
  */
-export function formatTime(iso: string): string {
-  const d = new Date(iso)
+export function formatTime(date: Date): string {
   const now = new Date()
-  const sameDay = d.toDateString() === now.toDateString()
-  const hhmm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  const sameDay = date.toDateString() === now.toDateString()
+  const hhmm = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   if (sameDay) return hhmm
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + hhmm
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + hhmm
 }

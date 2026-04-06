@@ -1,11 +1,11 @@
 /**
- * IndexedDB persistence for DecryptedMail messages.
+ * IndexedDB persistence for IMessage messages.
  *
  * Messages are stored with a computed `threadKey` so they can be loaded
  * per-conversation on startup. DM threadKey = other party's userID;
  * group threadKey = channelID (mail.group).
  */
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 
 const DB_NAME = 'vex-messages'
 const DB_VERSION = 1
@@ -33,7 +33,7 @@ function getDB(): Promise<IDBDatabase> {
   })
 }
 
-export async function saveMessage(mail: DecryptedMail, currentUserID: string): Promise<void> {
+export async function saveMessage(mail: IMessage, currentUserID: string): Promise<void> {
   const threadKey = mail.group ?? (mail.authorID === currentUserID ? mail.readerID : mail.authorID)
   const db = await getDB()
   return new Promise((resolve, reject) => {
@@ -45,16 +45,16 @@ export async function saveMessage(mail: DecryptedMail, currentUserID: string): P
 }
 
 export async function loadAllMessages(): Promise<{
-  dms: Record<string, DecryptedMail[]>
-  groups: Record<string, DecryptedMail[]>
+  dms: Record<string, IMessage[]>
+  groups: Record<string, IMessage[]>
 }> {
   const db = await getDB()
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly')
     const req = tx.objectStore(STORE).getAll()
     req.onsuccess = () => {
-      const dms: Record<string, DecryptedMail[]> = {}
-      const groups: Record<string, DecryptedMail[]> = {}
+      const dms: Record<string, IMessage[]> = {}
+      const groups: Record<string, IMessage[]> = {}
       for (const msg of req.result) {
         const key: string = msg.threadKey
         if (msg.group) {
@@ -91,7 +91,7 @@ import type { PersistenceCallbacks } from '@vex-chat/store'
  * Bulk-save by writing all messages for each thread to IndexedDB.
  * PersistenceCallbacks expects (full state) → save, so we put every message.
  */
-async function saveGroupMessages(groups: Record<string, DecryptedMail[]>): Promise<void> {
+async function saveGroupMessages(groups: Record<string, IMessage[]>): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(STORE, 'readwrite')
   const store = tx.objectStore(STORE)
@@ -104,7 +104,7 @@ async function saveGroupMessages(groups: Record<string, DecryptedMail[]>): Promi
   })
 }
 
-async function saveDmMessages(dms: Record<string, DecryptedMail[]>): Promise<void> {
+async function saveDmMessages(dms: Record<string, IMessage[]>): Promise<void> {
   const db = await getDB()
   const tx = db.transaction(STORE, 'readwrite')
   const store = tx.objectStore(STORE)

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DecryptedMail } from '@vex-chat/types'
+  import type { IMessage } from '@vex-chat/libvex'
   import { onMount } from 'svelte'
   import { chunkMessages, renderContent, handleLinkClick, formatTime, parseFileExtra, isImageType, formatFileSize } from './utils/messages.js'
   import { user, client } from './store/index.js'
@@ -12,7 +12,7 @@
     return $client?.fileUrl(fileID) ?? `${serverUrl}/file/${fileID}`
   }
 
-  let { messages = [], usernames = {} }: { messages: DecryptedMail[]; usernames?: Record<string, string> } = $props()
+  let { messages = [], usernames = {} }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
 
   const chunks = $derived(chunkMessages(messages))
 

@@ -1,13 +1,13 @@
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 import { shouldNotify } from '@vex-chat/store'
 import { playNotify } from './sounds.js'
 
 /** Minimal interface needed to subscribe/unsubscribe to mail events. */
 interface MailEventEmitter {
-  on(event: 'mail', handler: (mail: DecryptedMail) => void): void
-  off(event: 'mail', handler: (mail: DecryptedMail) => void): void
+  on(event: 'mail', handler: (mail: IMessage) => void): void
+  off(event: 'mail', handler: (mail: IMessage) => void): void
   getUser(userID: string): Promise<{ username: string } | null>
 }
 
@@ -38,7 +38,7 @@ async function ensurePermission(): Promise<boolean> {
   }
 }
 
-// ── Wire up to VexClient ──────────────────────────────────────────────────────
+// ── Wire up to Client ────────────────────────────────────────────────────────
 
 /**
  * Attaches a mail listener that fires desktop notifications using the shared
@@ -50,7 +50,7 @@ export function setupNotifications(
   resolveAuthorName?: (userID: string) => string | undefined,
   resolveChannelInfo?: (channelID: string) => { channelName: string; serverName: string } | undefined,
 ): () => void {
-  const handler = async (mail: DecryptedMail): Promise<void> => {
+  const handler = async (mail: IMessage): Promise<void> => {
     let focused = false
     try { focused = await getCurrentWindow().isFocused() } catch {}
 

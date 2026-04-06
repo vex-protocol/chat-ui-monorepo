@@ -8,7 +8,7 @@ import { ScreenLayout } from '../components/ScreenLayout'
 import { BackButton } from '../components/BackButton'
 import { VexButton } from '../components/VexButton'
 import { CornerBracketBox } from '../components/CornerBracketBox'
-import { parseInviteID } from '@vex-chat/libvex'
+import { parseInviteID } from '@vex-chat/store'
 
 export function JoinGroupScreen() {
   const navigation = useNavigation()

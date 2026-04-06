@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { encodeHex } from '@vex-chat/crypto'
-  import { VexClient } from '@vex-chat/libvex'
+  import { XUtils } from '@vex-chat/crypto'
+  import { Client } from '@vex-chat/libvex'
   import { bootstrap, user as userAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
@@ -49,7 +49,7 @@
     usernameStatus = 'checking'
     debounceTimer = setTimeout(async () => {
       try {
-        const taken = await VexClient.checkUsername(getServerUrl(), value)
+        const taken = await Client.checkUsername(getServerUrl(), value)
         if (username !== value) return // stale
         usernameStatus = taken ? 'taken' : 'available'
         if (taken) errors = { ...errors, username: 'Username is already taken' }
@@ -108,7 +108,7 @@
     try {
       const SERVER_URL = getServerUrl()
 
-      const result = await VexClient.registerAndLogin(SERVER_URL, username, password, 'Desktop')
+      const result = await Client.registerAndLogin(SERVER_URL, username, password, 'Desktop')
 
       if (!result.ok) {
         errors = { form: result.error.message || `Registration failed (${result.error.code})` }
@@ -121,8 +121,8 @@
       await keyStore.save({
         username,
         deviceID: result.deviceID,
-        deviceKey: encodeHex(result.signKeyPair.secretKey),
-        preKey: encodeHex(result.preKeyPair.secretKey),
+        deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
+        preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
         token: result.token,
       })
 

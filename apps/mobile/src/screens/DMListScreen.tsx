@@ -8,7 +8,8 @@ import {
   StyleSheet,
 } from 'react-native'
 import { useStore } from '@nanostores/react'
-import type { IUser, DecryptedMail } from '@vex-chat/types'
+import type { IUser } from '@vex-chat/libvex'
+import type { IMessage } from '@vex-chat/libvex'
 import { $familiars, $messages, $client } from '../store'
 import { $familiars as familiarsAtom, $dmUnreadCounts, avatarHue } from '@vex-chat/store'
 import { colors, typography } from '../theme'
@@ -53,7 +54,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
     navigation.navigate('Conversation', { userID: user.userID, username: user.username })
   }
 
-  function lastMessage(userID: string): DecryptedMail | undefined {
+  function lastMessage(userID: string): IMessage | undefined {
     const thread = allMessages[userID]
     return thread?.[thread.length - 1]
   }

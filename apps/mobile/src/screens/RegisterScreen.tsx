@@ -10,8 +10,8 @@ import {
   Platform,
   ScrollView,
 } from 'react-native'
-import { encodeHex } from '@vex-chat/crypto'
-import { VexClient } from '@vex-chat/libvex'
+import { XUtils } from '@vex-chat/crypto'
+import { Client } from '@vex-chat/libvex'
 import { bootstrap, mobilePersistence } from '../store'
 import { saveCredentials } from '../lib/keychain'
 import { getServerUrl } from '../lib/config'
@@ -35,7 +35,7 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
     try {
       const SERVER_URL = getServerUrl()
 
-      const result = await VexClient.registerAndLogin(SERVER_URL, username, password, 'Mobile')
+      const result = await Client.registerAndLogin(SERVER_URL, username, password, 'Mobile')
 
       if (!result.ok) {
         setError(result.error.message || `Registration failed (${result.error.code})`)
@@ -47,8 +47,8 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
       await saveCredentials({
         username,
         deviceID: result.deviceID,
-        deviceKey: encodeHex(result.signKeyPair.secretKey),
-        preKey: encodeHex(result.preKeyPair.secretKey),
+        deviceKey: XUtils.encodeHex(result.signKeyPair.secretKey),
+        preKey: XUtils.encodeHex(result.preKeyPair.secretKey),
         token: result.token,
       })
 

@@ -1,11 +1,11 @@
 import React from 'react'
 import { View, Text, StyleSheet } from 'react-native'
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/libvex'
 import { formatTime, avatarHue } from '@vex-chat/store'
 import { colors, typography } from '../theme'
 
 interface MessageBubbleRNProps {
-  message: DecryptedMail
+  message: IMessage
   isOwn: boolean
   authorName: string
 }
