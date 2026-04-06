@@ -1,18 +1,17 @@
 const path = require('path')
-const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config')
+const { getDefaultConfig } = require('expo/metro-config')
 
 const projectRoot = __dirname
-const workspaceRoot = path.resolve(projectRoot, '../..')
+const monorepoRoot = path.resolve(projectRoot, '../..')
 
-module.exports = mergeConfig(getDefaultConfig(projectRoot), {
-  watchFolders: [workspaceRoot],
+const config = getDefaultConfig(projectRoot)
 
-  resolver: {
-    unstable_enableSymlinks: true,
-    unstable_enablePackageExports: true,
-    nodeModulesPaths: [
-      path.resolve(projectRoot, 'node_modules'),
-      path.resolve(workspaceRoot, 'node_modules'),
-    ],
-  },
-})
+config.watchFolders = [monorepoRoot]
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(monorepoRoot, 'node_modules'),
+]
+config.resolver.unstable_enableSymlinks = true
+config.resolver.unstable_enablePackageExports = true
+
+module.exports = config

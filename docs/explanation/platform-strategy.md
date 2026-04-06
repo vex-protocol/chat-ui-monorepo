@@ -9,7 +9,7 @@ Vex is a cross-platform chat application targeting desktop and mobile.
 | Platform | Shell | UI Framework | Notes |
 |---|---|---|---|
 | Desktop | **Tauri 2.0** | **Svelte** | Replaces the original Electron+React `vex-desktop` ([ADR-001](../architecture/adr-001-monorepo-consolidation.md)) |
-| Mobile | **Expo (Prebuild)** | React Native | Expo SDK + CNG for config plugins and EAS builds; keeps native modules ([ADR-004](../architecture/adr-004-sibling-repo-migration.md)) |
+| Mobile | **Expo (Prebuild)** | React Native 0.83 / Expo SDK 55 | Expo Prebuild (CNG) for config plugins and EAS builds; upgrade to SDK 56 + RN 0.85 when stable ([ADR-004](../architecture/adr-004-sibling-repo-migration.md)) |
 
 ### Why Tauri + Svelte for desktop
 
