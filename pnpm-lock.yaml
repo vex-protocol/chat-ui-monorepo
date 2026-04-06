@@ -144,6 +144,9 @@ importers:
       kysely:
         specifier: ^0.28.15
         version: 0.28.15
+      kysely-dialect-tauri:
+        specifier: ^1.2.1
+        version: 1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15)
       kysely-expo:
         specifier: ^5.0.0
         version: 5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15)
@@ -268,6 +271,9 @@ importers:
       '@tauri-apps/plugin-process':
         specifier: ^2.3.1
         version: 2.3.1
+      '@tauri-apps/plugin-sql':
+        specifier: ^2.4.0
+        version: 2.4.0
       '@tauri-apps/plugin-store':
         specifier: ^2.4.2
         version: 2.4.2
@@ -2741,6 +2747,9 @@ packages:
   '@tauri-apps/plugin-process@2.3.1':
     resolution: {integrity: sha512-nCa4fGVaDL/B9ai03VyPOjfAHRHSBz5v6F/ObsB73r/dA3MHHhZtldaDMIc0V/pnUw9ehzr2iEG+XkSEyC0JJA==}
 
+  '@tauri-apps/plugin-sql@2.4.0':
+    resolution: {integrity: sha512-SIICc5JlnK6OrBZzOw7MmhXHPlmASpt5zLWIu10WW4kLr5cDYOXHdV2MoCgYQkgZLQfyBYgF3SQa5XCisUiQkw==}
+
   '@tauri-apps/plugin-store@2.4.2':
     resolution: {integrity: sha512-0ClHS50Oq9HEvLPhNzTNFxbWVOqoAp3dRvtewQBeqfIQ0z5m3JRnOISIn2ZVPCrQC0MyGyhTS9DWhHjpigQE7A==}
 
@@ -4709,11 +4718,22 @@ packages:
   kuler@2.0.0:
     resolution: {integrity: sha512-Xq9nH7KlWZmXAtodXDDRE7vs6DU1gTU8zYDHDiWLSip45Egwq3plLHzPn27NgvzL2r1LMPC1vdqh98sQxtqj4A==}
 
+  kysely-dialect-tauri@1.2.1:
+    resolution: {integrity: sha512-7kuhq1UJM7iAinAPpXMVYRThzb1sqCmpxhITfHD0CtMPBr8CWCsJ0W0xr0tk4NBGNb2f/lF59Ti8jTiqA4JgXg==}
+    peerDependencies:
+      '@tauri-apps/plugin-sql': ^2.0.0
+      kysely: '>=0.26'
+
   kysely-expo@5.0.0:
     resolution: {integrity: sha512-AbUI+WdMTL3jLSeg5fXOWmnhRoaLUQFcd26qi/Ke2TWrr3NDl1CPlA/zGRYGGbvnHjyLMtmyBO/DB6k2M1EXxA==}
     peerDependencies:
       expo-sqlite: ^16.0.8
       kysely: ^0.28.6
+
+  kysely-generic-sqlite@1.2.1:
+    resolution: {integrity: sha512-/Bs3/Uktn04nQ9g/4oSphLMEtSHkS5+j5hbKjK5gMqXQfqr/v3V3FKtoN4pLTmo2W35hNdrIpQnBukGL1zZc6g==}
+    peerDependencies:
+      kysely: '>=0.26'
 
   kysely@0.28.15:
     resolution: {integrity: sha512-r2clcf7HLWvDXaVUEvQymXJY4i3bSOIV3xsL/Upy3ZfSv5HeKsk9tsqbBptLvth5qHEIhxeHTA2jNLyQABkLBA==}
@@ -9918,6 +9938,10 @@ snapshots:
     dependencies:
       '@tauri-apps/api': 2.10.1
 
+  '@tauri-apps/plugin-sql@2.4.0':
+    dependencies:
+      '@tauri-apps/api': 2.10.1
+
   '@tauri-apps/plugin-store@2.4.2':
     dependencies:
       '@tauri-apps/api': 2.10.1
@@ -12327,9 +12351,19 @@ snapshots:
 
   kuler@2.0.0: {}
 
+  kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15):
+    dependencies:
+      '@tauri-apps/plugin-sql': 2.4.0
+      kysely: 0.28.15
+      kysely-generic-sqlite: 1.2.1(kysely@0.28.15)
+
   kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15):
     dependencies:
       expo-sqlite: 55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+      kysely: 0.28.15
+
+  kysely-generic-sqlite@1.2.1(kysely@0.28.15):
+    dependencies:
       kysely: 0.28.15
 
   kysely@0.28.15: {}

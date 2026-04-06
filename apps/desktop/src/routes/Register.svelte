@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
   import { Client } from '@vex-chat/libvex'
-  import { bootstrap, user as userAtom } from '../lib/store/index.js'
+  import { desktopBootstrap, user as userAtom } from '../lib/store/index.js'
   import { getServerUrl } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { playUnlock, playError } from '../lib/sounds.js'
@@ -126,7 +126,7 @@
       })
 
       // Bootstrap the store
-      await bootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
+      await desktopBootstrap(privateKey, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') })
 
       if (userAtom.get()) {
         playUnlock()
