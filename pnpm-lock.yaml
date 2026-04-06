@@ -7,11 +7,8 @@ settings:
 catalogs:
   default:
     '@nanostores/react':
-      specifier: ^0.8.0
-      version: 0.8.4
-    '@types/dompurify':
-      specifier: ^3.0.5
-      version: 3.2.0
+      specifier: ^1.1.0
+      version: 1.1.0
     '@types/uuid':
       specifier: ^10.0.0
       version: 10.0.0
@@ -22,8 +19,8 @@ catalogs:
       specifier: ^15.0.12
       version: 15.0.12
     nanostores:
-      specifier: ^0.11.3
-      version: 0.11.4
+      specifier: ^1.2.0
+      version: 1.2.0
     typescript:
       specifier: ^5.9.3
       version: 5.9.3
@@ -271,9 +268,6 @@ importers:
       '@tauri-apps/plugin-updater':
         specifier: ^2.10.0
         version: 2.10.1
-      '@types/dompurify':
-        specifier: 'catalog:'
-        version: 3.2.0
       '@types/uuid':
         specifier: 'catalog:'
         version: 10.0.0
@@ -325,7 +319,7 @@ importers:
     dependencies:
       '@nanostores/react':
         specifier: 'catalog:'
-        version: 0.8.4(nanostores@0.11.4)(react@19.2.3)
+        version: 1.1.0(nanostores@1.2.0)(react@19.2.3)
       '@notifee/react-native':
         specifier: ^9.1.8
         version: 9.1.8(react-native@0.83.2(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))
@@ -428,13 +422,13 @@ importers:
     dependencies:
       '@nanostores/react':
         specifier: '>=0.8'
-        version: 1.1.0(nanostores@0.11.4)(react@19.2.3)
+        version: 1.1.0(nanostores@1.2.0)(react@19.2.3)
       '@vex-chat/libvex':
         specifier: workspace:*
         version: link:../../../libvex-js
       nanostores:
         specifier: 'catalog:'
-        version: 0.11.4
+        version: 1.2.0
       uuid:
         specifier: 'catalog:'
         version: 11.1.0
@@ -1924,13 +1918,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@nanostores/react@0.8.4':
-    resolution: {integrity: sha512-EciHSzDXg7GmGODjegGG1VldPEinbAK+12/Uz5+MAdHmxf082Rl6eXqKFxAAu4pZAcr5dNTpv6wMfEe7XacjkQ==}
-    engines: {node: ^18.0.0 || >=20.0.0}
-    peerDependencies:
-      nanostores: ^0.9.0 || ^0.10.0 || ^0.11.0
-      react: 19.2.3
-
   '@nanostores/react@1.1.0':
     resolution: {integrity: sha512-MbH35fjhcf7LAubYX5vhOChYUfTLzNLqH/mBGLVsHkcvjy0F8crO1WQwdmQ2xKbAmtpalDa2zBt3Hlg5kqr8iw==}
     engines: {node: ^20.0.0 || >=22.0.0}
@@ -2814,10 +2801,6 @@ packages:
 
   '@types/doctrine@0.0.9':
     resolution: {integrity: sha512-eOIHzCUSH7SMfonMG1LsC2f8vxBFtho6NGBznK41R84YzPuvSBzrhEps33IsQiOW9+VL6NQ9DbjQJznk/S4uRA==}
-
-  '@types/dompurify@3.2.0':
-    resolution: {integrity: sha512-Fgg31wv9QbLDA0SpTOXO3MaxySc4DKGLi8sna4/Utjo4r3ZRPdCt4UQee8BWr+Q5z21yifghREPJGYaEOEIACg==}
-    deprecated: This is a stub types definition. dompurify provides its own type definitions, so you do not need this installed.
 
   '@types/ed2curve@0.2.4':
     resolution: {integrity: sha512-1m9IX8qypOa0K1NfdMsMxB3gjhKyXbr5Yl9FzzwWQjLSDFGLkvRvSfla1NYqzIt72ocIALMXsF+twRlzr1ov/g==}
@@ -5222,9 +5205,9 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
-  nanostores@0.11.4:
-    resolution: {integrity: sha512-k1oiVNN4hDK8NcNERSZLQiMfRzEGtfnvZvdBvey3SQbgn8Dcrk0h1I6vpxApjb10PFUflZrgJ2WEZyJQ+5v7YQ==}
-    engines: {node: ^18.0.0 || >=20.0.0}
+  nanostores@1.2.0:
+    resolution: {integrity: sha512-F0wCzbsH80G7XXo0Jd9/AVQC7ouWY6idUCTnMwW5t/Rv9W8qmO6endavDwg7TNp5GbugwSukFMVZqzPSrSMndg==}
+    engines: {node: ^20.0.0 || >=22.0.0}
 
   napi-build-utils@2.0.0:
     resolution: {integrity: sha512-GEbrYkbfF7MoNaoh2iGG84Mnf/WZfB0GdGEsM8wz7Expx/LlWf5U8t9nvJKXSp3qr5IsEbK04cBGhol/KwOsWA==}
@@ -8695,14 +8678,9 @@ snapshots:
   '@msgpackr-extract/msgpackr-extract-win32-x64@3.0.3':
     optional: true
 
-  '@nanostores/react@0.8.4(nanostores@0.11.4)(react@19.2.3)':
+  '@nanostores/react@1.1.0(nanostores@1.2.0)(react@19.2.3)':
     dependencies:
-      nanostores: 0.11.4
-      react: 19.2.3
-
-  '@nanostores/react@1.1.0(nanostores@0.11.4)(react@19.2.3)':
-    dependencies:
-      nanostores: 0.11.4
+      nanostores: 1.2.0
       react: 19.2.3
 
   '@noble/hashes@1.8.0': {}
@@ -9110,7 +9088,9 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.2': {}
@@ -9824,10 +9804,6 @@ snapshots:
   '@types/deep-eql@4.0.2': {}
 
   '@types/doctrine@0.0.9': {}
-
-  '@types/dompurify@3.2.0':
-    dependencies:
-      dompurify: 3.3.3
 
   '@types/ed2curve@0.2.4':
     dependencies:
@@ -12614,7 +12590,7 @@ snapshots:
 
   nanoid@3.3.11: {}
 
-  nanostores@0.11.4: {}
+  nanostores@1.2.0: {}
 
   napi-build-utils@2.0.0: {}
 
