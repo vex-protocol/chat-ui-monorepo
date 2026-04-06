@@ -58,7 +58,7 @@ export function AppTabs() {
           const serverChannels = channels[id] ?? []
           if (serverChannels.length > 0) {
             // Go directly to the first channel
-            const ch = serverChannels[0]
+            const ch = serverChannels[0]!
             ;(navigationRef as any).navigate('App', {
               screen: 'Channel',
               params: { channelID: ch.channelID, channelName: ch.name, serverID: id },

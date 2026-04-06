@@ -39,7 +39,8 @@ export function DMListScreen({ navigation }: { navigation: any }) {
       }
       setSearching(true)
       timerRef.current = setTimeout(async () => {
-        const found = (await client?.searchUsers(q)) ?? []
+        const [user] = (await client?.users.retrieve(q)) ?? [null]
+        const found = user ? [user] : []
         setResults(found)
         setSearching(false)
       }, 300)
@@ -74,7 +75,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
           <Text style={styles.username}>{item.username}</Text>
           {last && (
             <Text style={styles.preview} numberOfLines={1}>
-              {last.content}
+              {last.message}
             </Text>
           )}
         </View>

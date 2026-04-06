@@ -40,7 +40,7 @@ export async function showMessageNotification(mail: IMessage): Promise<void> {
   let authorName = familiars[mail.authorID]?.username
   if (!authorName) {
     try {
-      const user = await $client.get()?.getUser(mail.authorID)
+      const [user] = (await $client.get()?.users.retrieve(mail.authorID)) ?? [null]
       if (user) authorName = user.username
     } catch {}
   }

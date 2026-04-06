@@ -13,6 +13,7 @@ export interface MemberListItemProps {
 
 export default function MemberListItem(props: MemberListItemProps) {
   useDefaultProps<MemberListItemProps>({
+    userID: '',
     username: '',
     status: 'offline',
     className: '',

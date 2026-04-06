@@ -11,10 +11,10 @@ interface MessageBubbleRNProps {
 }
 
 export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNProps) {
-  if (message.mailType === 'system') {
+  if (message.group === '__system__') {
     return (
       <View style={styles.systemContainer}>
-        <Text style={styles.systemText}>{message.content}</Text>
+        <Text style={styles.systemText}>{message.message}</Text>
       </View>
     )
   }
@@ -34,9 +34,9 @@ export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNP
           <Text style={[styles.author, isOwn && styles.authorSelf]}>
             {authorName}
           </Text>
-          <Text style={styles.timestamp}>{formatTime(message.time)}</Text>
+          <Text style={styles.timestamp}>{formatTime(message.timestamp)}</Text>
         </View>
-        <Text style={styles.text}>{message.content}</Text>
+        <Text style={styles.text}>{message.message}</Text>
       </View>
     </View>
   )

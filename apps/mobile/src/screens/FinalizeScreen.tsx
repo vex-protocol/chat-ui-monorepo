@@ -34,8 +34,10 @@ export function FinalizeScreen({ navigation, route }: Props) {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const taken = await Client.checkUsername(getServerUrl(), name)
-        setAvailable(!taken)
+        // TODO: Client.checkUsername() was removed from the public API.
+        // For now, skip client-side availability checks; the server will
+        // reject duplicate usernames during registration.
+        setAvailable(null)
       } catch {
         setAvailable(null)
       }

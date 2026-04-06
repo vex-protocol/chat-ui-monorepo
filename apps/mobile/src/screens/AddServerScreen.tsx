@@ -24,9 +24,9 @@ export function AddServerScreen() {
     setLoading(true)
     setError('')
     try {
-      const server = await client.createServer(name.trim(), '')
+      const server = await client.servers.create(name.trim())
       $servers.setKey(server.serverID, server)
-      const ch = await client.listChannels(server.serverID)
+      const ch = await client.channels.retrieve(server.serverID)
       $channels.setKey(server.serverID, ch)
       if (navigation.canGoBack()) navigation.goBack()
     } catch (err) {
@@ -48,10 +48,14 @@ export function AddServerScreen() {
     setLoading(true)
     setError('')
     try {
-      const server = await client.joinServerViaInvite(inviteID)
-      $servers.setKey(server.serverID, server)
-      const ch = await client.listChannels(server.serverID)
-      $channels.setKey(server.serverID, ch)
+      const permission = await client.invites.redeem(inviteID)
+      const serverID = permission.resourceID
+      const server = await client.servers.retrieveByID(serverID)
+      if (server) {
+        $servers.setKey(server.serverID, server)
+        const ch = await client.channels.retrieve(server.serverID)
+        $channels.setKey(server.serverID, ch)
+      }
       if (navigation.canGoBack()) navigation.goBack()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join server')

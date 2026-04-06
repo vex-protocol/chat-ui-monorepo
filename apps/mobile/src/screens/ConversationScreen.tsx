@@ -12,7 +12,6 @@ import type { IMessage } from '@vex-chat/libvex'
 import { $messages, $user } from '../store'
 import { sendDirectMessage, markRead } from '@vex-chat/store'
 import { setActiveConversation } from '../lib/notifications'
-import { keychainKeyStore } from '../lib/keychain'
 import { colors, typography } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
 import { MessageBubbleRN } from '../components/MessageBubbleRN'
@@ -52,9 +51,7 @@ export function ConversationScreen({ route, navigation }: { route: any; navigati
     setText('')
     setError('')
     try {
-      const result = await sendDirectMessage(userID, content, {
-        keyStore: keychainKeyStore,
-      })
+      const result = await sendDirectMessage(userID, content)
       if (!result.ok) {
         setError(result.error ?? 'Failed to send')
       }

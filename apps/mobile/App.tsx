@@ -27,7 +27,8 @@ function App() {
   useEffect(() => {
     ;(async () => {
       await requestNotificationPermission()
-      await autoLogin(keychainKeyStore, getServerUrl(), mobilePersistence)
+      const SERVER_URL = getServerUrl()
+      await autoLogin(keychainKeyStore, { host: SERVER_URL, unsafeHttp: SERVER_URL.startsWith('http:') }, mobilePersistence)
 
       // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
       const saved = await loadFamiliars()
@@ -62,8 +63,8 @@ function App() {
   // Show local notifications for incoming messages when app is backgrounded
   useEffect(() => {
     if (!client) return
-    client.on('mail', showMessageNotification)
-    return () => { client.off('mail', showMessageNotification) }
+    ;(client as any).on('message', showMessageNotification)
+    return () => { (client as any).off('message', showMessageNotification) }
   }, [client])
 
   useEffect(() => {

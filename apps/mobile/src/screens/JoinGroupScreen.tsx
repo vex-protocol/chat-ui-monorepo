@@ -32,10 +32,14 @@ export function JoinGroupScreen() {
     setError('')
 
     try {
-      const server = await client.joinServerViaInvite(inviteID)
-      $servers.setKey(server.serverID, server)
-      const channels = await client.listChannels(server.serverID)
-      $channels.setKey(server.serverID, channels)
+      const permission = await client.invites.redeem(inviteID)
+      const serverID = permission.resourceID
+      const server = await client.servers.retrieveByID(serverID)
+      if (server) {
+        $servers.setKey(server.serverID, server)
+        const channels = await client.channels.retrieve(server.serverID)
+        $channels.setKey(server.serverID, channels)
+      }
       // Navigate back — AppTabs will re-render with the new server
       if (navigation.canGoBack()) navigation.goBack()
     } catch (err) {

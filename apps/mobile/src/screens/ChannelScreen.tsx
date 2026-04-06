@@ -10,7 +10,6 @@ import { useStore } from '@nanostores/react'
 import type { IMessage } from '@vex-chat/libvex'
 import { $groupMessages, $client, $user } from '../store'
 import { markRead, sendGroupMessage } from '@vex-chat/store'
-import { keychainKeyStore } from '../lib/keychain'
 import { setActiveConversation } from '../lib/notifications'
 import { colors } from '../theme'
 import { ChatHeader } from '../components/ChatHeader'
@@ -53,7 +52,7 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
   // Load channel members to resolve userIDs → usernames
   useEffect(() => {
     if (!client) return
-    client.listMembers(channelID).then(members => {
+    client.channels.userList(channelID).then((members: any[]) => {
       const map: Record<string, string> = {}
       for (const m of members) map[m.userID] = m.username
       setUsernames(map)
@@ -67,9 +66,7 @@ export function ChannelScreen({ route, navigation }: { route: any; navigation: a
     setSendError('')
     setText('')
     try {
-      const result = await sendGroupMessage(channelID, content, {
-        keyStore: keychainKeyStore,
-      })
+      const result = await sendGroupMessage(channelID, content)
       if (!result.ok) {
         setSendError(result.error ?? 'Failed to send')
       }

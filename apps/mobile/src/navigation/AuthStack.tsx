@@ -12,12 +12,12 @@ const Stack = createNativeStackNavigator()
 export function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="Initialize" component={InitializeScreen} />
-      <Stack.Screen name="Finalize" component={FinalizeScreen} />
+      <Stack.Screen name="Welcome" component={WelcomeScreen as any} />
+      <Stack.Screen name="Initialize" component={InitializeScreen as any} />
+      <Stack.Screen name="Finalize" component={FinalizeScreen as any} />
       <Stack.Screen name="HangTight" component={HangTightScreen} />
-      <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
-      <Stack.Screen name="Authenticate" component={AuthenticateScreen} />
+      <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen as any} />
+      <Stack.Screen name="Authenticate" component={AuthenticateScreen as any} />
     </Stack.Navigator>
   )
 }

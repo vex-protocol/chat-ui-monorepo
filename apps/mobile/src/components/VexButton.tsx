@@ -1,5 +1,5 @@
 import React from 'react'
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, ActivityIndicator } from 'react-native'
+import { TouchableOpacity, Text, StyleSheet, type ViewStyle, ActivityIndicator } from 'react-native'
 import { colors, typography } from '../theme'
 import { CornerBracketBox } from './CornerBracketBox'
 
@@ -28,10 +28,10 @@ export function VexButton({
     <CornerBracketBox
       size={8}
       color={isPrimary ? colors.accent : colors.border}
-      style={[
+      style={StyleSheet.flatten([
         glow && styles.glow,
         style,
-      ]}
+      ])}
     >
       <TouchableOpacity
         onPress={onPress}

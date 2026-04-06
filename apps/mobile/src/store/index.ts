@@ -40,6 +40,7 @@ export const mobilePersistence: PersistenceCallbacks = { loadMessages, saveGroup
 
 // Mobile-specific bootstrap: injects RN adapters + expo-sqlite storage so the
 // store never dynamically imports Node-only modules (ws, better-sqlite3).
+import { bootstrap as _bootstrap } from '@vex-chat/store'
 import { reactNativeAdapters } from '@vex-chat/libvex'
 import { createExpoStorage } from '@vex-chat/libvex/storage/expo'
 import type { IClientOptions, ILogger } from '@vex-chat/libvex'
@@ -57,7 +58,7 @@ export async function mobileBootstrap(
   persistence?: PersistenceCallbacks,
 ): Promise<void> {
   const storage = createExpoStorage('vex-client.db', privateKey, rnLogger, options as IClientOptions)
-  return bootstrap(privateKey, {
+  return _bootstrap(privateKey, {
     ...options,
     adapters: reactNativeAdapters(),
   }, persistence, storage)

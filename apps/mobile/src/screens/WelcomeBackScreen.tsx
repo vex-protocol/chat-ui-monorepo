@@ -16,7 +16,7 @@ interface SavedCreds {
   username: string
   deviceID: string
   deviceKey: string
-  preKey: string
+  preKey?: string
 }
 
 export function WelcomeBackScreen({ navigation }: Props) {
