@@ -11,8 +11,8 @@ The Vex platform was originally built across five+ independent repositories:
 | Repo | Role | Stack |
 |------|------|-------|
 | `vex-desktop` | Desktop client | Electron 28, React 17, Redux, Webpack 5 |
-| `spire` | Server | Express 4, Kysely, MySQL/SQLite dual, PBKDF2, Morgan/Winston |
-| `libvex-js` | Client SDK | 3,114-line monolithic `Client.ts`, Kysely/SQLite local DB |
+| `spire` | Server | Express 4, Knex, MySQL/SQLite dual, PBKDF2, Morgan/Winston |
+| `libvex-js` | Client SDK | 3,114-line monolithic `Client.ts`, Knex/SQLite local DB |
 | `crypto-js` | Crypto primitives | TweetNaCl, custom encoding |
 | `types-js` | Shared types | Manual interface definitions |
 
@@ -22,7 +22,7 @@ The Vex platform was originally built across five+ independent repositories:
 
 2. **Monolithic SDK.** `Client.ts` at 3,114 lines contained authentication, key exchange, message loop, WebSocket management, file handling, and session storage in a single class. Untestable, hard to reason about, impossible to tree-shake.
 
-3. **No mobile story.** The architecture was tightly coupled to Node.js and Electron. libvex depended on `sqlite3` (native addon), `ws` (Node-only), and `knex` — none of which ran on React Native without shims.
+3. **No mobile story.** The architecture was tightly coupled to Node.js and Electron. libvex depended on `sqlite3` (native addon), `ws` (Node-only), and `knex` — none of which run on React Native without shims.
 
 4. **Outdated cryptography.** TweetNaCl is unmaintained (last release 2018). No TypeScript types. No audit trail. Password hashing used PBKDF2 with 1,000 iterations (dangerously low by 2024 standards).
 
@@ -30,7 +30,7 @@ The Vex platform was originally built across five+ independent repositories:
 
 6. **Electron overhead.** ~200MB binary for a chat app. Chromium security surface. No native system tray integration without plugins. Context isolation was bolted on after initial design.
 
-7. **Duplicate schemas.** Types defined in `types-js` as interfaces, re-validated ad-hoc in spire routes, re-defined again in migration files. Three sources of truth for every data shape.
+7. **Duplicate schemas.** Types defined in `types-js` as interfaces, re-validated ad-hoc in spire routes, re-defined again in Knex migration files. Three sources of truth for every data shape.
 
 **Constraints:**
 - Solo developer
@@ -45,7 +45,7 @@ Consolidate everything into a single pnpm monorepo (`vex-chat`) and reimplement 
 ```
 vex-chat/
 ├── apps/
-│   ├── spire/          # Server (own repo, not in monorepo): Express 4, Kysely, SQLite
+│   ├── spire/          # Server (own repo, not in monorepo): Express 4, Knex, SQLite
 │   ├── desktop/        # Desktop: Tauri 2.0 + Svelte 5
 │   └── mobile/         # Mobile: React Native 0.84
 ├── packages/
@@ -66,7 +66,7 @@ vex-chat/
 | **Cross-platform UI** | _(none)_ | Mitosis | Write once, compile to Svelte + React components |
 | **State management** | Redux (14 reducers) | nanostores | Framework-agnostic, <1KB, works in Svelte + React |
 | **Server framework** | Express 4 | Express 5 | Async error handling, modern router |
-| **ORM** | ~~Knex (query builder)~~ | Kysely (type-safe SQL) | Full TypeScript inference, no runtime type errors — **done** |
+| **ORM** | Knex (query builder) | Kysely (type-safe SQL) | Full TypeScript inference, no runtime type errors |
 | **Database** | MySQL + SQLite dual | better-sqlite3 only | Synchronous, no native addon build issues, simpler ops |
 | **Schema validation** | Manual checks | Zod v4 → OpenAPI | Single source of truth: Zod schema → TS type → OpenAPI spec |
 | **Crypto signing** | TweetNaCl | @noble/curves (Ed25519) | Audited, maintained, TypeScript-native, ESM |
@@ -79,13 +79,13 @@ vex-chat/
 | **Package manager** | npm (per-repo) | pnpm 10 workspaces | Strict deps, workspace protocol, catalog for shared versions |
 | **Build** | Webpack 5 + Babel | Vite 7 + tsc | Native ESM, faster dev server, simpler config |
 
-> **Note:** Most server-side replacements (Express 5, Pino, Zod) were planned but not implemented. Kysely has shipped — both spire and libvex-js now use Kysely instead of Knex. Spire remains in its own repo using Express 4, Winston, and CJS. The client-side replacements (Tauri, Svelte, nanostores, @noble/curves, Mitosis) all shipped. See `docs/ops/roadmap.md` Later section for remaining spire modernization.
+> **Note:** The server-side replacements (Express 5, Kysely, Pino, Zod, Vitest) were planned but not implemented. Spire remains in its own repo using Express 4, Knex, Winston, and CJS. The client-side replacements (Tauri, Svelte, nanostores, @noble/curves, Mitosis) all shipped. See `docs/ops/roadmap.md` Later section for spire modernization status.
 
 ### Architectural changes
 
 1. **Modular libvex.** The 3,114-line `Client.ts` is decomposed into `client.ts`, `auth.ts`, `devices.ts`, `servers.ts`, `users.ts`, `mail.ts`, `session.ts`, `connection.ts`, `http.ts`, `iterators.ts`, and `bot/router.ts`. Each module is independently testable.
 
-2. **No local database in the SDK.** Old libvex embedded Knex + SQLite for local key/message storage (now replaced with Kysely). New libvex uses `EventEmitter3` — it emits `DecryptedMail` events and lets the app layer decide storage (Tauri fs, React Native AsyncStorage, IndexedDB, etc.). Key storage is injected via a `KeyStore` interface.
+2. **No local database in the SDK.** Old libvex embedded Knex + SQLite for local key/message storage. New libvex uses `EventEmitter3` — it emits `DecryptedMail` events and lets the app layer decide storage (Tauri fs, React Native AsyncStorage, IndexedDB, etc.). Key storage is injected via a `KeyStore` interface.
 
 3. **Layer enforcement.** `eslint-plugin-boundaries` enforces the dependency graph at lint time: `types → crypto → libvex → store → apps`. No package can import "upward."
 
@@ -150,7 +150,7 @@ vex-chat/
 
 - Old repos preserved at `~/Public/vex-desktop`, `~/Public/spire`, `~/Public/libvex-js` for reference during reimplementation.
 - Beads issue tracker captures every feature gap and dependency between implementation tasks.
-- SQLite → PostgreSQL migration path is straightforward via Kysely's multi-dialect support if horizontal scaling is ever needed.
+- SQLite → PostgreSQL migration path is straightforward via Knex's multi-dialect support if horizontal scaling is ever needed.
 
 ## Revisit Triggers
 
