@@ -26,7 +26,14 @@ export function WelcomeBackScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    loadCredentials().then((c) => setCreds(c))
+    loadCredentials().then((c) => {
+      if (c) {
+        setCreds(c)
+      } else {
+        // No saved credentials — go straight to login
+        navigation.replace('Welcome')
+      }
+    })
   }, [])
 
   async function handleContinue() {
