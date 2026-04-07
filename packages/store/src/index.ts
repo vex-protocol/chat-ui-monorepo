@@ -19,7 +19,7 @@ export { $avatarHash } from './avatarHash.ts'
 export { $verifiedKeys, markVerified, unmarkVerified, isVerified } from './verifiedKeys.ts'
 
 // Send DM
-export { sendDirectMessage, SENT_PREFIX } from './send-dm.ts'
+export { sendDirectMessage } from './send-dm.ts'
 export type { SendDMOptions, SendDMResult } from './send-dm.ts'
 
 // Send group message
