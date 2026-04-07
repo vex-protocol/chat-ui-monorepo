@@ -223,7 +223,7 @@ export async function registerAndBootstrap(
                 username,
                 deviceID: client.me.device().deviceID,
                 deviceKey: privateKey,
-                token: client.getAuthToken() ?? "",
+                token: "",
             };
             preset.adapters.logger.warn(
                 "[vex-store] register: saving creds for " + toSave.username,
@@ -300,7 +300,7 @@ export async function loginAndBootstrap(
                     username,
                     deviceID: client.me.device().deviceID,
                     deviceKey: privateKey,
-                    token: client.getAuthToken() ?? "",
+                    token: "",
                 };
                 preset.adapters.logger.warn(
                     "[vex-store] Saving creds: " +
@@ -323,7 +323,7 @@ export async function loginAndBootstrap(
             try {
                 await keyStore.save({
                     ...creds,
-                    token: client.getAuthToken() ?? "",
+                    token: "",
                 });
             } catch {
                 /* non-fatal */
@@ -354,21 +354,8 @@ export async function autoLogin(
 
     try {
         const client = await initClient(creds.deviceKey, preset, options);
-        if (creds.token) {
-            client.restoreAuth(creds.token);
-        }
         await client.connect();
         $user.set(client.me.user());
-
-        // Update saved token in case the server refreshed it
-        const freshToken = client.getAuthToken();
-        if (freshToken && freshToken !== creds.token) {
-            try {
-                await keyStore.save({ ...creds, token: freshToken });
-            } catch {
-                /* non-fatal */
-            }
-        }
 
         await populateState(client);
         cleanupStaleDevices(client); // fire-and-forget
