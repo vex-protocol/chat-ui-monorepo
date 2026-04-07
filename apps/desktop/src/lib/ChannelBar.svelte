@@ -33,7 +33,7 @@
     deleting = true
     deleteError = ''
     try {
-      await $client.deleteServer(serverID)
+      await $client.servers.delete(serverID)
     } catch (err) {
       deleteError = err instanceof Error ? err.message : 'Failed to delete'
       deleting = false

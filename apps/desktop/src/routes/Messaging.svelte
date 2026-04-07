@@ -27,14 +27,9 @@
   // Fetch the recipient's signKey and compute the fingerprint
   $effect(() => {
     if (!$client || !targetUserID) return
-    $client.devices.list(targetUserID).then((devices) => {
-      const device = devices?.[0]
-      if (!device) return
-      $client!.fetchKeyBundle(device.deviceID).then((bundle) => {
-        theirSignKey = bundle.signKey
-        fingerprint = $client!.getFingerprint(bundle.signKey) ?? ''
-      }).catch(() => {})
-    }).catch(() => {})
+    // TODO: fetchKeyBundle and getFingerprint not yet exposed in public API
+    // $client.devices.list(targetUserID).then(devices => { ... })
+    void targetUserID
   })
 
   const isVerifiedKey = $derived(theirSignKey ? $verifiedKeys.has(theirSignKey) : false)

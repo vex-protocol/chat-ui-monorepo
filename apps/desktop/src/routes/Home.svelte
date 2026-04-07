@@ -21,8 +21,9 @@
     joining = true
     joinError = ''
     try {
-      const server = await $client!.joinServerViaInvite(inviteID)
-      servers.setKey(server.serverID, server)
+      const permission = await $client!.invites.redeem(inviteID)
+      const server = await $client!.servers.retrieveByID(permission.resourceID)
+      if (server) servers.setKey(server.serverID, server)
       const serverChannels = await $client!.channels.retrieve(server.serverID)
       channels.setKey(server.serverID, serverChannels)
       const first = serverChannels[0]
