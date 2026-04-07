@@ -31,7 +31,7 @@
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.10.0",
     "@types/uuid": "catalog:",
-    "@vex-chat/libvex": "^1.0.5",
+    "@vex-chat/libvex": "^1.0.6",
     "@vex-chat/store": "workspace:*",
     "dompurify": "catalog:",
     "marked": "catalog:",
