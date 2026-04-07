@@ -14,8 +14,8 @@ packages:
     access: $all
     publish: $all
     unpublish: $all
-    # No proxy — @vex-chat packages served locally only.
-    # If not published locally, install fails (intentional).
+    # Fall through to npm for packages not published locally (types, crypto).
+    proxy: npmjs
 
   '**':
     access: $all
