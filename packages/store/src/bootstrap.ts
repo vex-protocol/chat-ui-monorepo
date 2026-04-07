@@ -117,8 +117,9 @@ export async function registerAndBootstrap(
       return { ok: false, error: 'Registered but login failed: ' + loginErr.message }
     }
 
-    // connect() populates device details (needed for keyStore.save)
+    // connect() populates device details and authenticates
     await client.connect()
+    $user.set(client.me.user())
 
     await keyStore.save({
       username,
@@ -154,8 +155,9 @@ export async function loginAndBootstrap(
       return { ok: false, error: 'Invalid username or password' }
     }
 
-    // connect() populates device details
+    // connect() populates device details and authenticates
     await client.connect()
+    $user.set(client.me.user())
 
     if (!creds) {
       // First login on this machine — register a new device
@@ -187,6 +189,7 @@ export async function autoLogin(
   try {
     const client = await initClient(creds.deviceKey, preset, options)
     await client.connect()
+    $user.set(client.me.user())
     return { ok: true }
   } catch (err: any) {
     if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
