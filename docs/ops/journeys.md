@@ -50,7 +50,7 @@ A complete comparison of what shipped in the old client versus what's available 
 - Multi-device fan-out (sends to all recipient devices)
 - Message forwarding to sender's own devices
 - Group messaging (member list endpoint + ServerChannel fan-out)
-- Local message persistence (IndexedDB desktop, AsyncStorage mobile — survives app restart)
+- Local message persistence (SQLite via IStorage on all platforms — survives app restart)
 - Unread badges (DM and channel, separated — desktop + mobile)
 - Notification suppression when conversation is active (desktop + mobile)
 - Channel notification format: "username (#channel, server)" (desktop + mobile)

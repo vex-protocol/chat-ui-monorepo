@@ -105,7 +105,7 @@ This is invisible to the user but critical to perceived performance. The bootstr
 ### Waterfall (current monorepo — `packages/store/bootstrap.ts`)
 
 ```
-0. Load persisted messages from IndexedDB → $messages, $groupMessages (Launch.svelte)
+0. Messages persist in SqliteStorage (loaded automatically by Client)
 1. Create VexClient         → $client.set(client)
 2. Wire real-time events    → mail → $messages, serverChange → $servers
 3. client.connect()         → WebSocket + challenge handshake
@@ -113,7 +113,7 @@ This is invisible to the user but critical to perceived performance. The bootstr
 5. client.listServers()     → $servers.set(...)
 6. For each server:
    └─ client.listChannels() → $channels.setKey(serverID, channels)
-7. Wire persistence listener → incoming mail saved to IndexedDB (Launch.svelte)
+7. Messages auto-persist via IStorage (SQLite)
 8. client.fetchInbox()      → add pending offline messages to atoms + persist
 9. [MISSING] Fetch familiars
 10. [MISSING] Fetch permissions per server
@@ -144,7 +144,7 @@ The new bootstrap is missing:
 - **Familiars list** — old client had `users.familiars()` returning all users you've exchanged messages with. New server has no equivalent endpoint.
 - **Permissions** — old client fetched all permissions to know which servers you're admin of. New bootstrap doesn't do this.
 
-DM history is now handled via **IndexedDB persistence** — messages are loaded from local storage on startup (step 0) and persisted as they arrive (step 7). The server still uses a relay model (delete after fetch), but offline messages are fetched via `fetchInbox()` (step 8) and persisted locally.
+DM history is now handled via **SQLite persistence** (SqliteStorage) — messages are loaded from the local SQLite database on startup (step 0) and persisted as they arrive (step 7). The server still uses a relay model (delete after fetch), but offline messages are fetched via `fetchInbox()` (step 8) and persisted locally.
 - **Online presence** — old client polled `channels.userList()` every 30 seconds. New `$onlineLists` atom exists but isn't wired.
 
 ### Pain Points

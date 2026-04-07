@@ -197,47 +197,25 @@ But the pure logic (emoji detection, URL extraction, mention parsing) moves to s
 
 ### Phase 2: Extract Auth Flow Orchestration into Store ✅
 
-Created `packages/store/src/auto-login.ts`:
+Extracted into `packages/store/src/bootstrap.ts` (autoLogin):
 
 ```typescript
 import type { KeyStore } from '@vex-chat/types'
-import type { PersistenceCallbacks } from './bootstrap.ts'
-import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced } from './bootstrap.ts'
-
-export interface AutoLoginResult {
-  ok: boolean
-  keyReplaced?: boolean
-  error?: string
-}
+import type { KeyStore, PlatformPreset } from '@vex-chat/types'
+import { autoLogin as autoLoginImpl } from './bootstrap.ts'
 
 /**
  * Attempts auto-login from stored credentials.
- * Platform apps provide the KeyStore and PersistenceCallbacks implementations.
+ * Platform apps provide the KeyStore and a PlatformPreset
+ * (bundles adapters + storage factory).
  */
-export async function autoLogin(
-  keyStore: KeyStore,
-  serverUrl: string,
-  persistence?: PersistenceCallbacks,
-): Promise<AutoLoginResult> {
-  const creds = await keyStore.loadActive()
-  if (!creds) return { ok: false }
-
-  try {
-    const deviceKey = decodeHex(creds.deviceKey)
-    const preKeySecret = decodeHex(creds.preKey)
-    await bootstrap(serverUrl, creds.deviceID, deviceKey, creds.token, preKeySecret, persistence)
-    return { ok: true }
-  } catch (err: any) {
-    if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
-    return { ok: false, error: err?.message ?? 'Unknown error' }
-  }
-}
+export { autoLogin } from './bootstrap.ts'
+// Signature: autoLogin(keyStore, preset, serverOptions)
 ```
 
 **Result:** Desktop's `Launch.svelte` and Mobile's `App.tsx` both reduce to:
 ```
-const result = await autoLogin(keyStore, getServerUrl(), persistence)
+const result = await autoLogin(keyStore, preset, serverOptions)
 if (result.ok) navigateToHome()
 else if (result.keyReplaced) navigateToLogin()
 ```
@@ -446,7 +424,7 @@ After all phases, the layer diagram looks like this:
 | File attachment parsing | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
 | Timestamp formatting | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
 | Emoji detection | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
-| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/auto-login.ts | Async function | ✅ Done |
+| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/bootstrap.ts (autoLogin) | Async function | ✅ Done |
 | Deep link URL parsing | desktop/deeplink.ts | libvex/deeplink.ts | Pure function | ✅ Done |
 | Unread count tracking | desktop/tray.ts (partial) | store/unread.ts | Nanostore atoms | ✅ Done (split DM/channel) |
 | Notification decisions | desktop/notifications.ts | store/notifications.ts | Pure function | ✅ Done (with author/channel resolution) |
@@ -492,10 +470,11 @@ Both frameworks subscribe to the same store shape. Business logic functions like
 `bootstrap()` mutate stores via `.set()` / `.setKey()` — framework-agnostic calls
 that trigger re-renders in whichever framework is subscribed.
 
-The `PersistenceCallbacks` dependency injection pattern already in `bootstrap()` is a
-stopgap — the goal is SQLite everywhere via `IStorage` (with platform-specific Kysely
-dialects). The general principle remains: define an interface in the shared package,
-inject implementations from the app layer.
+The `PlatformPreset` pattern in `bootstrap()` bundles adapters + storage factory per
+platform (e.g. `tauriPreset()`, `expoPreset()`, `nodePreset()`, `testPreset()`). SQLite
+is used everywhere via `IStorage` with platform-specific Kysely dialects. The general
+principle remains: define an interface in the shared package, inject implementations
+from the app layer.
 
 ---
 

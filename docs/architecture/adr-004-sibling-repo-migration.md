@@ -61,7 +61,7 @@ The monorepo's `packages/libvex`/`packages/crypto`/`packages/types` rewrite prop
 | Mail event shape | `"message"` event with `IMessage { decrypted: boolean, ... }` — stays as-is |
 | Crypto primitives | Existing `xDH`/`xHMAC`/`xKDF`/`XUtils` surface stays stable — but internal Node API calls must be swapped for pure-JS equivalents (see Phase A.5) |
 | Wire format | Uint8Array + 170-byte packed extra — matches spire natively, no adapter needed |
-| Persistence abstraction | `IStorage` interface — inject SQLite/IndexedDB/AsyncStorage backend per platform |
+| Persistence abstraction | `IStorage` interface — inject SQLite backend per platform (tauri-plugin-sql, expo-sqlite, better-sqlite3) |
 
 The sibling-repo approach is **fewer moving parts, less rewrite risk, and actually ships**. The monorepo `packages/libvex|crypto|types` are deleted.
 
@@ -95,7 +95,7 @@ The sibling repos stay at **4 packages** (`types` + `crypto` + `libvex` + monore
 @vex-chat/libvex/transport/test        → inMemoryAdapters, MockWebSocket, silentLogger — existing
 @vex-chat/libvex/storage/node         → SqliteStorage + createNodeStorage (better-sqlite3 + Kysely)
 @vex-chat/libvex/storage/memory       → MemoryStorage for tests
-(future: expo-sqlite and wa-sqlite/tauri-plugin-sql Kysely dialects for SqliteStorage)
+(shipped: createExpoStorage (expo-sqlite dialect), createTauriStorage (tauri-plugin-sql dialect))
 @vex-chat/libvex/keystore/node        → file-backed KeyStore (Node condition; wraps saveKeyFile)
 @vex-chat/libvex/keystore/memory      → in-memory KeyStore for tests
 @vex-chat/libvex/bot                  → CommandRouter, fromEvent
@@ -115,7 +115,7 @@ Bundlers tree-shake unused subpaths. Browser/RN bundles never pull the `node` su
 |---|---|
 | **Single Responsibility** | `Client` = protocol (auth handshake, mail, sessions). Credential persistence = app concern. Different concerns, different lifecycles. |
 | **Interface Segregation** | `IClientAdapters { logger, WebSocket }` is cohesive (runtime environment primitives). Adding `KeyStore` mixes stateful persistence with stateless constructors — breaks cohesion. |
-| **Security posture** | Identity keys belong in OS keychain (hardware-backed, biometric-gated). Session state belongs in local DB (SQLite/IndexedDB). Different backends, MUST NOT share one `IStorage`. |
+| **Security posture** | Identity keys belong in OS keychain (hardware-backed, biometric-gated). Session state belongs in local DB (SQLite). Different backends, MUST NOT share one `IStorage`. |
 | **Biometric UX timing** | If `Client.create()` auto-loaded credentials, it would trigger Face ID / biometric prompts at construction — apps lose control over when prompts appear. |
 | **Testability** | `Client.create(privateKey: string)` is trivially testable with any hex string. KeyStore injection requires mocks at every test site. |
 | **Industry precedent** | matrix-js-sdk, Twilio, Slack, Discord, Stripe all pass credentials as primitives. Only libsignal bundles identity persistence into its Store — and its Store is intentionally broader than what we need. |
@@ -153,7 +153,7 @@ export interface KeyStore {
 | Unit tests | `inMemoryKeyStore()` from `@vex-chat/libvex/keystore/memory` |
 | Mobile app | App-provided, wraps `react-native-keychain` (already exists at `apps/mobile/src/lib/keychain.ts`) |
 | Desktop app (Tauri) | App-provided, wraps Tauri Stronghold or `tauri-plugin-keyring` |
-| Browser / website | App-provided (IndexedDB + SubtleCrypto, or skip persistence) |
+| Browser / website | App-provided (tauri-plugin-sql for Tauri, wa-sqlite for pure browser (future)) |
 
 ### Session bootstrap pattern (app-level, not SDK)
 
@@ -397,7 +397,7 @@ import { MemoryStorage } from '@vex-chat/libvex/storage/memory'
 import { keychainKeyStore } from './lib/keychain'
 
 const adapters = await reactNativeAdapters()
-const storage = new MemoryStorage()  // future: SqliteStorage with expo-sqlite Kysely dialect
+const storage = createExpoStorage()  // SqliteStorage with expo-sqlite Kysely dialect
 const creds = await keychainKeyStore.load()
 
 const client = creds
@@ -421,7 +421,7 @@ const creds = await strongholdKeyStore.load()
 const client = creds
   ? await Client.create(creds.deviceKey, {
       adapters: await browserAdapters(),
-      storage: new MemoryStorage(),  // future: SqliteStorage with tauri-plugin-sql Kysely dialect
+      storage: createTauriStorage(),  // SqliteStorage with tauri-plugin-sql Kysely dialect
     })
   : null
 ```
@@ -480,7 +480,7 @@ Migrated `apps/mobile` from bare RN 0.84.1 to **Expo SDK 55 Prebuild (CNG)** wit
 | Consumer rewrite scope (~18 import sites, API shape changes) | Alternative: add a thin `VexClient` facade in libvex-js that preserves monorepo API shape. More libvex-js work, less consumer churn. Decide per open question #1. |
 | pnpm workspace lockfile contains `../` paths (non-portable) | Keep `pnpm-workspace.yaml` sibling entries on `feat/platform-adapters` branch only. Once sibling repos are published to npm, switch to registry versions and remove external workspace entries. |
 | Missing utility helpers (`parseVexLink`, `parseInviteID`) | Port as additive exports to libvex-js; small, low-risk, matches existing export style |
-| Browser IndexedDB backend for Tauri WebView | Tauri 2.x WebViews (WKWebView/WebView2) support IndexedDB; verify with spike |
+| SQLite backend for Tauri WebView | tauri-plugin-sql provides native SQLite access from the WebView via Tauri commands |
 | RN downgraded for Expo compat | Downgraded 0.84.1→0.83.2 for SDK 55. Upgrade to SDK 56 + RN 0.85 when stable (May/June 2026). |
 | Two-pass bootstrap for fresh clones (need 4 sibling repos) | `scripts/bootstrap.sh` clones missing siblings from GitHub |
 | Live API integration tests in libvex-js hit `api.vex.wtf` | Unchanged — run manually or against local spire |
