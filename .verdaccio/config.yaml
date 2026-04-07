@@ -1,0 +1,33 @@
+# Local npm registry for cross-repo development.
+# Start with: pnpm registry
+# Publish with: pnpm publish:local
+
+storage: ./storage
+
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+    maxage: 60m
+
+packages:
+  '@vex-chat/*':
+    access: $all
+    publish: $all
+    unpublish: $all
+    # No proxy — @vex-chat packages served locally only.
+    # If not published locally, install fails (intentional).
+
+  '**':
+    access: $all
+    proxy: npmjs
+
+# No auth required for local dev
+auth:
+  htpasswd:
+    file: ./htpasswd
+    max_users: -1
+
+server:
+  keepAliveTimeout: 60
+
+log: { type: stdout, format: pretty, level: warn }
