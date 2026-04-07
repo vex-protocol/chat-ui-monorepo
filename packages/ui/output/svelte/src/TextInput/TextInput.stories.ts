@@ -1,5 +1,5 @@
-import { meta } from './TextInput.stories-shared'
-import TextInput from './TextInput.svelte'
+import { meta } from "./TextInput.stories-shared";
+import TextInput from "./TextInput.svelte";
 
-export * from './TextInput.stories-shared'
-export default { ...meta, component: TextInput }
+export * from "./TextInput.stories-shared";
+export default { ...meta, component: TextInput };

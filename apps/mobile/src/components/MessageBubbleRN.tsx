@@ -1,103 +1,116 @@
-import React from 'react'
-import { View, Text, StyleSheet } from 'react-native'
-import type { IMessage } from '@vex-chat/libvex'
-import { formatTime, avatarHue } from '@vex-chat/store'
-import { colors, typography } from '../theme'
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import type { IMessage } from "@vex-chat/libvex";
+import { formatTime, avatarHue } from "@vex-chat/store";
+import { colors, typography } from "../theme";
 
 interface MessageBubbleRNProps {
-  message: IMessage
-  isOwn: boolean
-  authorName: string
+    message: IMessage;
+    isOwn: boolean;
+    authorName: string;
 }
 
-export function MessageBubbleRN({ message, isOwn, authorName }: MessageBubbleRNProps) {
-  if (message.group === '__system__') {
+export function MessageBubbleRN({
+    message,
+    isOwn,
+    authorName,
+}: MessageBubbleRNProps) {
+    if (message.group === "__system__") {
+        return (
+            <View style={styles.systemContainer}>
+                <Text style={styles.systemText}>{message.message}</Text>
+            </View>
+        );
+    }
+
     return (
-      <View style={styles.systemContainer}>
-        <Text style={styles.systemText}>{message.message}</Text>
-      </View>
-    )
-  }
+        <View style={styles.container}>
+            {/* Avatar */}
+            <View
+                style={[
+                    styles.avatar,
+                    {
+                        backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
+                    },
+                ]}
+            >
+                <Text style={styles.avatarText}>
+                    {authorName.charAt(0).toUpperCase()}
+                </Text>
+            </View>
 
-  return (
-    <View style={styles.container}>
-      {/* Avatar */}
-      <View style={[styles.avatar, { backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)` }]}>
-        <Text style={styles.avatarText}>
-          {authorName.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-
-      {/* Content */}
-      <View style={styles.content}>
-        <View style={styles.meta}>
-          <Text style={[styles.author, isOwn && styles.authorSelf]}>
-            {authorName}
-          </Text>
-          <Text style={styles.timestamp}>{formatTime(message.timestamp)}</Text>
+            {/* Content */}
+            <View style={styles.content}>
+                <View style={styles.meta}>
+                    <Text style={[styles.author, isOwn && styles.authorSelf]}>
+                        {authorName}
+                    </Text>
+                    <Text style={styles.timestamp}>
+                        {formatTime(message.timestamp)}
+                    </Text>
+                </View>
+                <Text style={styles.text}>{message.message}</Text>
+            </View>
         </View>
-        <Text style={styles.text}>{message.message}</Text>
-      </View>
-    </View>
-  )
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  content: {
-    flex: 1,
-  },
-  meta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-  },
-  author: {
-    ...typography.body,
-    color: colors.textSecondary,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  authorSelf: {
-    color: colors.accentMuted,
-  },
-  timestamp: {
-    ...typography.body,
-    color: colors.muted,
-    fontSize: 10,
-  },
-  text: {
-    ...typography.bodyLarge,
-    color: colors.textSecondary,
-  },
-  systemContainer: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  systemText: {
-    ...typography.body,
-    color: colors.muted,
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-})
+    container: {
+        flexDirection: "row",
+        gap: 10,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+    },
+    avatar: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 2,
+    },
+    avatarText: {
+        color: "#fff",
+        fontWeight: "700",
+        fontSize: 13,
+    },
+    content: {
+        flex: 1,
+    },
+    meta: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 2,
+    },
+    author: {
+        ...typography.body,
+        color: colors.textSecondary,
+        fontWeight: "600",
+        fontSize: 13,
+    },
+    authorSelf: {
+        color: colors.accentMuted,
+    },
+    timestamp: {
+        ...typography.body,
+        color: colors.muted,
+        fontSize: 10,
+    },
+    text: {
+        ...typography.bodyLarge,
+        color: colors.textSecondary,
+    },
+    systemContainer: {
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        alignItems: "center",
+    },
+    systemText: {
+        ...typography.body,
+        color: colors.muted,
+        fontSize: 12,
+        fontStyle: "italic",
+    },
+});

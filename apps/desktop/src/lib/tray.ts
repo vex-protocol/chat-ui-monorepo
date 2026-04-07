@@ -1,10 +1,10 @@
-import { invoke } from '@tauri-apps/api/core'
-import { getCurrentWindow } from '@tauri-apps/api/window'
-import type { IMessage } from '@vex-chat/libvex'
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { IMessage } from "@vex-chat/libvex";
 
 interface MailEmitter {
-  on(event: 'mail', handler: (mail: IMessage) => void): void
-  off(event: 'mail', handler: (mail: IMessage) => void): void
+    on(event: "mail", handler: (mail: IMessage) => void): void;
+    off(event: "mail", handler: (mail: IMessage) => void): void;
 }
 
 /**
@@ -12,37 +12,40 @@ interface MailEmitter {
  * Tauri command. Resets when the window gains focus.
  * Returns an unsubscribe / cleanup function.
  */
-export function setupTray(client: MailEmitter, currentUserID: string): () => void {
-  const win = getCurrentWindow()
-  let count = 0
-  let unlistenFocus: (() => void) | undefined
+export function setupTray(
+    client: MailEmitter,
+    currentUserID: string,
+): () => void {
+    const win = getCurrentWindow();
+    let count = 0;
+    let unlistenFocus: (() => void) | undefined;
 
-  // Focus → clear unread badge
-  void win
-    .listen('tauri://focus', () => {
-      if (count === 0) return
-      count = 0
-      void invoke('set_tray_unread', { count: 0 })
-    })
-    .then((fn) => {
-      unlistenFocus = fn
-    })
+    // Focus → clear unread badge
+    void win
+        .listen("tauri://focus", () => {
+            if (count === 0) return;
+            count = 0;
+            void invoke("set_tray_unread", { count: 0 });
+        })
+        .then((fn) => {
+            unlistenFocus = fn;
+        });
 
-  // New mail → increment badge if window is not focused
-  const mailHandler = (mail: IMessage): void => {
-    if (mail.authorID === currentUserID) return
-    void win.isFocused().then((focused) => {
-      if (!focused) {
-        count++
-        void invoke('set_tray_unread', { count })
-      }
-    })
-  }
+    // New mail → increment badge if window is not focused
+    const mailHandler = (mail: IMessage): void => {
+        if (mail.authorID === currentUserID) return;
+        void win.isFocused().then((focused) => {
+            if (!focused) {
+                count++;
+                void invoke("set_tray_unread", { count });
+            }
+        });
+    };
 
-  client.on('mail', mailHandler)
+    client.on("mail", mailHandler);
 
-  return () => {
-    client.off('mail', mailHandler)
-    unlistenFocus?.()
-  }
+    return () => {
+        client.off("mail", mailHandler);
+        unlistenFocus?.();
+    };
 }

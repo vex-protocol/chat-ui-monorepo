@@ -1,23 +1,23 @@
 export const meta = {
-  title: 'Modal',
-  argTypes: {
-    isOpen: {
-      control: 'boolean'
+    title: "Modal",
+    argTypes: {
+        isOpen: {
+            control: "boolean",
+        },
+        title: {
+            control: "text",
+        },
     },
-    title: {
-      control: 'text'
-    }
-  }
 };
 export const Open = {
-  args: {
-    isOpen: true,
-    title: 'Confirm Action'
-  }
+    args: {
+        isOpen: true,
+        title: "Confirm Action",
+    },
 };
 export const Closed = {
-  args: {
-    isOpen: false,
-    title: 'Confirm Action'
-  }
-}
+    args: {
+        isOpen: false,
+        title: "Confirm Action",
+    },
+};
