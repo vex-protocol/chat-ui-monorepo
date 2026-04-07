@@ -31,16 +31,13 @@
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.10.0",
     "@types/uuid": "catalog:",
-    "@vex-chat/libvex": "workspace:*",
+    "@vex-chat/libvex": "^1.0.0",
     "@vex-chat/store": "workspace:*",
     "dompurify": "catalog:",
     "marked": "catalog:",
     "svelte-spa-router": "^4.0.1",
     "tauri-plugin-keyring-api": "^0.1.1",
     "uuid": "catalog:"
-  },
-  "dependenciesMeta": {
-    "@vex-chat/libvex": { "injected": true }
   },
   "license": "AGPL-3.0-or-later"
 }

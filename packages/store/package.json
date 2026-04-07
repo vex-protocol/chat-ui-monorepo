@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@vex-chat/libvex": "workspace:*",
+    "@vex-chat/libvex": "^1.0.0",
     "nanostores": "catalog:",
     "uuid": "catalog:"
   },
@@ -18,9 +18,6 @@
     "@nanostores/react": {
       "optional": true
     }
-  },
-  "dependenciesMeta": {
-    "@vex-chat/libvex": { "injected": true }
   },
   "license": "AGPL-3.0-or-later"
 }
