@@ -34,6 +34,7 @@
     "@vex-chat/libvex": "^1.0.7",
     "@vex-chat/store": "workspace:*",
     "dompurify": "catalog:",
+    "kysely-dialect-tauri": "^1.2.1",
     "marked": "catalog:",
     "svelte-spa-router": "^4.0.1",
     "tauri-plugin-keyring-api": "^0.1.1",
