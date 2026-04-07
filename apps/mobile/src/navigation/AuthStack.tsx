@@ -12,7 +12,7 @@ import { LoginScreen } from '../screens/LoginScreen'
 const Stack = createNativeStackNavigator()
 
 export function AuthStack() {
-  const [initialRoute, setInitialRoute] = useState<string | null>(null)
+  const [initialRoute, setInitialRoute] = useState<'Welcome' | 'WelcomeBack' | null>(null)
 
   useEffect(() => {
     loadCredentials().then((creds) => {

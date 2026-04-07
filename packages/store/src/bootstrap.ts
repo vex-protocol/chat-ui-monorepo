@@ -197,7 +197,7 @@ export async function registerAndBootstrap(
         username,
         deviceID: client.me.device().deviceID,
         deviceKey: privateKey,
-        token: client.getAuthToken() ?? undefined,
+        token: client.getAuthToken() ?? '',
       }
       preset.adapters.logger.warn('[vex-store] register: saving creds for ' + toSave.username)
       await keyStore.save(toSave)
@@ -259,7 +259,7 @@ export async function loginAndBootstrap(
           username,
           deviceID: client.me.device().deviceID,
           deviceKey: privateKey,
-          token: client.getAuthToken() ?? undefined,
+          token: client.getAuthToken() ?? '',
         }
         preset.adapters.logger.warn('[vex-store] Saving creds: ' + JSON.stringify({ username: toSave.username, deviceID: toSave.deviceID }))
         await keyStore.save(toSave)
@@ -270,7 +270,7 @@ export async function loginAndBootstrap(
     } else {
       // Existing creds — update the token
       try {
-        await keyStore.save({ ...creds, token: client.getAuthToken() ?? undefined })
+        await keyStore.save({ ...creds, token: client.getAuthToken() ?? '' })
       } catch { /* non-fatal */ }
     }
 

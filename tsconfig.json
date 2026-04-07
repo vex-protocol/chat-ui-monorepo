@@ -19,5 +19,7 @@
     "noPropertyAccessFromIndexSignature": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
-  }
+  },
+  "include": [],
+  "exclude": ["apps", "packages"]
 }
