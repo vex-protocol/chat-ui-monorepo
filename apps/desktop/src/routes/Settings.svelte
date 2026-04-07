@@ -25,7 +25,7 @@
     devicesLoading = true
     devicesError = ''
     try {
-      devices = await $client.listDevices(userID)
+      devices = await $client.devices.list(userID) ?? []
     } catch (err) {
       devicesError = err instanceof Error ? err.message : 'Failed to load devices'
     } finally {

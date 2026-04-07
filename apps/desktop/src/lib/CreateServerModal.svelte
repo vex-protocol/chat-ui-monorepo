@@ -18,7 +18,7 @@
       const server = await $client!.createServer(n, n.slice(0, 1).toUpperCase())
       servers.setKey(server.serverID, server)
       // Spire auto-creates #general during createServer, so just fetch channels
-      const serverChannels = await $client!.listChannels(server.serverID)
+      const serverChannels = await $client!.channels.retrieve(server.serverID)
       channels.setKey(server.serverID, serverChannels)
       onclose()
       const firstChannel = serverChannels[0]

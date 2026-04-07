@@ -31,12 +31,12 @@
     let active = true
     loading = true
 
-    c.listMembers(cid)
+    c.channels.userList(cid)
       .then((result) => { if (active) { members = result; loading = false } })
       .catch(() => { if (active) loading = false })
 
     const interval = setInterval(() => {
-      c.listMembers(cid)
+      c.channels.userList(cid)
         .then((result) => { if (active) members = result })
         .catch(() => {})
     }, 30_000)

@@ -23,7 +23,7 @@
     try {
       const server = await $client!.joinServerViaInvite(inviteID)
       servers.setKey(server.serverID, server)
-      const serverChannels = await $client!.listChannels(server.serverID)
+      const serverChannels = await $client!.channels.retrieve(server.serverID)
       channels.setKey(server.serverID, serverChannels)
       const first = serverChannels[0]
       push(first ? `/server/${server.serverID}/${first.channelID}` : '/home')

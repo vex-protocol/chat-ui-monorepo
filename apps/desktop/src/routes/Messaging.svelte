@@ -27,8 +27,8 @@
   // Fetch the recipient's signKey and compute the fingerprint
   $effect(() => {
     if (!$client || !targetUserID) return
-    $client.listDevices(targetUserID).then((devices) => {
-      const device = devices[0]
+    $client.devices.list(targetUserID).then((devices) => {
+      const device = devices?.[0]
       if (!device) return
       $client!.fetchKeyBundle(device.deviceID).then((bundle) => {
         theirSignKey = bundle.signKey

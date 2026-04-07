@@ -48,7 +48,8 @@
     if (!q) { results = []; return }
     searching = true
     searchTimer = setTimeout(async () => {
-      results = await $client?.searchUsers(q) ?? []
+      const [found] = await $client?.users.retrieve(q) ?? [null]
+      results = found ? [found] : []
       searching = false
     }, 250)
   }
