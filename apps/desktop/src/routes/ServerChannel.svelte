@@ -15,10 +15,6 @@
     $channels[serverID]?.find(c => c.channelID === channelID)?.name ?? channelID.slice(0, 8),
   )
 
-  $effect(() => {
-    console.log('[ServerChannel] channelID=' + channelID + ' messages=' + channelMessages.length + ' keys=' + Object.keys($groupMessages).join(','))
-  })
-
   let sending = $state(false)
   let sendError = $state('')
   let usernames: Record<string, string> = $state({})
