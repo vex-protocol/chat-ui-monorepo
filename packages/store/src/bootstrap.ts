@@ -12,22 +12,50 @@ import { $familiars } from './familiars.ts'
 import { $keyReplaced } from './key-replaced.ts'
 
 /**
- * Fetches server list, channels per server, and permissions after login.
+ * Fetches server list, channels per server, permissions, and loads
+ * persisted message history from local SQLite after login.
  */
-async function populateServersAndChannels(client: Client): Promise<void> {
+async function populateState(client: Client): Promise<void> {
   try {
+    // Servers + channels
     const servers = await client.servers.retrieve()
     for (const server of servers) {
       $servers.setKey(server.serverID, server)
       const channels = await client.channels.retrieve(server.serverID)
       $channels.setKey(server.serverID, channels)
+
+      // Load persisted group messages per channel
+      for (const channel of channels) {
+        try {
+          const msgs = await client.messages.retrieveGroup(channel.channelID)
+          if (msgs.length > 0) {
+            $groupMessages.setKey(channel.channelID, msgs)
+          }
+        } catch { /* non-fatal */ }
+      }
     }
+
+    // Permissions
     const perms = await client.permissions.retrieve()
     for (const perm of perms) {
       $permissions.setKey(perm.permissionID, perm)
     }
+
+    // Load persisted DM history for known familiars
+    try {
+      const familiars = await client.users.familiars()
+      for (const user of familiars) {
+        $familiars.setKey(user.userID, user)
+        try {
+          const msgs = await client.messages.retrieve(user.userID)
+          if (msgs.length > 0) {
+            $messages.setKey(user.userID, msgs)
+          }
+        } catch { /* non-fatal */ }
+      }
+    } catch { /* non-fatal */ }
   } catch {
-    // Non-fatal — UI will show empty state, user can refresh
+    // Non-fatal — UI will show empty state
   }
 }
 
@@ -143,7 +171,7 @@ export async function registerAndBootstrap(
       // Non-fatal — user is authenticated, just won't auto-login next time
     }
 
-    await populateServersAndChannels(client)
+    await populateState(client)
 
     return { ok: true }
   } catch (err: any) {
@@ -200,7 +228,7 @@ export async function loginAndBootstrap(
     }
 
     // Populate servers and channels
-    await populateServersAndChannels(client)
+    await populateState(client)
 
     return { ok: true }
   } catch (err: any) {
@@ -224,7 +252,7 @@ export async function autoLogin(
     const client = await initClient(creds.deviceKey, preset, options)
     await client.connect()
     $user.set(client.me.user())
-    await populateServersAndChannels(client)
+    await populateState(client)
     return { ok: true }
   } catch (err: any) {
     if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
