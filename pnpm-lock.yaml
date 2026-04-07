@@ -90,8 +90,8 @@ importers:
         specifier: 'catalog:'
         version: 10.0.0
       '@vex-chat/libvex':
-        specifier: ^1.0.4
-        version: 1.0.4(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)
+        specifier: ^1.0.5
+        version: 1.0.5(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -157,8 +157,8 @@ importers:
         specifier: ^7.3.0
         version: 7.14.10(@react-navigation/native@7.2.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-screens@4.23.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       '@vex-chat/libvex':
-        specifier: ^1.0.4
-        version: 1.0.4(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)
+        specifier: ^1.0.5
+        version: 1.0.5(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -248,8 +248,8 @@ importers:
         specifier: '>=0.8'
         version: 1.1.0(nanostores@1.2.0)(react@19.2.3)
       '@vex-chat/libvex':
-        specifier: ^1.0.4
-        version: 1.0.4(@tauri-apps/plugin-sql@2.4.0)(typescript@6.0.2)
+        specifier: ^1.0.5
+        version: 1.0.5(@tauri-apps/plugin-sql@2.4.0)(typescript@6.0.2)
       nanostores:
         specifier: 'catalog:'
         version: 1.2.0
@@ -2612,8 +2612,8 @@ packages:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@1.0.4':
-    resolution: {integrity: sha512-GotJxNG8qYGGRPqzbva7S9mG7PHyaCUKoA9YKwKcJLK4fjMRU1+iA+31/5TlgRQrC529xOuf3lAECwkP/LPJcg==}
+  '@vex-chat/libvex@1.0.5':
+    resolution: {integrity: sha512-YTeU6Zedw+2+AU0tIuMmtEE62hYR0PfqS3HTITK0vljCP6++qb69Xd2hHr7yudENLJPWEdODeb6lrly4R6Jz3w==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
       '@tauri-apps/plugin-sql': '>=2.0.0'
@@ -2938,11 +2938,6 @@ packages:
 
   bser@2.1.1:
     resolution: {integrity: sha512-gQxTNE/GAfIIrmHLUE3oJyp5FO6HRBfhjnw4/wMmA63ZGDJnWBmgY/lyQBpnDUkGmAhbSe39tx2d/iTOAfglwQ==}
-
-  btoa@1.2.1:
-    resolution: {integrity: sha512-SB4/MIGlsiVkMcHmT+pSmIPoNDoHg+7cMzmt3Uxt628MTz2487DKSqK/fuhFBrkuqrYv5UCEnACpF4dTFNKc/g==}
-    engines: {node: '>= 0.4.0'}
-    hasBin: true
 
   buffer-crc32@1.0.0:
     resolution: {integrity: sha512-Db1SbgBS/fg/392AblrMJk97KggmvYhr4pB5ZIMTWtaivCPMWLkmb7m21cJvpvgK+J3nsU2CmmixNBZx4vFj/w==}
@@ -8177,9 +8172,7 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.4': {}
@@ -9049,7 +9042,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.2
 
-  '@vex-chat/libvex@1.0.4(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)':
+  '@vex-chat/libvex@1.0.5(@tauri-apps/plugin-sql@2.4.0)(typescript@5.9.3)':
     dependencies:
       '@extrahash/sleep': 1.0.1
       '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@5.9.3)
@@ -9057,7 +9050,6 @@ snapshots:
       axios: 1.14.0(debug@4.4.3)
       better-sqlite3: 11.10.0
       browser-or-node: 1.3.0
-      btoa: 1.2.1
       eventemitter3: 5.0.4
       knex: 3.2.9(better-sqlite3@11.10.0)
       msgpackr: 1.11.8
@@ -9084,7 +9076,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@vex-chat/libvex@1.0.4(@tauri-apps/plugin-sql@2.4.0)(typescript@6.0.2)':
+  '@vex-chat/libvex@1.0.5(@tauri-apps/plugin-sql@2.4.0)(typescript@6.0.2)':
     dependencies:
       '@extrahash/sleep': 1.0.1
       '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@6.0.2)
@@ -9092,7 +9084,6 @@ snapshots:
       axios: 1.14.0(debug@4.4.3)
       better-sqlite3: 11.10.0
       browser-or-node: 1.3.0
-      btoa: 1.2.1
       eventemitter3: 5.0.4
       knex: 3.2.9(better-sqlite3@11.10.0)
       msgpackr: 1.11.8
@@ -9489,8 +9480,6 @@ snapshots:
   bser@2.1.1:
     dependencies:
       node-int64: 0.4.0
-
-  btoa@1.2.1: {}
 
   buffer-crc32@1.0.0: {}
 
