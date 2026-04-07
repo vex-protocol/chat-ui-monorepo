@@ -6,6 +6,7 @@ import { FinalizeScreen } from '../screens/FinalizeScreen'
 import { HangTightScreen } from '../screens/HangTightScreen'
 import { WelcomeBackScreen } from '../screens/WelcomeBackScreen'
 import { AuthenticateScreen } from '../screens/AuthenticateScreen'
+import { LoginScreen } from '../screens/LoginScreen'
 
 const Stack = createNativeStackNavigator()
 
@@ -18,6 +19,7 @@ export function AuthStack() {
       <Stack.Screen name="HangTight" component={HangTightScreen} />
       <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen as any} />
       <Stack.Screen name="Authenticate" component={AuthenticateScreen as any} />
+      <Stack.Screen name="Login" component={LoginScreen as any} />
     </Stack.Navigator>
   )
 }

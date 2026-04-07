@@ -43,7 +43,7 @@ export function WelcomeScreen({ navigation }: Props) {
           />
           <Text
             style={styles.signInLink}
-            onPress={() => navigation.navigate('WelcomeBack')}
+            onPress={() => navigation.navigate('Login')}
           >
             Sign in
           </Text>

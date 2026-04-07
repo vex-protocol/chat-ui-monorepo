@@ -67,7 +67,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
 
   async function handleSwitchAccount() {
     await clearCredentials()
-    navigation.navigate('Welcome')
+    navigation.navigate('Login')
   }
 
   return (
