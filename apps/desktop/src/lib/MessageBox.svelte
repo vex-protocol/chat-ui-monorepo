@@ -58,7 +58,7 @@
     <div class="message-box__empty">No messages yet.</div>
   {/if}
 
-  {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
+  {#each chunks as chunk (chunk.messages[0]?.mailID ?? chunk.firstTime + chunk.authorID)}
     {#if chunk.messages[0]?.mailType === 'system'}
       <div class="message-system">
         <span class="message-system__text">{chunk.messages[0].message}</span>
