@@ -34,14 +34,6 @@ export default defineConfig({
     },
     // Hide native browser env APIs from Tauri frontend
     envPrefix: ["VITE_", "TAURI_ENV_*"],
-    define: {
-        // libvex deps (axios, browser-or-node) check process.env at runtime.
-        // Tauri webview has no process global — provide safe defaults.
-        "process.env.NODE_ENV": JSON.stringify("production"),
-        "process.env": "{}",
-        "process.versions": "undefined",
-        "process.platform": JSON.stringify("browser"),
-    },
     build: {
         // Tauri supports es2021
         target: "es2021",
