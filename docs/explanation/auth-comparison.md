@@ -249,9 +249,9 @@ uint8Array.toHex()
 
 These are **not yet available in any Node.js LTS** as of early 2026. They will eventually make `Buffer` unnecessary for this use case.
 
-If any code in this repo is ever shared with a browser environment (e.g., moved to a shared `packages/` module), replace `Buffer` with [`uint8array-extras`](https://github.com/sindresorhus/uint8array-extras) (`hexToUint8Array` / `uint8ArrayToHex`), which works identically in both environments.
+`@vex-chat/libvex` already runs in browsers (Tauri webview) and React Native, so it uses `Uint8Array` exclusively — all `Buffer` usage was removed during the platform adapter migration. Spire (Node.js only) still uses `Buffer` which is fine.
 
-**Rule of thumb:** `Buffer` in spire (Node.js only) is fine. Any code in a shared package that may run in a browser should use `uint8array-extras` or the native `Uint8Array` API once Node.js LTS supports it.
+**Rule of thumb:** `Buffer` in spire (Node.js only) is fine. Any shared code in `libvex-js`, `@vex-chat/crypto`, or `@vex-chat/types` must use `Uint8Array` — these packages run on all platforms.
 
 ---
 
