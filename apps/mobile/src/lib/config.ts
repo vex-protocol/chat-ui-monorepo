@@ -1,8 +1,8 @@
 import type { ServerOptions } from '@vex-chat/store'
 
-// Server URL — hardcoded for now, will be configurable later
+// Server host — no protocol prefix (Client adds http:// or https:// based on unsafeHttp)
 export function getServerUrl(): string {
-  return 'http://localhost:16777'
+  return 'localhost:16777'
 }
 
 export function getServerOptions(): ServerOptions {
