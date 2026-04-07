@@ -5,12 +5,28 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
-    "prepare": "husky"
+    "prepare": "husky",
+    "registry": "npx verdaccio -c .verdaccio/config.yaml",
+    "publish:local": "./scripts/publish-local.sh",
+    "install:local": "./scripts/install-local.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "pnpm -r --if-present lint",
+    "lint:fix": "pnpm -r --if-present lint:fix",
+    "preinstall": "npx only-allow pnpm"
   },
   "packageManager": "pnpm@10.30.3",
+  "lint-staged": {
+    "*.ts": ["eslint --fix", "prettier --write"]
+  },
   "devDependencies": {
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",
+    "prettier": "^3.2.0",
+    "eslint": "^10.1.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint-config-prettier": "^9.0.0",
     "typescript": "catalog:"
   },
   "pnpm": {

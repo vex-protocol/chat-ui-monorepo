@@ -1,2 +1,1 @@
-pnpm --filter @vex-chat/spire exec lint-staged
-pnpm --filter @vex-chat/spire lint
+pnpm exec lint-staged
