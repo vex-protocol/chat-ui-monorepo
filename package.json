@@ -17,6 +17,13 @@
     "overrides": {
       "react": "19.2.3"
     },
+    "peerDependencyRules": {
+      "allowedVersions": {
+        "expo-sqlite": ">=16",
+        "typescript": ">=5",
+        "@sveltejs/vite-plugin-svelte": ">=2"
+      }
+    },
     "onlyBuiltDependencies": [
       "sharp",
       "better-sqlite3",
