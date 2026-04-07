@@ -2,7 +2,7 @@
 
 ## Current Architecture
 
-Spire is a single-process Node.js server (Express 4 + `express-ws`) backed by SQLite via Kysely. It serves both HTTP REST endpoints and a WebSocket endpoint on the same port (`16777`). All state lives either in SQLite on disk or in two in-process `Map` objects.
+Spire is a single-process Node.js server (Express 4 + raw `ws` in `noServer` mode) backed by SQLite via Kysely. It serves both HTTP REST endpoints and a WebSocket endpoint on the same port (`16777`). All state lives either in SQLite on disk or in two in-process `Map` objects.
 
 ### State Inventory
 
