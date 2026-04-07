@@ -24,12 +24,18 @@ async function populateState(client: Client): Promise<void> {
       const channels = await client.channels.retrieve(server.serverID)
       $channels.setKey(server.serverID, channels)
 
-      // Load persisted group messages per channel
+      // Load persisted group messages per channel (deduplicate by mailID)
       for (const channel of channels) {
         try {
           const msgs = await client.messages.retrieveGroup(channel.channelID)
           if (msgs.length > 0) {
-            $groupMessages.setKey(channel.channelID, msgs)
+            const seen = new Set<string>()
+            const deduped = msgs.filter(m => {
+              if (seen.has(m.mailID)) return false
+              seen.add(m.mailID)
+              return true
+            })
+            $groupMessages.setKey(channel.channelID, deduped)
           }
         } catch { /* non-fatal */ }
       }
@@ -49,7 +55,13 @@ async function populateState(client: Client): Promise<void> {
         try {
           const msgs = await client.messages.retrieve(user.userID)
           if (msgs.length > 0) {
-            $messages.setKey(user.userID, msgs)
+            const seen = new Set<string>()
+            const deduped = msgs.filter(m => {
+              if (seen.has(m.mailID)) return false
+              seen.add(m.mailID)
+              return true
+            })
+            $messages.setKey(user.userID, deduped)
           }
         } catch { /* non-fatal */ }
       }
