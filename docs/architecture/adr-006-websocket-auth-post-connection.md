@@ -72,7 +72,7 @@ by [Discord's Gateway](https://docs.discord.com/developers/events/gateway)
 - Removed `express-ws` dependency entirely
 - Replaced with raw `ws` library (`WebSocketServer` with `noServer: true`)
 - `server.on("upgrade")` accepts all connections, calls `wss.handleUpgrade()`
-- `wss.on("connection")` waits for auth message with 5-second timeout
+- `wss.on("connection")` waits for auth message with 10-second timeout
 - `initApp()` type changed from `expressWs.Application` to `express.Application`
 - All Express HTTP routes unchanged
 
@@ -82,9 +82,18 @@ by [Discord's Gateway](https://docs.discord.com/developers/events/gateway)
 - `BrowserWebSocket` simplified — no longer attempts to pass headers
 - Same code path for all platforms (Node, browser, Tauri, React Native)
 
+**libvex-js (event loop fix):**
+- `connect()` yields the event loop (`setTimeout(0)`) between `initSocket()` and
+  `negotiateOTK()`. OTK generation creates 100 Ed25519 key pairs synchronously
+  (~5 seconds on mobile), blocking the event loop and preventing the WS `open`
+  callback from firing. Without the yield, the auth message never sends before
+  the server timeout expires — causing first-login failures while subsequent
+  logins (where OTKs are already uploaded) work fine.
+
 **libvex-js (other fixes applied during this session):**
 - `getUserDeviceList()` and `getMultiUserDeviceList()` filter out `deleted` devices
-- `sendGroupMessage()` skips sender's own devices (forward already handles them)
+- `sendGroupMessage()` skips sender's other own devices (forward handles them);
+  keeps sender's current device so the server relays the message back
 - Ping interval cleared on WS close (prevents "Ping failed" spam after disconnect)
 
 **vex-chat store (bootstrap.ts):**
