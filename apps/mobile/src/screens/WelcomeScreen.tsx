@@ -10,6 +10,7 @@ import { HourglassIcon } from '../components/HourglassIcon'
 type Props = NativeStackScreenProps<any, 'Welcome'>
 
 export function WelcomeScreen({ navigation }: Props) {
+
   return (
     <ScreenLayout>
       <View style={styles.container}>

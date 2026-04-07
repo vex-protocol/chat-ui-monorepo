@@ -21,10 +21,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
   async function handleLogout() {
     setLoggingOut(true)
+    // Don't call client.logout() — that invalidates the server session token.
+    // Just disconnect locally so autoLogin can reuse the saved token.
     try {
-      await client?.logout()
+      client?.close()
     } catch { /* ignore */ }
-    await clearCredentials()
     await clearMessages()
     resetAll()
   }
