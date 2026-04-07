@@ -61,7 +61,7 @@
   {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
     {#if chunk.messages[0]?.mailType === 'system'}
       <div class="message-system">
-        <span class="message-system__text">{chunk.messages[0].content}</span>
+        <span class="message-system__text">{chunk.messages[0].message}</span>
       </div>
     {:else}
       <div class="message-chunk">
@@ -103,11 +103,11 @@
                   </span>
                 </a>
               {/if}
-              {#if msg.content}
-                {@html renderContent(msg.content)}
+              {#if msg.message}
+                {@html renderContent(msg.message)}
               {/if}
             {:else}
-              {@html renderContent(msg.content)}
+              {@html renderContent(msg.message)}
             {/if}
           </div>
         {/each}
