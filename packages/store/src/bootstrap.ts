@@ -11,6 +11,26 @@ import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
 import { $familiars } from './familiars.ts'
 import { $keyReplaced } from './key-replaced.ts'
 
+/**
+ * Fetches server list, channels per server, and permissions after login.
+ */
+async function populateServersAndChannels(client: Client): Promise<void> {
+  try {
+    const servers = await client.servers.retrieve()
+    for (const server of servers) {
+      $servers.setKey(server.serverID, server)
+      const channels = await client.channels.retrieve(server.serverID)
+      $channels.setKey(server.serverID, channels)
+    }
+    const perms = await client.permissions.retrieve()
+    for (const perm of perms) {
+      $permissions.setKey(perm.permissionID, perm)
+    }
+  } catch {
+    // Non-fatal — UI will show empty state, user can refresh
+  }
+}
+
 /** Server connection options — identical across all auth flows. */
 export interface ServerOptions {
   host: string
@@ -126,6 +146,9 @@ export async function registerAndBootstrap(
       preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
       // Non-fatal — user is authenticated, just won't auto-login next time
     }
+
+    await populateServersAndChannels(client)
+
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Unknown error' }
@@ -161,13 +184,28 @@ export async function loginAndBootstrap(
 
     if (!creds) {
       // First login on this machine — register a new device
-      await client.devices.register()
-      await keyStore.save({
-        username,
-        deviceID: client.me.device().deviceID,
-        deviceKey: privateKey,
-      })
+      try {
+        await client.devices.register()
+      } catch (regErr: any) {
+        // 470 = device with this signing key already exists — that's OK, reuse it
+        if (regErr?.response?.status !== 470) {
+          preset.adapters.logger.warn('[vex-store] device registration failed: ' + regErr?.message)
+        }
+      }
+      try {
+        await keyStore.save({
+          username,
+          deviceID: client.me.device().deviceID,
+          deviceKey: privateKey,
+        })
+      } catch (saveErr: any) {
+        preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
+      }
     }
+
+    // Populate servers and channels
+    await populateServersAndChannels(client)
+
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Unknown error' }
@@ -190,6 +228,7 @@ export async function autoLogin(
     const client = await initClient(creds.deviceKey, preset, options)
     await client.connect()
     $user.set(client.me.user())
+    await populateServersAndChannels(client)
     return { ok: true }
   } catch (err: any) {
     if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
