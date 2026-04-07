@@ -48,12 +48,14 @@ async function initClient(
 
   // Wire real-time events
   client.on('message', (msg: IMessage) => {
-    preset.adapters.logger.debug('[vex-store] message: ' + msg.mailID + ' from: ' + msg.authorID)
+    preset.adapters.logger.info('[vex-store] message: id=' + msg.mailID + ' group=' + msg.group + ' dir=' + msg.direction + ' decrypted=' + msg.decrypted + ' from=' + msg.authorID + ' msg=' + msg.message?.slice(0, 30))
     const me = $user.get()
     if (msg.group) {
       const prev = $groupMessages.get()[msg.group] ?? []
+      preset.adapters.logger.info('[vex-store] group key=' + msg.group + ' prev=' + prev.length + ' dup=' + prev.some(m => m.mailID === msg.mailID))
       if (!prev.some(m => m.mailID === msg.mailID)) {
         $groupMessages.setKey(msg.group, [...prev, msg])
+        preset.adapters.logger.info('[vex-store] added to $groupMessages[' + msg.group + '], now ' + ($groupMessages.get()[msg.group]?.length ?? 0) + ' messages')
         if (me && msg.authorID !== me.userID) incrementChannelUnread(msg.group)
       }
     } else {
