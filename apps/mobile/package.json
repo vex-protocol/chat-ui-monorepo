@@ -41,8 +41,7 @@
     "node": ">= 22.11.0"
   },
   "dependenciesMeta": {
-    "@vex-chat/libvex": { "injected": true },
-    "@vex-chat/store": { "injected": true }
+    "@vex-chat/libvex": { "injected": true }
   },
   "license": "AGPL-3.0-or-later"
 }
