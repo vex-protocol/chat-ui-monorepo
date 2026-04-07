@@ -9,7 +9,6 @@ import { $permissions } from './permissions.ts'
 import { resetAll } from './reset.ts'
 import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
 import { $familiars } from './familiars.ts'
-import { SENT_PREFIX } from './send-dm.ts'
 import { $keyReplaced } from './key-replaced.ts'
 
 /** Server connection options — identical across all auth flows. */
@@ -63,15 +62,7 @@ async function initClient(
       const threadKey = isOwnMessage ? msg.readerID : msg.authorID
       const prev = $messages.get()[threadKey] ?? []
 
-      const localIdx = isOwnMessage
-        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.message === msg.message && m.authorID === msg.authorID)
-        : -1
-
-      if (localIdx !== -1) {
-        const updated = [...prev]
-        updated[localIdx] = msg
-        $messages.setKey(threadKey, updated)
-      } else if (!prev.some(m => m.mailID === msg.mailID)) {
+      if (!prev.some(m => m.mailID === msg.mailID)) {
         $messages.setKey(threadKey, [...prev, msg])
         if (!isOwnMessage) incrementDmUnread(threadKey)
 

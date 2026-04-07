@@ -34,28 +34,11 @@ export async function sendDirectMessage(
   if (!client || !me) return { ok: false, error: 'Not connected' }
 
   try {
+    // Client.messages.send() emits a "message" event with the outgoing
+    // message, which bootstrap.ts adds to $messages. No local echo needed.
     await client.messages.send(recipientUserID, content)
+    return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Failed to send message' }
   }
-
-  // Echo sent message locally (tagged so server echo can replace it)
-  const sentMsg: IMessage = {
-    nonce: '',
-    mailID: SENT_PREFIX + uuidv4(),
-    sender: '',
-    recipient: '',
-    message: content,
-    direction: 'outgoing',
-    timestamp: new Date(),
-    decrypted: true,
-    group: null,
-    forward: false,
-    authorID: me.userID,
-    readerID: recipientUserID,
-  }
-  const prev = $messages.get()[recipientUserID] ?? []
-  $messages.setKey(recipientUserID, [...prev, sentMsg])
-
-  return { ok: true }
 }

@@ -31,28 +31,11 @@ export async function sendGroupMessage(
   if (!client || !me) return { ok: false, error: 'Not connected' }
 
   try {
+    // Client.messages.group() emits a "message" event with the outgoing
+    // message, which bootstrap.ts adds to $groupMessages. No local echo needed.
     await client.messages.group(channelID, content)
+    return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Failed to send message' }
   }
-
-  // Local echo
-  const sentMsg: IMessage = {
-    nonce: '',
-    mailID: SENT_PREFIX + uuidv4(),
-    sender: '',
-    recipient: '',
-    message: content,
-    direction: 'outgoing',
-    timestamp: new Date(),
-    decrypted: true,
-    group: channelID,
-    forward: false,
-    authorID: me.userID,
-    readerID: me.userID,
-  }
-  const prev = $groupMessages.get()[channelID] ?? []
-  $groupMessages.setKey(channelID, [...prev, sentMsg])
-
-  return { ok: true }
 }
