@@ -173,14 +173,16 @@ export async function registerAndBootstrap(
     $user.set(currentUser)
 
     try {
-      await keyStore.save({
+      const toSave = {
         username,
         deviceID: client.me.device().deviceID,
         deviceKey: privateKey,
-      })
+      }
+      preset.adapters.logger.warn('[vex-store] register: saving creds for ' + toSave.username)
+      await keyStore.save(toSave)
+      preset.adapters.logger.warn('[vex-store] register: creds saved')
     } catch (saveErr: any) {
-      preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
-      // Non-fatal — user is authenticated, just won't auto-login next time
+      preset.adapters.logger.warn('[vex-store] register: keyStore.save failed: ' + saveErr?.message)
     }
 
     await populateState(client)
@@ -220,8 +222,10 @@ export async function loginAndBootstrap(
 
     if (!creds) {
       // First login on this machine — register a new device
+      preset.adapters.logger.warn('[vex-store] No saved creds for ' + username + ' — registering new device')
       try {
         await client.devices.register()
+        preset.adapters.logger.warn('[vex-store] Device registered: ' + client.me.device().deviceID)
       } catch (regErr: any) {
         // 470 = device with this signing key already exists — that's OK, reuse it
         if (regErr?.response?.status !== 470) {
@@ -229,11 +233,14 @@ export async function loginAndBootstrap(
         }
       }
       try {
-        await keyStore.save({
+        const toSave = {
           username,
           deviceID: client.me.device().deviceID,
           deviceKey: privateKey,
-        })
+        }
+        preset.adapters.logger.warn('[vex-store] Saving creds: ' + JSON.stringify({ username: toSave.username, deviceID: toSave.deviceID }))
+        await keyStore.save(toSave)
+        preset.adapters.logger.warn('[vex-store] Creds saved successfully')
       } catch (saveErr: any) {
         preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
       }
