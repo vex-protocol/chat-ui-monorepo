@@ -87,6 +87,26 @@ export interface AuthResult {
 }
 
 /**
+ * Deletes all of the current user's stale devices except the active one.
+ * Prevents fan-out to abandoned device registrations when sending messages.
+ */
+async function cleanupStaleDevices(client: Client): Promise<void> {
+  try {
+    const me = client.me.user()
+    const myDevice = client.me.device()
+    const allDevices = await client.devices.list(me.userID)
+    if (!allDevices || allDevices.length <= 1) return
+
+    for (const device of allDevices) {
+      if (device.deviceID === myDevice.deviceID) continue
+      try {
+        await client.devices.delete(device.deviceID)
+      } catch { /* non-fatal — server may reject if device is active */ }
+    }
+  } catch { /* non-fatal */ }
+}
+
+/**
  * Internal: creates the Client, wires events to nanostores atoms.
  * All public auth flows call this after obtaining a private key.
  */
@@ -177,6 +197,7 @@ export async function registerAndBootstrap(
         username,
         deviceID: client.me.device().deviceID,
         deviceKey: privateKey,
+        token: client.getAuthToken() ?? undefined,
       }
       preset.adapters.logger.warn('[vex-store] register: saving creds for ' + toSave.username)
       await keyStore.save(toSave)
@@ -186,6 +207,7 @@ export async function registerAndBootstrap(
     }
 
     await populateState(client)
+    cleanupStaleDevices(client) // fire-and-forget
 
     return { ok: true }
   } catch (err: any) {
@@ -237,6 +259,7 @@ export async function loginAndBootstrap(
           username,
           deviceID: client.me.device().deviceID,
           deviceKey: privateKey,
+          token: client.getAuthToken() ?? undefined,
         }
         preset.adapters.logger.warn('[vex-store] Saving creds: ' + JSON.stringify({ username: toSave.username, deviceID: toSave.deviceID }))
         await keyStore.save(toSave)
@@ -244,10 +267,16 @@ export async function loginAndBootstrap(
       } catch (saveErr: any) {
         preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
       }
+    } else {
+      // Existing creds — update the token
+      try {
+        await keyStore.save({ ...creds, token: client.getAuthToken() ?? undefined })
+      } catch { /* non-fatal */ }
     }
 
     // Populate servers and channels
     await populateState(client)
+    cleanupStaleDevices(client) // fire-and-forget
 
     return { ok: true }
   } catch (err: any) {
@@ -269,9 +298,22 @@ export async function autoLogin(
 
   try {
     const client = await initClient(creds.deviceKey, preset, options)
+    if (creds.token) {
+      client.restoreAuth(creds.token)
+    }
     await client.connect()
     $user.set(client.me.user())
+
+    // Update saved token in case the server refreshed it
+    const freshToken = client.getAuthToken()
+    if (freshToken && freshToken !== creds.token) {
+      try {
+        await keyStore.save({ ...creds, token: freshToken })
+      } catch { /* non-fatal */ }
+    }
+
     await populateState(client)
+    cleanupStaleDevices(client) // fire-and-forget
     return { ok: true }
   } catch (err: any) {
     if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
