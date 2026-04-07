@@ -119,13 +119,20 @@ export async function registerAndBootstrap(
 
     // connect() populates device details and authenticates
     await client.connect()
-    $user.set(client.me.user())
+    const currentUser = client.me.user()
+    preset.adapters.logger.info('[vex-store] Setting $user: ' + currentUser.username + ' (' + currentUser.userID + ')')
+    $user.set(currentUser)
 
-    await keyStore.save({
-      username,
-      deviceID: client.me.device().deviceID,
-      deviceKey: privateKey,
-    })
+    try {
+      await keyStore.save({
+        username,
+        deviceID: client.me.device().deviceID,
+        deviceKey: privateKey,
+      })
+    } catch (saveErr: any) {
+      preset.adapters.logger.warn('[vex-store] keyStore.save failed: ' + saveErr?.message)
+      // Non-fatal — user is authenticated, just won't auto-login next time
+    }
     return { ok: true }
   } catch (err: any) {
     return { ok: false, error: err?.message ?? 'Unknown error' }

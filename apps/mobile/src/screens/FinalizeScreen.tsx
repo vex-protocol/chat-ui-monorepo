@@ -60,8 +60,6 @@ export function FinalizeScreen({ navigation, route }: Props) {
     setError('')
 
     try {
-      navigation.navigate('HangTight')
-
       const result = await registerAndBootstrap(
         username,
         password,
@@ -71,13 +69,12 @@ export function FinalizeScreen({ navigation, route }: Props) {
       )
 
       if (!result.ok) {
-        if (navigation.canGoBack()) navigation.goBack()
         setError(result.error || 'Registration failed')
         setLoading(false)
         return
       }
+      // Success — RootNavigator auto-navigates when $user is set
     } catch (err) {
-      if (navigation.canGoBack()) navigation.goBack()
       setError(err instanceof Error ? err.message : 'Unexpected error')
       setLoading(false)
     }
