@@ -10,12 +10,8 @@ const DEFAULT_SERVER_URL =
     import.meta.env.VITE_SERVER_URL ||
     (import.meta.env.DEV ? "localhost:5180" : "api.vex.wtf");
 
-export function getServerUrl(): string {
-    return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL;
-}
-
-export function setServerUrl(url: string): void {
-    localStorage.setItem(SERVER_URL_KEY, url.replace(/\/$/, ""));
+export function clearSession(): void {
+    localStorage.removeItem(SERVER_URL_KEY);
 }
 
 /** Server options derived from the current URL — use everywhere. */
@@ -30,6 +26,10 @@ export function getServerOptions(): ServerOptions {
     };
 }
 
-export function clearSession(): void {
-    localStorage.removeItem(SERVER_URL_KEY);
+export function getServerUrl(): string {
+    return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL;
+}
+
+export function setServerUrl(url: string): void {
+    localStorage.setItem(SERVER_URL_KEY, url.replace(/\/$/, ""));
 }

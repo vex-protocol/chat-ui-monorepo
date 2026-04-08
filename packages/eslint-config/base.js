@@ -24,11 +24,10 @@ export const base = tseslint.config(
                 "error",
                 {
                     prefer: "type-imports",
-                    fixStyle: "inline-type-imports",
+                    fixStyle: "separate-type-imports",
                 },
             ],
             "@typescript-eslint/consistent-type-exports": "error",
-            "@typescript-eslint/no-import-type-side-effects": "error",
 
             "perfectionist/sort-imports": [
                 "error",

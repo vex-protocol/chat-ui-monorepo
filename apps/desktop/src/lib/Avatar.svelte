@@ -2,16 +2,16 @@
   import { avatarHue } from '@vex-chat/store'
 
   interface Props {
-    userID: string
-    serverUrl: string
-    /** Cache-bust version — increment after upload to force reload */
-    version?: number
-    size?: number
     /** Display name or username for initials fallback */
     name?: string
+    serverUrl: string
+    size?: number
+    userID: string
+    /** Cache-bust version — increment after upload to force reload */
+    version?: number
   }
 
-  let { userID, serverUrl, version = 0, size = 32, name }: Props = $props()
+  let { name, serverUrl, size, userID, version }: Props = $props()
 
   let failed = $state(false)
 
@@ -23,8 +23,8 @@
   })
 
   function initials(id: string, displayName?: string): string {
-    if (displayName) return displayName.slice(0, 2).toUpperCase()
-    return id.slice(0, 2).toUpperCase()
+    if (displayName) { displayName.slice(0, 2).toUpperCase(); return; }
+    id.slice(0, 2).toUpperCase();
   }
 </script>
 

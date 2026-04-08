@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { client } from './store/index.js'
   import type { IInvite } from '@vex-chat/libvex'
 
-  let { serverID = '', serverName = '', onclose }: { serverID?: string; serverName?: string; onclose: () => void } = $props()
+  import { client } from './store/index.js'
+
+  let { onclose, serverID, serverName }: { onclose: () => void; serverID?: string; serverName?: string; } = $props()
 
   let invites: IInvite[] = $state([])
   let loading = $state(true)
@@ -12,7 +13,7 @@
 
   async function loadInvites(): Promise<void> {
     try {
-      invites = await $client!.invites.retrieve(serverID)
+      invites = await $client.invites.retrieve(serverID)
     } catch {
       // ignore — empty list is fine
     } finally {
@@ -24,7 +25,7 @@
     creating = true
     error = ''
     try {
-      const invite = await $client!.invites.create(serverID, '1h')
+      const invite = await $client.invites.create(serverID, '1h')
       invites = [invite, ...invites]
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create invite'

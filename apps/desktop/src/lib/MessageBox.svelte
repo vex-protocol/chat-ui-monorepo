@@ -1,19 +1,15 @@
 <script lang="ts">
   import type { IMessage } from '@vex-chat/libvex'
+
   import { onMount } from 'svelte'
-  import { chunkMessages, renderContent, handleLinkClick, formatTime, parseFileExtra, isImageType, formatFileSize } from './utils/messages.js'
-  import { user, client } from './store/index.js'
-  import { getServerUrl } from './config.js'
+
   import Avatar from './Avatar.svelte'
+  import { getServerUrl } from './config.js'
+  import { user } from './store/index.js'
 
   const serverUrl = getServerUrl()
 
-  function fileUrl(fileID: string): string {
-    const host = $client?.getHost() ?? serverUrl
-    return `${host}/file/${fileID}`
-  }
-
-  let { messages = [], usernames = {} }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
+  let { messages, usernames }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
 
   const chunks = $derived(chunkMessages(messages))
 

@@ -49,7 +49,7 @@ export default [
                         },
                         {
                             groupName: "framework",
-                            elementNamePattern: "^react",
+                            elementNamePattern: "^react(-native)?$",
                         },
                     ],
                     groups: [

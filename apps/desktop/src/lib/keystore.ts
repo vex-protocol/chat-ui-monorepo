@@ -14,37 +14,7 @@ const ACTIVE_USER_KEY = "__vex_active_user__";
  * service name + username. The active user is tracked separately.
  */
 class KeyringKeyStore implements KeyStore {
-    private keyring: typeof import("tauri-plugin-keyring-api") | null = null;
-
-    private async getKeyring() {
-        if (!this.keyring) {
-            this.keyring = await import("tauri-plugin-keyring-api");
-        }
-        return this.keyring;
-    }
-
-    async load(username?: string): Promise<StoredCredentials | null> {
-        const kr = await this.getKeyring();
-        const user = username ?? (await this.getActiveUser(kr));
-        if (!user) return null;
-        const raw = await kr.getPassword(SERVICE, user);
-        if (!raw) return null;
-        try {
-            return JSON.parse(raw) as StoredCredentials;
-        } catch {
-            return null;
-        }
-    }
-
-    async loadActive(): Promise<StoredCredentials | null> {
-        return this.load();
-    }
-
-    async save(creds: StoredCredentials): Promise<void> {
-        const kr = await this.getKeyring();
-        await kr.setPassword(SERVICE, creds.username, JSON.stringify(creds));
-        await kr.setPassword(SERVICE, ACTIVE_USER_KEY, creds.username);
-    }
+    private keyring: null | typeof import("tauri-plugin-keyring-api") = null;
 
     async clear(username: string): Promise<void> {
         const kr = await this.getKeyring();
@@ -63,14 +33,44 @@ class KeyringKeyStore implements KeyStore {
         }
     }
 
+    async load(username?: string): Promise<null | StoredCredentials> {
+        const kr = await this.getKeyring();
+        const user = username ?? (await this.getActiveUser(kr));
+        if (!user) return null;
+        const raw = await kr.getPassword(SERVICE, user);
+        if (!raw) return null;
+        try {
+            return JSON.parse(raw) as StoredCredentials;
+        } catch {
+            return null;
+        }
+    }
+
+    async loadActive(): Promise<null | StoredCredentials> {
+        return this.load();
+    }
+
+    async save(creds: StoredCredentials): Promise<void> {
+        const kr = await this.getKeyring();
+        await kr.setPassword(SERVICE, creds.username, JSON.stringify(creds));
+        await kr.setPassword(SERVICE, ACTIVE_USER_KEY, creds.username);
+    }
+
     private async getActiveUser(
         kr: typeof import("tauri-plugin-keyring-api"),
-    ): Promise<string | null> {
+    ): Promise<null | string> {
         try {
             return await kr.getPassword(SERVICE, ACTIVE_USER_KEY);
         } catch {
             return null;
         }
+    }
+
+    private async getKeyring() {
+        if (!this.keyring) {
+            this.keyring = await import("tauri-plugin-keyring-api");
+        }
+        return this.keyring;
     }
 }
 
@@ -80,7 +80,14 @@ const LS_PREFIX = "vex-ks-";
 const LS_ACTIVE = "vex-active-user";
 
 class LocalStorageKeyStore implements KeyStore {
-    async load(username?: string): Promise<StoredCredentials | null> {
+    async clear(username: string): Promise<void> {
+        localStorage.removeItem(LS_PREFIX + username);
+        if (localStorage.getItem(LS_ACTIVE) === username) {
+            localStorage.removeItem(LS_ACTIVE);
+        }
+    }
+
+    async load(username?: string): Promise<null | StoredCredentials> {
         const user = username ?? localStorage.getItem(LS_ACTIVE);
         if (!user) return null;
         const raw = localStorage.getItem(LS_PREFIX + user);
@@ -92,7 +99,7 @@ class LocalStorageKeyStore implements KeyStore {
         }
     }
 
-    async loadActive(): Promise<StoredCredentials | null> {
+    async loadActive(): Promise<null | StoredCredentials> {
         return this.load();
     }
 
@@ -100,20 +107,13 @@ class LocalStorageKeyStore implements KeyStore {
         localStorage.setItem(LS_PREFIX + creds.username, JSON.stringify(creds));
         localStorage.setItem(LS_ACTIVE, creds.username);
     }
-
-    async clear(username: string): Promise<void> {
-        localStorage.removeItem(LS_PREFIX + username);
-        if (localStorage.getItem(LS_ACTIVE) === username) {
-            localStorage.removeItem(LS_ACTIVE);
-        }
-    }
 }
 
 // ── Export ───────────────────────────────────────────────────────────────────
 
 /** Uses OS keychain via tauri-plugin-keyring in Tauri, falls back to localStorage in dev browser. */
 export const keyStore: KeyStore & {
-    loadActive(): Promise<StoredCredentials | null>;
+    loadActive(): Promise<null | StoredCredentials>;
 } =
     typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
         ? new KeyringKeyStore()

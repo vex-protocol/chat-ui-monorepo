@@ -1,10 +1,12 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+
   import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-  import { loginAndBootstrap, user as userAtom, servers as serversAtom, channels as channelsAtom } from '../lib/store/index.js'
+
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
-  import { playUnlock, playError } from '../lib/sounds.js'
+  import { playError, playUnlock } from '../lib/sounds.js'
+  import { channels as channelsAtom, loginAndBootstrap, servers as serversAtom, user as userAtom } from '../lib/store/index.js'
 
   let username = $state('')
   let password = $state('')
@@ -29,10 +31,10 @@
       playUnlock()
       const serverList = Object.values(serversAtom.get())
       if (serverList.length > 0) {
-        const sid = serverList[0]!.serverID
+        const sid = serverList[0].serverID
         const chs = channelsAtom.get()[sid] ?? []
         if (chs.length > 0) {
-          push(`/server/${sid}/${chs[0]!.channelID}`)
+          push(`/server/${sid}/${chs[0].channelID}`)
         } else {
           push('/home')
         }

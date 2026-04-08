@@ -1,34 +1,33 @@
 <script lang="ts">
   import Router, { location, push } from 'svelte-spa-router'
-  import ServerBar from './lib/ServerBar.svelte'
+
   import ChannelBar from './lib/ChannelBar.svelte'
-  import UserMenu from './lib/UserMenu.svelte'
-
-  import Launch from './routes/Launch.svelte'
-  import Login from './routes/Login.svelte'
-  import Register from './routes/Register.svelte'
-  import Messaging from './routes/Messaging.svelte'
-  import ServerChannel from './routes/ServerChannel.svelte'
-  import Settings from './routes/Settings.svelte'
-  import Home from './routes/Home.svelte'
-
+  import { setupDeepLinks } from './lib/deeplink.js'
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
-  import { user, keyReplaced, servers, channels, client, familiars } from './lib/store/index.js'
   import { setupNotifications } from './lib/notifications.js'
+  import ServerBar from './lib/ServerBar.svelte'
+  import { channels, client, familiars, keyReplaced, servers, user } from './lib/store/index.js'
   import { setupTray } from './lib/tray.js'
-  import { setupDeepLinks } from './lib/deeplink.js'
+  import UserMenu from './lib/UserMenu.svelte'
+  import Home from './routes/Home.svelte'
+  import Launch from './routes/Launch.svelte'
+  import Login from './routes/Login.svelte'
+  import Messaging from './routes/Messaging.svelte'
+  import Register from './routes/Register.svelte'
+  import ServerChannel from './routes/ServerChannel.svelte'
+  import Settings from './routes/Settings.svelte'
 
   const routes = {
+    '*':                            Launch,
     '/':                            Launch,
+    '/home':                        Home,
     '/launch':                      Launch,
     '/login':                       Login,
-    '/register':                    Register,
-    '/home':                        Home,
-    '/settings':                    Settings,
     '/messaging/:userID':           Messaging,
+    '/register':                    Register,
     '/server/:serverID/:channelID': ServerChannel,
-    '*':                            Launch,
+    '/settings':                    Settings,
   }
 
   // Auth routes show no sidebars

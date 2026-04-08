@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { label = 'Loading...', size = 'md' }: { label?: string; size?: 'sm' | 'md' | 'lg' } = $props()
+  let { label, size }: { label?: string; size?: 'lg' | 'md' | 'sm' } = $props()
 </script>
 
 <div class="loading loading--{size}" role="status" aria-label={label}>

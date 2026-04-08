@@ -1,19 +1,21 @@
 <script lang="ts">
-  import { push } from 'svelte-spa-router'
   import type { IChannel } from '@vex-chat/libvex'
-  import { client, servers, channels as channelsStore } from './store/index.js'
+
+  import { push } from 'svelte-spa-router'
+
   import InviteModal from './InviteModal.svelte'
+  import { channels as channelsStore, client, servers } from './store/index.js'
 
   let {
-    serverName = '',
-    serverID = '',
-    channels = [],
-    activeChannelID = '',
+    activeChannelID,
+    channels,
+    serverID,
+    serverName,
   }: {
-    serverName?: string
-    serverID?: string
-    channels?: IChannel[]
     activeChannelID?: string
+    channels?: IChannel[]
+    serverID?: string
+    serverName?: string
   } = $props()
 
   function navToChannel(channelID: string): void {
@@ -45,7 +47,7 @@
     const remaining = Object.values(allServers).filter(s => s.serverID !== serverID)
     let dest = '/home'
     if (remaining.length > 0) {
-      const next = remaining[0]!
+      const next = remaining[0]
       const nextChans = channelsStore.get()[next.serverID] ?? []
       const firstChan = nextChans[0]
       dest = firstChan ? `/server/${next.serverID}/${firstChan.channelID}` : '/home'
@@ -87,7 +89,7 @@
     if (!name || !serverID) return
     addingError = ''
     try {
-      const channel = await $client!.channels.create(name, serverID)
+      const channel = await $client.channels.create(name, serverID)
       const current = channelsStore.get()[serverID] ?? []
       channelsStore.setKey(serverID, [...current, channel])
       addingChannel = false

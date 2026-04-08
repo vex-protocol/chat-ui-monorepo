@@ -1,23 +1,23 @@
 // Re-export all atoms without the $ prefix so Svelte's reactive $ syntax works cleanly.
 export {
-    $messages as messages,
-    $groupMessages as groupMessages,
-    $user as user,
-    $servers as servers,
+    $avatarHash as avatarHash,
     $channels as channels,
-    $permissions as permissions,
+    $client as client,
     $devices as devices,
     $familiars as familiars,
-    $onlineLists as onlineLists,
-    $client as client,
+    $groupMessages as groupMessages,
     $keyReplaced as keyReplaced,
-    $avatarHash as avatarHash,
+    $messages as messages,
+    $onlineLists as onlineLists,
+    $permissions as permissions,
+    $servers as servers,
+    $user as user,
 } from "@vex-chat/store";
 
 export {
-    registerAndBootstrap,
-    loginAndBootstrap,
     autoLogin,
+    loginAndBootstrap,
+    registerAndBootstrap,
     resetAll,
 } from "@vex-chat/store";
 // TODO: verified keys removed — needs secure storage re-implementation

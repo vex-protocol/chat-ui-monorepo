@@ -1,13 +1,13 @@
-import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { check } from "@tauri-apps/plugin-updater";
 
 export interface UpdateStatus {
     available: boolean;
-    version?: string;
     downloading: boolean;
+    error?: string;
     progress: number;
     readyToInstall: boolean;
-    error?: string;
+    version?: string;
 }
 
 type StatusCallback = (status: UpdateStatus) => void;
@@ -18,6 +18,11 @@ const initial: UpdateStatus = {
     progress: 0,
     readyToInstall: false,
 };
+
+/** Relaunches the app after an update has been installed. */
+export async function applyUpdate(): Promise<void> {
+    await relaunch();
+}
 
 /**
  * Checks for updates and manages the download lifecycle.
@@ -35,10 +40,10 @@ export async function checkForUpdates(onStatus: StatusCallback): Promise<void> {
 
         onStatus({
             available: true,
-            version: update.version,
             downloading: false,
             progress: 0,
             readyToInstall: false,
+            version: update.version,
         });
 
         // Download the update
@@ -54,18 +59,18 @@ export async function checkForUpdates(onStatus: StatusCallback): Promise<void> {
                     contentLength > 0 ? downloaded / contentLength : 0;
                 onStatus({
                     available: true,
-                    version: update.version,
                     downloading: true,
                     progress,
                     readyToInstall: false,
+                    version: update.version,
                 });
             } else if (event.event === "Finished") {
                 onStatus({
                     available: true,
-                    version: update.version,
                     downloading: false,
                     progress: 1,
                     readyToInstall: true,
+                    version: update.version,
                 });
             }
         });
@@ -75,9 +80,4 @@ export async function checkForUpdates(onStatus: StatusCallback): Promise<void> {
             error: err instanceof Error ? err.message : String(err),
         });
     }
-}
-
-/** Relaunches the app after an update has been installed. */
-export async function applyUpdate(): Promise<void> {
-    await relaunch();
 }

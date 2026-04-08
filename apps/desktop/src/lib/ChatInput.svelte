@@ -1,11 +1,11 @@
 <script lang="ts">
   let {
+    disabled,
     onSend,
-    disabled = false,
-    placeholder = 'Type a message...',
+    placeholder,
   }: {
-    onSend: (content: string, attachment?: File) => void
     disabled?: boolean
+    onSend: (content: string, attachment?: File) => void
     placeholder?: string
   } = $props()
 
@@ -13,7 +13,7 @@
   let textareaEl: HTMLTextAreaElement | null = $state(null)
   let fileInputEl: HTMLInputElement | null = $state(null)
   let attachment: File | null = $state(null)
-  let previewUrl: string | null = $state(null)
+  let previewUrl: null | string = $state(null)
 
   function autoResize(): void {
     if (!textareaEl) return

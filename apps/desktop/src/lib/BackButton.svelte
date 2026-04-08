@@ -1,7 +1,7 @@
 <script lang="ts">
   import { pop } from 'svelte-spa-router'
 
-  let { label = 'Back', onclick }: { label?: string; onclick?: () => void } = $props()
+  let { label, onclick }: { label?: string; onclick?: () => void } = $props()
 
   function handleClick() {
     if (onclick) { onclick() } else { pop() }

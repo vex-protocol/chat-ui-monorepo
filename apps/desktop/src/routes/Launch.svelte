@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
-  import Loading from '../lib/Loading.svelte'
+
   import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-  import { autoLogin, servers as serversAtom, channels as channelsAtom, user } from '../lib/store/index.js'
+
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
+  import Loading from '../lib/Loading.svelte'
+  import { autoLogin, channels as channelsAtom, servers as serversAtom, user } from '../lib/store/index.js'
 
   onMount(async () => {
     const result = await autoLogin(keyStore, tauriPreset(), getServerOptions())
@@ -20,10 +22,10 @@
 
     const serverList = Object.values(serversAtom.get())
     if (serverList.length > 0) {
-      const sid = serverList[0]!.serverID
+      const sid = serverList[0].serverID
       const chs = channelsAtom.get()[sid] ?? []
       if (chs.length > 0) {
-        push(`/server/${sid}/${chs[0]!.channelID}`)
+        push(`/server/${sid}/${chs[0].channelID}`)
       } else {
         push('/home')
       }

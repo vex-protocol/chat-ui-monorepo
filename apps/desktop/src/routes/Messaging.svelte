@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { markRead, sendDirectMessage } from '@vex-chat/store'
+
+  import ChatInput from '../lib/ChatInput.svelte'
   // Route: /messaging/:userID
   import MessageBox from '../lib/MessageBox.svelte'
-  import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client, user, familiars } from '../lib/store/index.js'
-  import { sendDirectMessage, markRead } from '@vex-chat/store'
+  import { client, familiars, messages } from '../lib/store/index.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -21,24 +22,24 @@
   let sendError = $state('')
   let showFingerprint = $state(false)
   let fingerprint = $state('')
-  let theirSignKey = $state('')
+  let _theirSignKey = $state('')
 
   // Fetch the recipient's signKey and compute the fingerprint
   $effect(() => {
     if (!$client || !targetUserID) return
     // TODO: fetchKeyBundle and getFingerprint not yet exposed in public API
     // $client.devices.list(targetUserID).then(devices => { ... })
-    void targetUserID
+    targetUserID
   })
 
   // TODO: verified key UI removed — needs secure storage re-implementation
 
-  async function handleSend(content: string, attachment?: File) {
+  async function handleSend(content: string, _attachment?: File) {
     if (!$client || sending) return
     sending = true
     sendError = ''
     try {
-      // TODO: file attachment upload — needs client.files.create() integration
+      // TODO: file _attachment upload — needs client.files.create() integration
       const result = await sendDirectMessage(targetUserID, content)
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'

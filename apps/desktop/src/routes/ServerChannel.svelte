@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { sendGroupMessage } from '@vex-chat/store'
+
+  import ChatInput from '../lib/ChatInput.svelte'
+  import { _keyStore } from '../lib/keystore.js'
   // Route: /server/:serverID/:channelID
   import MessageBox from '../lib/MessageBox.svelte'
-  import ChatInput from '../lib/ChatInput.svelte'
-  import { groupMessages, client, channels, user } from '../lib/store/index.js'
-  import { keyStore } from '../lib/keystore.js'
-  import { sendGroupMessage } from '@vex-chat/store'
+  import { channels, client, groupMessages, user } from '../lib/store/index.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -31,12 +32,12 @@
     }).catch(() => {})
   })
 
-  async function handleSend(content: string, attachment?: File) {
+  async function handleSend(content: string, _attachment?: File) {
     if (!$client || !$user || sending) return
     sending = true
     sendError = ''
     try {
-      // TODO: file attachment upload — needs client.files.create() integration
+      // TODO: file _attachment upload — needs client.files.create() integration
       const result = await sendGroupMessage(channelID, content)
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'

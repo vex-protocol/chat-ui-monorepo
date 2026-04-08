@@ -1,8 +1,10 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+
   import { validate as uuidValidate } from 'uuid'
+
   import CreateServerModal from '../lib/CreateServerModal.svelte'
-  import { client, servers, channels } from '../lib/store/index.js'
+  import { channels, client, servers } from '../lib/store/index.js'
 
   let showCreate = $state(false)
   let inviteInput = $state('')
@@ -21,11 +23,11 @@
     joining = true
     joinError = ''
     try {
-      const permission = await $client!.invites.redeem(inviteID)
-      const server = await $client!.servers.retrieveByID(permission.resourceID)
+      const permission = await $client.invites.redeem(inviteID)
+      const server = await $client.servers.retrieveByID(permission.resourceID)
       if (!server) throw new Error('Server not found')
       servers.setKey(server.serverID, server)
-      const serverChannels = await $client!.channels.retrieve(server.serverID)
+      const serverChannels = await $client.channels.retrieve(server.serverID)
       channels.setKey(server.serverID, serverChannels)
       const first = serverChannels[0]
       push(first ? `/server/${server.serverID}/${first.channelID}` : '/home')

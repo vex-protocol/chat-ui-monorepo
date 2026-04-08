@@ -1,10 +1,11 @@
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { IMessage } from "@vex-chat/libvex";
 
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 interface MailEmitter {
-    on(event: "message", handler: (mail: IMessage) => void): void;
     off(event: "message", handler: (mail: IMessage) => void): void;
+    on(event: "message", handler: (mail: IMessage) => void): void;
 }
 
 /**

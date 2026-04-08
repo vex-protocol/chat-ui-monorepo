@@ -1,12 +1,13 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import { client, avatarHash, resetAll } from './store/index.js'
+
+  import Avatar from './Avatar.svelte'
   import { clearSession, getServerUrl } from './config.js'
   import { keyStore } from './keystore.js'
   import { playLock } from './sounds.js'
-  import Avatar from './Avatar.svelte'
+  import { avatarHash, client, resetAll } from './store/index.js'
 
-  let { username = '', userID = '' }: { username?: string; userID?: string } = $props()
+  let { userID, username }: { userID?: string; username?: string; } = $props()
 
   let menuOpen = $state(false)
 

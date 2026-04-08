@@ -1,21 +1,34 @@
-import { marked } from "marked";
-import DOMPurify from "dompurify";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { applyEmoji } from "@vex-chat/store";
+
+import { openUrl } from "@tauri-apps/plugin-opener";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 // Re-export shared utilities so existing imports keep working
 export {
     chunkMessages,
-    parseFileExtra,
-    isImageType,
     formatFileSize,
     formatTime,
+    isImageType,
+    parseFileExtra,
 } from "@vex-chat/store";
-export type { MessageChunk, FileAttachment } from "@vex-chat/store";
+export type { FileAttachment, MessageChunk } from "@vex-chat/store";
 
 // ── Platform-specific: HTML rendering (requires DOM + marked + DOMPurify) ───
 
 marked.use({ breaks: true });
+
+/**
+ * Handles clicks inside the message box. Intercepts data-external links
+ * and opens them in the native browser via tauri-plugin-opener.
+ */
+export function handleLinkClick(e: MouseEvent): void {
+    const target = (e.target as Element).closest("[data-external]");
+    if (!target) return;
+    e.preventDefault();
+    const url = target.getAttribute("data-external");
+    if (url) openUrl(url).catch(console.error);
+}
 
 /**
  * Renders message content: emoji → markdown → sanitized HTML.
@@ -31,6 +44,7 @@ export function renderContent(content: string): string {
         '<a href="$1" data-external="$1"',
     );
     return DOMPurify.sanitize(annotated, {
+        ALLOWED_ATTR: ["href", "data-external", "rel", "src", "alt"],
         ALLOWED_TAGS: [
             "p",
             "br",
@@ -53,18 +67,5 @@ export function renderContent(content: string): string {
             "del",
             "img",
         ],
-        ALLOWED_ATTR: ["href", "data-external", "rel", "src", "alt"],
     });
-}
-
-/**
- * Handles clicks inside the message box. Intercepts data-external links
- * and opens them in the native browser via tauri-plugin-opener.
- */
-export function handleLinkClick(e: MouseEvent): void {
-    const target = (e.target as Element).closest("[data-external]");
-    if (!target) return;
-    e.preventDefault();
-    const url = target.getAttribute("data-external");
-    if (url) openUrl(url).catch(console.error);
 }

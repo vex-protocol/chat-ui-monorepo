@@ -1,10 +1,13 @@
 <script lang="ts">
-  import { push } from 'svelte-spa-router'
   import type { IUser } from '@vex-chat/libvex'
-  import { familiars, client } from './store/index.js'
+
+  import { push } from 'svelte-spa-router'
+
   import { $familiars as familiarsStore, $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
-  import { getServerUrl } from './config.js'
+
   import Avatar from './Avatar.svelte'
+  import { getServerUrl } from './config.js'
+  import { client, familiars } from './store/index.js'
 
   const serverUrl = getServerUrl()
 
@@ -40,7 +43,7 @@
   let query = $state('')
   let results: IUser[] = $state([])
   let searching = $state(false)
-  let searchTimer: ReturnType<typeof setTimeout> | null = null
+  let searchTimer: null | ReturnType<typeof setTimeout> = null
 
   function onInput(): void {
     if (searchTimer) clearTimeout(searchTimer)

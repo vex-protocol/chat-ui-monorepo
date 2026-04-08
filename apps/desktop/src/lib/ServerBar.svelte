@@ -1,10 +1,13 @@
 <script lang="ts">
+  import type { IChannel, IServer } from '@vex-chat/libvex'
+
   import { push } from 'svelte-spa-router'
-  import type { IServer, IChannel } from '@vex-chat/libvex'
+
   import { $totalDmUnread as totalDmUnread } from '@vex-chat/store'
+
   import CreateServerModal from './CreateServerModal.svelte'
 
-  let { serverList = [], activeServerID = '', channelMap = {} }: { serverList?: IServer[]; activeServerID?: string; channelMap?: Record<string, IChannel[]> } = $props()
+  let { activeServerID, channelMap, serverList }: { activeServerID?: string; channelMap?: Record<string, IChannel[]>; serverList?: IServer[]; } = $props()
 
   function navigateToServer(serverID: string): void {
     const chans = channelMap[serverID] ?? []

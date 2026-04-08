@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { client, servers, channels } from './store/index.js'
   import { push } from 'svelte-spa-router'
+
+  import { channels, client, servers } from './store/index.js'
 
   let { onclose }: { onclose: () => void } = $props()
 
@@ -15,10 +16,10 @@
     submitting = true
     error = ''
     try {
-      const server = await $client!.servers.create(n)
+      const server = await $client.servers.create(n)
       servers.setKey(server.serverID, server)
       // Spire auto-creates #general during createServer, so just fetch channels
-      const serverChannels = await $client!.channels.retrieve(server.serverID)
+      const serverChannels = await $client.channels.retrieve(server.serverID)
       channels.setKey(server.serverID, serverChannels)
       onclose()
       const firstChannel = serverChannels[0]

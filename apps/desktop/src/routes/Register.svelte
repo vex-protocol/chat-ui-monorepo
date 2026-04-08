@@ -1,10 +1,12 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
+
   import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-  import { registerAndBootstrap, user as userAtom } from '../lib/store/index.js'
+
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
-  import { playUnlock, playError } from '../lib/sounds.js'
+  import { playError, playUnlock } from '../lib/sounds.js'
+  import { registerAndBootstrap, user as userAtom } from '../lib/store/index.js'
 
   let username = $state('')
   let password = $state('')
@@ -15,7 +17,7 @@
   const USERNAME_RE = /^\w+$/
   const LEADING_TRAILING_RE = /^[-_]|[-_]$/
 
-  function validateUsername(value: string): string | null {
+  function validateUsername(value: string): null | string {
     if (value.length < 3) return 'Username must be at least 3 characters'
     if (!USERNAME_RE.test(value)) return 'Username can only contain letters, numbers, hyphens, and underscores'
     if (LEADING_TRAILING_RE.test(value)) return 'Username cannot start or end with a hyphen or underscore'

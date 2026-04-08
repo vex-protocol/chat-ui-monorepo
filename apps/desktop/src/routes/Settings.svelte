@@ -1,23 +1,25 @@
 <script lang="ts">
   import type { StoredCredentials } from '@vex-chat/libvex'
-  import { push } from 'svelte-spa-router'
-  import { theme, toggleTheme } from '../lib/stores/theme.js'
-  import { client, user } from '../lib/store/index.js'
-  import { getServerUrl, setServerUrl, clearSession } from '../lib/config.js'
-  import { keyStore } from '../lib/keystore.js'
-  import { getSoundsEnabled, setSoundsEnabled, playNotify } from '../lib/sounds.js'
-  import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
-  import { avatarHash } from '../lib/store/index.js'
-  import Avatar from '../lib/Avatar.svelte'
-  import { checkForUpdates, applyUpdate, type UpdateStatus } from '../lib/updater.js'
   import type { IDevice } from '@vex-chat/libvex'
+
+  import { push } from 'svelte-spa-router'
+
+  import Avatar from '../lib/Avatar.svelte'
+  import { clearSession, getServerUrl, setServerUrl } from '../lib/config.js'
+  import { keyStore } from '../lib/keystore.js'
+  import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
+  import { getSoundsEnabled, playNotify, setSoundsEnabled } from '../lib/sounds.js'
+  import { client, user } from '../lib/store/index.js'
+  import { avatarHash } from '../lib/store/index.js'
+  import { theme, toggleTheme } from '../lib/stores/theme.js'
+  import { applyUpdate, checkForUpdates, type UpdateStatus } from '../lib/updater.js'
 
   // ── Devices ────────────────────────────────────────────────────────────────
 
   let devices: IDevice[] = $state([])
   let devicesLoading = $state(false)
   let devicesError = $state('')
-  let deleteConfirmID: string | null = $state(null)
+  let deleteConfirmID: null | string = $state(null)
   let deleteError = $state('')
 
   // TODO: device management — needs IDevices.list() and proper delete API
@@ -64,10 +66,10 @@
 
   // ── Account info ────────────────────────────────────────────────────────────
 
-  let creds: StoredCredentials | null = $state(null)
+  let creds: null | StoredCredentials = $state(null)
   let fingerprint = $derived.by(() => {
     const key = creds?.deviceKey
-    return key ? key.slice(0, 16).toUpperCase() : 'N/A'
+    key ? key.slice(0, 16).toUpperCase() : 'N/A';
   })
 
   // Load credentials from KeyStore on mount
@@ -127,7 +129,7 @@
   // ── Danger zone ─────────────────────────────────────────────────────────────
 
   let confirmClear = $state(false)
-  let clearError = $state('')
+  let _clearError = $state('')
 
   async function handleLogout(): Promise<void> {
     try {
@@ -141,7 +143,7 @@
 
   function startClear(): void {
     confirmClear = true
-    clearError = ''
+    _clearError = ''
   }
 
   async function confirmClearKeys(): Promise<void> {

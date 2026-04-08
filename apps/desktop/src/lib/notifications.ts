@@ -1,17 +1,20 @@
+import type { IMessage } from "@vex-chat/libvex";
+
+import { shouldNotify } from "@vex-chat/store";
+
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
     isPermissionGranted,
     requestPermission,
     sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { IMessage } from "@vex-chat/libvex";
-import { shouldNotify } from "@vex-chat/store";
+
 import { playNotify } from "./sounds.js";
 
 /** Minimal interface needed to subscribe/unsubscribe to message events. */
 interface MailEventEmitter {
-    on(event: "message", handler: (mail: IMessage) => void): void;
     off(event: "message", handler: (mail: IMessage) => void): void;
+    on(event: "message", handler: (mail: IMessage) => void): void;
 }
 
 // ── Preference ────────────────────────────────────────────────────────────────
@@ -28,32 +31,17 @@ export function setNotificationsEnabled(enabled: boolean): void {
 
 // ── Permission ────────────────────────────────────────────────────────────────
 
-async function ensurePermission(): Promise<boolean> {
-    try {
-        let granted = await isPermissionGranted();
-        if (!granted) {
-            const result = await requestPermission();
-            granted = result === "granted";
-        }
-        return granted;
-    } catch {
-        return false;
-    }
-}
-
-// ── Wire up to Client ────────────────────────────────────────────────────────
-
 /**
  * Attaches a mail listener that fires desktop notifications using the shared
  * shouldNotify() decision logic. Returns an unsubscribe function.
  */
 export function setupNotifications(
     client: MailEventEmitter,
-    activeConversation: () => string | null,
+    activeConversation: () => null | string,
     resolveAuthorName?: (userID: string) => string | undefined,
     resolveChannelInfo?: (
         channelID: string,
-    ) => { channelName: string; serverName: string } | undefined,
+    ) => undefined | { channelName: string; serverName: string },
 ): () => void {
     const handler = async (mail: IMessage): Promise<void> => {
         let focused = false;
@@ -83,7 +71,7 @@ export function setupNotifications(
         if (!focused) {
             const granted = await ensurePermission();
             if (granted) {
-                sendNotification({ title: payload.title, body: payload.body });
+                sendNotification({ body: payload.body, title: payload.title });
             }
         }
     };
@@ -92,4 +80,19 @@ export function setupNotifications(
     return () => {
         client.off("message", handler);
     };
+}
+
+// ── Wire up to Client ────────────────────────────────────────────────────────
+
+async function ensurePermission(): Promise<boolean> {
+    try {
+        let granted = await isPermissionGranted();
+        if (!granted) {
+            const result = await requestPermission();
+            granted = result === "granted";
+        }
+        return granted;
+    } catch {
+        return false;
+    }
 }
