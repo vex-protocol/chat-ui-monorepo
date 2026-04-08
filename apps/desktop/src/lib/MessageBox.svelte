@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DecryptedMail } from '@vex-chat/types'
+  import type { IMessage } from '@vex-chat/libvex'
   import { onMount } from 'svelte'
   import { chunkMessages, renderContent, handleLinkClick, formatTime, parseFileExtra, isImageType, formatFileSize } from './utils/messages.js'
   import { user, client } from './store/index.js'
@@ -12,7 +12,7 @@
     return $client?.fileUrl(fileID) ?? `${serverUrl}/file/${fileID}`
   }
 
-  let { messages = [], usernames = {} }: { messages: DecryptedMail[]; usernames?: Record<string, string> } = $props()
+  let { messages = [], usernames = {} }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
 
   const chunks = $derived(chunkMessages(messages))
 
@@ -58,10 +58,10 @@
     <div class="message-box__empty">No messages yet.</div>
   {/if}
 
-  {#each chunks as chunk (chunk.firstTime + chunk.authorID)}
+  {#each chunks as chunk (chunk.messages[0]?.mailID ?? chunk.firstTime + chunk.authorID)}
     {#if chunk.messages[0]?.mailType === 'system'}
       <div class="message-system">
-        <span class="message-system__text">{chunk.messages[0].content}</span>
+        <span class="message-system__text">{chunk.messages[0].message}</span>
       </div>
     {:else}
       <div class="message-chunk">
@@ -103,11 +103,11 @@
                   </span>
                 </a>
               {/if}
-              {#if msg.content}
-                {@html renderContent(msg.content)}
+              {#if msg.message}
+                {@html renderContent(msg.message)}
               {/if}
             {:else}
-              {@html renderContent(msg.content)}
+              {@html renderContent(msg.message)}
             {/if}
           </div>
         {/each}

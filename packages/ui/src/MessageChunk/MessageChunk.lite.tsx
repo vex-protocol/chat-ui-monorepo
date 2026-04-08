@@ -14,6 +14,7 @@ export interface MessageChunkProps {
 
 export default function MessageChunk(props: MessageChunkProps) {
   useDefaultProps<MessageChunkProps>({
+    authorID: '',
     timestamp: '',
     messages: [],
     isSelf: false,

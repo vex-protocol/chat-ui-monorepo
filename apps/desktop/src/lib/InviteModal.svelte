@@ -1,6 +1,6 @@
 <script lang="ts">
   import { client } from './store/index.js'
-  import type { IInvite } from '@vex-chat/types'
+  import type { IInvite } from '@vex-chat/libvex'
 
   let { serverID = '', serverName = '', onclose }: { serverID?: string; serverName?: string; onclose: () => void } = $props()
 
@@ -24,7 +24,7 @@
     creating = true
     error = ''
     try {
-      const invite = await $client!.createInvite(serverID, '1h')
+      const invite = await $client!.invites.create(serverID, '1h')
       invites = [invite, ...invites]
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create invite'

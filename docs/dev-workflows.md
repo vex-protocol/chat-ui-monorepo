@@ -55,36 +55,47 @@ pnpm --filter @vex-chat/desktop check
 
 ---
 
-## Mobile (React Native)
+## Mobile (Expo + React Native)
 
-Native iOS and Android client.
+Native iOS and Android client via Expo Prebuild (CNG). `ios/` and `android/` directories are gitignored — generated from `app.json` + config plugins.
 
 ### Prerequisites
 
-- macOS for iOS: Xcode 15+, CocoaPods
-- Android: Android SDK, NDK, emulator or device
+- macOS for iOS: Xcode 16+
+- Android: Android SDK, emulator or device
+- `npx expo prebuild` generates native projects from config
 
-### First-time iOS setup
-
-```bash
-pnpm --filter @vex-chat/mobile pod-install
-```
-
-### Run dev
+### First-time setup
 
 ```bash
-pnpm --filter @vex-chat/mobile ios       # iOS simulator
-pnpm --filter @vex-chat/mobile android   # Android emulator
-pnpm --filter @vex-chat/mobile dev       # auto-selects (iOS on macOS, Android otherwise)
+cd apps/mobile
+npx expo prebuild          # generates ios/ and android/
 ```
+
+### Development build (recommended)
+
+```bash
+npx expo run:ios           # builds native + launches on iOS simulator
+npx expo run:android       # builds native + launches on Android emulator
+```
+
+After the first build (~2-5 min), subsequent launches are fast. JS changes hot-reload instantly.
+
+### Expo Go (quick JS-only testing)
+
+```bash
+npx expo start             # opens in Expo Go on device/simulator
+```
+
+Expo Go has a fixed set of native modules. Packages with custom native code (`@notifee/react-native`, etc.) will crash in Expo Go — use a development build instead. See `docs/explanation/platform-strategy.md` for the full Expo Go vs dev build comparison.
 
 ### Metro bundler (standalone)
 
 ```bash
-pnpm --filter @vex-chat/mobile start
+npx expo start --dev-client   # connects to an existing development build
 ```
 
-Useful if the app needs to reconnect to the bundler.
+Useful if the app needs to reconnect to the bundler after the native binary is already running.
 
 ---
 
@@ -174,14 +185,21 @@ Starts three servers:
 
 ## Shared Packages
 
-These have no build step — apps import TypeScript source directly.
+These have no build step -- apps import TypeScript source directly.
+
+**Monorepo packages:**
 
 | Package | Purpose | Used by |
 |---|---|---|
-| `packages/types` | Shared TypeScript interfaces | all apps + packages |
-| `packages/crypto` | Ed25519, X3DH, NaCl encryption | desktop, mobile, libvex (also consumed by spire via npm) |
-| `packages/libvex` | VexClient SDK (WebSocket, auth, messaging) | desktop, mobile, store |
 | `packages/store` | Nanostores reactive state | desktop, mobile |
+
+**Sibling repos (linked via pnpm workspace):**
+
+| Repo | npm name | Purpose | Used by |
+|---|---|---|---|
+| `../types-js` | `@vex-chat/types` | Shared TypeScript interfaces | all apps + packages |
+| `../crypto-js` | `@vex-chat/crypto` | Ed25519, X3DH, NaCl encryption | libvex (also consumed by spire via npm) |
+| `../libvex-js` | `@vex-chat/libvex` | Client SDK (WebSocket, auth, messaging) | store, desktop, mobile |
 
 ---
 
@@ -223,13 +241,18 @@ Push to `main` → Vercel auto-deploys.
 ## Dependency Graph
 
 ```
-apps/desktop ─── packages/store ─── packages/libvex ─── packages/crypto
-                      │                                       │
-                      └──────── packages/types ◄──────────────┘
+apps/desktop ─── packages/store ─── ../libvex-js ─── ../crypto-js
+                      │                                    │
+                      └──────── ../types-js ◄──────────────┘
 apps/mobile ──── packages/store
-apps/website ─── packages/types
+apps/website ─── ../types-js
 packages/ui ──── (standalone, compiles to React + Svelte)
 
-External:
+Sibling repos (linked via pnpm workspace):
+../types-js   (@vex-chat/types)
+../crypto-js  (@vex-chat/crypto)
+../libvex-js  (@vex-chat/libvex)
+
+External (NOT in pnpm workspace):
 spire (own repo) ── @vex-chat/crypto (via npm)
 ```

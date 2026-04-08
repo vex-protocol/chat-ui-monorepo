@@ -2,7 +2,7 @@
 
 End-to-end journey maps for the Vex platform. Each journey documents what the user does, what the system does, and where the experience breaks down.
 
-> **Source:** Derived from code analysis of both the original repos (`spire`, `vex-desktop`, `libvex-js`, `crypto-js`) and the current monorepo (`apps/desktop`, `apps/mobile`, `packages/libvex`, `packages/store`). The server (spire) lives in its own repo. Last updated March 2026.
+> **Source:** Derived from code analysis of the sibling repos (`../libvex-js`, `../crypto-js`, `../types-js`, `../spire`) and the monorepo (`apps/desktop`, `apps/mobile`, `packages/store`). Last updated April 2026.
 >
 > This document is the **story map backbone**. For the roadmap (what we're building now), see `roadmap.md`. For how the ops system works, see `README.md`.
 
@@ -50,7 +50,7 @@ A complete comparison of what shipped in the old client versus what's available 
 - Multi-device fan-out (sends to all recipient devices)
 - Message forwarding to sender's own devices
 - Group messaging (member list endpoint + ServerChannel fan-out)
-- Local message persistence (IndexedDB desktop, AsyncStorage mobile — survives app restart)
+- Local message persistence (SQLite via IStorage on all platforms — survives app restart)
 - Unread badges (DM and channel, separated — desktop + mobile)
 - Notification suppression when conversation is active (desktop + mobile)
 - Channel notification format: "username (#channel, server)" (desktop + mobile)

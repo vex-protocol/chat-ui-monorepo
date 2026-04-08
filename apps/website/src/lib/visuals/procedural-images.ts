@@ -4,167 +4,192 @@
  * Heading color matches the image's color folder.
  */
 
-import type { OrbColor } from './orb-images';
-import { isImageUsed, markImagesUsed, ORB_IMAGES_BY_COLOR } from './orb-images';
+import type { OrbColor } from "./orb-images";
+import { isImageUsed, markImagesUsed, ORB_IMAGES_BY_COLOR } from "./orb-images";
 
-const HALO_IMAGES = ['/orbs/halo-red.webp', '/orbs/ROYALPURPLE/BLACKHOLE.webp'];
+const HALO_IMAGES = ["/orbs/halo-red.webp", "/orbs/ROYALPURPLE/BLACKHOLE.webp"];
 
 const IMAGES_WITH_COLORS: Array<{ image: string; color: OrbColor }> = (() => {
-	const result: Array<{ image: string; color: OrbColor }> = [];
-	for (const [color, images] of Object.entries(ORB_IMAGES_BY_COLOR)) {
-		if (color === 'rainbow') continue;
-		for (const img of images) {
-			result.push({ image: img, color: color as OrbColor });
-		}
-	}
-	return result;
+    const result: Array<{ image: string; color: OrbColor }> = [];
+    for (const [color, images] of Object.entries(ORB_IMAGES_BY_COLOR)) {
+        if (color === "rainbow") continue;
+        for (const img of images) {
+            result.push({ image: img, color: color as OrbColor });
+        }
+    }
+    return result;
 })();
 
 const COLOR_HEX: Record<OrbColor, string> = {
-	red: '#e70000',
-	purple: '#7c3aed',
-	green: '#91e643',
-	blue: '#a8c8df',
-	pink: '#c5698b',
-	cream: '#d9c2a3',
-	rainbow: '#e70000',
+    red: "#e70000",
+    purple: "#7c3aed",
+    green: "#91e643",
+    blue: "#a8c8df",
+    pink: "#c5698b",
+    cream: "#d9c2a3",
+    rainbow: "#e70000",
 };
 
 export type CardWithColor = {
-	image: string;
-	color: string;
-	colorBg: string;
+    image: string;
+    color: string;
+    colorBg: string;
 };
 
 function darkenHex(hex: string, amount: number): string {
-	const n = parseInt(hex.slice(1), 16);
-	const r = Math.round(((n >> 16) & 255) * amount);
-	const g = Math.round(((n >> 8) & 255) * amount);
-	const b = Math.round((n & 255) * amount);
-	return (
-		'#' +
-		[r, g, b].map((x) => Math.max(0, x).toString(16).padStart(2, '0')).join('')
-	);
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.round(((n >> 16) & 255) * amount);
+    const g = Math.round(((n >> 8) & 255) * amount);
+    const b = Math.round((n & 255) * amount);
+    return (
+        "#" +
+        [r, g, b]
+            .map((x) => Math.max(0, x).toString(16).padStart(2, "0"))
+            .join("")
+    );
 }
 
 interface ProceduralSet {
-	mascot: string;
-	halo: string;
-	card: CardWithColor;
-	card2: CardWithColor;
-	cardHero: CardWithColor;
-	cardContact: CardWithColor;
+    mascot: string;
+    halo: string;
+    card: CardWithColor;
+    card2: CardWithColor;
+    cardHero: CardWithColor;
+    cardContact: CardWithColor;
 }
 
 const cache: Record<string, ProceduralSet> = {};
 const seedCache: Record<string, number> = {};
 
 function mulberry32(seed: number): () => number {
-	return () => {
-		seed |= 0;
-		let t = (seed += 0x6d2b79f5);
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
+    return () => {
+        seed |= 0;
+        let t = (seed += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
 }
 
 function getSeed(runKey: number): number {
-	const ts = Date.now();
-	const buf = new Uint8Array(4);
-	if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-		crypto.getRandomValues(buf);
-	}
-	const r = (buf[0]! << 24) | (buf[1]! << 16) | (buf[2]! << 8) | buf[3]!;
-	return ((ts >>> 0) ^ r) + runKey * 0x9e3779b9;
+    const ts = Date.now();
+    const buf = new Uint8Array(4);
+    if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+        crypto.getRandomValues(buf);
+    }
+    const r = (buf[0]! << 24) | (buf[1]! << 16) | (buf[2]! << 8) | buf[3]!;
+    return ((ts >>> 0) ^ r) + runKey * 0x9e3779b9;
 }
 
-function pickDistinctIndices(poolSize: number, count: number, rng: () => number): number[] {
-	const indices: number[] = [];
-	const available = Array.from({ length: poolSize }, (_, i) => i);
-	for (let i = 0; i < count && available.length > 0; i++) {
-		const idx = Math.floor(rng() * available.length);
-		indices.push(available[idx]!);
-		available.splice(idx, 1);
-	}
-	return indices;
+function pickDistinctIndices(
+    poolSize: number,
+    count: number,
+    rng: () => number,
+): number[] {
+    const indices: number[] = [];
+    const available = Array.from({ length: poolSize }, (_, i) => i);
+    for (let i = 0; i < count && available.length > 0; i++) {
+        const idx = Math.floor(rng() * available.length);
+        indices.push(available[idx]!);
+        available.splice(idx, 1);
+    }
+    return indices;
 }
 
 function pickCardIcons(
-	roomPath: string,
-	pool: Array<{ image: string; color: OrbColor }>,
-	count: number,
-	rng: () => number,
+    roomPath: string,
+    pool: Array<{ image: string; color: OrbColor }>,
+    count: number,
+    rng: () => number,
 ): CardWithColor[] {
-	const available = pool.filter(({ image }) => !isImageUsed(image, roomPath));
-	const indices = pickDistinctIndices(
-		available.length,
-		Math.min(count, available.length),
-		rng,
-	);
-	const picked = indices.map((i) => available[i]!);
-	markImagesUsed(
-		picked.map((p) => p.image),
-		roomPath,
-	);
-	return picked.map(({ image, color }) => {
-		const hex = COLOR_HEX[color] ?? COLOR_HEX.red;
-		return { image, color: hex, colorBg: darkenHex(hex, 0.45) };
-	});
+    const available = pool.filter(({ image }) => !isImageUsed(image, roomPath));
+    const indices = pickDistinctIndices(
+        available.length,
+        Math.min(count, available.length),
+        rng,
+    );
+    const picked = indices.map((i) => available[i]!);
+    markImagesUsed(
+        picked.map((p) => p.image),
+        roomPath,
+    );
+    return picked.map(({ image, color }) => {
+        const hex = COLOR_HEX[color] ?? COLOR_HEX.red;
+        return { image, color: hex, colorBg: darkenHex(hex, 0.45) };
+    });
 }
 
 function ensureCache(runKey: number, roomPath: string): ProceduralSet {
-	const cacheKey = `${runKey}:${roomPath}`;
-	if (cache[cacheKey]) return cache[cacheKey];
+    const cacheKey = `${runKey}:${roomPath}`;
+    if (cache[cacheKey]) return cache[cacheKey];
 
-	const key = String(runKey);
-	seedCache[key] ??= getSeed(runKey);
-	const rng = mulberry32(seedCache[key]!);
+    const key = String(runKey);
+    seedCache[key] ??= getSeed(runKey);
+    const rng = mulberry32(seedCache[key]!);
 
-	const halosAvailable = HALO_IMAGES.filter((p) => !isImageUsed(p, roomPath));
-	const halo =
-		halosAvailable.length > 0
-			? halosAvailable[Math.floor(rng() * halosAvailable.length)]!
-			: HALO_IMAGES[0]!;
-	markImagesUsed([halo], roomPath);
+    const halosAvailable = HALO_IMAGES.filter((p) => !isImageUsed(p, roomPath));
+    const halo =
+        halosAvailable.length > 0
+            ? halosAvailable[Math.floor(rng() * halosAvailable.length)]!
+            : HALO_IMAGES[0]!;
+    markImagesUsed([halo], roomPath);
 
-	const cards = pickCardIcons(roomPath, IMAGES_WITH_COLORS, 5, rng);
-	const fallback: CardWithColor = {
-		image: IMAGES_WITH_COLORS[0]?.image ?? '',
-		color: COLOR_HEX.red,
-		colorBg: darkenHex(COLOR_HEX.red, 0.45),
-	};
-	const mascot = cards[0]?.image ?? fallback.image;
-	const card = cards[1] ?? cards[0] ?? fallback;
-	const card2 = cards[2] ?? card;
-	const cardHero = cards[3] ?? card;
-	const cardContact = cards[4] ?? card2;
+    const cards = pickCardIcons(roomPath, IMAGES_WITH_COLORS, 5, rng);
+    const fallback: CardWithColor = {
+        image: IMAGES_WITH_COLORS[0]?.image ?? "",
+        color: COLOR_HEX.red,
+        colorBg: darkenHex(COLOR_HEX.red, 0.45),
+    };
+    const mascot = cards[0]?.image ?? fallback.image;
+    const card = cards[1] ?? cards[0] ?? fallback;
+    const card2 = cards[2] ?? card;
+    const cardHero = cards[3] ?? card;
+    const cardContact = cards[4] ?? card2;
 
-	const set: ProceduralSet = { mascot, halo, card, card2, cardHero, cardContact };
-	cache[cacheKey] = set;
-	return set;
+    const set: ProceduralSet = {
+        mascot,
+        halo,
+        card,
+        card2,
+        cardHero,
+        cardContact,
+    };
+    cache[cacheKey] = set;
+    return set;
 }
 
 export function getProceduralMascot(runKey: number, roomPath: string): string {
-	return ensureCache(runKey, roomPath).mascot;
+    return ensureCache(runKey, roomPath).mascot;
 }
 
 export function getProceduralHalo(runKey: number, roomPath: string): string {
-	return ensureCache(runKey, roomPath).halo;
+    return ensureCache(runKey, roomPath).halo;
 }
 
-export function getProceduralCard(runKey: number, roomPath: string): CardWithColor {
-	return ensureCache(runKey, roomPath).card;
+export function getProceduralCard(
+    runKey: number,
+    roomPath: string,
+): CardWithColor {
+    return ensureCache(runKey, roomPath).card;
 }
 
-export function getProceduralCard2(runKey: number, roomPath: string): CardWithColor {
-	return ensureCache(runKey, roomPath).card2;
+export function getProceduralCard2(
+    runKey: number,
+    roomPath: string,
+): CardWithColor {
+    return ensureCache(runKey, roomPath).card2;
 }
 
-export function getProceduralCardHero(runKey: number, roomPath: string): CardWithColor {
-	return ensureCache(runKey, roomPath).cardHero;
+export function getProceduralCardHero(
+    runKey: number,
+    roomPath: string,
+): CardWithColor {
+    return ensureCache(runKey, roomPath).cardHero;
 }
 
-export function getProceduralCardContact(runKey: number, roomPath: string): CardWithColor {
-	return ensureCache(runKey, roomPath).cardContact;
+export function getProceduralCardContact(
+    runKey: number,
+    roomPath: string,
+): CardWithColor {
+    return ensureCache(runKey, roomPath).cardContact;
 }

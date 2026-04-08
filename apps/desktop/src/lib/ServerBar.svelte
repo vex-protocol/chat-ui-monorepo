@@ -1,6 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import type { IServer, IChannel } from '@vex-chat/types'
+  import type { IServer, IChannel } from '@vex-chat/libvex'
   import { $totalDmUnread as totalDmUnread } from '@vex-chat/store'
   import CreateServerModal from './CreateServerModal.svelte'
 

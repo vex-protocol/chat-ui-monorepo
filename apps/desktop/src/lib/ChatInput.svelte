@@ -228,6 +228,7 @@
     flex: 1;
     resize: none;
     line-height: 1.5;
+    min-height: 40px;
     padding: 8px 12px;
     background: transparent;
     border: none;

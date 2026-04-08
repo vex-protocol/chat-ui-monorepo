@@ -34,14 +34,21 @@ A self-hosted, open-source alternative to Discord or Slack where:
 | Package | Replaces | Description |
 |---|---|---|
 | `apps/desktop` | `vex-desktop` | Tauri 2.0 + Svelte (replaces Electron+React) |
-| `apps/mobile` | — | React Native mobile client (new) |
-| `packages/types` | `types-js` | Shared TypeScript interfaces and enums |
-| `packages/libvex` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
-| `packages/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
-| `packages/store` | — | Framework-agnostic state containers (nanostores atoms) |
-| `packages/ui` | — | Mitosis design primitives, compiled to Svelte + React |
+| `apps/mobile` | -- | React Native mobile client (new) |
+| `packages/store` | -- | Framework-agnostic state containers (nanostores atoms) |
+| `packages/ui` | -- | Mitosis design primitives, compiled to Svelte + React |
 
-The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Knex, @noble/curves, argon2id, SQLite/MySQL.
+### Sibling repos (linked via pnpm workspace)
+
+| Repo | npm name | Replaces | Description |
+|---|---|---|---|
+| `../types-js` | `@vex-chat/types` | `types-js` | Shared TypeScript interfaces and enums |
+| `../crypto-js` | `@vex-chat/crypto` | `crypto-js` | Ed25519 signing, X25519 DH, secretbox encryption (`@noble/curves`) |
+| `../libvex-js` | `@vex-chat/libvex` | `libvex-js` | Framework-agnostic client SDK (WebSocket, auth, messaging) |
+
+These were originally in `packages/` but migrated to standalone sibling repos. They are linked into the pnpm workspace so monorepo packages can import them as `"workspace:*"` deps.
+
+The server (**spire**) stays in its own repo ([`vex-chat/spire`](https://github.com/vex-chat/spire)) — Express 4, Kysely, @noble/curves, argon2id, SQLite/MySQL. Spire is NOT in the pnpm workspace.
 
 See `docs/explanation/platform-strategy.md` for architecture details and `docs/explanation/design-system.md` for the Figma ↔ Storybook pipeline.
 
@@ -91,7 +98,7 @@ The server itself has a NaCl signing key pair (SPK). The server's public key is 
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth` | — | Login; returns JWT + sets `auth` cookie |
+| `POST` | `/auth` | — | Login; returns JWT (Bearer token) |
 | `POST` | `/register` | — | Register user+device (requires NaCl-signed register token) |
 | `GET` | `/token/:type` | JWT (except `register`) | Get scoped action token |
 | `POST` | `/whoami` | JWT | Get current user info |
@@ -129,9 +136,10 @@ Common events: `mail` (new message), `serverChange` (server/channel updated).
 
 Connection flow:
 1. Client fetches a `connect` action token → signs it with device key
-2. `POST /device/:id/connect` → server issues a `device` JWT (cookie)
-3. Client opens WS `/socket` with both `auth` + `device` cookies
-4. Server verifies both JWTs, creates `ClientManager` for the connection
+2. `POST /device/:id/connect` → server issues a `device` JWT (returned in body)
+3. Client opens WS `/socket` (bare, no credentials on upgrade)
+4. Client sends `{ type: "auth", token: JWT }` as first WS message
+5. Server verifies JWT, creates `ClientManager` for the connection
 
 ---
 

@@ -1,5 +1,5 @@
-import { atom } from 'nanostores'
-import type { VexClient } from '@vex-chat/libvex'
+import { atom } from "nanostores";
+import type { Client } from "@vex-chat/libvex";
 
-/** Singleton VexClient instance. Null until bootstrap() is called. */
-export const $client = atom<VexClient | null>(null)
+/** Singleton Client instance. Null until bootstrap() is called. */
+export const $client = atom<Client | null>(null);

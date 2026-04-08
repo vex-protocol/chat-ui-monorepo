@@ -3,7 +3,6 @@
   import { client, avatarHash, resetAll } from './store/index.js'
   import { clearSession, getServerUrl } from './config.js'
   import { keyStore } from './keystore.js'
-  import { clearMessages } from './persistence.js'
   import { playLock } from './sounds.js'
   import Avatar from './Avatar.svelte'
 
@@ -19,7 +18,7 @@
     const creds = await keyStore.loadActive()
     if (creds) await keyStore.save({ ...creds, token: undefined })
     resetAll()
-    clearMessages().catch(() => {})
+    // SQLite storage is per-device-key; no manual clear needed on logout
     clearSession()
     push('/login')
   }

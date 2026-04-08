@@ -1,6 +1,6 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
-  import type { IChannel } from '@vex-chat/types'
+  import type { IChannel } from '@vex-chat/libvex'
   import { client, servers, channels as channelsStore } from './store/index.js'
   import InviteModal from './InviteModal.svelte'
 
@@ -33,7 +33,7 @@
     deleting = true
     deleteError = ''
     try {
-      await $client.deleteServer(serverID)
+      await $client.servers.delete(serverID)
     } catch (err) {
       deleteError = err instanceof Error ? err.message : 'Failed to delete'
       deleting = false

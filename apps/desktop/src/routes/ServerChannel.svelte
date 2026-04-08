@@ -24,7 +24,7 @@
   $effect(() => {
     if (!$client || !channelID) return
     void $channels[serverID] // reactive dep — re-fetch members when server membership changes
-    $client.listMembers(channelID).then(members => {
+    $client.channels.userList(channelID).then(members => {
       const map: Record<string, string> = {}
       for (const m of members) map[m.userID] = m.username
       usernames = map

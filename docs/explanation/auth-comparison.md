@@ -114,7 +114,7 @@ If single-use tokens are needed in the future, a small Redis/DB-backed token rev
 | Token redemption | Client NaCl-signs the token UUID with their device signing key; server verifies signature | Client presents JWT token directly |
 | userID source | `uuid.stringify(regKey)` — derived from the NaCl-signed registration token | Fresh `uuid.v4()` |
 | Device creation | Bundled into registration — creates user + device + preKeys atomically | Separate (`/devices` endpoint) |
-| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Knex catches constraint violations; we translate |
+| Duplicate errors | Detects `ER_DUP_ENTRY` MySQL error codes by string matching (`users_username_unique`, `users_signkey_unique`) | Kysely catches constraint violations; we translate |
 
 **Upstream registration payload** (`XTypes.HTTP.IRegistrationPayload`):
 ```ts
@@ -158,12 +158,12 @@ Authentication is cookie-based. The `protect` middleware is a separate guard tha
 
 | | Current |
 |---|---|
-| Query builder | Knex |
+| Query builder | Kysely |
 | Default DB | SQLite (also supports MySQL) |
-| Schema management | `if (!hasTable) createTable` inline in `Database.init()` |
+| Schema management | Kysely `Migrator` + `FileMigrationProvider` — migrations in `src/migrations/`, run on startup via `migrateToLatest()` |
 | Type safety | Runtime types from `@vex-chat/types` |
 
-The upstream `Database` class creates tables on startup if they don't exist — there is a `migrations/` directory in the repo but the production code doesn't use it (the `init()` method handles DDL inline). This means schema changes require manual `ALTER TABLE` in production.
+Schema management now uses Kysely's `Migrator` with `FileMigrationProvider`. Migrations live in `src/migrations/` and run automatically on startup via `migrateToLatest()`. The initial migration is the existing schema verbatim; future changes are new migration files.
 
 ---
 
@@ -182,7 +182,7 @@ This project is **privacy-first**. We match the upstream privacy model exactly. 
 | JWT library | `jsonwebtoken` (CJS) | N/A (receives JWT) | |
 | Transport | HTTP cookie `auth` + `Authorization` header | Bearer token header | SDK sends Bearer; spire accepts both |
 | Password hashing | PBKDF2 + argon2id (lazy migration) | N/A (server-only) | Old hashes upgraded on login |
-| DB | Knex + SQLite/MySQL | N/A | |
+| DB | Kysely + SQLite/MySQL | N/A | |
 
 ### Notes on divergences
 
@@ -249,9 +249,9 @@ uint8Array.toHex()
 
 These are **not yet available in any Node.js LTS** as of early 2026. They will eventually make `Buffer` unnecessary for this use case.
 
-If any code in this repo is ever shared with a browser environment (e.g., moved to a shared `packages/` module), replace `Buffer` with [`uint8array-extras`](https://github.com/sindresorhus/uint8array-extras) (`hexToUint8Array` / `uint8ArrayToHex`), which works identically in both environments.
+`@vex-chat/libvex` already runs in browsers (Tauri webview) and React Native, so it uses `Uint8Array` exclusively — all `Buffer` usage was removed during the platform adapter migration. Spire (Node.js only) still uses `Buffer` which is fine.
 
-**Rule of thumb:** `Buffer` in spire (Node.js only) is fine. Any code in a shared package that may run in a browser should use `uint8array-extras` or the native `Uint8Array` API once Node.js LTS supports it.
+**Rule of thumb:** `Buffer` in spire (Node.js only) is fine. Any shared code in `libvex-js`, `@vex-chat/crypto`, or `@vex-chat/types` must use `Uint8Array` — these packages run on all platforms.
 
 ---
 

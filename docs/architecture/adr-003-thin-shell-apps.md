@@ -10,7 +10,7 @@
 ## Context
 
 Vex Chat ships two client apps — a Tauri+Svelte 5 desktop app and a React Native mobile
-app — on top of five shared packages (`crypto`, `types`, `libvex`, `store`, `ui`). The
+app — on top of two monorepo packages (`store`, `ui`) plus three sibling repos (`types-js`, `crypto-js`, `libvex-js`). The
 goal is for desktop and mobile to be **pure view layers** for their respective platforms,
 with all reusable logic living in shared packages.
 
@@ -65,7 +65,7 @@ have leaked into the app layers.
 - Platform-specific UI components (Svelte components / React Native screens)
 - Navigation and routing
 - Platform integrations (push notifications, keychain, file system, tray, updater)
-- Platform-specific persistence implementations (IndexedDB, AsyncStorage)
+- Platform-specific persistence implementations (SQLite everywhere is the goal — see IStorage)
 
 ---
 
@@ -153,13 +153,13 @@ need them — desktop for tray badges, mobile for tab badges and app icon badges
 Created `packages/store/src/message-utils.ts`:
 
 ```typescript
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/types'
 
 export interface MessageChunk {
   authorID: string
   authorName?: string
   timestamp: string
-  messages: DecryptedMail[]
+  messages: IMessage[]
 }
 
 /**
@@ -167,7 +167,7 @@ export interface MessageChunk {
  * Pure function — no platform dependencies.
  */
 export function chunkMessages(
-  messages: DecryptedMail[],
+  messages: IMessage[],
   gapMs = 5 * 60_000,
   maxPerChunk = 100,
 ): MessageChunk[] { /* ... */ }
@@ -197,54 +197,32 @@ But the pure logic (emoji detection, URL extraction, mention parsing) moves to s
 
 ### Phase 2: Extract Auth Flow Orchestration into Store ✅
 
-Created `packages/store/src/auto-login.ts`:
+Extracted into `packages/store/src/bootstrap.ts` (autoLogin):
 
 ```typescript
 import type { KeyStore } from '@vex-chat/types'
-import type { PersistenceCallbacks } from './bootstrap.ts'
-import { decodeHex } from '@vex-chat/crypto'
-import { bootstrap, $keyReplaced } from './bootstrap.ts'
-
-export interface AutoLoginResult {
-  ok: boolean
-  keyReplaced?: boolean
-  error?: string
-}
+import type { KeyStore, PlatformPreset } from '@vex-chat/types'
+import { autoLogin as autoLoginImpl } from './bootstrap.ts'
 
 /**
  * Attempts auto-login from stored credentials.
- * Platform apps provide the KeyStore and PersistenceCallbacks implementations.
+ * Platform apps provide the KeyStore and a PlatformPreset
+ * (bundles adapters + storage factory).
  */
-export async function autoLogin(
-  keyStore: KeyStore,
-  serverUrl: string,
-  persistence?: PersistenceCallbacks,
-): Promise<AutoLoginResult> {
-  const creds = await keyStore.loadActive()
-  if (!creds) return { ok: false }
-
-  try {
-    const deviceKey = decodeHex(creds.deviceKey)
-    const preKeySecret = decodeHex(creds.preKey)
-    await bootstrap(serverUrl, creds.deviceID, deviceKey, creds.token, preKeySecret, persistence)
-    return { ok: true }
-  } catch (err: any) {
-    if ($keyReplaced.get()) return { ok: false, keyReplaced: true }
-    return { ok: false, error: err?.message ?? 'Unknown error' }
-  }
-}
+export { autoLogin } from './bootstrap.ts'
+// Signature: autoLogin(keyStore, preset, serverOptions)
 ```
 
 **Result:** Desktop's `Launch.svelte` and Mobile's `App.tsx` both reduce to:
 ```
-const result = await autoLogin(keyStore, getServerUrl(), persistence)
+const result = await autoLogin(keyStore, preset, serverOptions)
 if (result.ok) navigateToHome()
 else if (result.keyReplaced) navigateToLogin()
 ```
 
-### Phase 3: Extract Deep Link Parsing into libvex ✅
+### Phase 3: Extract Deep Link Parsing into libvex-js ✅
 
-Created `packages/libvex/src/deeplink.ts`:
+Created `libvex-js/src/deeplink.ts` (sibling repo):
 
 ```typescript
 export type VexLink =
@@ -300,7 +278,7 @@ Wired into `bootstrap()` mail handler. Screens call `markRead()` on focus.
 Implemented in `packages/store/src/notifications.ts`:
 
 ```typescript
-import type { DecryptedMail } from '@vex-chat/types'
+import type { IMessage } from '@vex-chat/types'
 import { $user } from './user.ts'
 
 export interface NotificationPayload {
@@ -325,7 +303,7 @@ export interface NotificationPayload {
  * @param resolveChannelInfo - Optional lookup from channelID to channel+server names
  */
 export function shouldNotify(
-  mail: DecryptedMail,
+  msg: IMessage,
   activeConversation: string | null,
   appFocused: boolean,
   resolveAuthorName?: (userID: string) => string | undefined,
@@ -353,7 +331,7 @@ After all phases, the layer diagram looks like this:
 ||  Svelte components              React Native screens           ||
 ||  svelte-spa-router              React Navigation               ||
 ||  Tauri window/tray/updater      Notifee push notifications     ||
-||  IndexedDB persistence impl     AsyncStorage persistence impl  ||
+||  SqliteStorage (tauri-plugin-sql) SqliteStorage (expo-sqlite)   ||
 ||  TauriKeyStore                  KeychainKeyStore               ||
 ||  DOMPurify HTML rendering       RN rich text rendering         ||
 ||  Web Audio sounds               (platform sounds)              ||
@@ -384,7 +362,7 @@ After all phases, the layer diagram looks like this:
 +==============================================+
                      |
 +==============================================+
-||          @vex-chat/libvex (SDK)            ||
+||    @vex-chat/libvex (SDK — sibling repo)  ||
 +==============================================+
 ||  VexClient        - main SDK facade        ||
 ||  VexConnection    - WebSocket + NaCl       ||
@@ -403,10 +381,10 @@ After all phases, the layer diagram looks like this:
          +-----------+-----------+
          |                       |
 +==================+   +==================+
-|| @vex-chat/crypto||   || @vex-chat/types ||
+|| @vex-chat/crypto||   || @vex-chat/types ||  (both sibling repos)
 +==================+   +==================+
 || Ed25519 sign    ||   || IUser, IDevice  ||
-|| X25519 DH       ||   || DecryptedMail   ||
+|| X25519 DH       ||   || IMessage        ||
 || XSalsa20 box    ||   || IServer, etc.   ||
 || HKDF session    ||   || KeyStore iface  ||
 || Fingerprints    ||   || StoredCreds     ||
@@ -431,7 +409,7 @@ After all phases, the layer diagram looks like this:
 | UI Components | Svelte 5 components | React Native screens | Different rendering targets |
 | Navigation | svelte-spa-router | React Navigation | Framework-specific |
 | Key Storage | TauriKeyStore (plugin-store) | Keychain (react-native-keychain) | OS-specific secure storage |
-| Message Persistence | IndexedDB | AsyncStorage | Platform storage APIs |
+| Message Persistence | SqliteStorage (better-sqlite3 / tauri-plugin-sql) | SqliteStorage (expo-sqlite) | Platform SQLite dialects |
 | Content Rendering | marked → DOMPurify (HTML) | RN Text components | DOM vs native views |
 | Window Management | Tauri window/tray/menu | N/A | Desktop-only |
 | App Updates | Tauri updater | App Store/Play Store | Platform-specific |
@@ -446,7 +424,7 @@ After all phases, the layer diagram looks like this:
 | File attachment parsing | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
 | Timestamp formatting | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
 | Emoji detection | desktop/utils/messages.ts | store/message-utils.ts | Pure function | ✅ Done |
-| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/auto-login.ts | Async function | ✅ Done |
+| Auto-login orchestration | desktop/Launch.svelte, mobile/App.tsx | store/bootstrap.ts (autoLogin) | Async function | ✅ Done |
 | Deep link URL parsing | desktop/deeplink.ts | libvex/deeplink.ts | Pure function | ✅ Done |
 | Unread count tracking | desktop/tray.ts (partial) | store/unread.ts | Nanostore atoms | ✅ Done (split DM/channel) |
 | Notification decisions | desktop/notifications.ts | store/notifications.ts | Pure function | ✅ Done (with author/channel resolution) |
@@ -463,7 +441,7 @@ singletons** that satisfy both Svelte's store contract and React's external stor
 **Same store definition (in `packages/store`):**
 ```typescript
 import { map } from 'nanostores'
-export const $messages = map<Record<string, DecryptedMail[]>>({})
+export const $messages = map<Record<string, IMessage[]>>({})
 ```
 
 **Svelte consumption (desktop) — zero adapter, native `$` syntax:**
@@ -492,9 +470,11 @@ Both frameworks subscribe to the same store shape. Business logic functions like
 `bootstrap()` mutate stores via `.set()` / `.setKey()` — framework-agnostic calls
 that trigger re-renders in whichever framework is subscribed.
 
-The `PersistenceCallbacks` dependency injection pattern already in `bootstrap()` is the
-model for all platform-specific concerns: define an interface in the shared package,
-inject implementations from the app layer.
+The `PlatformPreset` pattern in `bootstrap()` bundles adapters + storage factory per
+platform (e.g. `tauriPreset()`, `expoPreset()`, `nodePreset()`, `testPreset()`). SQLite
+is used everywhere via `IStorage` with platform-specific Kysely dialects. The general
+principle remains: define an interface in the shared package, inject implementations
+from the app layer.
 
 ---
 
@@ -520,8 +500,8 @@ All five phases completed 2026-03-20. Remaining extraction opportunities identif
 1. **If it doesn't import a platform API, it doesn't belong in an app.** Pure TypeScript
    functions and nanostores atoms should always live in `packages/`.
 
-2. **Platform-specific code is injected, not imported.** Follow the `PersistenceCallbacks`
-   pattern: define interfaces in shared packages, implement in apps, inject at bootstrap.
+2. **Platform-specific code is injected, not imported.** Follow the `IStorage` / adapter
+   injection pattern: define interfaces in shared packages, implement in apps, inject at bootstrap.
 
 3. **Apps are adapters, not owners.** An app adapts shared logic to its platform —
    mapping nanostores to Svelte reactivity, mapping notification payloads to Notifee

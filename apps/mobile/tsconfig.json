@@ -1,23 +1,22 @@
 {
   "compilerOptions": {
-    // React Native / Metro uses bundler-style resolution (not nodenext — breaks .ios.ts/.android.ts)
     "module": "esnext",
     "moduleResolution": "bundler",
     "target": "esnext",
     "jsx": "react-native",
-
-    // Do not inherit verbatimModuleSyntax/nodenext from root — Metro handles transforms
     "isolatedModules": true,
     "moduleDetection": "force",
-
-    // Strictness
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "App.tsx",
+    "index.js"
+  ],
+  "extends": "expo/tsconfig.base"
 }

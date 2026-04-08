@@ -93,7 +93,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 
 ### Pain Points
 
-- ~~**Race condition.**~~ Fixed — `POST /invite/:id/join` now wraps `isInviteValid`, `hasPermission`, and `createPermission` in a single Knex transaction.
+- ~~**Race condition.**~~ Fixed — `POST /invite/:id/join` now wraps `isInviteValid`, `hasPermission`, and `createPermission` in a single Kysely transaction.
 - **No deep-link on mobile.** Mobile app doesn't handle `vex://` URLs yet.
 - **No invite preview UI.** Both old and new desktop clients auto-join without showing the server name first.
 
@@ -117,7 +117,7 @@ Receive link  →  Open app  →  Validate invite  →  Join  →  See channels
 |-----------|-----|-----|
 | Backend | `POST /mail` with `group` field | Same — `saveMail()` stores group channelID |
 | Client SDK | `client.messages.group(channelID, message)` — fans out to ALL devices of ALL channel members | `client.sendMail(..., { group: channelID })` — sends to one device per call; app loops over devices with `Promise.allSettled` |
-| Desktop UI | Fully working (sends + renders in `ServerPane.tsx`) | `ServerChannel.svelte` — fully working: `listMembers()` → enumerate devices → `Promise.allSettled` fan-out with `{ group: channelID }`. Sent messages appear on sender's device and persist to IndexedDB |
+| Desktop UI | Fully working (sends + renders in `ServerPane.tsx`) | `ServerChannel.svelte` — fully working: `listMembers()` → enumerate devices → `Promise.allSettled` fan-out with `{ group: channelID }`. Sent messages appear on sender's device and persist to SQLite |
 | Mobile UI | N/A | `ChannelScreen.tsx` has send function but marked as incomplete |
 | Member list | `POST /userList/:channelID` returns all server members | `GET /server/:id/members` — returns user profiles (joins permissions with users). Requires server membership (403 otherwise) |
 

@@ -7,12 +7,19 @@ node_modules
 
 AGENTS.md
 
-# iOS
-apps/mobile/ios/Pods/
-apps/mobile/ios/build/
-apps/mobile/ios/.xcode.env.local
-apps/mobile/ios/VexMobile.xcworkspace/xcuserdata/
+# Mobile native dirs (Expo Prebuild / CNG generates these)
+apps/mobile/ios/
+apps/mobile/android/
 
 # Dolt database files
 .dolt/
 *.db
+
+.expo
+
+# Verdaccio local registry
+.verdaccio/storage/
+.verdaccio/htpasswd
+
+# Local registry config — points to localhost:4873, breaks without Verdaccio running
+.npmrc

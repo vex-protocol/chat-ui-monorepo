@@ -1,203 +1,380 @@
-import { atom } from 'nanostores'
-import { VexClient } from '@vex-chat/libvex'
-import type { DecryptedMail } from '@vex-chat/types'
-import { $client } from './client.ts'
-import { $user } from './user.ts'
-import { $messages, $groupMessages } from './messages.ts'
-import { $servers } from './servers.ts'
-import { $channels } from './channels.ts'
-import { $permissions } from './permissions.ts'
-import { resetAll } from './reset.ts'
-import { incrementDmUnread, incrementChannelUnread } from './unread.ts'
-import { $familiars } from './familiars.ts'
-import { SENT_PREFIX } from './send-dm.ts'
+import { Client } from "@vex-chat/libvex";
+import type { IMessage, PlatformPreset, KeyStore } from "@vex-chat/libvex";
+import { $client } from "./client.ts";
+import { $user } from "./user.ts";
+import { $messages, $groupMessages } from "./messages.ts";
+import { $servers } from "./servers.ts";
+import { $channels } from "./channels.ts";
+import { $permissions } from "./permissions.ts";
+import { resetAll } from "./reset.ts";
+import { incrementDmUnread, incrementChannelUnread } from "./unread.ts";
+import { $familiars } from "./familiars.ts";
+import { $keyReplaced } from "./key-replaced.ts";
 
 /**
- * Optional persistence callbacks — platform-specific (IndexedDB on desktop, AsyncStorage on mobile).
- * Passed into bootstrap() so the store package stays platform-agnostic.
+ * Fetches server list, channels per server, permissions, and loads
+ * persisted message history from local SQLite after login.
  */
-export interface PersistenceCallbacks {
-  /** Load previously persisted messages from local storage. */
-  loadMessages: () => Promise<{ dms: Record<string, DecryptedMail[]>; groups: Record<string, DecryptedMail[]> }>
-  /** Persist the current message state to local storage. */
-  saveGroupMessages: (groups: Record<string, DecryptedMail[]>) => Promise<void>
-  saveDmMessages: (dms: Record<string, DecryptedMail[]>) => Promise<void>
+async function populateState(client: Client): Promise<void> {
+    try {
+        // Servers + channels
+        const servers = await client.servers.retrieve();
+        for (const server of servers) {
+            $servers.setKey(server.serverID, server);
+            const channels = await client.channels.retrieve(server.serverID);
+            $channels.setKey(server.serverID, channels);
+
+            // Load persisted group messages per channel (deduplicate by mailID)
+            for (const channel of channels) {
+                try {
+                    const msgs = await client.messages.retrieveGroup(
+                        channel.channelID,
+                    );
+                    if (msgs.length > 0) {
+                        const seen = new Set<string>();
+                        const deduped = msgs.filter((m) => {
+                            if (seen.has(m.mailID)) return false;
+                            seen.add(m.mailID);
+                            return true;
+                        });
+                        $groupMessages.setKey(channel.channelID, deduped);
+                    }
+                } catch {
+                    /* non-fatal */
+                }
+            }
+        }
+
+        // Permissions
+        const perms = await client.permissions.retrieve();
+        for (const perm of perms) {
+            $permissions.setKey(perm.permissionID, perm);
+        }
+
+        // Load persisted DM history for known familiars
+        try {
+            const familiars = await client.users.familiars();
+            for (const user of familiars) {
+                $familiars.setKey(user.userID, user);
+                try {
+                    const msgs = await client.messages.retrieve(user.userID);
+                    if (msgs.length > 0) {
+                        const seen = new Set<string>();
+                        const deduped = msgs.filter((m) => {
+                            if (seen.has(m.mailID)) return false;
+                            seen.add(m.mailID);
+                            return true;
+                        });
+                        $messages.setKey(user.userID, deduped);
+                    }
+                } catch {
+                    /* non-fatal */
+                }
+            }
+        } catch {
+            /* non-fatal */
+        }
+    } catch {
+        // Non-fatal — UI will show empty state
+    }
+}
+
+/** Server connection options — identical across all auth flows. */
+export interface ServerOptions {
+    host: string;
+    unsafeHttp?: boolean;
+    logLevel?: string;
+    inMemoryDb?: boolean;
+}
+
+/** Result from any auth flow. */
+export interface AuthResult {
+    ok: boolean;
+    keyReplaced?: boolean;
+    error?: string;
 }
 
 /**
- * Set to true if the server returned HTTP 470 (corrupt key file).
- * The app should navigate to login and prompt the user to re-register their device.
+ * Deletes all of the current user's stale devices except the active one.
+ * Prevents fan-out to abandoned device registrations when sending messages.
  */
-export const $keyReplaced = atom<boolean>(false)
+async function cleanupStaleDevices(client: Client): Promise<void> {
+    try {
+        const me = client.me.user();
+        const myDevice = client.me.device();
+        const allDevices = await client.devices.list(me.userID);
+        if (!allDevices || allDevices.length <= 1) return;
+
+        for (const device of allDevices) {
+            if (device.deviceID === myDevice.deviceID) continue;
+            try {
+                await client.devices.delete(device.deviceID);
+            } catch {
+                /* non-fatal — server may reject if device is active */
+            }
+        }
+    } catch {
+        /* non-fatal */
+    }
+}
 
 /**
- * Initialises the VexClient, wires real-time events, connects to the server,
- * then runs the bootstrap waterfall to populate initial state from HTTP.
- *
- * Call this once during app startup before rendering any components that read
- * atoms. Calling it a second time replaces the previous client.
- *
- * @param serverUrl    - Base HTTP URL of the Vex server (e.g. 'https://chat.example.com')
- * @param deviceID     - UUID of the registered device
- * @param deviceKey    - Ed25519 secret key seed for the device (32 bytes)
- * @param authToken    - Optional JWT to pre-seed the client (from login/register response)
- * @param preKeySecret - Ed25519 secret key seed of the registered preKey (32 bytes).
- *                       Required to decrypt incoming messages via SessionManager.
+ * Internal: creates the Client, wires events to nanostores atoms.
+ * All public auth flows call this after obtaining a private key.
  */
-export async function bootstrap(
-  serverUrl: string,
-  deviceID: string,
-  deviceKey: Uint8Array,
-  authToken?: string,
-  preKeySecret?: Uint8Array,
-  persistence?: PersistenceCallbacks,
-): Promise<void> {
-  // Clear stale state from any previous session (prevents data leaking between accounts)
-  resetAll()
+async function initClient(
+    privateKey: string,
+    preset: PlatformPreset,
+    options: ServerOptions,
+): Promise<Client> {
+    resetAll();
 
-  const client = VexClient.create(serverUrl, deviceID, deviceKey, preKeySecret)
-  if (authToken) client.setAuthToken(authToken)
-  $client.set(client)
+    const storage = await preset.createStorage(
+        "vex-client.db",
+        privateKey,
+        preset.adapters.logger,
+    );
+    const client = await Client.create(
+        privateKey,
+        {
+            ...options,
+            adapters: preset.adapters,
+            deviceName: preset.deviceName,
+        } as any,
+        storage,
+    );
+    $client.set(client);
 
-  // Wire real-time events before connecting so nothing is missed
-  client.on('authed', (user) => {
-    $user.set(user)
-  })
+    // Wire real-time events
+    client.on("message", (msg: IMessage) => {
+        const me = $user.get();
+        if (msg.group) {
+            const prev = $groupMessages.get()[msg.group] ?? [];
+            if (!prev.some((m) => m.mailID === msg.mailID)) {
+                $groupMessages.setKey(msg.group, [...prev, msg]);
+                if (me && msg.authorID !== me.userID)
+                    incrementChannelUnread(msg.group);
+            }
+        } else {
+            const isOwnMessage = me && msg.authorID === me.userID;
+            const threadKey = isOwnMessage ? msg.readerID : msg.authorID;
+            const prev = $messages.get()[threadKey] ?? [];
 
-  client.on('mail', (mail) => {
-    // mail is DecryptedMail — SessionManager already decrypted it inside VexClient
-    console.log('[vex-store] mail received:', mail.mailID, 'from:', mail.authorID, 'group:', mail.group)
-    const me = $user.get()
-    if (mail.group) {
-      // Group / channel message — key by channelID, deduplicate by mailID
-      const prev = $groupMessages.get()[mail.group] ?? []
-      if (!prev.some(m => m.mailID === mail.mailID)) {
-        $groupMessages.setKey(mail.group, [...prev, mail])
-        persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
-        // Track unread (apps call markRead when conversation is focused)
-        if (me && mail.authorID !== me.userID) incrementChannelUnread(mail.group)
-      }
-    } else {
-      // Direct message — key by the other party's userID, deduplicate
-      const isOwnMessage = me && mail.authorID === me.userID
-      const threadKey = isOwnMessage ? mail.readerID : mail.authorID
-      const prev = $messages.get()[threadKey] ?? []
+            if (!prev.some((m) => m.mailID === msg.mailID)) {
+                $messages.setKey(threadKey, [...prev, msg]);
+                if (!isOwnMessage) incrementDmUnread(threadKey);
 
-      // If this is a server echo of a locally-sent message, replace the local version
-      const localIdx = isOwnMessage
-        ? prev.findIndex(m => m.mailID.startsWith(SENT_PREFIX) && m.content === mail.content && m.authorID === mail.authorID)
-        : -1
-
-      if (localIdx !== -1) {
-        // Replace local echo with server version
-        const updated = [...prev]
-        updated[localIdx] = mail
-        $messages.setKey(threadKey, updated)
-        persistence?.saveDmMessages($messages.get()).catch(() => {})
-      } else if (!prev.some(m => m.mailID === mail.mailID)) {
-        $messages.setKey(threadKey, [...prev, mail])
-        persistence?.saveDmMessages($messages.get()).catch(() => {})
-
-        if (!isOwnMessage) {
-          incrementDmUnread(threadKey)
+                const otherUserID = threadKey;
+                if (!$familiars.get()[otherUserID]) {
+                    $familiars.setKey(otherUserID, {
+                        userID: otherUserID,
+                        username: otherUserID.slice(0, 8),
+                        lastSeen: new Date(),
+                    });
+                    client.users
+                        .retrieve(otherUserID)
+                        .then(([u]) => {
+                            if (u) $familiars.setKey(otherUserID, u);
+                        })
+                        .catch(() => {});
+                }
+            }
         }
+    });
 
-        // Auto-add the other party as familiar so they appear in DM list
-        const otherUserID = threadKey
-        if (!$familiars.get()[otherUserID]) {
-          $familiars.setKey(otherUserID, {
-            userID: otherUserID,
-            username: otherUserID.slice(0, 8),
-            lastSeen: mail.time,
-          })
-          client.getUser(otherUserID).then(u => {
-            if (u) $familiars.setKey(otherUserID, u)
-          }).catch(() => {})
-        }
-      }
-    }
-  })
+    return client;
+}
 
-  client.on('serverChange', (server: any) => {
-    const serverID = server.serverID as string
-    const joined = server.joined as { userID: string; username: string } | undefined
-
-    // Re-fetch channels for this server (handles new members, new channels, etc.)
-    client.listChannels(serverID).then(channels => {
-      $channels.setKey(serverID, channels)
-
-      // Insert a "X joined the server" system message into the first channel
-      if (joined && channels.length > 0) {
-        const channelID = channels[0]!.channelID
-        const sysMail: DecryptedMail = {
-          mailID: `system-join-${joined.userID}-${Date.now()}`,
-          authorID: joined.userID,
-          readerID: '',
-          group: channelID,
-          mailType: 'system',
-          time: new Date().toISOString(),
-          content: `${joined.username} has joined the server`,
-          extra: null,
-          forward: null,
-        }
-        const prev = $groupMessages.get()[channelID] ?? []
-        $groupMessages.setKey(channelID, [...prev, sysMail])
-        persistence?.saveGroupMessages($groupMessages.get()).catch(() => {})
-      }
-    }).catch(() => {})
-  })
-
-  await client.connect()
-
-  // ── Waterfall: populate initial state ──────────────────────────────────────
-
-  // 1. Current user — throws if not authenticated, letting the caller redirect.
-  const user = await client.whoami()
-  $user.set(user)
-
-  // 2. Servers
-  const servers = await client.listServers()
-  for (const server of servers) {
-    $servers.setKey(server.serverID, server)
-  }
-
-  // 3. Channels + permissions per server (parallel per server)
-  await Promise.all(
-    servers.map(async (server) => {
-      const [channels] = await Promise.all([
-        client.listChannels(server.serverID),
-        // TODO: populate $permissions once a GET /user/me/permissions endpoint exists
-        // client.listPermissions(server.serverID).then(perms => { ... })
-      ])
-      $channels.setKey(server.serverID, channels)
-    }),
-  )
-
-  // TODO: populate $familiars + $devices once familiars endpoint exists
-
-  // 4. Load locally persisted messages (instant — no network required).
-  //    Privacy model: spire deletes messages after receipt, so local storage is authoritative.
-  if (persistence) {
+/**
+ * Register a new account → save credentials → connect.
+ * One call replaces: Client.create + register + keyStore.save + connect + event wiring.
+ */
+export async function registerAndBootstrap(
+    username: string,
+    password: string,
+    preset: PlatformPreset,
+    options: ServerOptions,
+    keyStore: KeyStore,
+): Promise<AuthResult> {
     try {
-      const saved = await persistence.loadMessages()
-      for (const [key, msgs] of Object.entries(saved.groups)) {
-        $groupMessages.setKey(key, msgs)
-      }
-      for (const [key, msgs] of Object.entries(saved.dms)) {
-        $messages.setKey(key, msgs)
-      }
-    } catch {
-      // Non-fatal — messages just won't be pre-populated
-    }
-  }
+        const privateKey = Client.generateSecretKey();
+        const client = await initClient(privateKey, preset, options);
 
-  // 5. Fetch any messages received while offline (not yet receipted).
-  //    After decrypt, VexClient sends a receipt → spire deletes the message.
-  //    The mail event handler above saves to local storage before the receipt is sent.
-  try {
-    const pending = await client.fetchInbox()
-    for (const msg of pending) client.emit('mail', msg)
-  } catch {
-    // Non-fatal — real-time messages will still arrive via WebSocket
-  }
+        const [user, regErr] = await client.register(username, password);
+        if (regErr || !user) {
+            return {
+                ok: false,
+                error: regErr?.message ?? "Registration failed",
+            };
+        }
+
+        // login() sets the Bearer token needed by connect()
+        const loginErr = await client.login(username, password);
+        if (loginErr) {
+            return {
+                ok: false,
+                error: "Registered but login failed: " + loginErr.message,
+            };
+        }
+
+        // connect() populates device details and authenticates
+        await client.connect();
+        const currentUser = client.me.user();
+        $user.set(currentUser);
+
+        try {
+            const toSave = {
+                username,
+                deviceID: client.me.device().deviceID,
+                deviceKey: privateKey,
+                token: "",
+            };
+            preset.adapters.logger.warn(
+                "[vex-store] register: saving creds for " + toSave.username,
+            );
+            await keyStore.save(toSave);
+            preset.adapters.logger.warn("[vex-store] register: creds saved");
+        } catch (saveErr: any) {
+            preset.adapters.logger.warn(
+                "[vex-store] register: keyStore.save failed: " +
+                    saveErr?.message,
+            );
+        }
+
+        await populateState(client);
+        cleanupStaleDevices(client); // fire-and-forget
+
+        return { ok: true };
+    } catch (err: any) {
+        return { ok: false, error: err?.message ?? "Unknown error" };
+    }
+}
+
+/**
+ * Login with existing credentials → save credentials → connect.
+ * If no device exists on this machine, registers a new device automatically.
+ */
+export async function loginAndBootstrap(
+    username: string,
+    password: string,
+    preset: PlatformPreset,
+    options: ServerOptions,
+    keyStore: KeyStore,
+): Promise<AuthResult> {
+    try {
+        // Check if we have a saved device key for this username
+        const creds = await keyStore.load(username);
+        const privateKey = creds?.deviceKey ?? Client.generateSecretKey();
+
+        const client = await initClient(privateKey, preset, options);
+        const loginErr = await client.login(username, password);
+
+        if (loginErr) {
+            return { ok: false, error: "Invalid username or password" };
+        }
+
+        // connect() populates device details and authenticates
+        await client.connect();
+        $user.set(client.me.user());
+
+        if (!creds) {
+            // First login on this machine — register a new device
+            preset.adapters.logger.warn(
+                "[vex-store] No saved creds for " +
+                    username +
+                    " — registering new device",
+            );
+            try {
+                await client.devices.register();
+                preset.adapters.logger.warn(
+                    "[vex-store] Device registered: " +
+                        client.me.device().deviceID,
+                );
+            } catch (regErr: any) {
+                // 470 = device with this signing key already exists — that's OK, reuse it
+                if (regErr?.response?.status !== 470) {
+                    preset.adapters.logger.warn(
+                        "[vex-store] device registration failed: " +
+                            regErr?.message,
+                    );
+                }
+            }
+            try {
+                const toSave = {
+                    username,
+                    deviceID: client.me.device().deviceID,
+                    deviceKey: privateKey,
+                    token: "",
+                };
+                preset.adapters.logger.warn(
+                    "[vex-store] Saving creds: " +
+                        JSON.stringify({
+                            username: toSave.username,
+                            deviceID: toSave.deviceID,
+                        }),
+                );
+                await keyStore.save(toSave);
+                preset.adapters.logger.warn(
+                    "[vex-store] Creds saved successfully",
+                );
+            } catch (saveErr: any) {
+                preset.adapters.logger.warn(
+                    "[vex-store] keyStore.save failed: " + saveErr?.message,
+                );
+            }
+        } else {
+            // Existing creds — update the token
+            try {
+                await keyStore.save({
+                    ...creds,
+                    token: "",
+                });
+            } catch {
+                /* non-fatal */
+            }
+        }
+
+        // Populate servers and channels
+        await populateState(client);
+        cleanupStaleDevices(client); // fire-and-forget
+
+        return { ok: true };
+    } catch (err: any) {
+        return { ok: false, error: err?.message ?? "Unknown error" };
+    }
+}
+
+/**
+ * Auto-login from stored credentials → connect.
+ * Returns { ok: false } if no credentials found.
+ */
+export async function autoLogin(
+    keyStore: KeyStore,
+    preset: PlatformPreset,
+    options: ServerOptions,
+): Promise<AuthResult> {
+    const creds = await keyStore.load();
+    if (!creds) return { ok: false };
+
+    try {
+        const client = await initClient(creds.deviceKey, preset, options);
+
+        // Authenticate using the device key (ADR-007).
+        // No password needed — challenge-response proves possession of
+        // the Ed25519 private key stored in the OS keychain.
+        const authErr = await client.loginWithDeviceKey(creds.deviceID);
+        if (authErr) {
+            return { ok: false, error: authErr.message };
+        }
+
+        await client.connect();
+        $user.set(client.me.user());
+
+        await populateState(client);
+        cleanupStaleDevices(client); // fire-and-forget
+        return { ok: true };
+    } catch (err: any) {
+        if ($keyReplaced.get()) return { ok: false, keyReplaced: true };
+        return { ok: false, error: err?.message ?? "Unknown error" };
+    }
 }
