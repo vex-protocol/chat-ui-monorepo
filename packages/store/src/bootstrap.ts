@@ -362,7 +362,7 @@ export async function autoLogin(
         // Authenticate using the device key (ADR-007).
         // No password needed — challenge-response proves possession of
         // the Ed25519 private key stored in the OS keychain.
-        const authErr = await client.loginWithDeviceKey();
+        const authErr = await client.loginWithDeviceKey(creds.deviceID);
         if (authErr) {
             return { ok: false, error: authErr.message };
         }
