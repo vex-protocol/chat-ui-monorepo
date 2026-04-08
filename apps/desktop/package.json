@@ -30,7 +30,6 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-sql": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.10.0",
-    "@types/uuid": "catalog:",
     "@vex-chat/libvex": "^1.1.0",
     "@vex-chat/store": "workspace:*",
     "dompurify": "catalog:",

@@ -8,6 +8,5 @@ catalog:
   nanostores: "^1.2.0"
   "@nanostores/react": "^1.1.0"
   uuid: "^11.0.0"
-  "@types/uuid": "^10.0.0"
   marked: "^15.0.12"
   dompurify: "^3.2.6"

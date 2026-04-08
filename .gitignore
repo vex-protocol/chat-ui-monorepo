@@ -21,5 +21,9 @@ apps/mobile/android/
 .verdaccio/storage/
 .verdaccio/htpasswd
 
+# Wrong lockfiles / package managers
+package-lock.json
+yarn.lock
+
 # Local registry config — points to localhost:4873, breaks without Verdaccio running
 .npmrc
