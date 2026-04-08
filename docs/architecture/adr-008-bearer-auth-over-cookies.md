@@ -94,19 +94,18 @@ After:
 
 ### Server changes (spire)
 
-1. **Accept both** — `checkAuth` middleware reads from `Authorization: Bearer`
-   header first, falls back to `req.cookies.auth`. One additional line:
+1. **Replace cookie auth with Bearer** — `checkAuth` middleware reads from
+   `Authorization: Bearer` header only:
 
    ```typescript
-   const token = req.headers.authorization?.replace("Bearer ", "")
-       ?? req.cookies?.auth;
+   const token = req.headers.authorization?.replace("Bearer ", "");
    ```
 
-2. **Keep `cookie-parser`** — for backward compatibility with any existing
-   browser sessions. Can be removed later.
+2. **Remove `cookie-parser`** — no longer needed. Remove `res.cookie()` calls
+   from login, register, goodbye, and device-key auth endpoints.
 
-3. **Login response** — continue returning `{ user, token }` in the body.
-   Stop setting `Set-Cookie` header (optional; can keep for browser compat).
+3. **Login response** — return `{ user, token }` in the body only. No
+   `Set-Cookie` header.
 
 ### Test impact
 
@@ -162,17 +161,17 @@ per-request via axios interceptors.
 
 ### Negative
 
-- **Server must accept both** during migration (trivial — one line in middleware)
-- **Existing browser sessions** that rely on cookies will need to re-login
-  (the cookie is still valid server-side, just not sent by the new client)
+- **Breaking change** — all clients must update simultaneously with the server.
+  No backward compatibility period. This is acceptable because vex-chat
+  controls both the server and all clients.
 
-### Migration path
+### Implementation order
 
-1. Add Bearer support to spire's `checkAuth` (backward compatible)
-2. Switch Client.ts to per-client axios + Bearer headers
-3. Update test transports (remove cookie simulation)
+1. Spire: replace `checkAuth` with Bearer-only, remove `cookie-parser`,
+   remove all `res.cookie()` calls
+2. Client.ts: per-client axios instance, Bearer header, delete cookie code
+3. Delete test transport cookie simulation
 4. Add multi-client integration tests
-5. Optionally remove `cookie-parser` and `Set-Cookie` from spire later
 
 ---
 
