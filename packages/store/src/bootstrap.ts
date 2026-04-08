@@ -136,7 +136,11 @@ async function initClient(
     );
     const client = await Client.create(
         privateKey,
-        { ...options, adapters: preset.adapters } as any,
+        {
+            ...options,
+            adapters: preset.adapters,
+            deviceName: preset.deviceName,
+        } as any,
         storage,
     );
     $client.set(client);
