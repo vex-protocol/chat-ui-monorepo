@@ -16,8 +16,8 @@ import { $user } from "./user.ts";
  * Call on logout before navigating to prevent stale data leaking
  * to the next user session.
  *
- * Note: $verifiedKeys is intentionally NOT reset — verified fingerprints
- * are device-scoped and persist across accounts.
+ * TODO: once verified keys are re-implemented with secure storage,
+ * they should persist across accounts (device-scoped, not reset here).
  */
 export function resetAll(): void {
     $client.set(null);

@@ -35,9 +35,11 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "^19.2.0",
+    "@vex-chat/eslint-config": "workspace:*",
     "babel-preset-expo": "^55.0.15",
-    "typescript": "^5.8.3",
-    "@vex-chat/eslint-config": "workspace:*"
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "typescript": "^5.8.3"
   },
   "engines": {
     "node": ">= 22.11.0"

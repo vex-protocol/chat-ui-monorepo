@@ -2,9 +2,8 @@
   // Route: /messaging/:userID
   import MessageBox from '../lib/MessageBox.svelte'
   import ChatInput from '../lib/ChatInput.svelte'
-  import { messages, client, user, familiars, verifiedKeys, markVerified, unmarkVerified } from '../lib/store/index.js'
+  import { messages, client, user, familiars } from '../lib/store/index.js'
   import { sendDirectMessage, markRead } from '@vex-chat/store'
-  import { keyStore } from '../lib/keystore.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -32,16 +31,7 @@
     void targetUserID
   })
 
-  const isVerifiedKey = $derived(theirSignKey ? $verifiedKeys.has(theirSignKey) : false)
-
-  function toggleVerified() {
-    if (!theirSignKey) return
-    if (isVerifiedKey) {
-      unmarkVerified(theirSignKey)
-    } else {
-      markVerified(theirSignKey)
-    }
-  }
+  // TODO: verified key UI removed — needs secure storage re-implementation
 
   async function handleSend(content: string, attachment?: File) {
     if (!$client || sending) return
@@ -68,38 +58,18 @@
       {#if fingerprint}
         <button
           class="dm-pane__action dm-pane__shield"
-          class:dm-pane__shield--verified={isVerifiedKey}
-          title={isVerifiedKey ? 'Verified — click to view fingerprint' : 'Unverified — click to verify'}
+          title="Session fingerprint"
           aria-label="Session fingerprint"
           onclick={() => { showFingerprint = !showFingerprint }}
         >
-          {isVerifiedKey ? '🟢' : '🟡'}
+          🟡
         </button>
       {/if}
       <button class="dm-pane__action" title="Search" aria-label="Search">🔍</button>
     </div>
   </header>
 
-  {#if showFingerprint && fingerprint}
-    <div class="fingerprint-panel">
-      <div class="fingerprint-panel__header">
-        <span class="fingerprint-panel__title">Session fingerprint</span>
-        <button class="fingerprint-panel__close" onclick={() => { showFingerprint = false }}>✕</button>
-      </div>
-      <code class="fingerprint-panel__code">{fingerprint}</code>
-      <p class="fingerprint-panel__desc">
-        Compare this fingerprint with the other party via a trusted channel (phone, in person).
-        If they match, mark as verified.
-      </p>
-      <button
-        class="fingerprint-panel__btn"
-        class:fingerprint-panel__btn--verified={isVerifiedKey}
-        onclick={toggleVerified}
-      >
-        {isVerifiedKey ? 'Mark as unverified' : 'Mark as verified'}
-      </button>
-    </div>
-  {/if}
+  <!-- TODO: fingerprint verification panel — needs secure storage for verified keys -->
 
   <MessageBox messages={threadMessages} usernames={usernameMap} />
 

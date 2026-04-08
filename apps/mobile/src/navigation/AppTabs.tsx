@@ -1,47 +1,29 @@
 import React, { useState } from "react";
-import { View, StyleSheet } from "react-native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useStore } from "@nanostores/react";
-import { $familiars, $servers, $channels } from "../store";
-import { navigationRef } from "./navigationRef";
-import { colors } from "../theme";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import { ServerSidebar } from "../components/ServerSidebar";
-import { DMListScreen } from "../screens/DMListScreen";
-import { ConversationScreen } from "../screens/ConversationScreen";
+import { AddServerScreen } from "../screens/AddServerScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
-import { SettingsScreen } from "../screens/SettingsScreen";
-import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
+import { ConversationScreen } from "../screens/ConversationScreen";
+import { DMListScreen } from "../screens/DMListScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
-import { AddServerScreen } from "../screens/AddServerScreen";
+import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
+import { SettingsScreen } from "../screens/SettingsScreen";
+import { $channels, $familiars, $servers } from "../store";
+import { colors } from "../theme";
+
+import { navigationRef } from "./navigationRef";
 
 const Stack = createNativeStackNavigator();
 
-function ContentStack({ initialRoute }: { initialRoute: string }) {
-    return (
-        <Stack.Navigator
-            screenOptions={{ headerShown: false }}
-            initialRouteName={initialRoute}
-        >
-            <Stack.Screen
-                name="OnboardingEmpty"
-                component={OnboardingEmptyScreen}
-            />
-            <Stack.Screen name="JoinGroup" component={JoinGroupScreen} />
-            <Stack.Screen name="AddServer" component={AddServerScreen} />
-            <Stack.Screen name="DMList" component={DMListScreen} />
-            <Stack.Screen name="Conversation" component={ConversationScreen} />
-            <Stack.Screen name="ChannelList" component={ChannelListScreen} />
-            <Stack.Screen name="Channel" component={ChannelScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-        </Stack.Navigator>
-    );
-}
-
 export function AppTabs() {
     const insets = useSafeAreaInsets();
-    const [activeServerId, setActiveServerId] = useState<string | null>(null);
+    const [activeServerId, setActiveServerId] = useState<null | string>(null);
     const familiars = useStore($familiars);
     const servers = useStore($servers);
     const channels = useStore($channels);
@@ -53,7 +35,7 @@ export function AppTabs() {
             <View
                 style={[
                     styles.fullScreen,
-                    { paddingTop: insets.top, paddingBottom: insets.bottom },
+                    { paddingBottom: insets.bottom, paddingTop: insets.top },
                 ]}
             >
                 <ContentStack initialRoute="OnboardingEmpty" />
@@ -65,31 +47,15 @@ export function AppTabs() {
         <View
             style={[
                 styles.container,
-                { paddingTop: insets.top, paddingBottom: insets.bottom },
+                { paddingBottom: insets.bottom, paddingTop: insets.top },
             ]}
         >
             <ServerSidebar
                 activeServerId={activeServerId}
-                onSelectServer={(id) => {
-                    setActiveServerId(id);
-                    const serverChannels = channels[id] ?? [];
-                    if (serverChannels.length > 0) {
-                        // Go directly to the first channel
-                        const ch = serverChannels[0]!;
-                        (navigationRef as any).navigate("App", {
-                            screen: "Channel",
-                            params: {
-                                channelID: ch.channelID,
-                                channelName: ch.name,
-                                serverID: id,
-                            },
-                        });
-                    } else {
-                        (navigationRef as any).navigate("App", {
-                            screen: "ChannelList",
-                            params: { serverID: id },
-                        });
-                    }
+                onAddServer={() => {
+                    (navigationRef as any).navigate("App", {
+                        screen: "AddServer",
+                    });
                 }}
                 onSelectHome={() => {
                     setActiveServerId(null);
@@ -97,10 +63,26 @@ export function AppTabs() {
                         screen: "DMList",
                     });
                 }}
-                onAddServer={() => {
-                    (navigationRef as any).navigate("App", {
-                        screen: "AddServer",
-                    });
+                onSelectServer={(id) => {
+                    setActiveServerId(id);
+                    const serverChannels = channels[id] ?? [];
+                    if (serverChannels.length > 0) {
+                        // Go directly to the first channel
+                        const ch = serverChannels[0]!;
+                        (navigationRef as any).navigate("App", {
+                            params: {
+                                channelID: ch.channelID,
+                                channelName: ch.name,
+                                serverID: id,
+                            },
+                            screen: "Channel",
+                        });
+                    } else {
+                        (navigationRef as any).navigate("App", {
+                            params: { serverID: id },
+                            screen: "ChannelList",
+                        });
+                    }
                 }}
                 onSettings={() => {
                     (navigationRef as any).navigate("App", {
@@ -115,17 +97,38 @@ export function AppTabs() {
     );
 }
 
+function ContentStack({ initialRoute }: { initialRoute: string }) {
+    return (
+        <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{ headerShown: false }}
+        >
+            <Stack.Screen
+                component={OnboardingEmptyScreen}
+                name="OnboardingEmpty"
+            />
+            <Stack.Screen component={JoinGroupScreen} name="JoinGroup" />
+            <Stack.Screen component={AddServerScreen} name="AddServer" />
+            <Stack.Screen component={DMListScreen} name="DMList" />
+            <Stack.Screen component={ConversationScreen} name="Conversation" />
+            <Stack.Screen component={ChannelListScreen} name="ChannelList" />
+            <Stack.Screen component={ChannelScreen} name="Channel" />
+            <Stack.Screen component={SettingsScreen} name="Settings" />
+        </Stack.Navigator>
+    );
+}
+
 const styles = StyleSheet.create({
     container: {
+        backgroundColor: colors.bg,
         flex: 1,
         flexDirection: "row",
-        backgroundColor: colors.bg,
-    },
-    fullScreen: {
-        flex: 1,
-        backgroundColor: colors.bg,
     },
     content: {
+        flex: 1,
+    },
+    fullScreen: {
+        backgroundColor: colors.bg,
         flex: 1,
     },
 });

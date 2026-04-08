@@ -1,19 +1,22 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
 import type { IMessage } from "@vex-chat/libvex";
-import { formatTime, avatarHue } from "@vex-chat/store";
+
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+
+import { avatarHue, formatTime } from "@vex-chat/store";
+
 import { colors, typography } from "../theme";
 
 interface MessageBubbleRNProps {
-    message: IMessage;
-    isOwn: boolean;
     authorName: string;
+    isOwn: boolean;
+    message: IMessage;
 }
 
 export function MessageBubbleRN({
-    message,
-    isOwn,
     authorName,
+    isOwn,
+    message,
 }: MessageBubbleRNProps) {
     if (message.group === "__system__") {
         return (
@@ -56,61 +59,61 @@ export function MessageBubbleRN({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flexDirection: "row",
-        gap: 10,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
+    author: {
+        ...typography.body,
+        color: colors.textSecondary,
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    authorSelf: {
+        color: colors.accentMuted,
     },
     avatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
         alignItems: "center",
+        borderRadius: 16,
+        height: 32,
         justifyContent: "center",
         marginTop: 2,
+        width: 32,
     },
     avatarText: {
         color: "#fff",
-        fontWeight: "700",
         fontSize: 13,
+        fontWeight: "700",
+    },
+    container: {
+        flexDirection: "row",
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
     },
     content: {
         flex: 1,
     },
     meta: {
-        flexDirection: "row",
         alignItems: "center",
+        flexDirection: "row",
         gap: 8,
         marginBottom: 2,
     },
-    author: {
-        ...typography.body,
-        color: colors.textSecondary,
-        fontWeight: "600",
-        fontSize: 13,
-    },
-    authorSelf: {
-        color: colors.accentMuted,
-    },
-    timestamp: {
-        ...typography.body,
-        color: colors.muted,
-        fontSize: 10,
-    },
-    text: {
-        ...typography.bodyLarge,
-        color: colors.textSecondary,
-    },
     systemContainer: {
-        paddingVertical: 6,
-        paddingHorizontal: 12,
         alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
     },
     systemText: {
         ...typography.body,
         color: colors.muted,
         fontSize: 12,
         fontStyle: "italic",
+    },
+    text: {
+        ...typography.bodyLarge,
+        color: colors.textSecondary,
+    },
+    timestamp: {
+        ...typography.body,
+        color: colors.muted,
+        fontSize: 10,
     },
 });

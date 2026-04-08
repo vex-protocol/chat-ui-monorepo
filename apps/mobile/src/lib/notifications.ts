@@ -1,35 +1,46 @@
-import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
-import { AppState } from "react-native";
 import type { IMessage } from "@vex-chat/libvex";
+
+import { AppState } from "react-native";
+
 import { shouldNotify } from "@vex-chat/store";
-import { $familiars, $channels, $servers, $client } from "../store";
+
+import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
+
 import { navigateToConversation } from "../navigation/navigationRef";
+import { $channels, $client, $familiars, $servers } from "../store";
 
 const CHANNEL_ID = "vex-messages";
 
 let channelReady = false;
-let activeConversation: string | null = null;
-
-/** Call from screens to track which conversation the user is viewing. */
-export function setActiveConversation(key: string | null): void {
-    activeConversation = key;
-}
-
-async function ensureChannel(): Promise<void> {
-    if (channelReady) return;
-    await notifee.createChannel({
-        id: CHANNEL_ID,
-        name: "Messages",
-        importance: AndroidImportance.HIGH,
-        sound: "default",
-    });
-    channelReady = true;
-}
+let activeConversation: null | string = null;
 
 export async function requestNotificationPermission(): Promise<boolean> {
     const settings = await notifee.requestPermission();
     // authorizationStatus 1 = AUTHORIZED, 2 = PROVISIONAL
     return settings.authorizationStatus >= 1;
+}
+
+/** Call from screens to track which conversation the user is viewing. */
+export function setActiveConversation(key: null | string): void {
+    activeConversation = key;
+}
+
+export function setupNotificationHandlers(): () => void {
+    // Foreground events (app is open, user taps notification from notification center)
+    const unsubForeground = notifee.onForegroundEvent(({ detail, type }) => {
+        if (type === EventType.PRESS) {
+            handleNotificationPress(detail.notification?.data);
+        }
+    });
+
+    // Background/killed events (app was closed or backgrounded)
+    notifee.onBackgroundEvent(async ({ detail, type }) => {
+        if (type === EventType.PRESS) {
+            handleNotificationPress(detail.notification?.data);
+        }
+    });
+
+    return unsubForeground;
 }
 
 export async function showMessageNotification(mail: IMessage): Promise<void> {
@@ -74,44 +85,37 @@ export async function showMessageNotification(mail: IMessage): Promise<void> {
     await ensureChannel();
 
     await notifee.displayNotification({
-        title: payload.title,
-        body: payload.body,
-        data: {
-            authorID: payload.authorID,
-            username: payload.title,
-        },
         android: {
             channelId: CHANNEL_ID,
             pressAction: { id: "default" },
             sound: "default",
         },
+        body: payload.body,
+        data: {
+            authorID: payload.authorID,
+            username: payload.title,
+        },
         ios: {
             sound: "default",
         },
+        title: payload.title,
     });
+}
+
+async function ensureChannel(): Promise<void> {
+    if (channelReady) return;
+    await notifee.createChannel({
+        id: CHANNEL_ID,
+        importance: AndroidImportance.HIGH,
+        name: "Messages",
+        sound: "default",
+    });
+    channelReady = true;
 }
 
 function handleNotificationPress(
-    data: Record<string, string | number | object> | undefined,
+    data: Record<string, number | object | string> | undefined,
 ): void {
     if (!data?.authorID || !data?.username) return;
     navigateToConversation(String(data.authorID), String(data.username));
-}
-
-export function setupNotificationHandlers(): () => void {
-    // Foreground events (app is open, user taps notification from notification center)
-    const unsubForeground = notifee.onForegroundEvent(({ type, detail }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-    });
-
-    // Background/killed events (app was closed or backgrounded)
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-    });
-
-    return unsubForeground;
 }

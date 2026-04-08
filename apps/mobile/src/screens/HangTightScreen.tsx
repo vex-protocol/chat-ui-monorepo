@@ -1,21 +1,23 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing, StyleSheet } from "react-native";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+
 import { useStore } from "@nanostores/react";
+
+import { ScreenLayout } from "../components/ScreenLayout";
 import { $user } from "../store";
 import { colors, typography } from "../theme";
-import { ScreenLayout } from "../components/ScreenLayout";
 
 export function HangTightScreen() {
-    const user = useStore($user);
+    const _user = useStore($user);
     const spin = useRef(new Animated.Value(0)).current;
     const pulse = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
         Animated.loop(
             Animated.timing(spin, {
-                toValue: 1,
                 duration: 3000,
                 easing: Easing.linear,
+                toValue: 1,
                 useNativeDriver: true,
             }),
         ).start();
@@ -23,13 +25,13 @@ export function HangTightScreen() {
         Animated.loop(
             Animated.sequence([
                 Animated.timing(pulse, {
-                    toValue: 1.1,
                     duration: 1000,
+                    toValue: 1.1,
                     useNativeDriver: true,
                 }),
                 Animated.timing(pulse, {
-                    toValue: 1,
                     duration: 1000,
+                    toValue: 1,
                     useNativeDriver: true,
                 }),
             ]),
@@ -66,19 +68,19 @@ export function HangTightScreen() {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        justifyContent: "center",
         alignItems: "center",
+        flex: 1,
         gap: 12,
-    },
-    icon: {
-        fontSize: 48,
-        color: colors.accent,
-        marginBottom: 24,
+        justifyContent: "center",
     },
     heading: {
         ...typography.heading,
         color: colors.text,
+    },
+    icon: {
+        color: colors.accent,
+        fontSize: 48,
+        marginBottom: 24,
     },
     subtitle: {
         ...typography.body,

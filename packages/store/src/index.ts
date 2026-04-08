@@ -66,9 +66,5 @@ export {
 // State atoms
 export { $user } from "./user.ts";
 
-export {
-    $verifiedKeys,
-    isVerified,
-    markVerified,
-    unmarkVerified,
-} from "./verifiedKeys.ts";
+// TODO: verified keys need platform-specific secure storage (keychain/sqlite),
+// not localStorage. Removed — re-implement with IStorage adapter.

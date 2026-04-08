@@ -1,8 +1,20 @@
 import { appImportRestrictions, base } from "@vex-chat/eslint-config/base";
+import svelte from "eslint-plugin-svelte";
 
 export default [
     { ignores: ["dist/**", "build/**", "src-tauri/target/**"] },
     ...base,
+    ...svelte.configs["flat/recommended"],
+    ...svelte.configs["flat/prettier"],
+    {
+        files: ["**/*.svelte"],
+        languageOptions: {
+            parserOptions: {
+                projectService: true,
+                extraFileExtensions: [".svelte"],
+            },
+        },
+    },
     {
         rules: {
             ...appImportRestrictions,

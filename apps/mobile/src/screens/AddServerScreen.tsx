@@ -1,19 +1,22 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { useStore } from "@nanostores/react";
-import { $client, $servers, $channels } from "../store";
-import { colors, typography } from "../theme";
-import { ScreenLayout } from "../components/ScreenLayout";
-import { BackButton } from "../components/BackButton";
-import { VexButton } from "../components/VexButton";
-import { CornerBracketBox } from "../components/CornerBracketBox";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+
 import { parseInviteID } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
+import { useNavigation } from "@react-navigation/native";
+
+import { BackButton } from "../components/BackButton";
+import { CornerBracketBox } from "../components/CornerBracketBox";
+import { ScreenLayout } from "../components/ScreenLayout";
+import { VexButton } from "../components/VexButton";
+import { $channels, $client, $servers } from "../store";
+import { colors, typography } from "../theme";
 
 export function AddServerScreen() {
     const navigation = useNavigation<any>();
     const client = useStore($client);
-    const [mode, setMode] = useState<"pick" | "create" | "join">("pick");
+    const [mode, setMode] = useState<"create" | "join" | "pick">("pick");
     const [name, setName] = useState("");
     const [inviteInput, setInviteInput] = useState("");
     const [error, setError] = useState("");
@@ -80,13 +83,13 @@ export function AddServerScreen() {
                     </View>
                     <View style={styles.options}>
                         <VexButton
-                            title="Create a server"
-                            onPress={() => setMode("create")}
                             glow
+                            onPress={() => { setMode("create"); }}
+                            title="Create a server"
                         />
                         <VexButton
+                            onPress={() => { setMode("join"); }}
                             title="Join via invite"
-                            onPress={() => setMode("join")}
                             variant="outline"
                         />
                     </View>
@@ -120,30 +123,30 @@ export function AddServerScreen() {
 
                     <View style={styles.field}>
                         <Text style={styles.label}>SERVER NAME</Text>
-                        <CornerBracketBox size={8} color={colors.border}>
+                        <CornerBracketBox color={colors.border} size={8}>
                             <TextInput
-                                style={styles.input}
-                                value={name}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!loading}
                                 onChangeText={(t) => {
                                     setName(t);
                                     setError("");
                                 }}
                                 placeholder="My server"
                                 placeholderTextColor={colors.mutedDark}
-                                autoCapitalize="none"
-                                autoCorrect={false}
-                                editable={!loading}
+                                style={styles.input}
+                                value={name}
                             />
                         </CornerBracketBox>
                     </View>
 
                     <View style={styles.buttonRow}>
                         <VexButton
-                            title="Create"
-                            onPress={handleCreate}
-                            loading={loading}
                             disabled={!name.trim()}
                             glow
+                            loading={loading}
+                            onPress={handleCreate}
+                            title="Create"
                         />
                     </View>
                 </View>
@@ -176,30 +179,30 @@ export function AddServerScreen() {
 
                 <View style={styles.field}>
                     <Text style={styles.label}>INVITE CODE</Text>
-                    <CornerBracketBox size={8} color={colors.border}>
+                    <CornerBracketBox color={colors.border} size={8}>
                         <TextInput
-                            style={styles.input}
-                            value={inviteInput}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!loading}
                             onChangeText={(t) => {
                                 setInviteInput(t);
                                 setError("");
                             }}
                             placeholder="Paste invite link or code"
                             placeholderTextColor={colors.mutedDark}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
+                            style={styles.input}
+                            value={inviteInput}
                         />
                     </CornerBracketBox>
                 </View>
 
                 <View style={styles.buttonRow}>
                     <VexButton
-                        title="Join"
-                        onPress={handleJoin}
-                        loading={loading}
                         disabled={!inviteInput.trim()}
                         glow
+                        loading={loading}
+                        onPress={handleJoin}
+                        title="Join"
                     />
                 </View>
             </View>
@@ -208,28 +211,13 @@ export function AddServerScreen() {
 }
 
 const styles = StyleSheet.create({
+    buttonRow: {
+        alignItems: "center",
+    },
     content: {
         flex: 1,
-        justifyContent: "center",
         gap: 24,
-    },
-    header: {
-        alignItems: "center",
-        gap: 8,
-    },
-    heading: {
-        ...typography.heading,
-        color: colors.text,
-        textAlign: "center",
-    },
-    subtitle: {
-        ...typography.body,
-        color: colors.muted,
-        textAlign: "center",
-    },
-    options: {
-        gap: 12,
-        alignItems: "center",
+        justifyContent: "center",
     },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
@@ -244,18 +232,33 @@ const styles = StyleSheet.create({
     field: {
         gap: 6,
     },
+    header: {
+        alignItems: "center",
+        gap: 8,
+    },
+    heading: {
+        ...typography.heading,
+        color: colors.text,
+        textAlign: "center",
+    },
+    input: {
+        backgroundColor: colors.surface,
+        color: colors.textSecondary,
+        fontSize: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
     label: {
         ...typography.label,
         color: colors.muted,
     },
-    input: {
-        color: colors.textSecondary,
-        fontSize: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        backgroundColor: colors.surface,
-    },
-    buttonRow: {
+    options: {
         alignItems: "center",
+        gap: 12,
+    },
+    subtitle: {
+        ...typography.body,
+        color: colors.muted,
+        textAlign: "center",
     },
 });

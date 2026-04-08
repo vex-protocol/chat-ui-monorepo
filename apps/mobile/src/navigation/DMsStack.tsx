@@ -1,7 +1,9 @@
 import React from "react";
+
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { DMListScreen } from "../screens/DMListScreen";
+
 import { ConversationScreen } from "../screens/ConversationScreen";
+import { DMListScreen } from "../screens/DMListScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -14,13 +16,13 @@ export function DMsStack() {
             }}
         >
             <Stack.Screen
-                name="DMList"
                 component={DMListScreen}
+                name="DMList"
                 options={{ title: "Messages" }}
             />
             <Stack.Screen
-                name="Conversation"
                 component={ConversationScreen}
+                name="Conversation"
                 options={({ route }: { route: any }) => ({
                     title: `@${route.params?.username ?? ""}`,
                 })}

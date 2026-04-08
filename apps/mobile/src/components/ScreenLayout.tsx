@@ -1,30 +1,30 @@
 import React from "react";
-import { View, StyleSheet, ImageBackground, ViewStyle } from "react-native";
+import { ImageBackground, StyleSheet, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../theme";
 
 const bgGrid = require("../assets/images/bg-grid.png");
+import { colors } from "../theme";
 
 interface ScreenLayoutProps {
     children: React.ReactNode;
-    style?: ViewStyle;
     padded?: boolean;
+    style?: ViewStyle;
 }
 
 export function ScreenLayout({
     children,
-    style,
     padded = true,
+    style,
 }: ScreenLayoutProps) {
     const insets = useSafeAreaInsets();
 
     return (
         <View style={styles.root}>
             <ImageBackground
-                source={bgGrid}
-                resizeMode="repeat"
-                style={styles.background}
                 imageStyle={styles.gridImage}
+                resizeMode="repeat"
+                source={bgGrid}
+                style={styles.background}
             >
                 {/* Vignette overlay */}
                 <View style={styles.vignette} />
@@ -33,8 +33,8 @@ export function ScreenLayout({
                         styles.content,
                         padded && { paddingHorizontal: 24 },
                         {
-                            paddingTop: insets.top + 16,
                             paddingBottom: insets.bottom + 16,
+                            paddingTop: insets.top + 16,
                         },
                         style,
                     ]}
@@ -47,23 +47,23 @@ export function ScreenLayout({
 }
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        backgroundColor: colors.bg,
-    },
     background: {
         flex: 1,
     },
+    content: {
+        flex: 1,
+        zIndex: 1,
+    },
     gridImage: {
         opacity: 0.15,
+    },
+    root: {
+        backgroundColor: colors.bg,
+        flex: 1,
     },
     vignette: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: colors.bg,
         opacity: 0.4,
-    },
-    content: {
-        flex: 1,
-        zIndex: 1,
     },
 });

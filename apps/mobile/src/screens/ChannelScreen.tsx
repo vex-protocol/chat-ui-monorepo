@@ -1,4 +1,6 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import type { IMessage } from "@vex-chat/libvex";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -6,22 +8,24 @@ import {
     StyleSheet,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useStore } from "@nanostores/react";
-import type { IMessage } from "@vex-chat/libvex";
-import { $groupMessages, $client, $user } from "../store";
+
 import { markRead, sendGroupMessage } from "@vex-chat/store";
-import { setActiveConversation } from "../lib/notifications";
-import { colors } from "../theme";
+
+import { useStore } from "@nanostores/react";
+
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { setActiveConversation } from "../lib/notifications";
+import { $client, $groupMessages, $user } from "../store";
+import { colors } from "../theme";
 
 export function ChannelScreen({
-    route,
     navigation,
+    route,
 }: {
-    route: any;
     navigation: any;
+    route: any;
 }) {
     const { channelID, channelName, serverID } = route.params as {
         channelID: string;
@@ -54,7 +58,7 @@ export function ChannelScreen({
     const insets = useSafeAreaInsets();
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
-    const [sendError, setSendError] = useState("");
+    const [_sendError, setSendError] = useState("");
     const [usernames, setUsernames] = useState<Record<string, string>>({});
 
     // Load channel members to resolve userIDs → usernames
@@ -91,43 +95,43 @@ export function ChannelScreen({
         const isOwn = item.authorID === user?.userID;
         return (
             <MessageBubbleRN
-                message={item}
-                isOwn={isOwn}
                 authorName={
                     isOwn
                         ? "You"
                         : (usernames[item.authorID] ??
                           item.authorID.slice(0, 8))
                 }
+                isOwn={isOwn}
+                message={item}
             />
         );
     }
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             keyboardVerticalOffset={insets.top}
+            style={styles.container}
         >
             <ChatHeader
-                title={`# ${channelName}`}
                 onBack={() => navigation.navigate("ChannelList", { serverID })}
+                title={`# ${channelName}`}
             />
 
             <FlatList
+                contentContainerStyle={styles.list}
                 data={messages}
+                inverted
                 keyExtractor={(m) => m.mailID}
                 renderItem={renderMessage}
-                inverted
-                contentContainerStyle={styles.list}
             />
 
             <MessageInputBar
-                value={text}
                 onChangeText={setText}
                 onSend={sendMessage}
                 placeholder={`Message #${channelName}`}
                 sending={sending}
+                value={text}
             />
         </KeyboardAvoidingView>
     );
@@ -135,8 +139,8 @@ export function ChannelScreen({
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         backgroundColor: colors.bg,
+        flex: 1,
     },
     list: {
         paddingVertical: 8,

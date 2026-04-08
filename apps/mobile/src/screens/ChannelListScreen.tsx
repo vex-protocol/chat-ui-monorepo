@@ -1,23 +1,26 @@
+import type { IChannel } from "@vex-chat/libvex";
+
 import React from "react";
 import {
-    View,
-    Text,
     FlatList,
-    TouchableOpacity,
     StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
+
 import { useStore } from "@nanostores/react";
-import type { IChannel } from "@vex-chat/libvex";
+
 import { $channels } from "../store";
 
 export function ChannelListScreen({
-    route,
     navigation,
+    route,
 }: {
-    route: any;
     navigation: any;
+    route: any;
 }) {
-    const { serverID, serverName } = route.params as {
+    const { serverID, serverName: _serverName } = route.params as {
         serverID: string;
         serverName: string;
     };
@@ -27,7 +30,6 @@ export function ChannelListScreen({
     function renderChannel({ item }: { item: IChannel }) {
         return (
             <TouchableOpacity
-                style={styles.row}
                 onPress={() =>
                     navigation.navigate("Channel", {
                         channelID: item.channelID,
@@ -35,6 +37,7 @@ export function ChannelListScreen({
                         serverID,
                     })
                 }
+                style={styles.row}
             >
                 <Text style={styles.hash}>#</Text>
                 <Text style={styles.name}>{item.name}</Text>
@@ -60,17 +63,17 @@ export function ChannelListScreen({
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#1a1a1a" },
-    row: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-        padding: 14,
-        borderBottomWidth: 1,
-        borderBottomColor: "#2a2a2a",
-    },
+    container: { backgroundColor: "#1a1a1a", flex: 1 },
+    empty: { alignItems: "center", flex: 1, justifyContent: "center" },
+    emptyText: { color: "#666666", fontSize: 14, fontStyle: "italic" },
     hash: { color: "#666666", fontSize: 18, fontWeight: "700", width: 20 },
     name: { color: "#e8e8e8", fontSize: 15 },
-    empty: { flex: 1, alignItems: "center", justifyContent: "center" },
-    emptyText: { color: "#666666", fontSize: 14, fontStyle: "italic" },
+    row: {
+        alignItems: "center",
+        borderBottomColor: "#2a2a2a",
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        gap: 8,
+        padding: 14,
+    },
 });

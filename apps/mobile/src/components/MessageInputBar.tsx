@@ -1,27 +1,28 @@
 import React from "react";
 import {
-    View,
+    StyleSheet,
+    Text,
     TextInput,
     TouchableOpacity,
-    Text,
-    StyleSheet,
+    View,
 } from "react-native";
-import { colors, typography } from "../theme";
+
+import { colors } from "../theme";
 
 interface MessageInputBarProps {
-    value: string;
     onChangeText: (text: string) => void;
     onSend: () => void;
     placeholder?: string;
     sending?: boolean;
+    value: string;
 }
 
 export function MessageInputBar({
-    value,
     onChangeText,
     onSend,
     placeholder = "Message...",
     sending = false,
+    value,
 }: MessageInputBarProps) {
     const canSend = value.trim().length > 0 && !sending;
 
@@ -32,19 +33,19 @@ export function MessageInputBar({
             </TouchableOpacity>
 
             <TextInput
-                style={styles.input}
-                value={value}
+                editable={!sending}
+                multiline
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 placeholderTextColor={colors.mutedDark}
-                multiline
-                editable={!sending}
+                style={styles.input}
+                value={value}
             />
 
             <TouchableOpacity
-                style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
-                onPress={onSend}
                 disabled={!canSend}
+                onPress={onSend}
+                style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
             >
                 <Text style={styles.sendText}>→</Text>
             </TouchableOpacity>
@@ -53,46 +54,46 @@ export function MessageInputBar({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flexDirection: "row",
-        alignItems: "flex-end",
-        padding: 8,
-        gap: 8,
-        borderTopWidth: 1,
-        borderTopColor: colors.borderSubtle,
-        backgroundColor: colors.surface,
-    },
     actionBtn: {
-        width: 36,
-        height: 36,
+        alignItems: "center",
+        borderColor: colors.border,
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: colors.border,
-        alignItems: "center",
+        height: 36,
         justifyContent: "center",
+        width: 36,
     },
     actionIcon: {
         color: colors.muted,
         fontSize: 18,
     },
+    container: {
+        alignItems: "flex-end",
+        backgroundColor: colors.surface,
+        borderTopColor: colors.borderSubtle,
+        borderTopWidth: 1,
+        flexDirection: "row",
+        gap: 8,
+        padding: 8,
+    },
     input: {
-        flex: 1,
         backgroundColor: colors.input,
-        color: colors.textSecondary,
-        borderWidth: 1,
         borderColor: colors.borderSubtle,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        borderWidth: 1,
+        color: colors.textSecondary,
+        flex: 1,
         fontSize: 14,
         maxHeight: 100,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
     },
     sendBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: colors.accent,
         alignItems: "center",
+        backgroundColor: colors.accent,
+        borderRadius: 18,
+        height: 36,
         justifyContent: "center",
+        width: 36,
     },
     sendBtnDisabled: {
         opacity: 0.4,

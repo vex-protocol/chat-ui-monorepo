@@ -1,8 +1,10 @@
 import React from "react";
+
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ServerListScreen } from "../screens/ServerListScreen";
+
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
+import { ServerListScreen } from "../screens/ServerListScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -15,20 +17,20 @@ export function ServersStack() {
             }}
         >
             <Stack.Screen
-                name="ServerList"
                 component={ServerListScreen}
+                name="ServerList"
                 options={{ title: "Servers" }}
             />
             <Stack.Screen
-                name="ChannelList"
                 component={ChannelListScreen}
+                name="ChannelList"
                 options={({ route }: { route: any }) => ({
                     title: route.params?.serverName ?? "Channels",
                 })}
             />
             <Stack.Screen
-                name="Channel"
                 component={ChannelScreen}
+                name="Channel"
                 options={({ route }: { route: any }) => ({
                     title: `#${route.params?.channelName ?? ""}`,
                 })}

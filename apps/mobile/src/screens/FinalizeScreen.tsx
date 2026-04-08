@@ -1,28 +1,31 @@
-import React, { useState, useCallback, useRef } from "react";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+import React, { useCallback, useRef, useState } from "react";
 import {
-    View,
+    ScrollView,
+    StyleSheet,
     Text,
     TextInput,
-    ScrollView,
     TouchableOpacity,
-    StyleSheet,
+    View,
 } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { registerAndBootstrap } from "../store";
+
 import { expoPreset } from "@vex-chat/libvex/preset/expo";
-import { keychainKeyStore } from "../lib/keychain";
-import { getServerOptions } from "../lib/config";
-import { colors, typography } from "../theme";
-import { ScreenLayout } from "../components/ScreenLayout";
+
 import { BackButton } from "../components/BackButton";
-import { VexButton } from "../components/VexButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
+import { ScreenLayout } from "../components/ScreenLayout";
+import { VexButton } from "../components/VexButton";
+import { getServerOptions } from "../lib/config";
+import { keychainKeyStore } from "../lib/keychain";
+import { registerAndBootstrap } from "../store";
+import { colors, typography } from "../theme";
 
 type Props = NativeStackScreenProps<any, "Finalize">;
 
 const AVATAR_PRESETS = ["🟥", "🔷", "🟢", "🟡", "🟣"] as const;
 
-export function FinalizeScreen({ navigation, route }: Props) {
+export function FinalizeScreen({ navigation: _navigation, route }: Props) {
     const method = (route.params as any)?.method ?? "username";
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -31,7 +34,7 @@ export function FinalizeScreen({ navigation, route }: Props) {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [available, setAvailable] = useState<boolean | null>(null);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debounceRef = useRef<null | ReturnType<typeof setTimeout>>(null);
 
     const checkAvailability = useCallback((name: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -92,9 +95,9 @@ export function FinalizeScreen({ navigation, route }: Props) {
             <BackButton />
 
             <ScrollView
-                style={styles.scroll}
-                showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                style={styles.scroll}
             >
                 <View style={styles.methodBadge}>
                     <Text style={styles.methodText}>
@@ -116,15 +119,15 @@ export function FinalizeScreen({ navigation, route }: Props) {
                     <View style={styles.inputRow}>
                         <Text style={styles.atSign}>@</Text>
                         <TextInput
-                            style={styles.input}
-                            value={username}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!loading}
+                            maxLength={19}
                             onChangeText={handleUsernameChange}
                             placeholder="username"
                             placeholderTextColor={colors.mutedDark}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            maxLength={19}
-                            editable={!loading}
+                            style={styles.input}
+                            value={username}
                         />
                         {available !== null && (
                             <Text
@@ -143,26 +146,26 @@ export function FinalizeScreen({ navigation, route }: Props) {
                 <View style={styles.field}>
                     <Text style={styles.label}>PASSWORD</Text>
                     <TextInput
-                        style={[styles.input, styles.inputFull]}
-                        value={password}
+                        editable={!loading}
                         onChangeText={setPassword}
                         placeholder="••••••••"
                         placeholderTextColor={colors.mutedDark}
                         secureTextEntry
-                        editable={!loading}
+                        style={[styles.input, styles.inputFull]}
+                        value={password}
                     />
                 </View>
 
                 <View style={styles.field}>
                     <Text style={styles.label}>CONFIRM PASSWORD</Text>
                     <TextInput
-                        style={[styles.input, styles.inputFull]}
-                        value={confirm}
+                        editable={!loading}
                         onChangeText={setConfirm}
                         placeholder="••••••••"
                         placeholderTextColor={colors.mutedDark}
                         secureTextEntry
-                        editable={!loading}
+                        style={[styles.input, styles.inputFull]}
+                        value={confirm}
                     />
                 </View>
 
@@ -173,15 +176,15 @@ export function FinalizeScreen({ navigation, route }: Props) {
                         {AVATAR_PRESETS.map((emoji, i) => (
                             <TouchableOpacity
                                 key={i}
-                                onPress={() => setSelectedAvatar(i)}
+                                onPress={() => { setSelectedAvatar(i); }}
                             >
                                 <CornerBracketBox
-                                    size={6}
                                     color={
                                         selectedAvatar === i
                                             ? colors.accent
                                             : colors.border
                                     }
+                                    size={6}
                                 >
                                     <View
                                         style={[
@@ -198,7 +201,7 @@ export function FinalizeScreen({ navigation, route }: Props) {
                             </TouchableOpacity>
                         ))}
                         <TouchableOpacity onPress={() => {}}>
-                            <CornerBracketBox size={6} color={colors.border}>
+                            <CornerBracketBox color={colors.border} size={6}>
                                 <View style={styles.avatarCell}>
                                     <Text style={styles.avatarPlus}>+</Text>
                                 </View>
@@ -208,12 +211,12 @@ export function FinalizeScreen({ navigation, route }: Props) {
                 </View>
 
                 <VexButton
-                    title="Complete Setup"
-                    onPress={handleComplete}
-                    loading={loading}
                     disabled={!username || !password || !confirm}
                     glow
+                    loading={loading}
+                    onPress={handleComplete}
                     style={styles.completeBtn}
+                    title="Complete Setup"
                 />
             </ScrollView>
         </ScreenLayout>
@@ -221,34 +224,54 @@ export function FinalizeScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-    scroll: {
-        flex: 1,
-        marginTop: 24,
-    },
-    methodBadge: {
-        alignSelf: "flex-start",
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderWidth: 1,
-        borderColor: colors.border,
-    },
-    methodText: {
-        ...typography.label,
+    atSign: {
+        ...typography.bodyLarge,
         color: colors.muted,
-        fontSize: 10,
+        marginRight: 4,
     },
-    heading: {
-        ...typography.heading,
-        color: colors.text,
-        marginTop: 12,
-        marginBottom: 20,
+    avail: {
+        fontSize: 16,
+        marginLeft: 8,
+    },
+    availNo: {
+        color: colors.error,
+    },
+    availOk: {
+        color: "#22c55e",
+    },
+    avatarCell: {
+        alignItems: "center",
+        backgroundColor: colors.surface,
+        height: 56,
+        justifyContent: "center",
+        width: 56,
+    },
+    avatarEmoji: {
+        fontSize: 28,
+    },
+    avatarGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    avatarPlus: {
+        color: colors.muted,
+        fontSize: 24,
+    },
+    avatarSelected: {
+        borderColor: colors.accent,
+        borderWidth: 1,
+    },
+    completeBtn: {
+        marginBottom: 32,
+        marginTop: 8,
     },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
         borderColor: colors.error,
         borderWidth: 1,
-        padding: 10,
         marginBottom: 12,
+        padding: 10,
     },
     errorText: {
         ...typography.body,
@@ -258,70 +281,50 @@ const styles = StyleSheet.create({
         gap: 6,
         marginBottom: 16,
     },
-    label: {
-        ...typography.label,
-        color: colors.muted,
-    },
-    inputRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: colors.input,
-        borderWidth: 1,
-        borderColor: colors.borderSubtle,
-        paddingHorizontal: 12,
-    },
-    atSign: {
-        ...typography.bodyLarge,
-        color: colors.muted,
-        marginRight: 4,
+    heading: {
+        ...typography.heading,
+        color: colors.text,
+        marginBottom: 20,
+        marginTop: 12,
     },
     input: {
-        flex: 1,
         color: colors.textSecondary,
+        flex: 1,
         fontSize: 14,
         paddingVertical: 12,
     },
     inputFull: {
         backgroundColor: colors.input,
-        borderWidth: 1,
         borderColor: colors.borderSubtle,
+        borderWidth: 1,
         paddingHorizontal: 12,
     },
-    avail: {
-        fontSize: 16,
-        marginLeft: 8,
-    },
-    availOk: {
-        color: "#22c55e",
-    },
-    availNo: {
-        color: colors.error,
-    },
-    avatarGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 10,
-    },
-    avatarCell: {
-        width: 56,
-        height: 56,
+    inputRow: {
         alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: colors.surface,
-    },
-    avatarSelected: {
+        backgroundColor: colors.input,
+        borderColor: colors.borderSubtle,
         borderWidth: 1,
-        borderColor: colors.accent,
+        flexDirection: "row",
+        paddingHorizontal: 12,
     },
-    avatarEmoji: {
-        fontSize: 28,
-    },
-    avatarPlus: {
-        fontSize: 24,
+    label: {
+        ...typography.label,
         color: colors.muted,
     },
-    completeBtn: {
-        marginTop: 8,
-        marginBottom: 32,
+    methodBadge: {
+        alignSelf: "flex-start",
+        borderColor: colors.border,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+    },
+    methodText: {
+        ...typography.label,
+        color: colors.muted,
+        fontSize: 10,
+    },
+    scroll: {
+        flex: 1,
+        marginTop: 24,
     },
 });

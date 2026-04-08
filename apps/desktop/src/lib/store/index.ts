@@ -19,8 +19,5 @@ export {
     loginAndBootstrap,
     autoLogin,
     resetAll,
-    markVerified,
-    unmarkVerified,
-    isVerified,
 } from "@vex-chat/store";
-export { $verifiedKeys as verifiedKeys } from "@vex-chat/store";
+// TODO: verified keys removed — needs secure storage re-implementation

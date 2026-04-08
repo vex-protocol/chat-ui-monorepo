@@ -1,41 +1,18 @@
-import { Platform, TextStyle } from "react-native";
+import { Platform, type TextStyle } from "react-native";
 
 export const fontFamilies = {
+    body: Platform.select({ android: "Inter-Medium", ios: "Inter-Medium" })!,
     heading: Platform.select({
-        ios: "SpaceGrotesk-Medium",
         android: "SpaceGrotesk-Medium",
+        ios: "SpaceGrotesk-Medium",
     })!,
     mono: Platform.select({
-        ios: "ChivoMono-Light",
         android: "ChivoMono-Light",
+        ios: "ChivoMono-Light",
     })!,
-    body: Platform.select({ ios: "Inter-Medium", android: "Inter-Medium" })!,
 } as const;
 
 export const typography = {
-    heading: {
-        fontFamily: fontFamilies.heading,
-        fontSize: 40,
-        fontWeight: "500",
-        lineHeight: 48,
-    } satisfies TextStyle,
-
-    headingSmall: {
-        fontFamily: fontFamilies.heading,
-        fontSize: 28,
-        fontWeight: "500",
-        lineHeight: 34,
-    } satisfies TextStyle,
-
-    label: {
-        fontFamily: fontFamilies.mono,
-        fontSize: 12,
-        fontWeight: "300",
-        lineHeight: 16,
-        textTransform: "uppercase",
-        letterSpacing: 1.5,
-    } satisfies TextStyle,
-
     body: {
         fontFamily: fontFamilies.mono,
         fontSize: 12,
@@ -55,6 +32,29 @@ export const typography = {
         fontSize: 14,
         fontWeight: "500",
         lineHeight: 20,
+    } satisfies TextStyle,
+
+    heading: {
+        fontFamily: fontFamilies.heading,
+        fontSize: 40,
+        fontWeight: "500",
+        lineHeight: 48,
+    } satisfies TextStyle,
+
+    headingSmall: {
+        fontFamily: fontFamilies.heading,
+        fontSize: 28,
+        fontWeight: "500",
+        lineHeight: 34,
+    } satisfies TextStyle,
+
+    label: {
+        fontFamily: fontFamilies.mono,
+        fontSize: 12,
+        fontWeight: "300",
+        letterSpacing: 1.5,
+        lineHeight: 16,
+        textTransform: "uppercase",
     } satisfies TextStyle,
 } as const;
 

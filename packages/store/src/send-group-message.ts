@@ -18,7 +18,7 @@ export interface SendGroupMessageResult {
 export async function sendGroupMessage(
     channelID: string,
     content: string,
-    options?: SendGroupMessageOptions,
+    _options?: SendGroupMessageOptions,
 ): Promise<SendGroupMessageResult> {
     const client = $client.get();
     const me = $user.get();

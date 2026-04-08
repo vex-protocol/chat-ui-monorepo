@@ -1,32 +1,34 @@
 import React from "react";
 import {
-    View,
-    Text,
     Image,
-    TouchableOpacity,
     ScrollView,
     StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { useStore } from "@nanostores/react";
-import { $servers } from "../store";
+
 import { $totalDmUnread } from "@vex-chat/store";
-import { colors } from "../theme";
+
+import { useStore } from "@nanostores/react";
 
 const vexLogo = require("../assets/images/vex-logo.png");
+import { $servers } from "../store";
+import { colors } from "../theme";
 
 interface ServerSidebarProps {
-    activeServerId: string | null;
-    onSelectServer: (serverId: string) => void;
-    onSelectHome: () => void;
+    activeServerId: null | string;
     onAddServer: () => void;
+    onSelectHome: () => void;
+    onSelectServer: (serverId: string) => void;
     onSettings: () => void;
 }
 
 export function ServerSidebar({
     activeServerId,
-    onSelectServer,
-    onSelectHome,
     onAddServer,
+    onSelectHome,
+    onSelectServer,
     onSettings,
 }: ServerSidebarProps) {
     const servers = useStore($servers);
@@ -38,9 +40,9 @@ export function ServerSidebar({
             {/* Home / Vex icon */}
             <TouchableOpacity onPress={onSelectHome} style={styles.homeBtn}>
                 <Image
+                    resizeMode="contain"
                     source={vexLogo}
                     style={styles.logo}
-                    resizeMode="contain"
                 />
                 {totalUnread > 0 && (
                     <View style={styles.homeBadge}>
@@ -55,15 +57,15 @@ export function ServerSidebar({
 
             {/* Server list */}
             <ScrollView
-                style={styles.serverList}
                 showsVerticalScrollIndicator={false}
+                style={styles.serverList}
             >
                 {serverList.map((server) => {
                     const active = server.serverID === activeServerId;
                     return (
                         <TouchableOpacity
                             key={server.serverID}
-                            onPress={() => onSelectServer(server.serverID)}
+                            onPress={() => { onSelectServer(server.serverID); }}
                             style={[
                                 styles.serverBtn,
                                 active && styles.serverBtnActive,
@@ -77,7 +79,7 @@ export function ServerSidebar({
                 })}
 
                 {/* Add server */}
-                <TouchableOpacity style={styles.addBtn} onPress={onAddServer}>
+                <TouchableOpacity onPress={onAddServer} style={styles.addBtn}>
                     <Text style={styles.addText}>+</Text>
                 </TouchableOpacity>
             </ScrollView>
@@ -91,92 +93,92 @@ export function ServerSidebar({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        width: 60,
-        backgroundColor: colors.surface,
-        borderRightWidth: 1,
-        borderRightColor: colors.borderSubtle,
+    addBtn: {
         alignItems: "center",
-        paddingVertical: 8,
-    },
-    homeBtn: {
-        width: 44,
+        borderColor: colors.border,
+        borderRadius: 22,
+        borderStyle: "dashed",
+        borderWidth: 1,
         height: 44,
-        alignItems: "center",
         justifyContent: "center",
-        marginBottom: 4,
+        marginVertical: 4,
+        width: 44,
+    },
+    addText: {
+        color: colors.muted,
+        fontSize: 20,
+    },
+    container: {
+        alignItems: "center",
+        backgroundColor: colors.surface,
+        borderRightColor: colors.borderSubtle,
+        borderRightWidth: 1,
+        paddingVertical: 8,
+        width: 60,
+    },
+    divider: {
+        backgroundColor: colors.border,
+        height: 1,
+        marginVertical: 6,
+        width: 32,
     },
     homeBadge: {
-        position: "absolute",
-        bottom: -2,
-        right: -2,
-        minWidth: 18,
-        height: 18,
-        paddingHorizontal: 4,
-        borderRadius: 9,
-        backgroundColor: colors.error,
         alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 2,
+        backgroundColor: colors.error,
         borderColor: colors.surface,
+        borderRadius: 9,
+        borderWidth: 2,
+        bottom: -2,
+        height: 18,
+        justifyContent: "center",
+        minWidth: 18,
+        paddingHorizontal: 4,
+        position: "absolute",
+        right: -2,
     },
     homeBadgeText: {
         color: "#fff",
         fontSize: 10,
         fontWeight: "700",
     },
+    homeBtn: {
+        alignItems: "center",
+        height: 44,
+        justifyContent: "center",
+        marginBottom: 4,
+        width: 44,
+    },
     logo: {
-        width: 28,
         height: 28,
-    },
-    divider: {
-        width: 32,
-        height: 1,
-        backgroundColor: colors.border,
-        marginVertical: 6,
-    },
-    serverList: {
-        flex: 1,
+        width: 28,
     },
     serverBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: colors.card,
         alignItems: "center",
+        backgroundColor: colors.card,
+        borderRadius: 22,
+        height: 44,
         justifyContent: "center",
         marginVertical: 4,
+        width: 44,
     },
     serverBtnActive: {
-        borderRadius: 14,
         backgroundColor: colors.accentDark,
+        borderRadius: 14,
     },
     serverInitial: {
         color: colors.text,
         fontSize: 16,
         fontWeight: "600",
     },
-    addBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderStyle: "dashed",
-        alignItems: "center",
-        justifyContent: "center",
-        marginVertical: 4,
-    },
-    addText: {
-        color: colors.muted,
-        fontSize: 20,
+    serverList: {
+        flex: 1,
     },
     settingsBtn: {
-        width: 44,
-        height: 44,
         alignItems: "center",
+        height: 44,
         justifyContent: "center",
         marginTop: 4,
+        width: 44,
     },
     settingsIcon: {
         color: colors.muted,

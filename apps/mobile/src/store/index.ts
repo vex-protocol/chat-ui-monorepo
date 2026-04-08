@@ -5,25 +5,25 @@
  * import atoms from here and subscribe via useStore() from @nanostores/react.
  */
 export {
-    // Auth flows
-    registerAndBootstrap,
-    loginAndBootstrap,
-    autoLogin,
-
+    $channels,
     // Client / key-replaced flag
     $client,
-    $keyReplaced,
+    $devices,
 
+    $familiars,
+    $groupMessages,
+
+    $keyReplaced,
+    $messages,
+    $onlineLists,
+    $permissions,
+    $servers,
     // State atoms
     $user,
-    $familiars,
-    $messages,
-    $groupMessages,
-    $servers,
-    $channels,
-    $permissions,
-    $devices,
-    $onlineLists,
+    autoLogin,
+    loginAndBootstrap,
+    // Auth flows
+    registerAndBootstrap,
 } from "@vex-chat/store";
 
-export type { ServerOptions, AuthResult } from "@vex-chat/store";
+export type { AuthResult, ServerOptions } from "@vex-chat/store";

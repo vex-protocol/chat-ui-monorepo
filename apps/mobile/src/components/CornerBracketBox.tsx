@@ -1,21 +1,22 @@
 import React from "react";
-import { View, StyleSheet, ViewStyle } from "react-native";
+import { StyleSheet, View, type ViewStyle } from "react-native";
+
 import { colors } from "../theme";
 
 interface CornerBracketBoxProps {
     children: React.ReactNode;
-    size?: number;
     color?: string;
-    thickness?: number;
+    size?: number;
     style?: ViewStyle;
+    thickness?: number;
 }
 
 export function CornerBracketBox({
     children,
-    size = 12,
     color = colors.border,
-    thickness = 1,
+    size = 12,
     style,
+    thickness = 1,
 }: CornerBracketBoxProps) {
     const bracketStyle = { borderColor: color, borderWidth: thickness };
 
@@ -26,9 +27,9 @@ export function CornerBracketBox({
                 style={[
                     styles.corner,
                     styles.topLeft,
-                    { width: size, height: size },
+                    { height: size, width: size },
                     bracketStyle,
-                    { borderRightWidth: 0, borderBottomWidth: 0 },
+                    { borderBottomWidth: 0, borderRightWidth: 0 },
                 ]}
             />
             {/* Top-right */}
@@ -36,9 +37,9 @@ export function CornerBracketBox({
                 style={[
                     styles.corner,
                     styles.topRight,
-                    { width: size, height: size },
+                    { height: size, width: size },
                     bracketStyle,
-                    { borderLeftWidth: 0, borderBottomWidth: 0 },
+                    { borderBottomWidth: 0, borderLeftWidth: 0 },
                 ]}
             />
             {/* Bottom-left */}
@@ -46,7 +47,7 @@ export function CornerBracketBox({
                 style={[
                     styles.corner,
                     styles.bottomLeft,
-                    { width: size, height: size },
+                    { height: size, width: size },
                     bracketStyle,
                     { borderRightWidth: 0, borderTopWidth: 0 },
                 ]}
@@ -56,7 +57,7 @@ export function CornerBracketBox({
                 style={[
                     styles.corner,
                     styles.bottomRight,
-                    { width: size, height: size },
+                    { height: size, width: size },
                     bracketStyle,
                     { borderLeftWidth: 0, borderTopWidth: 0 },
                 ]}
@@ -67,6 +68,14 @@ export function CornerBracketBox({
 }
 
 const styles = StyleSheet.create({
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+    },
     container: {
         position: "relative",
     },
@@ -75,19 +84,11 @@ const styles = StyleSheet.create({
         zIndex: 1,
     },
     topLeft: {
-        top: 0,
         left: 0,
+        top: 0,
     },
     topRight: {
+        right: 0,
         top: 0,
-        right: 0,
-    },
-    bottomLeft: {
-        bottom: 0,
-        left: 0,
-    },
-    bottomRight: {
-        bottom: 0,
-        right: 0,
     },
 });

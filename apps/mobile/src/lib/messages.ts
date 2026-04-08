@@ -1,3 +1,5 @@
+import type { IMessage } from "@vex-chat/libvex";
+
 /**
  * Local message persistence for React Native using AsyncStorage.
  *
@@ -6,43 +8,41 @@
  * keyed by thread (channelID for groups, userID for DMs).
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { IMessage } from "@vex-chat/libvex";
 
 const GROUP_KEY = "vex:groupMessages";
 const DM_KEY = "vex:dmMessages";
 const FAMILIARS_KEY = "vex:familiars";
-
-export async function saveGroupMessages(
-    groups: Record<string, IMessage[]>,
-): Promise<void> {
-    await AsyncStorage.setItem(GROUP_KEY, JSON.stringify(groups));
-}
-
-export async function saveDmMessages(
-    dms: Record<string, IMessage[]>,
-): Promise<void> {
-    await AsyncStorage.setItem(DM_KEY, JSON.stringify(dms));
-}
-
-export async function loadMessages(): Promise<{
-    groups: Record<string, IMessage[]>;
-    dms: Record<string, IMessage[]>;
-}> {
-    const [groupsRaw, dmsRaw] = await Promise.all([
-        AsyncStorage.getItem(GROUP_KEY),
-        AsyncStorage.getItem(DM_KEY),
-    ]);
-    return {
-        groups: groupsRaw ? JSON.parse(groupsRaw) : {},
-        dms: dmsRaw ? JSON.parse(dmsRaw) : {},
-    };
-}
 
 export async function clearMessages(): Promise<void> {
     await Promise.all([
         AsyncStorage.removeItem(GROUP_KEY),
         AsyncStorage.removeItem(DM_KEY),
     ]);
+}
+
+export async function loadFamiliars(): Promise<Record<string, IUser>> {
+    const raw = await AsyncStorage.getItem(FAMILIARS_KEY);
+    return raw ? JSON.parse(raw) : {};
+}
+
+export async function loadMessages(): Promise<{
+    dms: Record<string, IMessage[]>;
+    groups: Record<string, IMessage[]>;
+}> {
+    const [groupsRaw, dmsRaw] = await Promise.all([
+        AsyncStorage.getItem(GROUP_KEY),
+        AsyncStorage.getItem(DM_KEY),
+    ]);
+    return {
+        dms: dmsRaw ? JSON.parse(dmsRaw) : {},
+        groups: groupsRaw ? JSON.parse(groupsRaw) : {},
+    };
+}
+
+export async function saveDmMessages(
+    dms: Record<string, IMessage[]>,
+): Promise<void> {
+    await AsyncStorage.setItem(DM_KEY, JSON.stringify(dms));
 }
 
 // ── Familiars persistence ─────────────────────────────────────────────────────
@@ -55,7 +55,8 @@ export async function saveFamiliars(
     await AsyncStorage.setItem(FAMILIARS_KEY, JSON.stringify(familiars));
 }
 
-export async function loadFamiliars(): Promise<Record<string, IUser>> {
-    const raw = await AsyncStorage.getItem(FAMILIARS_KEY);
-    return raw ? JSON.parse(raw) : {};
+export async function saveGroupMessages(
+    groups: Record<string, IMessage[]>,
+): Promise<void> {
+    await AsyncStorage.setItem(GROUP_KEY, JSON.stringify(groups));
 }

@@ -18,7 +18,7 @@ export interface SendDMResult {
 export async function sendDirectMessage(
     recipientUserID: string,
     content: string,
-    options?: SendDMOptions,
+    _options?: SendDMOptions,
 ): Promise<SendDMResult> {
     const client = $client.get();
     const me = $user.get();

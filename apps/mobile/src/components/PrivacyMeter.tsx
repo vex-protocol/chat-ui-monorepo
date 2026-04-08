@@ -1,5 +1,6 @@
 import React from "react";
-import { View, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
+
 import { colors } from "../theme";
 
 interface PrivacyMeterProps {
@@ -23,15 +24,15 @@ export function PrivacyMeter({ level }: PrivacyMeterProps) {
 }
 
 const styles = StyleSheet.create({
+    bar: {
+        borderRadius: 1,
+        height: 14,
+        width: 8,
+    },
     container: {
+        alignItems: "center",
         flexDirection: "row",
         gap: 3,
-        alignItems: "center",
-    },
-    bar: {
-        width: 8,
-        height: 14,
-        borderRadius: 1,
     },
     filled: {
         backgroundColor: colors.accent,

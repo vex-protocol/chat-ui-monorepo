@@ -1,15 +1,19 @@
+import type { IServer } from "@vex-chat/libvex";
+
 import React from "react";
 import {
-    View,
-    Text,
     FlatList,
-    TouchableOpacity,
     StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { useStore } from "@nanostores/react";
-import type { IServer } from "@vex-chat/libvex";
-import { $servers } from "../store";
+
 import { avatarHue } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
+
+import { $servers } from "../store";
 
 export function ServerListScreen({ navigation }: { navigation: any }) {
     const servers = useStore($servers);
@@ -18,13 +22,13 @@ export function ServerListScreen({ navigation }: { navigation: any }) {
     function renderServer({ item }: { item: IServer }) {
         return (
             <TouchableOpacity
-                style={styles.row}
                 onPress={() =>
                     navigation.navigate("ChannelList", {
                         serverID: item.serverID,
                         serverName: item.name,
                     })
                 }
+                style={styles.row}
             >
                 <View
                     style={[
@@ -61,24 +65,24 @@ export function ServerListScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#1a1a1a" },
-    row: {
-        flexDirection: "row",
+    container: { backgroundColor: "#1a1a1a", flex: 1 },
+    empty: { alignItems: "center", flex: 1, justifyContent: "center" },
+    emptyText: { color: "#666666", fontSize: 14, fontStyle: "italic" },
+    icon: {
         alignItems: "center",
+        borderRadius: 20,
+        height: 40,
+        justifyContent: "center",
+        width: 40,
+    },
+    iconText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    name: { color: "#e8e8e8", fontSize: 16 },
+    row: {
+        alignItems: "center",
+        borderBottomColor: "#2a2a2a",
+        borderBottomWidth: 1,
+        flexDirection: "row",
         gap: 12,
         padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#2a2a2a",
     },
-    icon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    iconText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-    name: { color: "#e8e8e8", fontSize: 16 },
-    empty: { flex: 1, alignItems: "center", justifyContent: "center" },
-    emptyText: { color: "#666666", fontSize: 14, fontStyle: "italic" },
 });

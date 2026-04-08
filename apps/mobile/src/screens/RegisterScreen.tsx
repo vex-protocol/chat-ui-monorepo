@@ -1,19 +1,21 @@
 import React, { useState } from "react";
 import {
-    View,
-    Text,
-    TextInput,
-    TouchableOpacity,
     ActivityIndicator,
-    StyleSheet,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { registerAndBootstrap } from "../store";
+
 import { expoPreset } from "@vex-chat/libvex/preset/expo";
-import { keychainKeyStore } from "../lib/keychain";
+
 import { getServerOptions } from "../lib/config";
+import { keychainKeyStore } from "../lib/keychain";
+import { registerAndBootstrap } from "../store";
 
 export function RegisterScreen({ navigation }: { navigation: any }) {
     const [username, setUsername] = useState("");
@@ -53,8 +55,8 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
 
     return (
         <KeyboardAvoidingView
-            style={styles.page}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
+            style={styles.page}
         >
             <ScrollView
                 contentContainerStyle={styles.scroll}
@@ -73,57 +75,57 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
                     <View style={styles.field}>
                         <Text style={styles.label}>USERNAME</Text>
                         <TextInput
-                            style={styles.input}
-                            value={username}
-                            onChangeText={setUsername}
-                            onChange={(e) => setUsername(e.nativeEvent.text)}
-                            placeholder="choose a username"
-                            placeholderTextColor="#666666"
                             autoCapitalize="none"
                             autoCorrect={false}
-                            textContentType="none"
-                            maxLength={19}
                             editable={!loading}
+                            maxLength={19}
+                            onChange={(e) => { setUsername(e.nativeEvent.text); }}
+                            onChangeText={setUsername}
+                            placeholder="choose a username"
+                            placeholderTextColor="#666666"
+                            style={styles.input}
+                            textContentType="none"
+                            value={username}
                         />
                     </View>
 
                     <View style={styles.field}>
                         <Text style={styles.label}>PASSWORD</Text>
                         <TextInput
-                            style={styles.input}
-                            value={password}
+                            editable={!loading}
+                            onChange={(e) => { setPassword(e.nativeEvent.text); }}
                             onChangeText={setPassword}
-                            onChange={(e) => setPassword(e.nativeEvent.text)}
                             placeholder="••••••••"
                             placeholderTextColor="#666666"
                             secureTextEntry
+                            style={styles.input}
                             textContentType="none"
-                            editable={!loading}
+                            value={password}
                         />
                     </View>
 
                     <View style={styles.field}>
                         <Text style={styles.label}>CONFIRM PASSWORD</Text>
                         <TextInput
-                            style={styles.input}
-                            value={confirm}
+                            editable={!loading}
+                            onChange={(e) => { setConfirm(e.nativeEvent.text); }}
                             onChangeText={setConfirm}
-                            onChange={(e) => setConfirm(e.nativeEvent.text)}
                             placeholder="••••••••"
                             placeholderTextColor="#666666"
                             secureTextEntry
+                            style={styles.input}
                             textContentType="none"
-                            editable={!loading}
+                            value={confirm}
                         />
                     </View>
 
                     <TouchableOpacity
+                        disabled={loading || !username || !password || !confirm}
+                        onPress={handleRegister}
                         style={[
                             styles.button,
                             loading && styles.buttonDisabled,
                         ]}
-                        onPress={handleRegister}
-                        disabled={loading || !username || !password || !confirm}
                     >
                         {loading ? (
                             <ActivityIndicator color="#fff" size="small" />
@@ -151,63 +153,63 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-    page: { flex: 1, backgroundColor: "#1a1a1a" },
-    scroll: {
-        flexGrow: 1,
-        justifyContent: "center",
+    button: {
         alignItems: "center",
-        padding: 16,
+        backgroundColor: "#cc2a2a",
+        borderRadius: 4,
+        marginTop: 4,
+        paddingVertical: 12,
     },
+    buttonDisabled: { opacity: 0.5 },
+    buttonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
     card: {
         backgroundColor: "#141414",
         borderColor: "#2a2a2a",
-        borderWidth: 1,
         borderRadius: 8,
+        borderWidth: 1,
+        gap: 16,
         padding: 32,
         width: 340,
-        gap: 16,
     },
-    title: { color: "#e8e8e8", fontSize: 22, fontWeight: "700" },
-    subtitle: { color: "#a0a0a0", fontSize: 13, marginTop: -8 },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
         borderColor: "#e53935",
-        borderWidth: 1,
         borderRadius: 4,
+        borderWidth: 1,
         padding: 10,
     },
     errorText: { color: "#e53935", fontSize: 13 },
     field: { gap: 5 },
+    footer: {
+        alignItems: "center",
+        flexDirection: "row",
+        justifyContent: "center",
+    },
+    footerText: { color: "#a0a0a0", fontSize: 13 },
+    input: {
+        backgroundColor: "#242424",
+        borderColor: "#2a2a2a",
+        borderRadius: 4,
+        borderWidth: 1,
+        color: "#e8e8e8",
+        fontSize: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
     label: {
         color: "#a0a0a0",
         fontSize: 12,
         fontWeight: "600",
         letterSpacing: 0.5,
     },
-    input: {
-        backgroundColor: "#242424",
-        color: "#e8e8e8",
-        borderColor: "#2a2a2a",
-        borderWidth: 1,
-        borderRadius: 4,
-        paddingVertical: 10,
-        paddingHorizontal: 12,
-        fontSize: 14,
-    },
-    button: {
-        backgroundColor: "#cc2a2a",
-        borderRadius: 4,
-        paddingVertical: 12,
-        alignItems: "center",
-        marginTop: 4,
-    },
-    buttonDisabled: { opacity: 0.5 },
-    buttonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
-    footer: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    footerText: { color: "#a0a0a0", fontSize: 13 },
     link: { color: "#cc2a2a", fontSize: 13, textDecorationLine: "underline" },
+    page: { backgroundColor: "#1a1a1a", flex: 1 },
+    scroll: {
+        alignItems: "center",
+        flexGrow: 1,
+        justifyContent: "center",
+        padding: 16,
+    },
+    subtitle: { color: "#a0a0a0", fontSize: 13, marginTop: -8 },
+    title: { color: "#e8e8e8", fontSize: 22, fontWeight: "700" },
 });

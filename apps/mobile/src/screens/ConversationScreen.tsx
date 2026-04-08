@@ -1,28 +1,32 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import type { IMessage } from "@vex-chat/libvex";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    View,
-    Text,
     FlatList,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
+    Text,
+    View,
 } from "react-native";
+
+import { markRead, sendDirectMessage } from "@vex-chat/store";
+
 import { useStore } from "@nanostores/react";
-import type { IMessage } from "@vex-chat/libvex";
-import { $messages, $user } from "../store";
-import { sendDirectMessage, markRead } from "@vex-chat/store";
-import { setActiveConversation } from "../lib/notifications";
-import { colors, typography } from "../theme";
+
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { setActiveConversation } from "../lib/notifications";
+import { $messages, $user } from "../store";
+import { colors, typography } from "../theme";
 
 export function ConversationScreen({
-    route,
     navigation,
+    route,
 }: {
-    route: any;
     navigation: any;
+    route: any;
 }) {
     const { userID, username } = route.params as {
         userID: string;
@@ -76,23 +80,23 @@ export function ConversationScreen({
         const isOwn = item.authorID === user?.userID;
         return (
             <MessageBubbleRN
-                message={item}
-                isOwn={isOwn}
                 authorName={isOwn ? "You" : username}
+                isOwn={isOwn}
+                message={item}
             />
         );
     }
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             keyboardVerticalOffset={0}
+            style={styles.container}
         >
             <ChatHeader
-                title="Home"
-                subtitle={`@${username}`}
                 onBack={() => navigation.goBack()}
+                subtitle={`@${username}`}
+                title="Home"
             />
 
             {messages.length === 0 ? (
@@ -104,11 +108,11 @@ export function ConversationScreen({
                 </View>
             ) : (
                 <FlatList
+                    contentContainerStyle={styles.list}
                     data={messages}
+                    inverted
                     keyExtractor={(m) => m.mailID}
                     renderItem={renderMessage}
-                    inverted
-                    contentContainerStyle={styles.list}
                 />
             )}
 
@@ -119,11 +123,11 @@ export function ConversationScreen({
             )}
 
             <MessageInputBar
-                value={text}
                 onChangeText={setText}
                 onSend={sendMessage}
                 placeholder={`Message @${username}`}
                 sending={sending}
+                value={text}
             />
         </KeyboardAvoidingView>
     );
@@ -131,21 +135,13 @@ export function ConversationScreen({
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         backgroundColor: colors.bg,
-    },
-    list: {
-        paddingVertical: 8,
+        flex: 1,
     },
     empty: {
-        flex: 1,
         alignItems: "center",
+        flex: 1,
         justifyContent: "center",
-    },
-    emptyText: {
-        ...typography.body,
-        color: colors.mutedDark,
-        fontStyle: "italic",
     },
     emptyHint: {
         ...typography.body,
@@ -153,13 +149,21 @@ const styles = StyleSheet.create({
         fontSize: 11,
         marginTop: 4,
     },
+    emptyText: {
+        ...typography.body,
+        color: colors.mutedDark,
+        fontStyle: "italic",
+    },
     errorBar: {
+        backgroundColor: "rgba(229, 57, 53, 0.15)",
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: "rgba(229, 57, 53, 0.15)",
     },
     errorText: {
         ...typography.body,
         color: colors.error,
+    },
+    list: {
+        paddingVertical: 8,
     },
 });
