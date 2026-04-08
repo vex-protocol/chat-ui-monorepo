@@ -98,7 +98,7 @@ The server itself has a NaCl signing key pair (SPK). The server's public key is 
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/auth` | — | Login; returns JWT + sets `auth` cookie |
+| `POST` | `/auth` | — | Login; returns JWT (Bearer token) |
 | `POST` | `/register` | — | Register user+device (requires NaCl-signed register token) |
 | `GET` | `/token/:type` | JWT (except `register`) | Get scoped action token |
 | `POST` | `/whoami` | JWT | Get current user info |
@@ -136,9 +136,10 @@ Common events: `mail` (new message), `serverChange` (server/channel updated).
 
 Connection flow:
 1. Client fetches a `connect` action token → signs it with device key
-2. `POST /device/:id/connect` → server issues a `device` JWT (cookie)
-3. Client opens WS `/socket` with both `auth` + `device` cookies
-4. Server verifies both JWTs, creates `ClientManager` for the connection
+2. `POST /device/:id/connect` → server issues a `device` JWT (returned in body)
+3. Client opens WS `/socket` (bare, no credentials on upgrade)
+4. Client sends `{ type: "auth", token: JWT }` as first WS message
+5. Server verifies JWT, creates `ClientManager` for the connection
 
 ---
 

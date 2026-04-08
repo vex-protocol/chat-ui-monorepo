@@ -41,7 +41,7 @@ The WebSocket layer handles device authentication (Ed25519 challenge-response) a
 | Bottleneck | Impact | Mitigation |
 |---|---|---|
 | **Password hashing on login/register** | Spire currently uses `pbkdf2Sync` (1000 iterations) which blocks the event loop for ~50-100ms per call — zero requests served during that time. Planned migration to async argon2id (libuv thread pool). | Replace `pbkdf2Sync` with async `crypto.pbkdf2()` as an immediate fix, then migrate to argon2id. Rate limit login endpoints. |
-| **SQLite single-writer lock** | All writes serialize globally. Under write-heavy load (many messages), writes queue behind each other. Reads are unaffected (WAL mode). | **Done** — WAL mode + production PRAGMAs (cache_size=64MB, mmap_size=8GB, busy_timeout=5s) applied at connection open via `createSqliteDb()` helper. |
+| **SQLite single-writer lock** | All writes serialize globally. Under write-heavy load (many messages), writes queue behind each other. Reads are unaffected (WAL mode). | **Done** — WAL mode + production PRAGMAs (cache_size=64MB, busy_timeout=5s) applied at connection open. mmap_size not yet set (future optimization). |
 | **No live push** | Recipients must poll `GET /mail/:deviceID`. Every poll is a DB read + delete. Frequent polling from many clients amplifies read load unnecessarily. | Wire the `onMail` WebSocket callback to push to online recipients, falling back to store-and-forward for offline devices. |
 | **Mail table growth** | If recipients don't fetch mail, rows accumulate indefinitely. No TTL or expiry on mail rows. | Add a periodic cleanup job or a `created_at` column with TTL-based expiry. |
 

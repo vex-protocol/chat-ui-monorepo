@@ -1,6 +1,6 @@
 # ADR-008: Bearer Token Auth Over Cookies
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-07
 **Deciders:** @dgill
 

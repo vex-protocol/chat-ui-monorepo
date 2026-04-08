@@ -208,7 +208,7 @@ export async function registerAndBootstrap(
             };
         }
 
-        // login() sets the auth cookie needed by connect()
+        // login() sets the Bearer token needed by connect()
         const loginErr = await client.login(username, password);
         if (loginErr) {
             return {
