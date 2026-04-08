@@ -32,6 +32,10 @@ function saveVerified(keys: Set<string>): void {
 
 export const $verifiedKeys = atom<Set<string>>(loadVerified());
 
+export function isVerified(signKey: string): boolean {
+    return $verifiedKeys.get().has(signKey);
+}
+
 export function markVerified(signKey: string): void {
     const keys = new Set($verifiedKeys.get());
     keys.add(signKey);
@@ -44,8 +48,4 @@ export function unmarkVerified(signKey: string): void {
     keys.delete(signKey);
     $verifiedKeys.set(keys);
     saveVerified(keys);
-}
-
-export function isVerified(signKey: string): boolean {
-    return $verifiedKeys.get().has(signKey);
 }

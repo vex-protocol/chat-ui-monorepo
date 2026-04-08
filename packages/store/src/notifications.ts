@@ -1,14 +1,15 @@
 import type { IMessage } from "@vex-chat/libvex";
+
 import { $user } from "./user.ts";
 
 export interface NotificationPayload {
-    title: string;
+    authorID: string;
     body: string;
     conversationKey: string;
-    mailID: string;
-    authorID: string;
     /** Set for group messages — the channelID. */
-    group: string | null;
+    group: null | string;
+    mailID: string;
+    title: string;
 }
 
 /**
@@ -27,12 +28,12 @@ export interface NotificationPayload {
  */
 export function shouldNotify(
     msg: IMessage,
-    activeConversation: string | null,
+    activeConversation: null | string,
     appFocused: boolean,
     resolveAuthorName?: (userID: string) => string | undefined,
     resolveChannelInfo?: (
         channelID: string,
-    ) => { channelName: string; serverName: string } | undefined,
+    ) => undefined | { channelName: string; serverName: string },
 ): NotificationPayload | null {
     const me = $user.get();
     if (!me) return null;
@@ -60,11 +61,11 @@ export function shouldNotify(
             : msg.message;
 
     return {
-        title,
+        authorID: msg.authorID,
         body,
         conversationKey,
-        mailID: msg.mailID,
-        authorID: msg.authorID,
         group: msg.group,
+        mailID: msg.mailID,
+        title,
     };
 }

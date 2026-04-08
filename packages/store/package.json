@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "devDependencies": {
+    "@vex-chat/eslint-config": "workspace:*"
+  },
   "dependencies": {
     "@vex-chat/libvex": "1.2.0-rc.1",
     "nanostores": "catalog:",

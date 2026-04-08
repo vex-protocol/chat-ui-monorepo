@@ -1,5 +1,6 @@
-import { map } from "nanostores";
 import type { IUser } from "@vex-chat/libvex";
+
+import { map } from "nanostores";
 
 /**
  * Online users per channel, keyed by channelID.

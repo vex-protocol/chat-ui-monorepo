@@ -1,15 +1,11 @@
-import ts from "@typescript-eslint/eslint-plugin";
-import parser from "@typescript-eslint/parser";
-import eslintConfigPrettier from "eslint-config-prettier";
+/**
+ * Root ESLint config — fallback for files at the repo root.
+ * Each app/package has its own eslint.config.js that imports
+ * from @vex-chat/eslint-config/base.
+ */
+import { base } from "@vex-chat/eslint-config/base";
 
 export default [
-    {
-        files: ["**/*.ts"],
-        languageOptions: { parser },
-        plugins: { "@typescript-eslint": ts },
-        rules: {
-            "@typescript-eslint/no-explicit-any": "off",
-        },
-    },
-    eslintConfigPrettier,
+    { ignores: ["apps/**", "packages/**", "node_modules/**", "scripts/**"] },
+    ...base,
 ];

@@ -1,4 +1,4 @@
-import { map, computed } from "nanostores";
+import { computed, map } from "nanostores";
 
 /** Unread DM counts, keyed by userID. */
 export const $dmUnreadCounts = map<Record<string, number>>({});
@@ -16,14 +16,14 @@ export const $totalChannelUnread = computed($channelUnreadCounts, (counts) =>
     Object.values(counts).reduce((sum, n) => sum + n, 0),
 );
 
-export function incrementDmUnread(userID: string): void {
-    const prev = $dmUnreadCounts.get()[userID] ?? 0;
-    $dmUnreadCounts.setKey(userID, prev + 1);
-}
-
 export function incrementChannelUnread(channelID: string): void {
     const prev = $channelUnreadCounts.get()[channelID] ?? 0;
     $channelUnreadCounts.setKey(channelID, prev + 1);
+}
+
+export function incrementDmUnread(userID: string): void {
+    const prev = $dmUnreadCounts.get()[userID] ?? 0;
+    $dmUnreadCounts.setKey(userID, prev + 1);
 }
 
 export function markRead(conversationKey: string): void {

@@ -1,31 +1,43 @@
-// Client singleton
-export { $client } from "./client.ts";
+export { $avatarHash } from "./avatarHash.ts";
 
 // Auth flows (register, login, auto-login — each creates Client + wires events + connects)
 export {
-    registerAndBootstrap,
-    loginAndBootstrap,
     autoLogin,
+    loginAndBootstrap,
+    registerAndBootstrap,
 } from "./bootstrap.ts";
-export type { ServerOptions, AuthResult } from "./bootstrap.ts";
-export { $keyReplaced } from "./key-replaced.ts";
-
-// State atoms
-export { $user } from "./user.ts";
-export { $familiars } from "./familiars.ts";
-export { $messages, $groupMessages } from "./messages.ts";
-export { $servers } from "./servers.ts";
+export type { AuthResult, ServerOptions } from "./bootstrap.ts";
 export { $channels } from "./channels.ts";
-export { $permissions } from "./permissions.ts";
+
+// Client singleton
+export { $client } from "./client.ts";
+// Deep link parsing
+export { parseInviteID, parseVexLink } from "./deeplink.ts";
+export type { VexLink } from "./deeplink.ts";
 export { $devices } from "./devices.ts";
-export { $onlineLists } from "./onlineLists.ts";
-export { $avatarHash } from "./avatarHash.ts";
+export { $familiars } from "./familiars.ts";
+export { $keyReplaced } from "./key-replaced.ts";
+// Message utilities
 export {
-    $verifiedKeys,
-    markVerified,
-    unmarkVerified,
-    isVerified,
-} from "./verifiedKeys.ts";
+    applyEmoji,
+    avatarHue,
+    chunkMessages,
+    formatFileSize,
+    formatTime,
+    isImageType,
+    parseFileExtra,
+} from "./message-utils.ts";
+export type { FileAttachment, MessageChunk } from "./message-utils.ts";
+export { $groupMessages, $messages } from "./messages.ts";
+// Notification decisions
+export { shouldNotify } from "./notifications.ts";
+
+export type { NotificationPayload } from "./notifications.ts";
+export { $onlineLists } from "./onlineLists.ts";
+
+export { $permissions } from "./permissions.ts";
+// Reset
+export { resetAll } from "./reset.ts";
 
 // Send DM
 export { sendDirectMessage } from "./send-dm.ts";
@@ -33,42 +45,30 @@ export type { SendDMOptions, SendDMResult } from "./send-dm.ts";
 
 // Send group message
 export { sendGroupMessage } from "./send-group-message.ts";
+
 export type {
     SendGroupMessageOptions,
     SendGroupMessageResult,
 } from "./send-group-message.ts";
-
-// Notification decisions
-export { shouldNotify } from "./notifications.ts";
-export type { NotificationPayload } from "./notifications.ts";
+export { $servers } from "./servers.ts";
 
 // Unread counts
 export {
-    $dmUnreadCounts,
     $channelUnreadCounts,
-    $totalDmUnread,
+    $dmUnreadCounts,
     $totalChannelUnread,
-    incrementDmUnread,
+    $totalDmUnread,
     incrementChannelUnread,
+    incrementDmUnread,
     markRead,
     resetAllUnread,
 } from "./unread.ts";
+// State atoms
+export { $user } from "./user.ts";
 
-// Message utilities
 export {
-    avatarHue,
-    chunkMessages,
-    parseFileExtra,
-    isImageType,
-    formatFileSize,
-    applyEmoji,
-    formatTime,
-} from "./message-utils.ts";
-export type { MessageChunk, FileAttachment } from "./message-utils.ts";
-
-// Deep link parsing
-export { parseVexLink, parseInviteID } from "./deeplink.ts";
-export type { VexLink } from "./deeplink.ts";
-
-// Reset
-export { resetAll } from "./reset.ts";
+    $verifiedKeys,
+    isVerified,
+    markVerified,
+    unmarkVerified,
+} from "./verifiedKeys.ts";

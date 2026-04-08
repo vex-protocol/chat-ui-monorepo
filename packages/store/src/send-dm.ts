@@ -2,13 +2,13 @@ import { $client } from "./client.ts";
 import { $user } from "./user.ts";
 
 export interface SendDMOptions {
+    extra?: null | string;
     mailType?: string;
-    extra?: string | null;
 }
 
 export interface SendDMResult {
-    ok: boolean;
     error?: string;
+    ok: boolean;
 }
 
 /**
@@ -22,12 +22,12 @@ export async function sendDirectMessage(
 ): Promise<SendDMResult> {
     const client = $client.get();
     const me = $user.get();
-    if (!client || !me) return { ok: false, error: "Not connected" };
+    if (!client || !me) return { error: "Not connected", ok: false };
 
     try {
         await client.messages.send(recipientUserID, content);
         return { ok: true };
     } catch (err: any) {
-        return { ok: false, error: err?.message ?? "Failed to send message" };
+        return { error: err?.message ?? "Failed to send message", ok: false };
     }
 }

@@ -1,15 +1,15 @@
-import { $client } from "./client.ts";
-import { $keyReplaced } from "./key-replaced.ts";
-import { $user } from "./user.ts";
-import { $familiars } from "./familiars.ts";
-import { $messages, $groupMessages } from "./messages.ts";
-import { $servers } from "./servers.ts";
-import { $channels } from "./channels.ts";
-import { $permissions } from "./permissions.ts";
-import { $devices } from "./devices.ts";
-import { $onlineLists } from "./onlineLists.ts";
 import { $avatarHash } from "./avatarHash.ts";
-import { $dmUnreadCounts, $channelUnreadCounts } from "./unread.ts";
+import { $channels } from "./channels.ts";
+import { $client } from "./client.ts";
+import { $devices } from "./devices.ts";
+import { $familiars } from "./familiars.ts";
+import { $keyReplaced } from "./key-replaced.ts";
+import { $groupMessages, $messages } from "./messages.ts";
+import { $onlineLists } from "./onlineLists.ts";
+import { $permissions } from "./permissions.ts";
+import { $servers } from "./servers.ts";
+import { $channelUnreadCounts, $dmUnreadCounts } from "./unread.ts";
+import { $user } from "./user.ts";
 
 /**
  * Resets all nanostores atoms to their default values.

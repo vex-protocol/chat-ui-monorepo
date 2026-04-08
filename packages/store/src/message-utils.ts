@@ -2,6 +2,21 @@ import type { IMessage } from "@vex-chat/libvex";
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
+export interface FileAttachment {
+    contentType: string;
+    fileID: string;
+    fileName: string;
+    fileSize: number;
+}
+
+// ── File attachment parsing ──────────────────────────────────────────────────
+
+export interface MessageChunk {
+    authorID: string;
+    firstTime: Date;
+    messages: IMessage[];
+}
+
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
 export function avatarHue(id: string): number {
     let h = 0;
@@ -9,16 +24,19 @@ export function avatarHue(id: string): number {
     return Math.abs(h) % 360;
 }
 
-// ── File attachment parsing ──────────────────────────────────────────────────
-
-export interface FileAttachment {
-    fileID: string;
-    fileName: string;
-    fileSize: number;
-    contentType: string;
+export function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export function parseFileExtra(extra: string | null): FileAttachment | null {
+export function isImageType(contentType: string): boolean {
+    return contentType.startsWith("image/");
+}
+
+// ── Message chunking ─────────────────────────────────────────────────────────
+
+export function parseFileExtra(extra: null | string): FileAttachment | null {
     if (!extra) return null;
     try {
         const obj = JSON.parse(extra);
@@ -33,24 +51,6 @@ export function parseFileExtra(extra: string | null): FileAttachment | null {
         /* not file JSON */
     }
     return null;
-}
-
-export function isImageType(contentType: string): boolean {
-    return contentType.startsWith("image/");
-}
-
-export function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-// ── Message chunking ─────────────────────────────────────────────────────────
-
-export interface MessageChunk {
-    authorID: string;
-    messages: IMessage[];
-    firstTime: Date;
 }
 
 const CHUNK_GAP_MS = 5 * 60 * 1000; // 5 minutes
@@ -82,8 +82,8 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
         } else {
             chunks.push({
                 authorID: msg.authorID,
-                messages: [msg],
                 firstTime: msg.timestamp,
+                messages: [msg],
             });
         }
     }
@@ -94,35 +94,35 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
 // ── Emoji shortcodes ────────────────────────────────────────────────────────
 
 const EMOJI: Record<string, string> = {
-    smile: "😊",
-    grin: "😁",
-    laugh: "😂",
-    joy: "😂",
-    heart: "❤️",
-    thumbsup: "👍",
-    "+1": "👍",
-    thumbsdown: "👎",
     "-1": "👎",
-    fire: "🔥",
-    rocket: "🚀",
-    wave: "👋",
-    check: "✅",
-    x: "❌",
-    star: "⭐",
-    eyes: "👀",
-    tada: "🎉",
-    clap: "👏",
-    pray: "🙏",
-    muscle: "💪",
-    cool: "😎",
-    think: "🤔",
-    shrug: "🤷",
-    ok: "👌",
-    zzz: "😴",
-    cry: "😢",
+    "+1": "👍",
     angry: "😠",
+    check: "✅",
+    clap: "👏",
     confused: "😕",
+    cool: "😎",
+    cry: "😢",
     dizzy: "😵",
+    eyes: "👀",
+    fire: "🔥",
+    grin: "😁",
+    heart: "❤️",
+    joy: "😂",
+    laugh: "😂",
+    muscle: "💪",
+    ok: "👌",
+    pray: "🙏",
+    rocket: "🚀",
+    shrug: "🤷",
+    smile: "😊",
+    star: "⭐",
+    tada: "🎉",
+    think: "🤔",
+    thumbsdown: "👎",
+    thumbsup: "👍",
+    wave: "👋",
+    x: "❌",
+    zzz: "😴",
 };
 
 /** Replaces :shortcode: with emoji characters. */
@@ -145,7 +145,7 @@ export function formatTime(date: Date): string {
     });
     if (sameDay) return hhmm;
     return (
-        date.toLocaleDateString([], { month: "short", day: "numeric" }) +
+        date.toLocaleDateString([], { day: "numeric", month: "short" }) +
         " " +
         hhmm
     );

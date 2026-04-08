@@ -1,5 +1,6 @@
-import { map } from "nanostores";
 import type { IMessage } from "@vex-chat/libvex";
+
+import { map } from "nanostores";
 
 /**
  * Direct messages, keyed by the other party's userID.

@@ -9,8 +9,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "@sveltejs/adapter-vercel": "^5.7.4",
     "@sveltejs/kit": "^2.21.1",
@@ -21,7 +20,8 @@
     "svelte-check": "^4.3.4",
     "tailwindcss": "^4.2.1",
     "typescript": "~5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "@vex-chat/eslint-config": "workspace:*"
   },
   "license": "AGPL-3.0-or-later"
 }
