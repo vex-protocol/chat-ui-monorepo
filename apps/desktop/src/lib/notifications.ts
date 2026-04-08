@@ -8,11 +8,10 @@ import type { IMessage } from "@vex-chat/libvex";
 import { shouldNotify } from "@vex-chat/store";
 import { playNotify } from "./sounds.js";
 
-/** Minimal interface needed to subscribe/unsubscribe to mail events. */
+/** Minimal interface needed to subscribe/unsubscribe to message events. */
 interface MailEventEmitter {
-    on(event: "mail", handler: (mail: IMessage) => void): void;
-    off(event: "mail", handler: (mail: IMessage) => void): void;
-    getUser(userID: string): Promise<{ username: string } | null>;
+    on(event: "message", handler: (mail: IMessage) => void): void;
+    off(event: "message", handler: (mail: IMessage) => void): void;
 }
 
 // ── Preference ────────────────────────────────────────────────────────────────
@@ -75,22 +74,9 @@ export function setupNotifications(
 
         // If author name wasn't resolved (or is just a truncated UUID), fetch from server
         const knownName = resolveAuthorName?.(mail.authorID);
-        if (!knownName || knownName === mail.authorID.slice(0, 8)) {
-            try {
-                const user = await client.getUser(mail.authorID);
-                if (user) {
-                    const name = user.username;
-                    if (mail.group) {
-                        const info = resolveChannelInfo?.(mail.group);
-                        payload.title = info
-                            ? `${name} (#${info.channelName}, ${info.serverName})`
-                            : `${name} (#channel)`;
-                    } else {
-                        payload.title = name;
-                    }
-                }
-            } catch {}
-        }
+        // TODO: user lookup for notification title — needs a lookup callback or
+        // the MailEventEmitter interface needs a users.retrieve method
+        void knownName;
 
         playNotify();
 
@@ -102,8 +88,8 @@ export function setupNotifications(
         }
     };
 
-    client.on("mail", handler);
+    client.on("message", handler);
     return () => {
-        client.off("mail", handler);
+        client.off("message", handler);
     };
 }

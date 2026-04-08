@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { StoredCredentials } from '@vex-chat/libvex'
   import { push } from 'svelte-spa-router'
   import { theme, toggleTheme } from '../lib/stores/theme.js'
   import { client, user } from '../lib/store/index.js'
@@ -19,34 +20,16 @@
   let deleteConfirmID: string | null = $state(null)
   let deleteError = $state('')
 
+  // TODO: device management — needs IDevices.list() and proper delete API
   async function loadDevices(): Promise<void> {
-    const userID = $user?.userID
-    if (!userID || !$client) return
-    devicesLoading = true
-    devicesError = ''
-    try {
-      devices = await $client.devices.list(userID) ?? []
-    } catch (err) {
-      devicesError = err instanceof Error ? err.message : 'Failed to load devices'
-    } finally {
-      devicesLoading = false
-    }
+    devicesLoading = false
+    devicesError = 'Device listing not yet supported by SDK'
   }
 
-  async function handleDeleteDevice(deviceID: string): Promise<void> {
-    const userID = $user?.userID
-    if (!userID || !$client) return
-    deleteError = ''
-    try {
-      await $client.deleteDevice(userID, deviceID)
-      devices = devices.filter(d => d.deviceID !== deviceID)
-      deleteConfirmID = null
-    } catch (err) {
-      deleteError = err instanceof Error ? err.message : 'Failed to delete device'
-    }
+  async function handleDeleteDevice(_deviceID: string): Promise<void> {
+    deleteError = 'Device deletion not yet supported by SDK'
   }
 
-  // Load devices on mount
   loadDevices()
 
   // ── Sounds ──────────────────────────────────────────────────────────────────
@@ -81,12 +64,11 @@
 
   // ── Account info ────────────────────────────────────────────────────────────
 
-  let creds: import('@vex-chat/libvex').StoredCredentials | null = $state(null)
-  let fingerprint = $derived(
-    creds?.deviceKey
-      ? creds.deviceKey.slice(0, 16).toUpperCase()
-      : 'N/A'
-  )
+  let creds: StoredCredentials | null = $state(null)
+  let fingerprint = $derived.by(() => {
+    const key = creds?.deviceKey
+    return key ? key.slice(0, 16).toUpperCase() : 'N/A'
+  })
 
   // Load credentials from KeyStore on mount
   keyStore.loadActive().then((c) => { creds = c })
@@ -116,7 +98,7 @@
     avatarUploading = true
     try {
       const data = new Uint8Array(await file.arrayBuffer())
-      await $client.setAvatar(data, file.type)
+      await $client.me.setAvatar(data)
       avatarHash.set(Date.now())
     } catch (err) {
       avatarError = err instanceof Error ? err.message : 'Upload failed'

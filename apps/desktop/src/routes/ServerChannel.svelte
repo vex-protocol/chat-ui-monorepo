@@ -36,26 +36,8 @@
     sending = true
     sendError = ''
     try {
-      // Upload attachment first if present
-      let mailType: string | undefined
-      let extra: string | null | undefined
-      if (attachment) {
-        const buf = new Uint8Array(await attachment.arrayBuffer())
-        const { fileID } = await $client.uploadFile(buf, attachment.type)
-        mailType = 'file'
-        extra = JSON.stringify({
-          fileID,
-          fileName: attachment.name,
-          fileSize: attachment.size,
-          contentType: attachment.type,
-        })
-      }
-
-      const result = await sendGroupMessage(channelID, content, {
-        mailType,
-        extra,
-        keyStore,
-      })
+      // TODO: file attachment upload — needs client.files.create() integration
+      const result = await sendGroupMessage(channelID, content)
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'
       }

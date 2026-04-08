@@ -12,7 +12,7 @@
 
   async function loadInvites(): Promise<void> {
     try {
-      invites = await $client!.listInvites(serverID)
+      invites = await $client!.invites.retrieve(serverID)
     } catch {
       // ignore — empty list is fine
     } finally {

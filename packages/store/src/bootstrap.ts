@@ -94,29 +94,8 @@ export interface AuthResult {
     error?: string;
 }
 
-/**
- * Deletes all of the current user's stale devices except the active one.
- * Prevents fan-out to abandoned device registrations when sending messages.
- */
-async function cleanupStaleDevices(client: Client): Promise<void> {
-    try {
-        const me = client.me.user();
-        const myDevice = client.me.device();
-        const allDevices = await client.devices.list(me.userID);
-        if (!allDevices || allDevices.length <= 1) return;
-
-        for (const device of allDevices) {
-            if (device.deviceID === myDevice.deviceID) continue;
-            try {
-                await client.devices.delete(device.deviceID);
-            } catch {
-                /* non-fatal — server may reject if device is active */
-            }
-        }
-    } catch {
-        /* non-fatal */
-    }
-}
+// TODO: cleanupStaleDevices removed — Client.devices.list() doesn't exist in the
+// public API. Re-add when IDevices exposes a list method.
 
 /**
  * Internal: creates the Client, wires events to nanostores atoms.
@@ -242,7 +221,7 @@ export async function registerAndBootstrap(
         }
 
         await populateState(client);
-        cleanupStaleDevices(client); // fire-and-forget
+        // TODO: cleanupStaleDevices — needs IDevices.list() API
 
         return { ok: true };
     } catch (err: any) {
@@ -336,7 +315,7 @@ export async function loginAndBootstrap(
 
         // Populate servers and channels
         await populateState(client);
-        cleanupStaleDevices(client); // fire-and-forget
+        // TODO: cleanupStaleDevices — needs IDevices.list() API
 
         return { ok: true };
     } catch (err: any) {
@@ -371,7 +350,7 @@ export async function autoLogin(
         $user.set(client.me.user());
 
         await populateState(client);
-        cleanupStaleDevices(client); // fire-and-forget
+        // TODO: cleanupStaleDevices — needs IDevices.list() API
         return { ok: true };
     } catch (err: any) {
         if ($keyReplaced.get()) return { ok: false, keyReplaced: true };

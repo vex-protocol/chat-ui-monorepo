@@ -81,8 +81,8 @@ importers:
         specifier: ^2.10.0
         version: 2.10.1
       '@vex-chat/libvex':
-        specifier: ^1.1.0
-        version: 1.1.0(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)
+        specifier: 1.2.0-rc.1
+        version: 1.2.0-rc.1(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -151,8 +151,8 @@ importers:
         specifier: ^7.3.0
         version: 7.14.10(@react-navigation/native@7.2.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native-screens@4.23.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       '@vex-chat/libvex':
-        specifier: ^1.1.0
-        version: 1.1.0(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)
+        specifier: 1.2.0-rc.1
+        version: 1.2.0-rc.1(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)
       '@vex-chat/store':
         specifier: workspace:*
         version: link:../../packages/store
@@ -245,8 +245,8 @@ importers:
         specifier: '>=0.8'
         version: 1.1.0(nanostores@1.2.0)(react@19.2.3)
       '@vex-chat/libvex':
-        specifier: ^1.1.0
-        version: 1.1.0(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@6.0.2)
+        specifier: 1.2.0-rc.1
+        version: 1.2.0-rc.1(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@6.0.2)
       nanostores:
         specifier: 'catalog:'
         version: 1.2.0
@@ -2610,9 +2610,9 @@ packages:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@1.1.0':
-    resolution: {integrity: sha512-7xRNuRT3iAfnakMHEyuZfhajjCcS/LTJK3BingXOa78ky6uyYsvfs7vCDo+F9uo3Mz79jlyZd5N6F2SdQbV9Eg==}
-    engines: {node: '>=24.0.0'}
+  '@vex-chat/libvex@1.2.0-rc.1':
+    resolution: {integrity: sha512-1BqKwrWONYygrBLkOi4TtqephtRjMdpeTke230xNJoK/c8NQqEOFegH3OdhNayMfbs/GfB6XhhkXaqRt83MZWA==}
+    engines: {node: '>=24.0.0', npm: '>=10.0.0'}
     peerDependencies:
       '@tauri-apps/plugin-sql': '>=2.0.0'
       better-sqlite3: '>=11.0.0'
@@ -2631,13 +2631,9 @@ packages:
       kysely-expo:
         optional: true
 
-  '@vex-chat/types@1.0.1':
-    resolution: {integrity: sha512-GZMGtoVVYNY9wNQTVuRL6BTDaQk01wohgL227oreV/nZF5bPaBvzorXeqAFjYxFMkboZG4y8nJSF0fiic6rkxw==}
-    peerDependencies:
-      tweetnacl: ^1.0.3
-    peerDependenciesMeta:
-      tweetnacl:
-        optional: true
+  '@vex-chat/types@1.1.0-rc.6':
+    resolution: {integrity: sha512-99i3MsuC5+/BZYNuFKbYJ92lLA4WYGKNCHzu8kc8MA/MpHnNoN6kdQg3KY6PHMmaJuzU94Ph9kNJzc0eayX4WQ==}
+    engines: {node: '>=24.0.0', npm: '>=10.0.0'}
 
   '@vscode/sudo-prompt@9.3.2':
     resolution: {integrity: sha512-gcXoCN00METUNFeQOFJ+C9xUI0DKB+0EGMVg7wbVYRHBw2Eq3fKisDZOkRdOz3kqXRKOENMfShPOmypw1/8nOw==}
@@ -6108,6 +6104,9 @@ packages:
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
+  zod@4.3.6:
+    resolution: {integrity: sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==}
+
 snapshots:
 
   '@angular/compiler@11.2.14':
@@ -8415,7 +8414,9 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.4': {}
@@ -9269,12 +9270,12 @@ snapshots:
       - rollup
       - supports-color
 
-  '@vex-chat/crypto@1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@5.9.3)':
+  '@vex-chat/crypto@1.1.1(@vex-chat/types@1.1.0-rc.6)(typescript@5.9.3)':
     dependencies:
       '@noble/hashes': 2.0.1
       '@stablelib/base64': 2.0.1
       '@stablelib/utf8': 2.1.0
-      '@vex-chat/types': 1.0.1(tweetnacl@1.0.3)
+      '@vex-chat/types': 1.1.0-rc.6
       bip39: 3.1.0
       ed2curve: 0.3.0
       msgpackr: 1.11.8
@@ -9282,12 +9283,12 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@vex-chat/crypto@1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@6.0.2)':
+  '@vex-chat/crypto@1.1.1(@vex-chat/types@1.1.0-rc.6)(typescript@6.0.2)':
     dependencies:
       '@noble/hashes': 2.0.1
       '@stablelib/base64': 2.0.1
       '@stablelib/utf8': 2.1.0
-      '@vex-chat/types': 1.0.1(tweetnacl@1.0.3)
+      '@vex-chat/types': 1.1.0-rc.6
       bip39: 3.1.0
       ed2curve: 0.3.0
       msgpackr: 1.11.8
@@ -9295,11 +9296,11 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.2
 
-  '@vex-chat/libvex@1.1.0(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)':
+  '@vex-chat/libvex@1.2.0-rc.1(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@5.9.3)':
     dependencies:
       '@extrahash/sleep': 1.0.1
-      '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@5.9.3)
-      '@vex-chat/types': 1.0.1(tweetnacl@1.0.3)
+      '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.1.0-rc.6)(typescript@5.9.3)
+      '@vex-chat/types': 1.1.0-rc.6
       axios: 1.14.0(debug@4.4.3)
       eventemitter3: 5.0.4
       kysely: 0.28.15
@@ -9323,11 +9324,11 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@vex-chat/libvex@1.1.0(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@6.0.2)':
+  '@vex-chat/libvex@1.2.0-rc.1(@tauri-apps/plugin-sql@2.4.0)(better-sqlite3@11.10.0)(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely-dialect-tauri@1.2.1(@tauri-apps/plugin-sql@2.4.0)(kysely@0.28.15))(kysely-expo@5.0.0(expo-sqlite@55.0.13(expo@55.0.11)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@6.0.2))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3))(kysely@0.28.15))(typescript@6.0.2)':
     dependencies:
       '@extrahash/sleep': 1.0.1
-      '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.0.1(tweetnacl@1.0.3))(typescript@6.0.2)
-      '@vex-chat/types': 1.0.1(tweetnacl@1.0.3)
+      '@vex-chat/crypto': 1.1.1(@vex-chat/types@1.1.0-rc.6)(typescript@6.0.2)
+      '@vex-chat/types': 1.1.0-rc.6
       axios: 1.14.0(debug@4.4.3)
       eventemitter3: 5.0.4
       kysely: 0.28.15
@@ -9351,9 +9352,9 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@vex-chat/types@1.0.1(tweetnacl@1.0.3)':
-    optionalDependencies:
-      tweetnacl: 1.0.3
+  '@vex-chat/types@1.1.0-rc.6':
+    dependencies:
+      zod: 4.3.6
 
   '@vscode/sudo-prompt@9.3.2':
     optional: true
@@ -13304,3 +13305,5 @@ snapshots:
   zimmerframe@1.1.4: {}
 
   zod@3.25.76: {}
+
+  zod@4.3.6: {}

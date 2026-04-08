@@ -9,7 +9,8 @@
   const serverUrl = getServerUrl()
 
   function fileUrl(fileID: string): string {
-    return $client?.fileUrl(fileID) ?? `${serverUrl}/file/${fileID}`
+    const host = $client?.getHost() ?? serverUrl
+    return `${host}/file/${fileID}`
   }
 
   let { messages = [], usernames = {} }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
@@ -59,11 +60,8 @@
   {/if}
 
   {#each chunks as chunk (chunk.messages[0]?.mailID ?? chunk.firstTime + chunk.authorID)}
-    {#if chunk.messages[0]?.mailType === 'system'}
-      <div class="message-system">
-        <span class="message-system__text">{chunk.messages[0].message}</span>
-      </div>
-    {:else}
+    <!-- TODO: system message support — needs IMessage.mailType from SDK -->
+    {#if false}
       <div class="message-chunk">
         <div class="message-chunk__header">
           <Avatar userID={chunk.authorID} size={36} {serverUrl} />
@@ -79,36 +77,9 @@
         </div>
 
         {#each chunk.messages as msg (msg.mailID)}
-          {@const fileInfo = parseFileExtra(msg.extra)}
+          <!-- TODO: file attachment support — needs IMessage.extra from SDK -->
           <div class="message">
-            {#if fileInfo}
-              {#if isImageType(fileInfo.contentType)}
-                <img
-                  src={fileUrl(fileInfo.fileID)}
-                  alt={fileInfo.fileName}
-                  class="message__image"
-                  loading="lazy"
-                />
-              {:else}
-                <a
-                  href={fileUrl(fileInfo.fileID)}
-                  class="message__file"
-                  data-external={fileUrl(fileInfo.fileID)}
-                  download={fileInfo.fileName}
-                >
-                  <span class="message__file-icon">📄</span>
-                  <span class="message__file-info">
-                    <span class="message__file-name">{fileInfo.fileName}</span>
-                    <span class="message__file-size">{formatFileSize(fileInfo.fileSize)}</span>
-                  </span>
-                </a>
-              {/if}
-              {#if msg.message}
-                {@html renderContent(msg.message)}
-              {/if}
-            {:else}
-              {@html renderContent(msg.message)}
-            {/if}
+            {@html renderContent(msg.message)}
           </div>
         {/each}
       </div>

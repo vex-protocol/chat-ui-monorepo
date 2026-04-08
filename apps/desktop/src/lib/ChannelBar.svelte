@@ -87,7 +87,7 @@
     if (!name || !serverID) return
     addingError = ''
     try {
-      const channel = await $client!.createChannel(serverID, name)
+      const channel = await $client!.channels.create(name, serverID)
       const current = channelsStore.get()[serverID] ?? []
       channelsStore.setKey(serverID, [...current, channel])
       addingChannel = false

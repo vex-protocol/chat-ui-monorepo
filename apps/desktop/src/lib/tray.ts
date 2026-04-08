@@ -3,8 +3,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { IMessage } from "@vex-chat/libvex";
 
 interface MailEmitter {
-    on(event: "mail", handler: (mail: IMessage) => void): void;
-    off(event: "mail", handler: (mail: IMessage) => void): void;
+    on(event: "message", handler: (mail: IMessage) => void): void;
+    off(event: "message", handler: (mail: IMessage) => void): void;
 }
 
 /**
@@ -42,10 +42,10 @@ export function setupTray(
         });
     };
 
-    client.on("mail", mailHandler);
+    client.on("message", mailHandler);
 
     return () => {
-        client.off("mail", mailHandler);
+        client.off("message", mailHandler);
         unlistenFocus?.();
     };
 }
