@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -10,7 +10,7 @@ import { colors, typography } from "../theme";
 interface MessageBubbleRNProps {
     authorName: string;
     isOwn: boolean;
-    message: IMessage;
+    message: Message;
 }
 
 export function MessageBubbleRN({

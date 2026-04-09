@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IUser } from '@vex-chat/libvex'
+  import type { User } from '@vex-chat/libvex'
 
   import { push } from 'svelte-spa-router'
 
@@ -19,7 +19,7 @@
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (!saved) return
-      const list = JSON.parse(saved) as IUser[]
+      const list = JSON.parse(saved) as User[]
       for (const u of list) familiarsStore.setKey(u.userID, u)
     } catch {
       // ignore
@@ -31,7 +31,7 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
   }
 
-  function addFamiliar(user: IUser): void {
+  function addFamiliar(user: User): void {
     familiarsStore.setKey(user.userID, user)
     saveFamiliars()
   }
@@ -41,7 +41,7 @@
   // ── Search ────────────────────────────────────────────────────────────────────
 
   let query = $state('')
-  let results: IUser[] = $state([])
+  let results: User[] = $state([])
   let searching = $state(false)
   let searchTimer: null | ReturnType<typeof setTimeout> = null
 
@@ -57,7 +57,7 @@
     }, 250)
   }
 
-  function openDM(user: IUser): void {
+  function openDM(user: User): void {
     addFamiliar(user)
     query = ''
     results = []

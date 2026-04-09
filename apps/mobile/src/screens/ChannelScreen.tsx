@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -91,7 +91,7 @@ export function ChannelScreen({
         setSending(false);
     }, [text, user, channelID]);
 
-    function renderMessage({ item }: { item: IMessage }) {
+    function renderMessage({ item }: { item: Message }) {
         const isOwn = item.authorID === user?.userID;
         return (
             <MessageBubbleRN

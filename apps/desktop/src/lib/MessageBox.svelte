@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IMessage } from '@vex-chat/libvex'
+  import type { Message } from '@vex-chat/libvex'
 
   import { onMount } from 'svelte'
 
@@ -9,7 +9,7 @@
 
   const serverUrl = getServerUrl()
 
-  let { messages, usernames }: { messages: IMessage[]; usernames?: Record<string, string> } = $props()
+  let { messages, usernames }: { messages: Message[]; usernames?: Record<string, string> } = $props()
 
   const chunks = $derived(chunkMessages(messages))
 
@@ -56,7 +56,7 @@
   {/if}
 
   {#each chunks as chunk (chunk.messages[0]?.mailID ?? chunk.firstTime + chunk.authorID)}
-    <!-- TODO: system message support — needs IMessage.mailType from SDK -->
+    <!-- TODO: system message support — needs Message.mailType from SDK -->
     {#if false}
       <div class="message-chunk">
         <div class="message-chunk__header">
@@ -73,7 +73,7 @@
         </div>
 
         {#each chunk.messages as msg (msg.mailID)}
-          <!-- TODO: file attachment support — needs IMessage.extra from SDK -->
+          <!-- TODO: file attachment support — needs Message.extra from SDK -->
           <div class="message">
             {@html renderContent(msg.message)}
           </div>

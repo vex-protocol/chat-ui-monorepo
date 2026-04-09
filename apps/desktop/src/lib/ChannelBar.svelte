@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IChannel } from '@vex-chat/libvex'
+  import type { Channel } from '@vex-chat/libvex'
 
   import { push } from 'svelte-spa-router'
 
@@ -13,7 +13,7 @@
     serverName,
   }: {
     activeChannelID?: string
-    channels?: IChannel[]
+    channels?: Channel[]
     serverID?: string
     serverName?: string
   } = $props()

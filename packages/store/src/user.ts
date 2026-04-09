@@ -1,6 +1,6 @@
-import type { IUser } from "@vex-chat/libvex";
+import type { User } from "@vex-chat/libvex";
 
 import { atom } from "nanostores";
 
 /** The currently authenticated user. Null if not logged in. */
-export const $user = atom<IUser | null>(null);
+export const $user = atom<User | null>(null);

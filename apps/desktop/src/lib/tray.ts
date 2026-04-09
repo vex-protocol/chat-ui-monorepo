@@ -1,11 +1,11 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface MailEmitter {
-    off(event: "message", handler: (mail: IMessage) => void): void;
-    on(event: "message", handler: (mail: IMessage) => void): void;
+    off(event: "message", handler: (mail: Message) => void): void;
+    on(event: "message", handler: (mail: Message) => void): void;
 }
 
 /**
@@ -33,7 +33,7 @@ export function setupTray(
         });
 
     // New mail → increment badge if window is not focused
-    const mailHandler = (mail: IMessage): void => {
+    const mailHandler = (mail: Message): void => {
         if (mail.authorID === currentUserID) return;
         void win.isFocused().then((focused) => {
             if (!focused) {

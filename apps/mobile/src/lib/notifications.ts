@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { AppState } from "react-native";
 
@@ -43,7 +43,7 @@ export function setupNotificationHandlers(): () => void {
     return unsubForeground;
 }
 
-export async function showMessageNotification(mail: IMessage): Promise<void> {
+export async function showMessageNotification(mail: Message): Promise<void> {
     const appFocused = AppState.currentState === "active";
     const familiars = $familiars.get();
 

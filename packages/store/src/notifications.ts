@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { $user } from "./user.ts";
 
@@ -27,7 +27,7 @@ export interface NotificationPayload {
  * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
  */
 export function shouldNotify(
-    msg: IMessage,
+    msg: Message,
     activeConversation: null | string,
     appFocused: boolean,
     resolveAuthorName?: (userID: string) => string | undefined,

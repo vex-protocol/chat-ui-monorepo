@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IChannel, IServer } from '@vex-chat/libvex'
+  import type { Channel, Server } from '@vex-chat/libvex'
 
   import { push } from 'svelte-spa-router'
 
@@ -7,7 +7,7 @@
 
   import CreateServerModal from './CreateServerModal.svelte'
 
-  let { activeServerID, channelMap, serverList }: { activeServerID?: string; channelMap?: Record<string, IChannel[]>; serverList?: IServer[]; } = $props()
+  let { activeServerID, channelMap, serverList }: { activeServerID?: string; channelMap?: Record<string, Channel[]>; serverList?: Server[]; } = $props()
 
   function navigateToServer(serverID: string): void {
     const chans = channelMap[serverID] ?? []

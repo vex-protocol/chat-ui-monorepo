@@ -1,4 +1,4 @@
-import type { IServer } from "@vex-chat/libvex";
+import type { Server } from "@vex-chat/libvex";
 
 import React from "react";
 import {
@@ -19,7 +19,7 @@ export function ServerListScreen({ navigation }: { navigation: any }) {
     const servers = useStore($servers);
     const serverList = Object.values(servers);
 
-    function renderServer({ item }: { item: IServer }) {
+    function renderServer({ item }: { item: Server }) {
         return (
             <TouchableOpacity
                 onPress={() =>

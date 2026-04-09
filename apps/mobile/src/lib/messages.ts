@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 /**
  * Local message persistence for React Native using AsyncStorage.
@@ -20,14 +20,14 @@ export async function clearMessages(): Promise<void> {
     ]);
 }
 
-export async function loadFamiliars(): Promise<Record<string, IUser>> {
+export async function loadFamiliars(): Promise<Record<string, User>> {
     const raw = await AsyncStorage.getItem(FAMILIARS_KEY);
     return raw ? JSON.parse(raw) : {};
 }
 
 export async function loadMessages(): Promise<{
-    dms: Record<string, IMessage[]>;
-    groups: Record<string, IMessage[]>;
+    dms: Record<string, Message[]>;
+    groups: Record<string, Message[]>;
 }> {
     const [groupsRaw, dmsRaw] = await Promise.all([
         AsyncStorage.getItem(GROUP_KEY),
@@ -40,23 +40,23 @@ export async function loadMessages(): Promise<{
 }
 
 export async function saveDmMessages(
-    dms: Record<string, IMessage[]>,
+    dms: Record<string, Message[]>,
 ): Promise<void> {
     await AsyncStorage.setItem(DM_KEY, JSON.stringify(dms));
 }
 
 // ── Familiars persistence ─────────────────────────────────────────────────────
 
-import type { IUser } from "@vex-chat/libvex";
+import type { User } from "@vex-chat/libvex";
 
 export async function saveFamiliars(
-    familiars: Record<string, IUser>,
+    familiars: Record<string, User>,
 ): Promise<void> {
     await AsyncStorage.setItem(FAMILIARS_KEY, JSON.stringify(familiars));
 }
 
 export async function saveGroupMessages(
-    groups: Record<string, IMessage[]>,
+    groups: Record<string, Message[]>,
 ): Promise<void> {
     await AsyncStorage.setItem(GROUP_KEY, JSON.stringify(groups));
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { StoredCredentials } from '@vex-chat/libvex'
-  import type { IDevice } from '@vex-chat/libvex'
+  import type { Device } from '@vex-chat/libvex'
 
   import { push } from 'svelte-spa-router'
 
@@ -16,13 +16,13 @@
 
   // ── Devices ────────────────────────────────────────────────────────────────
 
-  let devices: IDevice[] = $state([])
+  let devices: Device[] = $state([])
   let devicesLoading = $state(false)
   let devicesError = $state('')
   let deleteConfirmID: null | string = $state(null)
   let deleteError = $state('')
 
-  // TODO: device management — needs IDevices.list() and proper delete API
+  // TODO: device management — needs Devices.list() and proper delete API
   async function loadDevices(): Promise<void> {
     devicesLoading = false
     devicesError = 'Device listing not yet supported by SDK'

@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { shouldNotify } from "@vex-chat/store";
 
@@ -13,8 +13,8 @@ import { playNotify } from "./sounds.js";
 
 /** Minimal interface needed to subscribe/unsubscribe to message events. */
 interface MailEventEmitter {
-    off(event: "message", handler: (mail: IMessage) => void): void;
-    on(event: "message", handler: (mail: IMessage) => void): void;
+    off(event: "message", handler: (mail: Message) => void): void;
+    on(event: "message", handler: (mail: Message) => void): void;
 }
 
 // ── Preference ────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ export function setupNotifications(
         channelID: string,
     ) => undefined | { channelName: string; serverName: string },
 ): () => void {
-    const handler = async (mail: IMessage): Promise<void> => {
+    const handler = async (mail: Message): Promise<void> => {
         let focused = false;
         try {
             focused = await getCurrentWindow().isFocused();

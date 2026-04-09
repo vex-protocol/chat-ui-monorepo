@@ -67,4 +67,4 @@ export {
 export { $user } from "./user.ts";
 
 // TODO: verified keys need platform-specific secure storage (keychain/sqlite),
-// not localStorage. Removed — re-implement with IStorage adapter.
+// not localStorage. Removed — re-implement with Storage adapter.

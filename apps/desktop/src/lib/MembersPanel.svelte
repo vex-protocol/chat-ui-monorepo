@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IUser } from '@vex-chat/libvex'
+  import type { User } from '@vex-chat/libvex'
 
   import { _onMount } from 'svelte'
 
@@ -11,10 +11,10 @@
 
   const ONLINE_THRESHOLD = 1000 * 60 * 5 // 5 minutes
 
-  let members: IUser[] = $state([])
+  let members: User[] = $state([])
   let loading = $state(false)
 
-  function isOnline(user: IUser): boolean {
+  function isOnline(user: User): boolean {
     if (!user.lastSeen) return false
     return Date.now() - new Date(user.lastSeen).getTime() < ONLINE_THRESHOLD
   }

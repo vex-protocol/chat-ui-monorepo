@@ -1,5 +1,5 @@
-import type { IUser } from "@vex-chat/libvex";
-import type { IMessage } from "@vex-chat/libvex";
+import type { User } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -30,7 +30,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
     const unreadCounts = useStore($dmUnreadCounts);
 
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState<IUser[]>([]);
+    const [results, setResults] = useState<User[]>([]);
     const [searching, setSearching] = useState(false);
     const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
 
@@ -56,7 +56,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         [client],
     );
 
-    function openConversation(user: IUser) {
+    function openConversation(user: User) {
         familiarsAtom.setKey(user.userID, user);
         setQuery("");
         setResults([]);
@@ -66,12 +66,12 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         });
     }
 
-    function lastMessage(userID: string): IMessage | undefined {
+    function lastMessage(userID: string): Message | undefined {
         const thread = allMessages[userID];
         return thread?.[thread.length - 1];
     }
 
-    function renderFamiliar({ item }: { item: IUser }) {
+    function renderFamiliar({ item }: { item: User }) {
         const last = lastMessage(item.userID);
         const unread = unreadCounts[item.userID] ?? 0;
         return (
@@ -110,7 +110,7 @@ export function DMListScreen({ navigation }: { navigation: any }) {
         );
     }
 
-    function renderResult({ item }: { item: IUser }) {
+    function renderResult({ item }: { item: User }) {
         return (
             <TouchableOpacity
                 onPress={() => { openConversation(item); }}

@@ -1,4 +1,4 @@
-import type { IMessage, KeyStore, PlatformPreset } from "@vex-chat/libvex";
+import type { Message, KeyStore, PlatformPreset } from "@vex-chat/libvex";
 
 import { Client } from "@vex-chat/libvex";
 
@@ -55,7 +55,7 @@ export async function autoLogin(
         $user.set(client.me.user());
 
         await populateState(client);
-        // TODO: cleanupStaleDevices — needs IDevices.list() API
+        // TODO: cleanupStaleDevices — needs Devices.list() API
         return { ok: true };
     } catch (err: any) {
         if ($keyReplaced.get()) return { keyReplaced: true, ok: false };
@@ -64,7 +64,7 @@ export async function autoLogin(
 }
 
 // TODO: cleanupStaleDevices removed — Client.devices.list() doesn't exist in the
-// public API. Re-add when IDevices exposes a list method.
+// public API. Re-add when Devices exposes a list method.
 
 /**
  * Login with existing credentials → save credentials → connect.
@@ -152,7 +152,7 @@ export async function loginAndBootstrap(
 
         // Populate servers and channels
         await populateState(client);
-        // TODO: cleanupStaleDevices — needs IDevices.list() API
+        // TODO: cleanupStaleDevices — needs Devices.list() API
 
         return { ok: true };
     } catch (err: any) {
@@ -217,7 +217,7 @@ export async function registerAndBootstrap(
         }
 
         await populateState(client);
-        // TODO: cleanupStaleDevices — needs IDevices.list() API
+        // TODO: cleanupStaleDevices — needs Devices.list() API
 
         return { ok: true };
     } catch (err: any) {
@@ -253,7 +253,7 @@ async function initClient(
     $client.set(client);
 
     // Wire real-time events
-    client.on("message", (msg: IMessage) => {
+    client.on("message", (msg: Message) => {
         const me = $user.get();
         if (msg.group) {
             const prev = $groupMessages.get()[msg.group] ?? [];
@@ -274,7 +274,7 @@ async function initClient(
                 const otherUserID = threadKey;
                 if (!$familiars.get()[otherUserID]) {
                     $familiars.setKey(otherUserID, {
-                        lastSeen: new Date(),
+                        lastSeen: new Date().toISOString(),
                         userID: otherUserID,
                         username: otherUserID.slice(0, 8),
                     });

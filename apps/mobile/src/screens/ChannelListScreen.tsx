@@ -1,4 +1,4 @@
-import type { IChannel } from "@vex-chat/libvex";
+import type { Channel } from "@vex-chat/libvex";
 
 import React from "react";
 import {
@@ -25,9 +25,9 @@ export function ChannelListScreen({
         serverName: string;
     };
     const allChannels = useStore($channels);
-    const channels: IChannel[] = allChannels[serverID] ?? [];
+    const channels: Channel[] = allChannels[serverID] ?? [];
 
-    function renderChannel({ item }: { item: IChannel }) {
+    function renderChannel({ item }: { item: Channel }) {
         return (
             <TouchableOpacity
                 onPress={() =>

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { IInvite } from '@vex-chat/libvex'
+  import type { Invite } from '@vex-chat/libvex'
 
   import { client } from './store/index.js'
 
   let { onclose, serverID, serverName }: { onclose: () => void; serverID?: string; serverName?: string; } = $props()
 
-  let invites: IInvite[] = $state([])
+  let invites: Invite[] = $state([])
   let loading = $state(true)
   let creating = $state(false)
   let error = $state('')
