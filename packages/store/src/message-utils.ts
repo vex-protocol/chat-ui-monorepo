@@ -1,4 +1,4 @@
-import type { Message } from "@vex-chat/libvex";
+import type { IMessage } from "@vex-chat/libvex";
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ export interface FileAttachment {
 export interface MessageChunk {
     authorID: string;
     firstTime: Date;
-    messages: Message[];
+    messages: IMessage[];
 }
 
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
@@ -60,7 +60,7 @@ const MAX_CHUNK_SIZE = 100;
  * Groups messages by sender into display chunks.
  * Starts a new chunk on: different sender, >5 min gap, or 100 message cap.
  */
-export function chunkMessages(messages: Message[]): MessageChunk[] {
+export function chunkMessages(messages: IMessage[]): MessageChunk[] {
     const sorted = [...messages].sort(
         (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
     );

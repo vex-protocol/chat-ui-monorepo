@@ -1,23 +1,36 @@
-export { $avatarHash } from "./avatarHash.ts";
+// ── VexService (primary API for apps) ───────────────────────────────────────
 
-// Auth flows (register, login, auto-login — each creates Client + wires events + connects)
-export {
-    autoLogin,
-    loginAndBootstrap,
-    registerAndBootstrap,
-} from "./bootstrap.ts";
-export type { AuthResult, ServerOptions } from "./bootstrap.ts";
-export { $channels } from "./channels.ts";
-
-// Client singleton
-export { $client } from "./client.ts";
-// Deep link parsing
 export { parseInviteID, parseVexLink } from "./deeplink.ts";
 export type { VexLink } from "./deeplink.ts";
-export { $devices } from "./devices.ts";
-export { $familiars } from "./familiars.ts";
-export { $keyReplaced } from "./key-replaced.ts";
-// Message utilities
+
+// ── Domain atoms (readonly — apps can subscribe, not write) ─────────────────
+
+export {
+    $avatarHash,
+    $devices,
+    $familiars,
+    $keyReplaced,
+    $user,
+} from "./domains/identity.ts";
+
+export {
+    $channelUnreadCounts,
+    $dmUnreadCounts,
+    $groupMessages,
+    $messages,
+    $totalChannelUnread,
+    $totalDmUnread,
+} from "./domains/messaging.ts";
+
+export {
+    $channels,
+    $onlineLists,
+    $permissions,
+    $servers,
+} from "./domains/servers.ts";
+
+// ── Utilities (pure functions, no state) ────────────────────────────────────
+
 export {
     applyEmoji,
     avatarHue,
@@ -28,43 +41,14 @@ export {
     parseFileExtra,
 } from "./message-utils.ts";
 export type { FileAttachment, MessageChunk } from "./message-utils.ts";
-export { $groupMessages, $messages } from "./messages.ts";
-// Notification decisions
+
 export { shouldNotify } from "./notifications.ts";
-
 export type { NotificationPayload } from "./notifications.ts";
-export { $onlineLists } from "./onlineLists.ts";
 
-export { $permissions } from "./permissions.ts";
-// Reset
-export { resetAll } from "./reset.ts";
-
-// Send DM
-export { sendDirectMessage } from "./send-dm.ts";
-export type { SendDMOptions, SendDMResult } from "./send-dm.ts";
-
-// Send group message
-export { sendGroupMessage } from "./send-group-message.ts";
-
+export { vexService } from "./service.ts";
 export type {
-    SendGroupMessageOptions,
-    SendGroupMessageResult,
-} from "./send-group-message.ts";
-export { $servers } from "./servers.ts";
-
-// Unread counts
-export {
-    $channelUnreadCounts,
-    $dmUnreadCounts,
-    $totalChannelUnread,
-    $totalDmUnread,
-    incrementChannelUnread,
-    incrementDmUnread,
-    markRead,
-    resetAllUnread,
-} from "./unread.ts";
-// State atoms
-export { $user } from "./user.ts";
-
-// TODO: verified keys need platform-specific secure storage (keychain/sqlite),
-// not localStorage. Removed — re-implement with Storage adapter.
+    AuthResult,
+    BootstrapConfig,
+    OperationResult,
+    ServerOptions,
+} from "./service.ts";
