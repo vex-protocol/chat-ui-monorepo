@@ -35,7 +35,7 @@ Svelte components use DOM elements + CSS. React Native uses `View` + `StyleSheet
 The SDK layer lives in **standalone sibling repos**, not inside vex-chat. The monorepo contains only apps + genuinely shared vex-chat-specific packages.
 
 ```
-/Users/dgill/Public/
+~/Public/
 ├── vex-chat/                    (this monorepo — apps + store + ui)
 │   packages/
 │     store/                     — nanostores atoms; Client event wiring (@vex-chat/store)

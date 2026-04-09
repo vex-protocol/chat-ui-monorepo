@@ -2,7 +2,7 @@
 
 **Status:** Accepted (Phases 1–5 implemented 2026-03-20)
 **Date:** 2026-03-20
-**Deciders:** @dgill
+**Deciders:** @dream
 **Supersedes:** None
 
 ---

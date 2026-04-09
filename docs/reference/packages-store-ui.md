@@ -6,14 +6,14 @@ The state management layer and design system primitives that connect `Client` to
 
 ## `packages/store` — `@vex-chat/store`
 
-Nanostores atoms per state slice. Wraps `Client` from `@vex-chat/libvex` — `bootstrap()` wires real-time events directly to atoms and runs the waterfall HTTP fetch. Apps never import `Client` directly — they import atoms. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
+Nanostores atoms per state slice, exposed through the `VexService` facade (see [ADR-009](../architecture/adr-009-vexservice-facade.md)). `VexService` privately owns the `Client` from `@vex-chat/libvex` — apps never import `Client` directly. They call `vexService.login()`, `vexService.sendDM()`, etc. and subscribe to readonly atoms. Svelte apps use atoms natively (nanostores implements the Svelte store contract); React Native apps use `@nanostores/react`.
 
 ### Responsibility split
 
 | Layer | Owns |
 |---|---|
 | `@vex-chat/libvex` (Client) | Network I/O: HTTP requests, WebSocket frames, NaCl handshake, discriminated union results |
-| `@vex-chat/store` (nanostores atoms) | Runtime state: nanostores atoms per slice, event wiring in `bootstrap()`, waterfall HTTP fetch |
+| `@vex-chat/store` (VexService + atoms) | Runtime state: VexService facade, nanostores atoms per domain, event wiring, waterfall HTTP fetch |
 | Svelte (native) | `$atomName` reactive syntax — no adapter needed; nanostores atoms implement `.subscribe()` |
 | `@nanostores/react` | Framework binding for apps/mobile — `useStore($atom)` in React Native components |
 
@@ -21,106 +21,78 @@ Nanostores atoms per state slice. Wraps `Client` from `@vex-chat/libvex` — `bo
 
 ```
 packages/store/src/
-  index.ts         — barrel: all atoms + bootstrap() + resetAll() + $keyReplaced
-  client.ts        — $client atom<Client | null>
-  bootstrap.ts     — bootstrap(serverUrl, deviceID, deviceKey): create client, wire events, connect, waterfall fetch
-  reset.ts         — resetAll(): resets all atoms to defaults on logout
-  user.ts          — $user atom<IUser | null>
-  familiars.ts     — $familiars map (populated when familiars API exists)
-  messages.ts      — $messages, $groupMessages maps (DM keyed by userID, group by channelID)
-  servers.ts       — $servers map (populated by bootstrap + serverChange event)
-  channels.ts      — $channels map (populated by bootstrap per server)
-  permissions.ts   — $permissions map
-  devices.ts       — $devices map
-  onlineLists.ts   — $onlineLists map
-  avatarHash.ts    — $avatarHash atom<number> (cache-busting counter for avatar uploads)
-  verifiedKeys.ts  — $verifiedKeys atom<Set<string>> (localStorage-persisted) + markVerified/unmarkVerified/isVerified
-  auto-login.ts    — auto-login logic from stored credentials
-  deeplink.ts      — deep link handling
-  key-replaced.ts  — $keyReplaced atom + detection logic
-  message-utils.ts — message helper utilities
-  notifications.ts — notification wiring
-  send-dm.ts       — send DM action
-  send-group-message.ts — send group message action
-  unread.ts        — unread count tracking
+  index.ts              — barrel: readonly atoms + vexService + utilities
+  service.ts            — VexService class: auth, messaging, servers, user ops
+  domains/
+    identity.ts         — $user, $familiars, $devices, $avatarHash, $keyReplaced
+    messaging.ts        — $messages, $groupMessages, $dmUnreadCounts, $channelUnreadCounts,
+                          $totalDmUnread (computed), $totalChannelUnread (computed)
+    servers.ts          — $servers, $channels, $permissions, $onlineLists
+  deeplink.ts           — parseVexLink(), parseInviteID()
+  message-utils.ts      — chunkMessages(), formatTime(), parseFileExtra(), avatarHue(), applyEmoji()
+  notifications.ts      — shouldNotify() decision logic
 ```
+
+Each domain module exports writable atoms (`$fooWritable`, internal to `service.ts`)
+and readonly atoms (`$foo`, exported to apps via `readonlyType()`).
+See [ADR-010](../architecture/adr-010-domain-atom-consolidation.md).
 
 ### State atoms
 
 All state is nanostores `atom()` or `map()` — plain values, no framework reactivity baked in.
 
-| Atom | nanostores type | Keyed by |
-|---|---|---|
-| `$user` | `atom<IUser \| null>` | — |
-| `$familiars` | `map<Record<string, IUser>>` | userID |
-| `$messages` | `map<Record<string, IMessage[]>>` | other party's userID |
-| `$groupMessages` | `map<Record<string, IMessage[]>>` | channelID |
-| `$servers` | `map<Record<string, IServer>>` | serverID |
-| `$channels` | `map<Record<string, IChannel[]>>` | serverID |
-| `$permissions` | `map<Record<string, IPermission>>` | permissionID |
-| `$devices` | `map<Record<string, IDevice[]>>` | ownerID (userID) |
-| `$onlineLists` | `map<Record<string, IUser[]>>` | channelID |
-| `$avatarHash` | `atom<number>` | — (cache-busting counter) |
-| `$verifiedKeys` | `atom<Set<string>>` | — (localStorage-persisted signKeys) |
+| Atom | Domain | nanostores type | Keyed by |
+|---|---|---|---|
+| `$user` | identity | `atom<IUser \| null>` | — |
+| `$familiars` | identity | `map<Record<string, IUser>>` | userID |
+| `$devices` | identity | `map<Record<string, IDevice[]>>` | ownerID (userID) |
+| `$avatarHash` | identity | `atom<number>` | — (cache-busting counter) |
+| `$keyReplaced` | identity | `atom<boolean>` | — |
+| `$messages` | messaging | `map<Record<string, IMessage[]>>` | other party's userID |
+| `$groupMessages` | messaging | `map<Record<string, IMessage[]>>` | channelID |
+| `$dmUnreadCounts` | messaging | `map<Record<string, number>>` | userID |
+| `$channelUnreadCounts` | messaging | `map<Record<string, number>>` | channelID |
+| `$totalDmUnread` | messaging | `computed<number>` | — (sum of DM unreads) |
+| `$totalChannelUnread` | messaging | `computed<number>` | — (sum of channel unreads) |
+| `$servers` | servers | `map<Record<string, IServer>>` | serverID |
+| `$channels` | servers | `map<Record<string, IChannel[]>>` | serverID |
+| `$permissions` | servers | `map<Record<string, IPermission>>` | permissionID |
+| `$onlineLists` | servers | `map<Record<string, IUser[]>>` | channelID |
 
-### Wiring pattern
+All atoms are exported as `readonlyType()` wrappers — apps can subscribe but not write.
 
-Events are wired in `bootstrap()` after creating the client, before `client.connect()`:
+### VexService
+
+`VexService` is the sole gateway between apps and the SDK. It privately owns the `Client` instance and exposes named methods for all operations. See [ADR-009](../architecture/adr-009-vexservice-facade.md).
+
+**Auth methods** accept a `BootstrapConfig` (see [ADR-011](../architecture/adr-011-platform-config-ownership.md)) that provides platform-specific WebSocket, storage, and device name:
 
 ```ts
-// packages/store/src/bootstrap.ts (excerpt)
-import { map } from 'nanostores'
-import { $client } from './client'
+import { vexService } from '@vex-chat/store'
+import { desktopConfig } from './platform'
 
-client.on('message', (msg) => {
-  if (msg.group) {
-    const prev = $groupMessages.get()[msg.group] ?? []
-    $groupMessages.setKey(msg.group, [...prev, msg])
-  } else {
-    const me = $user.get()
-    const key = me && msg.authorID === me.userID ? msg.readerID : msg.authorID
-    const prev = $messages.get()[key] ?? []
-    $messages.setKey(key, [...prev, msg])
-  }
-})
-client.on('serverChange', (server) => $servers.setKey(server.serverID, server))
+const result = await vexService.autoLogin(keyStore, desktopConfig(), serverOptions)
+if (!result.ok) navigateToLogin()
 ```
 
-### Bootstrap sequence
+Internally, `VexService` creates the `Client`, wires events to writable atoms, connects, and runs the waterfall HTTP fetch. Events are wired **before** `connect()` so nothing is missed.
 
-`bootstrap(serverUrl, deviceID, deviceKey)` in `bootstrap.ts` creates the `Client`, wires events, connects, then fetches initial state. Events are wired **before** `connect()` so nothing is missed.
-
-**Currently implemented** (matched to spire's existing endpoints):
-1. `client.users.me()` → set `$user`
-2. `client.servers.list()` → populate `$servers`
-3. `client.channels.list(serverID)` for each server → populate `$channels` (parallel)
-
-**Pending server endpoints:**
-- `$familiars` — needs `GET /users/me/familiars` (currently populated on first DM)
-- `$devices` — needs familiars list first, then `GET /user/:id/devices` per familiar
-- `$messages` (DM history) — needs `GET /messages/:userID`
-- `$groupMessages` (channel history) — needs `GET /channel/:id/messages`
-- `$permissions` — needs `GET /users/me/permissions` or per-server endpoint
-
-Error recovery: HTTP 470 (corrupt key file) → set `$keyReplaced = true` for the app to navigate to login.
-
-### Logout / state reset
-
-`resetAll()` in `reset.ts` sets every atom back to its default value. Call it on logout before clearing localStorage credentials to prevent stale data from leaking to the next user session. `$verifiedKeys` is intentionally NOT reset — verified fingerprints are device-scoped and persist across accounts.
+**Logout** resets all writable atoms to defaults and closes the Client connection.
 
 ### Svelte usage (`apps/desktop`)
 
 nanostores atoms implement the Svelte store contract (`.subscribe()` method) — no adapter package needed.
-`apps/desktop/src/lib/store/index.ts` re-exports atoms without the `$` prefix so Svelte's `$` reactive syntax works cleanly:
+`apps/desktop/src/lib/store/index.ts` re-exports atoms and `vexService` for convenient Svelte `$` syntax:
 
 ```ts
 // apps/desktop/src/lib/store/index.ts
 export { $messages as messages, $user as user, $servers as servers } from '@vex-chat/store'
+export { vexService } from '@vex-chat/store'
 ```
 
 ```svelte
 <script>
-  import { messages, user } from '$lib/store'
+  import { messages, user, vexService } from '$lib/store'
 </script>
 
 {#each $messages[currentUserID] ?? [] as mail}
@@ -137,9 +109,9 @@ export { $messages as messages, $user as user, $servers as servers } from '@vex-
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "dependencies": {
-    "@vex-chat/types":  "workspace:*",
-    "@vex-chat/libvex": "workspace:*",
-    "nanostores":       "catalog:"
+    "@vex-chat/libvex": "1.2.0-rc.1",
+    "nanostores":       "catalog:",
+    "uuid":             "catalog:"
   },
   "peerDependencies": {
     "@nanostores/react": ">=0.8"
@@ -150,7 +122,7 @@ export { $messages as messages, $user as user, $servers as servers } from '@vex-
 }
 ```
 
-`@vex-chat/types` and `@vex-chat/libvex` resolve to the sibling repos (`../types-js`, `../libvex-js`) linked via pnpm workspace. `@nanostores/react` is an optional peer dep — only `apps/mobile` installs it. Svelte needs no adapter.
+`@vex-chat/libvex` is consumed as a published npm package (via verdaccio for local dev). `@nanostores/react` is an optional peer dep — only `apps/mobile` installs it. Svelte needs no adapter.
 
 ---
 

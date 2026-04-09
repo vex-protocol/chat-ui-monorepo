@@ -10,7 +10,8 @@ What we're building, in what order, and why. This is the strategy layer — the 
 
 | Priority | What | Notes |
 |---|---|---|
-| P1 | `feat/platform-adapters` branch | Sibling-repo migration (ADR-004): transport adapters, SqliteStorage, Expo Prebuild. Active across vex-chat + libvex-js + crypto-js + types-js. |
+| P1 | `protocol-specs` branch | Zod migration, VexService facade, domain atom consolidation, supply chain hardening. See IMPLEMENTATION_PLAN.md. |
+| P1 | E2E integration tests | Two-user DM (X3DH), group messaging, auto-login on Tauri/RN, multi-device sync. |
 
 ---
 
@@ -31,7 +32,7 @@ Important but not scoped. May never ship if priorities change. That's fine.
 | P4 | Account deletion | 15 | Privacy feature, needs design |
 | P4 | Custom emoji | 10, 11 | Nice-to-have, large effort |
 | P4 | Moderation tools (kick/ban) | 11 | Needed when servers grow |
-| P4 | Spire modernization (Zod, ESM, Pino) | — | Tech debt; Express 4 + Winston remains |
+| P4 | Spire modernization (Zod, ESM, Pino) | — | Tech debt; Express 4→5 done, Winston + CJS remain |
 
 ---
 

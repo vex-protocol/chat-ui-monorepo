@@ -16,15 +16,11 @@ Every message is encrypted on your device before it leaves. The server stores on
 
 | Package | Description |
 |---|---|
-| `apps/desktop` | Desktop client — Tauri 2.0 + Svelte |
-| `apps/mobile` | Mobile client — React Native |
-| `packages/libvex` | Framework-agnostic client SDK (WebSocket, auth, messaging, E2E encryption) |
-| `packages/store` | Shared state management (nanostores atoms) + business logic |
-| `packages/types` | Shared TypeScript interfaces and enums |
-| `packages/crypto` | Ed25519/X25519 signing, DH, secretbox encryption (`@noble/curves`) |
+| `apps/desktop` | Desktop client — Tauri 2.0 + Svelte 5 |
+| `apps/mobile` | Mobile client — Expo + React Native |
+| `packages/store` | Shared state management (nanostores atoms) + VexService facade |
 | `packages/ui` | Mitosis design primitives → Svelte + React |
-
-The server (**spire**) lives in its own repo: [`vex-chat/spire`](https://github.com/vex-chat/spire).
+| `packages/eslint-config` | Shared ESLint base config + SDK-only import restrictions |
 
 ---
 
@@ -78,6 +74,15 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | [`adr-001-monorepo-consolidation.md`](docs/architecture/adr-001-monorepo-consolidation.md) | Why five repos became one monorepo, every technology replacement, trade-offs accepted |
 | [`adr-002-tracing-over-logging.md`](docs/architecture/adr-002-tracing-over-logging.md) | Why OTel tracing instead of log shipping — privacy-first observability with 13 attributes and zero PII |
 | [`adr-003-thin-shell-apps.md`](docs/architecture/adr-003-thin-shell-apps.md) | Maximizing logic reuse: apps as thin view-layer shells over shared packages |
+| [`adr-004-sibling-repo-migration.md`](docs/architecture/adr-004-sibling-repo-migration.md) | Sibling repos as source of truth for libvex, types, crypto |
+| [`adr-005-rust-wasm-crypto.md`](docs/architecture/adr-005-rust-wasm-crypto.md) | Evaluating Rust WASM for the crypto layer |
+| [`adr-006-websocket-auth-post-connection.md`](docs/architecture/adr-006-websocket-auth-post-connection.md) | Post-connection WebSocket authentication for cross-platform compatibility |
+| [`adr-007-device-key-auto-login.md`](docs/architecture/adr-007-device-key-auto-login.md) | Passwordless device-key challenge-response auto-login |
+| [`adr-008-bearer-auth-over-cookies.md`](docs/architecture/adr-008-bearer-auth-over-cookies.md) | Bearer token auth replacing cookies for cross-platform consistency |
+| [`adr-009-vexservice-facade.md`](docs/architecture/adr-009-vexservice-facade.md) | VexService singleton as sole gateway between apps and SDK |
+| [`adr-010-domain-atom-consolidation.md`](docs/architecture/adr-010-domain-atom-consolidation.md) | Domain atom grouping + readonly boundaries via `readonlyType()` |
+| [`adr-011-platform-config-ownership.md`](docs/architecture/adr-011-platform-config-ownership.md) | Store owns BootstrapConfig; apps provide platform adapters |
+| [`adr-012-supply-chain-security.md`](docs/architecture/adr-014-supply-chain-security.md) | Defense-in-depth supply chain security posture |
 
 **`docs/explanation/`** — why decisions were made, strategy and rationale
 
