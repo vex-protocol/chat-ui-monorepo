@@ -2455,6 +2455,23 @@ Each team member:
 - Mobile: `expoPreset()` → `mobileConfig()` (local platform.ts)
 - Mobile: fix hardcoded localhost:16777 → `__DEV__` conditional
 
+#### Architecture Refactoring — DONE (2026-04-09)
+
+All items completed:
+- [x] VexService class replaces $client atom + bootstrap.ts god function
+- [x] Domain atoms (18 files → 3) with readonlyType exports
+- [x] All 24 direct $client calls in apps migrated to vexService.method()
+- [x] BootstrapConfig type replaces PlatformPreset (store-owned)
+- [x] Zero `as any` in store
+- [x] All `catch (err: any)` fixed to `catch (err: unknown)`
+- [x] Tauri/Expo presets removed from libvex
+- [x] Desktop/mobile have local platform.ts with BootstrapConfig
+- [x] Mobile config.ts localhost bug fixed
+- [x] Website app deleted (marketing site, not chat client)
+- [x] Desktop notifications refactored to atom subscriptions (no Client.on)
+- [x] ESLint SDK-only enforcement (fetch/WS/axios banned in apps)
+- [x] no-restricted-imports blocks @vex-chat/libvex direct access from apps
+
 #### Remaining eslint-disable directives (12 in libvex)
 
 All 12 are `no-unsafe-type-assertion` for msgpack.decode() casts. Removal requires:
@@ -2462,18 +2479,6 @@ All 12 are `no-unsafe-type-assertion` for msgpack.decode() casts. Removal requir
 - Create `z.discriminatedUnion("type", [...])` in libvex
 - Replace `as ChallMsg` / `as SuccessMsg` with `wsMessage.parse()`
 - Also removes the unvalidated fast-path `decode()` in codec.ts
-
-This is deferred until the architecture refactoring is complete.
-
-#### ESLint SDK-only enforcement (DONE)
-
-`appImportRestrictions` in packages/eslint-config/base.js now bans:
-- Direct HTTP clients: axios, ky, ofetch, got, node-fetch, undici
-- Direct WebSocket: ws, websocket, sockjs-client, socket.io-client
-- Browser globals: fetch(), XMLHttpRequest, WebSocket (in apps only)
-- SDK internals: @vex-chat/types, @vex-chat/crypto
-
-Website exempted from no-restricted-globals (marketing site uses fetch for download metadata, privacy policies, invite previews).
 
 ### Additional Gotchas from Recent Work
 
