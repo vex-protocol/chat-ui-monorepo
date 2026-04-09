@@ -3,7 +3,7 @@ packages:
   - 'packages/*'
 
 catalog:
-  typescript: ^5.9.3
+  typescript: ^6.0.2
   '@types/node': ^25.3.3
   '@vex-chat/libvex': 1.2.0-rc.5
   nanostores: "^1.2.0"
