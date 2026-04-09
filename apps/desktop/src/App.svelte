@@ -17,6 +17,7 @@
   import ServerChannel from './routes/ServerChannel.svelte'
   import Settings from './routes/Settings.svelte'
 
+  // eslint-disable-next-line perfectionist/sort-objects -- route order matters: '*' catch-all MUST be last
   const routes = {
     '/':                            Launch,
     '/home':                        Home,
