@@ -3,19 +3,17 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { parseInviteID } from "@vex-chat/store";
 
-import { useStore } from "@nanostores/react";
 import { useNavigation } from "@react-navigation/native";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import { $channels, $client, $servers } from "../store";
+import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
 export function AddServerScreen() {
     const navigation = useNavigation<any>();
-    const client = useStore($client);
     const [mode, setMode] = useState<"create" | "join" | "pick">("pick");
     const [name, setName] = useState("");
     const [inviteInput, setInviteInput] = useState("");
@@ -23,14 +21,16 @@ export function AddServerScreen() {
     const [loading, setLoading] = useState(false);
 
     async function handleCreate() {
-        if (!name.trim() || !client) return;
+        if (!name.trim()) return;
         setLoading(true);
         setError("");
         try {
-            const server = await client.servers.create(name.trim());
-            $servers.setKey(server.serverID, server);
-            const ch = await client.channels.retrieve(server.serverID);
-            $channels.setKey(server.serverID, ch);
+            const result = await vexService.createServer(name.trim());
+            if (!result.ok) {
+                setError(result.error || "Failed to create server");
+                setLoading(false);
+                return;
+            }
             if (navigation.canGoBack()) navigation.goBack();
         } catch (err) {
             setError(
@@ -46,20 +46,14 @@ export function AddServerScreen() {
             setError("Please enter a valid invite link or code");
             return;
         }
-        if (!client) {
-            setError("Not connected");
-            return;
-        }
         setLoading(true);
         setError("");
         try {
-            const permission = await client.invites.redeem(inviteID);
-            const serverID = permission.resourceID;
-            const server = await client.servers.retrieveByID(serverID);
-            if (server) {
-                $servers.setKey(server.serverID, server);
-                const ch = await client.channels.retrieve(server.serverID);
-                $channels.setKey(server.serverID, ch);
+            const result = await vexService.joinInvite(inviteID);
+            if (!result.ok) {
+                setError(result.error || "Failed to join server");
+                setLoading(false);
+                return;
             }
             if (navigation.canGoBack()) navigation.goBack();
         } catch (err) {

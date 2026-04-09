@@ -1,4 +1,4 @@
-import type { Message } from "@vex-chat/libvex";
+import type { IMessage as Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -10,15 +10,13 @@ import {
     View,
 } from "react-native";
 
-import { markRead, sendDirectMessage } from "@vex-chat/store";
-
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
-import { $messages, $user } from "../store";
+import { vexService, $messages, $user } from "../store";
 import { colors, typography } from "../theme";
 
 export function ConversationScreen({
@@ -44,7 +42,7 @@ export function ConversationScreen({
     // Track active conversation for notification suppression + mark read
     useEffect(() => {
         setActiveConversation(userID);
-        markRead(userID);
+        vexService.markRead(userID);
         return () => {
             setActiveConversation(null);
         };
@@ -52,7 +50,7 @@ export function ConversationScreen({
 
     // Mark read whenever new messages arrive while viewing
     useEffect(() => {
-        if (messages.length > 0) markRead(userID);
+        if (messages.length > 0) vexService.markRead(userID);
     }, [messages.length, userID]);
 
     const [text, setText] = useState("");
@@ -66,7 +64,7 @@ export function ConversationScreen({
         setText("");
         setError("");
         try {
-            const result = await sendDirectMessage(userID, content);
+            const result = await vexService.sendDM(userID, content);
             if (!result.ok) {
                 setError(result.error ?? "Failed to send");
             }

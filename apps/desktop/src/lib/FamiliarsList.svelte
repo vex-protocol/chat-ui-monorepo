@@ -3,27 +3,24 @@
 
   import { push } from 'svelte-spa-router'
 
-  import { $familiars as familiarsStore, $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
+  import { $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
 
   import Avatar from './Avatar.svelte'
   import { getServerUrl } from './config.js'
-  import { client, familiars } from './store/index.js'
+  import { familiars, vexService } from './store/index.js'
 
   const serverUrl = getServerUrl()
 
   // ── Familiar persistence ─────────────────────────────────────────────────────
+  // NOTE: Familiars atom is now readonly. Local persistence is managed via
+  // localStorage only for the search-initiated "add familiar" flow. The
+  // authoritative familiar list comes from the store's bootstrap.
 
   const STORAGE_KEY = 'vex-familiars'
 
   function loadFamiliars(): void {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (!saved) return
-      const list = JSON.parse(saved) as User[]
-      for (const u of list) familiarsStore.setKey(u.userID, u)
-    } catch {
-      // ignore
-    }
+    // Familiars are populated by VexService during bootstrap.
+    // localStorage is only used to seed the search sidebar list.
   }
 
   function saveFamiliars(): void {
@@ -31,8 +28,9 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
   }
 
-  function addFamiliar(user: User): void {
-    familiarsStore.setKey(user.userID, user)
+  function addFamiliar(_user: User): void {
+    // Familiars atom is readonly — VexService adds familiars when messages arrive.
+    // Just persist the current list for next session.
     saveFamiliars()
   }
 
@@ -51,7 +49,7 @@
     if (!q) { results = []; return }
     searching = true
     searchTimer = setTimeout(async () => {
-      const [found] = await $client?.users.retrieve(q) ?? [null]
+      const found = await vexService.lookupUser(q)
       results = found ? [found] : []
       searching = false
     }, 250)

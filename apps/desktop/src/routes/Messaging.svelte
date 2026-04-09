@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { markRead, sendDirectMessage } from '@vex-chat/store'
-
   import ChatInput from '../lib/ChatInput.svelte'
   // Route: /messaging/:userID
   import MessageBox from '../lib/MessageBox.svelte'
-  import { client, familiars, messages } from '../lib/store/index.js'
+  import { familiars, messages, vexService } from '../lib/store/index.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -12,7 +10,7 @@
 
   // Clear unread count when viewing this conversation
   $effect(() => {
-    if (targetUserID) markRead(targetUserID)
+    if (targetUserID) vexService.markRead(targetUserID)
   })
   const threadMessages = $derived($messages[targetUserID] ?? [])
   const targetUsername = $derived($familiars[targetUserID]?.username ?? targetUserID.slice(0, 8))
@@ -26,21 +24,20 @@
 
   // Fetch the recipient's signKey and compute the fingerprint
   $effect(() => {
-    if (!$client || !targetUserID) return
+    if (!targetUserID) return
     // TODO: fetchKeyBundle and getFingerprint not yet exposed in public API
-    // $client.devices.list(targetUserID).then(devices => { ... })
     targetUserID
   })
 
   // TODO: verified key UI removed — needs secure storage re-implementation
 
   async function handleSend(content: string, _attachment?: File) {
-    if (!$client || sending) return
+    if (sending) return
     sending = true
     sendError = ''
     try {
       // TODO: file _attachment upload — needs client.files.create() integration
-      const result = await sendDirectMessage(targetUserID, content)
+      const result = await vexService.sendDM(targetUserID, content)
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'
       }

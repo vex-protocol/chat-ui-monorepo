@@ -18,7 +18,7 @@ import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
 import { keychainKeyStore } from "../lib/keychain";
-import { registerAndBootstrap } from "../store";
+import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
 type Props = NativeStackScreenProps<any, "Finalize">;
@@ -70,7 +70,7 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
         setError("");
 
         try {
-            const result = await registerAndBootstrap(
+            const result = await vexService.register(
                 username,
                 password,
                 expoPreset(),

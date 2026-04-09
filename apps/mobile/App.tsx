@@ -1,13 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
 import { useStore } from "@nanostores/react";
 import {
-    autoLogin,
+    vexService,
     $keyReplaced,
     $user,
-    $client,
     $familiars,
     $messages,
     $groupMessages,
@@ -16,7 +15,6 @@ import { expoPreset } from "@vex-chat/libvex/preset/expo";
 import { keychainKeyStore, clearCredentials } from "./src/lib/keychain";
 import { getServerOptions } from "./src/lib/config";
 import {
-    loadFamiliars,
     saveFamiliars,
     saveDmMessages,
     saveGroupMessages,
@@ -33,7 +31,6 @@ import { colors, fontFamilies } from "./src/theme";
 function App() {
     const keyReplaced = useStore($keyReplaced);
     const user = useStore($user);
-    const client = useStore($client);
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -45,13 +42,8 @@ function App() {
     useEffect(() => {
         (async () => {
             await requestNotificationPermission();
-            await autoLogin(keychainKeyStore, expoPreset(), getServerOptions());
-
-            // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
-            const saved = await loadFamiliars();
-            for (const [id, u] of Object.entries(saved)) {
-                $familiars.setKey(id, u);
-            }
+            await vexService.autoLogin(keychainKeyStore, expoPreset(), getServerOptions());
+            // Familiars are populated by vexService.populateState() during bootstrap
         })();
     }, []);
 
@@ -77,14 +69,33 @@ function App() {
         }
     }, [allGroups]);
 
-    // Show local notifications for incoming messages when app is backgrounded
+    // Show local notifications for incoming messages by watching atom changes
+    const prevDmsRef = useRef(allDms);
+    const prevGroupsRef = useRef(allGroups);
+
     useEffect(() => {
-        if (!client) return;
-        (client as any).on("message", showMessageNotification);
-        return () => {
-            (client as any).off("message", showMessageNotification);
-        };
-    }, [client]);
+        const prev = prevDmsRef.current;
+        prevDmsRef.current = allDms;
+        for (const [threadID, thread] of Object.entries(allDms)) {
+            const prevThread = prev[threadID] ?? [];
+            if (thread.length > prevThread.length) {
+                const newMsg = thread[thread.length - 1];
+                if (newMsg) showMessageNotification(newMsg);
+            }
+        }
+    }, [allDms]);
+
+    useEffect(() => {
+        const prev = prevGroupsRef.current;
+        prevGroupsRef.current = allGroups;
+        for (const [channelID, thread] of Object.entries(allGroups)) {
+            const prevThread = prev[channelID] ?? [];
+            if (thread.length > prevThread.length) {
+                const newMsg = thread[thread.length - 1];
+                if (newMsg) showMessageNotification(newMsg);
+            }
+        }
+    }, [allGroups]);
 
     useEffect(() => {
         if (keyReplaced) {

@@ -5,7 +5,7 @@
   import { clearSession, getServerUrl } from './config.js'
   import { keyStore } from './keystore.js'
   import { playLock } from './sounds.js'
-  import { avatarHash, client, resetAll } from './store/index.js'
+  import { avatarHash, vexService } from './store/index.js'
 
   let { userID, username }: { userID?: string; username?: string; } = $props()
 
@@ -14,11 +14,11 @@
   async function logout(): Promise<void> {
     menuOpen = false
     playLock()
-    try { await $client?.logout() } catch { /* ignore */ }
+    try { await vexService.logout() } catch { /* ignore */ }
     // Clear JWT so auto-login won't fire, but keep device keys
     const creds = await keyStore.loadActive()
     if (creds) await keyStore.save({ ...creds, token: undefined })
-    resetAll()
+    // VexService.logout() resets all state internally.
     // SQLite storage is per-device-key; no manual clear needed on logout
     clearSession()
     push('/login')

@@ -6,7 +6,7 @@
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { playError, playUnlock } from '../lib/sounds.js'
-  import { channels as channelsAtom, loginAndBootstrap, servers as serversAtom, user as userAtom } from '../lib/store/index.js'
+  import { channels as channelsAtom, servers as serversAtom, user as userAtom, vexService } from '../lib/store/index.js'
 
   let username = $state('')
   let password = $state('')
@@ -18,7 +18,7 @@
     loading = true
     error = ''
 
-    const result = await loginAndBootstrap(username, password, tauriPreset(), getServerOptions(), keyStore)
+    const result = await vexService.login(username, password, tauriPreset(), getServerOptions(), keyStore)
 
     if (!result.ok) {
       error = result.error ?? 'Login failed'

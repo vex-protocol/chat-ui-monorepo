@@ -5,10 +5,12 @@
   import { setupDeepLinks } from './lib/deeplink.js'
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
-  import { setupNotifications } from './lib/notifications.js'
+  // TODO: Re-enable when VexService exposes message event subscriptions
+  // import { setupNotifications } from './lib/notifications.js'
   import ServerBar from './lib/ServerBar.svelte'
-  import { channels, client, familiars, keyReplaced, servers, user } from './lib/store/index.js'
-  import { setupTray } from './lib/tray.js'
+  import { channels, familiars, keyReplaced, servers, user } from './lib/store/index.js'
+  // TODO: Re-enable when VexService exposes message event subscriptions
+  // import { setupTray } from './lib/tray.js'
   import UserMenu from './lib/UserMenu.svelte'
   import Home from './routes/Home.svelte'
   import Launch from './routes/Launch.svelte'
@@ -57,23 +59,11 @@
     : null
   )
 
-  // Wire desktop notifications and tray unread tracking
-  $effect(() => {
-    const c = $client
-    const u = $user
-    if (!c || !u) return
-    const unNotify = setupNotifications(c, () => activeConversationKey, (userID: string) => {
-      return $familiars[userID]?.username
-    }, (channelID: string) => {
-      for (const [serverID, chs] of Object.entries($channels)) {
-        const ch = chs.find((c: { channelID: string }) => c.channelID === channelID)
-        if (ch) return { channelName: ch.name, serverName: $servers[serverID]?.name ?? 'server' }
-      }
-      return undefined
-    })
-    const unTray = setupTray(c, u.userID)
-    return () => { unNotify(); unTray() }
-  })
+  // TODO: Desktop notifications and tray unread tracking need refactoring.
+  // Previously these subscribed to Client's "message" event, but Client is now
+  // private inside VexService. These features need VexService to expose an
+  // onMessage subscription, or the notification/tray logic should subscribe to
+  // the $messages/$groupMessages atoms instead.
 
   // Register vex:// deep-link handler
   $effect(() => {

@@ -2,7 +2,6 @@
 export {
     $avatarHash as avatarHash,
     $channels as channels,
-    $client as client,
     $devices as devices,
     $familiars as familiars,
     $groupMessages as groupMessages,
@@ -14,10 +13,5 @@ export {
     $user as user,
 } from "@vex-chat/store";
 
-export {
-    autoLogin,
-    loginAndBootstrap,
-    registerAndBootstrap,
-    resetAll,
-} from "@vex-chat/store";
+export { vexService } from "@vex-chat/store";
 // TODO: verified keys removed — needs secure storage re-implementation

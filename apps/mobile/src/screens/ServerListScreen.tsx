@@ -1,4 +1,4 @@
-import type { Server } from "@vex-chat/libvex";
+import type { IServer as Server } from "@vex-chat/libvex";
 
 import React from "react";
 import {

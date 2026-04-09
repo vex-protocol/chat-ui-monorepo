@@ -1,4 +1,4 @@
-import type { Message } from "@vex-chat/libvex";
+import type { IMessage as Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -9,15 +9,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { markRead, sendGroupMessage } from "@vex-chat/store";
-
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
-import { $client, $groupMessages, $user } from "../store";
+import { vexService, $groupMessages, $user } from "../store";
 import { colors } from "../theme";
 
 export function ChannelScreen({
@@ -33,7 +31,6 @@ export function ChannelScreen({
         serverID: string;
     };
     const allGroupMessages = useStore($groupMessages);
-    const client = useStore($client);
     const user = useStore($user);
 
     // Store keeps messages oldest-first; inverted FlatList needs newest-first
@@ -45,14 +42,14 @@ export function ChannelScreen({
     // Track active channel for notification suppression + mark read
     useEffect(() => {
         setActiveConversation(channelID);
-        markRead(channelID);
+        vexService.markRead(channelID);
         return () => {
             setActiveConversation(null);
         };
     }, [channelID]);
 
     useEffect(() => {
-        if (messages.length > 0) markRead(channelID);
+        if (messages.length > 0) vexService.markRead(channelID);
     }, [messages.length, channelID]);
 
     const insets = useSafeAreaInsets();
@@ -63,16 +60,15 @@ export function ChannelScreen({
 
     // Load channel members to resolve userIDs → usernames
     useEffect(() => {
-        if (!client) return;
-        client.channels
-            .userList(channelID)
-            .then((members: any[]) => {
+        vexService
+            .getChannelMembers(channelID)
+            .then((members) => {
                 const map: Record<string, string> = {};
                 for (const m of members) map[m.userID] = m.username;
                 setUsernames(map);
             })
             .catch(() => {});
-    }, [client, channelID]);
+    }, [channelID]);
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
@@ -81,7 +77,7 @@ export function ChannelScreen({
         setSendError("");
         setText("");
         try {
-            const result = await sendGroupMessage(channelID, content);
+            const result = await vexService.sendGroupMessage(channelID, content);
             if (!result.ok) {
                 setSendError(result.error ?? "Failed to send");
             }

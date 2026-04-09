@@ -6,7 +6,7 @@
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import { playError, playUnlock } from '../lib/sounds.js'
-  import { registerAndBootstrap, user as userAtom } from '../lib/store/index.js'
+  import { user as userAtom, vexService } from '../lib/store/index.js'
 
   let username = $state('')
   let password = $state('')
@@ -35,7 +35,7 @@
 
     loading = true
 
-    const result = await registerAndBootstrap(username, password, tauriPreset(), getServerOptions(), keyStore)
+    const result = await vexService.register(username, password, tauriPreset(), getServerOptions(), keyStore)
 
     if (!result.ok) {
       errors = { form: result.error ?? 'Registration failed' }

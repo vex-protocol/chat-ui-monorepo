@@ -8,31 +8,27 @@ import {
     View,
 } from "react-native";
 
-import { resetAll } from "@vex-chat/store";
-
 import { useStore } from "@nanostores/react";
 import notifee, { AndroidImportance } from "@notifee/react-native";
 
 import { clearCredentials } from "../lib/keychain";
 import { clearMessages } from "../lib/messages";
-import { $client, $user } from "../store";
+import { vexService, $user } from "../store";
 
-export function SettingsScreen({ _navigation }: { navigation: any }) {
+export function SettingsScreen({ navigation: _navigation }: { navigation: any }) {
     const user = useStore($user);
-    const client = useStore($client);
     const [loggingOut, setLoggingOut] = useState(false);
 
     async function handleLogout() {
         setLoggingOut(true);
-        // Don't call client.logout() — that invalidates the server session token.
-        // Just disconnect locally so autoLogin can reuse the saved token.
+        // Close connection + reset atoms so navigation redirects to auth.
+        // This does NOT invalidate the server session — autoLogin can reuse saved credentials.
         try {
-            client?.close();
+            await vexService.logout();
         } catch {
             /* ignore */
         }
         await clearMessages();
-        resetAll();
     }
 
     function handleClearKeys() {
@@ -44,13 +40,12 @@ export function SettingsScreen({ _navigation }: { navigation: any }) {
                 {
                     onPress: async () => {
                         try {
-                            await client?.logout();
+                            await vexService.logout();
                         } catch {
                             /* ignore */
                         }
                         await clearCredentials();
                         await clearMessages();
-                        resetAll();
                     },
                     style: "destructive",
                     text: "Clear keys",

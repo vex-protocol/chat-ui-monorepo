@@ -9,8 +9,8 @@
   import { keyStore } from '../lib/keystore.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
   import { getSoundsEnabled, playNotify, setSoundsEnabled } from '../lib/sounds.js'
-  import { client, user } from '../lib/store/index.js'
-  import { avatarHash } from '../lib/store/index.js'
+  import { user, vexService } from '../lib/store/index.js'
+  import { $avatarHash as avatarHash } from '@vex-chat/store'
   import { theme, toggleTheme } from '../lib/stores/theme.js'
   import { applyUpdate, checkForUpdates, type UpdateStatus } from '../lib/updater.js'
 
@@ -91,7 +91,7 @@
     }
 
     const userID = $user?.userID
-    if (!userID || !$client) {
+    if (!userID) {
       avatarError = 'Not authenticated'
       return
     }
@@ -100,8 +100,8 @@
     avatarUploading = true
     try {
       const data = new Uint8Array(await file.arrayBuffer())
-      await $client.me.setAvatar(data)
-      avatarHash.set(Date.now())
+      const result = await vexService.setAvatar(data)
+      if (!result.ok) throw new Error(result.error ?? 'Upload failed')
     } catch (err) {
       avatarError = err instanceof Error ? err.message : 'Upload failed'
     } finally {
@@ -133,7 +133,7 @@
 
   async function handleLogout(): Promise<void> {
     try {
-      await $client?.logout()
+      await vexService.logout()
     } catch { /* ignore */ }
     // Clear the stored JWT so auto-login won't fire, but keep device keys
     if (creds) await keyStore.save({ ...creds, token: undefined })

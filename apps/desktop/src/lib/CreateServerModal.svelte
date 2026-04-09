@@ -1,7 +1,7 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
 
-  import { channels, client, servers } from './store/index.js'
+  import { channels, servers, vexService } from './store/index.js'
 
   let { onclose }: { onclose: () => void } = $props()
 
@@ -16,17 +16,26 @@
     submitting = true
     error = ''
     try {
-      const server = await $client.servers.create(n)
-      servers.setKey(server.serverID, server)
-      // Spire auto-creates #general during createServer, so just fetch channels
-      const serverChannels = await $client.channels.retrieve(server.serverID)
-      channels.setKey(server.serverID, serverChannels)
+      const result = await vexService.createServer(n)
+      if (!result.ok) {
+        error = result.error ?? 'Failed to create server'
+        return
+      }
+      // VexService updates $servers and $channels atoms internally.
+      // Find the newly added server to navigate to it.
+      const allServers = Object.values(servers.get())
+      const newServer = allServers[allServers.length - 1]
       onclose()
-      const firstChannel = serverChannels[0]
-      if (firstChannel) {
-        push(`/server/${server.serverID}/${firstChannel.channelID}`)
+      if (newServer) {
+        const serverChannels = channels.get()[newServer.serverID] ?? []
+        const firstChannel = serverChannels[0]
+        if (firstChannel) {
+          push(`/server/${newServer.serverID}/${firstChannel.channelID}`)
+        } else {
+          push(`/server/${newServer.serverID}/`)
+        }
       } else {
-        push(`/server/${server.serverID}/`)
+        push('/home')
       }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to create server'

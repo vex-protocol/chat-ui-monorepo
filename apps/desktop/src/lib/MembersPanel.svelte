@@ -5,7 +5,7 @@
 
   import Avatar from './Avatar.svelte'
   import { getServerUrl } from './config.js'
-  import { client } from './store/index.js'
+  import { vexService } from './store/index.js'
 
   let { _serverID, channelID }: { channelID?: string; serverID?: string; } = $props()
 
@@ -23,22 +23,19 @@
   const offline = $derived(members.filter(u => !isOnline(u)))
 
   // Fetch on mount and when channelID changes, poll every 30s.
-  // Capture $client and channelID as explicit dependencies;
-  // use captured values in callbacks to avoid re-tracking.
   $effect(() => {
     const cid = channelID
-    const c = $client
-    if (!cid || !c) return
+    if (!cid) return
 
     let active = true
     loading = true
 
-    c.channels.userList(cid)
+    vexService.getChannelMembers(cid)
       .then((result) => { if (active) { members = result; loading = false } })
       .catch(() => { if (active) loading = false })
 
     const interval = setInterval(() => {
-      c.channels.userList(cid)
+      vexService.getChannelMembers(cid)
         .then((result) => { if (active) members = result })
         .catch(() => {})
     }, 30_000)

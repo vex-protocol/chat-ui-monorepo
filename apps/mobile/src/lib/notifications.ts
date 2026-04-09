@@ -1,13 +1,13 @@
-import type { Message } from "@vex-chat/libvex";
+import type { IMessage as Message } from "@vex-chat/libvex";
 
 import { AppState } from "react-native";
 
-import { shouldNotify } from "@vex-chat/store";
+import { shouldNotify, vexService } from "@vex-chat/store";
 
 import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
 
 import { navigateToConversation } from "../navigation/navigationRef";
-import { $channels, $client, $familiars, $servers } from "../store";
+import { $channels, $familiars, $servers } from "../store";
 
 const CHANNEL_ID = "vex-messages";
 
@@ -51,9 +51,7 @@ export async function showMessageNotification(mail: Message): Promise<void> {
     let authorName = familiars[mail.authorID]?.username;
     if (!authorName) {
         try {
-            const [user] = (await $client
-                .get()
-                ?.users.retrieve(mail.authorID)) ?? [null];
+            const user = await vexService.lookupUser(mail.authorID);
             if (user) authorName = user.username;
         } catch {}
     }

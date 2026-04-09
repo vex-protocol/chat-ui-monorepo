@@ -1,4 +1,4 @@
-import type { Message } from "@vex-chat/libvex";
+import type { IMessage as Message } from "@vex-chat/libvex";
 
 /**
  * Local message persistence for React Native using AsyncStorage.
@@ -47,7 +47,7 @@ export async function saveDmMessages(
 
 // ── Familiars persistence ─────────────────────────────────────────────────────
 
-import type { User } from "@vex-chat/libvex";
+import type { IUser as User } from "@vex-chat/libvex";
 
 export async function saveFamiliars(
     familiars: Record<string, User>,

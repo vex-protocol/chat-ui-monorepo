@@ -7,10 +7,10 @@
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
   import Loading from '../lib/Loading.svelte'
-  import { autoLogin, channels as channelsAtom, servers as serversAtom, user } from '../lib/store/index.js'
+  import { channels as channelsAtom, servers as serversAtom, user, vexService } from '../lib/store/index.js'
 
   onMount(async () => {
-    const result = await autoLogin(keyStore, tauriPreset(), getServerOptions())
+    const result = await vexService.autoLogin(keyStore, tauriPreset(), getServerOptions())
 
     if (!result.ok) {
       push('/login')

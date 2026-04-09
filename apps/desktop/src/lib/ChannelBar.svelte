@@ -4,7 +4,7 @@
   import { push } from 'svelte-spa-router'
 
   import InviteModal from './InviteModal.svelte'
-  import { channels as channelsStore, client, servers } from './store/index.js'
+  import { channels as channelsStore, servers, vexService } from './store/index.js'
 
   let {
     activeChannelID,
@@ -31,18 +31,11 @@
   let showInvite = $state(false)
 
   async function handleDeleteServer(): Promise<void> {
-    if (!serverID || !$client) return
+    if (!serverID) return
     deleting = true
     deleteError = ''
-    try {
-      await $client.servers.delete(serverID)
-    } catch (err) {
-      deleteError = err instanceof Error ? err.message : 'Failed to delete'
-      deleting = false
-      return
-    }
 
-    // Compute next destination before modifying stores
+    // Compute next destination before deleting
     const allServers = servers.get()
     const remaining = Object.values(allServers).filter(s => s.serverID !== serverID)
     let dest = '/home'
@@ -53,13 +46,14 @@
       dest = firstChan ? `/server/${next.serverID}/${firstChan.channelID}` : '/home'
     }
 
-    // Update stores
-    const { [serverID]: _, ...rest } = allServers
-    servers.set(rest)
-    const { [serverID]: __, ...restChans } = channelsStore.get()
-    channelsStore.set(restChans)
+    const result = await vexService.deleteServer(serverID)
+    if (!result.ok) {
+      deleteError = result.error ?? 'Failed to delete'
+      deleting = false
+      return
+    }
 
-    // Navigate away
+    // VexService updates $servers and $channels atoms internally.
     confirmDelete = false
     menuOpen = false
     deleting = false
@@ -89,12 +83,18 @@
     if (!name || !serverID) return
     addingError = ''
     try {
-      const channel = await $client.channels.create(name, serverID)
-      const current = channelsStore.get()[serverID] ?? []
-      channelsStore.setKey(serverID, [...current, channel])
+      const result = await vexService.createChannel(name, serverID)
+      if (!result.ok) {
+        addingError = result.error ?? 'Failed'
+        return
+      }
+      // VexService updates $channels atom internally.
+      // Navigate to the last channel in the updated list (the newly created one).
+      const updatedChannels = channelsStore.get()[serverID] ?? []
+      const newChan = updatedChannels[updatedChannels.length - 1]
       addingChannel = false
       newChannelName = ''
-      push(`/server/${serverID}/${channel.channelID}`)
+      if (newChan) push(`/server/${serverID}/${newChan.channelID}`)
     } catch (err) {
       addingError = err instanceof Error ? err.message : 'Failed'
     }

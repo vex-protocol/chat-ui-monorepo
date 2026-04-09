@@ -1,11 +1,9 @@
 <script lang="ts">
-  import { sendGroupMessage } from '@vex-chat/store'
-
   import ChatInput from '../lib/ChatInput.svelte'
   import { _keyStore } from '../lib/keystore.js'
   // Route: /server/:serverID/:channelID
   import MessageBox from '../lib/MessageBox.svelte'
-  import { channels, client, groupMessages, user } from '../lib/store/index.js'
+  import { channels, groupMessages, user, vexService } from '../lib/store/index.js'
 
   let { params }: { params: Record<string, string> } = $props()
 
@@ -23,9 +21,9 @@
   // Load channel members to resolve userIDs → usernames.
   // Re-runs when channelID or channels change (serverChange notify triggers $channels update).
   $effect(() => {
-    if (!$client || !channelID) return
+    if (!channelID) return
     void $channels[serverID] // reactive dep — re-fetch members when server membership changes
-    $client.channels.userList(channelID).then(members => {
+    vexService.getChannelMembers(channelID).then(members => {
       const map: Record<string, string> = {}
       for (const m of members) map[m.userID] = m.username
       usernames = map
@@ -33,12 +31,12 @@
   })
 
   async function handleSend(content: string, _attachment?: File) {
-    if (!$client || !$user || sending) return
+    if (!$user || sending) return
     sending = true
     sendError = ''
     try {
       // TODO: file _attachment upload — needs client.files.create() integration
-      const result = await sendGroupMessage(channelID, content)
+      const result = await vexService.sendGroupMessage(channelID, content)
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'
       }

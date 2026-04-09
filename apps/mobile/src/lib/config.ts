@@ -9,6 +9,11 @@ export function getServerOptions(): ServerOptions {
 }
 
 // Server host — no protocol prefix (Client adds http:// or https:// based on unsafeHttp)
+const DEFAULT_SERVER_URL =
+    typeof __DEV__ !== "undefined" && __DEV__
+        ? "localhost:16777"
+        : "api.vex.wtf";
+
 export function getServerUrl(): string {
-    return "localhost:16777";
+    return DEFAULT_SERVER_URL;
 }

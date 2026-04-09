@@ -1,5 +1,5 @@
-import type { User } from "@vex-chat/libvex";
-import type { Message } from "@vex-chat/libvex";
+import type { IUser as User } from "@vex-chat/libvex";
+import type { IMessage as Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -14,19 +14,17 @@ import {
 import {
     $dmUnreadCounts,
     avatarHue,
-    $familiars as familiarsAtom,
 } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
-import { $client, $familiars, $messages } from "../store";
+import { vexService, $familiars, $messages } from "../store";
 import { colors, typography } from "../theme";
 
 export function DMListScreen({ navigation }: { navigation: any }) {
     const familiars = useStore($familiars);
     const allMessages = useStore($messages);
-    const client = useStore($client);
     const unreadCounts = useStore($dmUnreadCounts);
 
     const [query, setQuery] = useState("");
@@ -47,17 +45,18 @@ export function DMListScreen({ navigation }: { navigation: any }) {
             }
             setSearching(true);
             timerRef.current = setTimeout(async () => {
-                const [user] = (await client?.users.retrieve(q)) ?? [null];
+                const user = await vexService.lookupUser(q);
                 const found = user ? [user] : [];
                 setResults(found);
                 setSearching(false);
             }, 300);
         },
-        [client],
+        [],
     );
 
     function openConversation(user: User) {
-        familiarsAtom.setKey(user.userID, user);
+        // Familiars atom is readonly; vexService will add the user to familiars
+        // automatically once a message is exchanged.
         setQuery("");
         setResults([]);
         navigation.navigate("Conversation", {

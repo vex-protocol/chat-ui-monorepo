@@ -1,4 +1,4 @@
-import type { Channel } from "@vex-chat/libvex";
+import type { IChannel as Channel } from "@vex-chat/libvex";
 
 import React from "react";
 import {

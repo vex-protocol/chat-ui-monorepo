@@ -14,7 +14,7 @@ import { expoPreset } from "@vex-chat/libvex/preset/expo";
 
 import { getServerOptions } from "../lib/config";
 import { keychainKeyStore } from "../lib/keychain";
-import { loginAndBootstrap } from "../store";
+import { vexService } from "../store";
 
 export function LoginScreen({ navigation }: { navigation: any }) {
     const [username, setUsername] = useState("");
@@ -27,7 +27,7 @@ export function LoginScreen({ navigation }: { navigation: any }) {
         setError("");
 
         try {
-            const result = await loginAndBootstrap(
+            const result = await vexService.login(
                 username,
                 password,
                 expoPreset(),

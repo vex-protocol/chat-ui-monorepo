@@ -6,13 +6,11 @@
  */
 export {
     $channels,
-    // Client / key-replaced flag
-    $client,
     $devices,
-
     $familiars,
     $groupMessages,
 
+    // Key-replaced flag
     $keyReplaced,
     $messages,
     $onlineLists,
@@ -20,10 +18,8 @@ export {
     $servers,
     // State atoms
     $user,
-    autoLogin,
-    loginAndBootstrap,
-    // Auth flows
-    registerAndBootstrap,
+    // VexService singleton
+    vexService,
 } from "@vex-chat/store";
 
 export type { AuthResult, ServerOptions } from "@vex-chat/store";

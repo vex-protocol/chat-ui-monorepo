@@ -4,7 +4,7 @@
   import { validate as uuidValidate } from 'uuid'
 
   import CreateServerModal from '../lib/CreateServerModal.svelte'
-  import { channels, client, servers } from '../lib/store/index.js'
+  import { channels, servers, vexService } from '../lib/store/index.js'
 
   let showCreate = $state(false)
   let inviteInput = $state('')
@@ -23,14 +23,22 @@
     joining = true
     joinError = ''
     try {
-      const permission = await $client.invites.redeem(inviteID)
-      const server = await $client.servers.retrieveByID(permission.resourceID)
-      if (!server) throw new Error('Server not found')
-      servers.setKey(server.serverID, server)
-      const serverChannels = await $client.channels.retrieve(server.serverID)
-      channels.setKey(server.serverID, serverChannels)
-      const first = serverChannels[0]
-      push(first ? `/server/${server.serverID}/${first.channelID}` : '/home')
+      const result = await vexService.joinInvite(inviteID)
+      if (!result.ok) {
+        joinError = result.error ?? 'Failed to join server'
+        return
+      }
+      // VexService updates $servers and $channels atoms internally.
+      // Find the newly added server to navigate to it.
+      const allServers = Object.values(servers.get())
+      const last = allServers[allServers.length - 1]
+      if (last) {
+        const chs = channels.get()[last.serverID] ?? []
+        const first = chs[0]
+        push(first ? `/server/${last.serverID}/${first.channelID}` : '/home')
+      } else {
+        push('/home')
+      }
     } catch (err) {
       joinError = err instanceof Error ? err.message : 'Failed to join server'
     } finally {

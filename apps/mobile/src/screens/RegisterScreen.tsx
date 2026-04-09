@@ -15,7 +15,7 @@ import { expoPreset } from "@vex-chat/libvex/preset/expo";
 
 import { getServerOptions } from "../lib/config";
 import { keychainKeyStore } from "../lib/keychain";
-import { registerAndBootstrap } from "../store";
+import { vexService } from "../store";
 
 export function RegisterScreen({ navigation }: { navigation: any }) {
     const [username, setUsername] = useState("");
@@ -34,7 +34,7 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
         setError("");
 
         try {
-            const result = await registerAndBootstrap(
+            const result = await vexService.register(
                 username,
                 password,
                 expoPreset(),

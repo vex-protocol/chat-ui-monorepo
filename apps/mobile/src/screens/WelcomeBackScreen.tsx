@@ -15,7 +15,7 @@ import {
     keychainKeyStore,
     loadCredentials,
 } from "../lib/keychain";
-import { autoLogin } from "../store";
+import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
 type Props = NativeStackScreenProps<any, "WelcomeBack">;
@@ -55,7 +55,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
         try {
             navigation.navigate("HangTight");
 
-            const result = await autoLogin(
+            const result = await vexService.autoLogin(
                 keychainKeyStore,
                 expoPreset(),
                 getServerOptions(),

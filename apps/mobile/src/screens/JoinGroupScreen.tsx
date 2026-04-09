@@ -3,19 +3,17 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { parseInviteID } from "@vex-chat/store";
 
-import { useStore } from "@nanostores/react";
 import { useNavigation } from "@react-navigation/native";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import { $channels, $client, $servers } from "../store";
+import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
 export function JoinGroupScreen() {
     const navigation = useNavigation();
-    const client = useStore($client);
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -26,24 +24,16 @@ export function JoinGroupScreen() {
             setError("Please enter a valid invite link or code");
             return;
         }
-        if (!client) {
-            setError("Not connected");
-            return;
-        }
 
         setLoading(true);
         setError("");
 
         try {
-            const permission = await client.invites.redeem(inviteID);
-            const serverID = permission.resourceID;
-            const server = await client.servers.retrieveByID(serverID);
-            if (server) {
-                $servers.setKey(server.serverID, server);
-                const channels = await client.channels.retrieve(
-                    server.serverID,
-                );
-                $channels.setKey(server.serverID, channels);
+            const result = await vexService.joinInvite(inviteID);
+            if (!result.ok) {
+                setError(result.error || "Failed to join server");
+                setLoading(false);
+                return;
             }
             // Navigate back — AppTabs will re-render with the new server
             if (navigation.canGoBack()) navigation.goBack();
