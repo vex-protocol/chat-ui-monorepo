@@ -17,18 +17,17 @@
   import ServerChannel from './routes/ServerChannel.svelte'
   import Settings from './routes/Settings.svelte'
 
-  // eslint-disable-next-line perfectionist/sort-objects -- route order matters: '*' catch-all MUST be last
-  const routes = {
-    '/':                            Launch,
-    '/home':                        Home,
-    '/launch':                      Launch,
-    '/login':                       Login,
-    '/messaging/:userID':           Messaging,
-    '/register':                    Register,
-    '/server/:serverID/:channelID': ServerChannel,
-    '/settings':                    Settings,
-    '*':                            Launch,
-  }
+  const routes = new Map([
+    ['/',                            Launch],
+    ['/home',                        Home],
+    ['/launch',                      Launch],
+    ['/login',                       Login],
+    ['/messaging/:userID',           Messaging],
+    ['/register',                    Register],
+    ['/server/:serverID/:channelID', ServerChannel],
+    ['/settings',                    Settings],
+    ['*',                            Launch],
+  ])
 
   // Auth routes show no sidebars
   const AUTH_ROUTES = ['/', '/login', '/register', '/launch']
