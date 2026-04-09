@@ -9,7 +9,13 @@
   import { channels as channelsAtom, servers as serversAtom, user, vexService } from '../lib/store/index.js'
 
   onMount(async () => {
-    const result = await vexService.autoLogin(keyStore, desktopConfig(), getServerOptions())
+    let result: { ok: boolean }
+    try {
+      result = await vexService.autoLogin(keyStore, desktopConfig(), getServerOptions())
+    } catch {
+      push('/login')
+      return
+    }
 
     if (!result.ok) {
       push('/login')
