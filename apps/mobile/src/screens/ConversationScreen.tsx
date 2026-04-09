@@ -63,7 +63,7 @@ export function ConversationScreen({
             if (!result.ok) {
                 setError(result.error ?? "Failed to send");
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to send");
         }
         setSending(false);

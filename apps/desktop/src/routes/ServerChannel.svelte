@@ -40,7 +40,7 @@
       if (!result.ok) {
         sendError = result.error ?? 'Failed to send'
       }
-    } catch (err) {
+    } catch (err: unknown) {
       sendError = err instanceof Error ? err.message : 'Failed to send'
     } finally {
       sending = false

@@ -95,7 +95,7 @@
       addingChannel = false
       newChannelName = ''
       if (newChan) push(`/server/${serverID}/${newChan.channelID}`)
-    } catch (err) {
+    } catch (err: unknown) {
       addingError = err instanceof Error ? err.message : 'Failed'
     }
   }

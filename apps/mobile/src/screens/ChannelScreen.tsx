@@ -75,7 +75,7 @@ export function ChannelScreen({
             if (!result.ok) {
                 setSendError(result.error ?? "Failed to send");
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setSendError(err instanceof Error ? err.message : "Failed to send");
         }
         setSending(false);

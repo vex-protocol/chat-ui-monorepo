@@ -35,7 +35,7 @@ export function AddServerScreen() {
                 return;
             }
             if (navigation.canGoBack()) navigation.goBack();
-        } catch (err) {
+        } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to create server",
             );
@@ -59,7 +59,7 @@ export function AddServerScreen() {
                 return;
             }
             if (navigation.canGoBack()) navigation.goBack();
-        } catch (err) {
+        } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to join server",
             );

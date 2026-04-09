@@ -82,7 +82,7 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                 return;
             }
             // Success — RootNavigator auto-navigates when $user is set
-        } catch (err) {
+        } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error");
             setLoading(false);
         }

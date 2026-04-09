@@ -66,7 +66,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 return;
             }
             // Success — RootNavigator auto-switches to App when $user becomes non-null
-        } catch (err) {
+        } catch (err: unknown) {
             // Navigate back so the user sees the error instead of being stuck on HangTight
             if (navigation.canGoBack()) navigation.goBack();
             setError(err instanceof Error ? err.message : "Failed to sign in");

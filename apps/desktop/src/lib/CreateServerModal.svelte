@@ -37,7 +37,7 @@
       } else {
         push('/home')
       }
-    } catch (err) {
+    } catch (err: unknown) {
       error = err instanceof Error ? err.message : 'Failed to create server'
     } finally {
       submitting = false

@@ -28,7 +28,7 @@
       if (!serverID) throw new Error('No server selected')
       const invite = await vexService.createInvite(serverID, '1h')
       invites = [invite, ...invites]
-    } catch (err) {
+    } catch (err: unknown) {
       error = err instanceof Error ? err.message : 'Failed to create invite'
     } finally {
       creating = false

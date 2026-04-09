@@ -74,7 +74,7 @@ export async function checkForUpdates(onStatus: StatusCallback): Promise<void> {
                 });
             }
         });
-    } catch (err) {
+    } catch (err: unknown) {
         onStatus({
             ...initial,
             error: err instanceof Error ? err.message : String(err),

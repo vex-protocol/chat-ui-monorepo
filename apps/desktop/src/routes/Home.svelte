@@ -39,7 +39,7 @@
       } else {
         push('/home')
       }
-    } catch (err) {
+    } catch (err: unknown) {
       joinError = err instanceof Error ? err.message : 'Failed to join server'
     } finally {
       joining = false

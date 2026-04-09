@@ -114,6 +114,6 @@ async function ensureChannel(): Promise<void> {
 function handleNotificationPress(
     data: Record<string, number | object | string> | undefined,
 ): void {
-    if (!data?.authorID || !data?.username) return;
-    navigateToConversation(String(data.authorID), String(data.username));
+    if (!data?.["authorID"] || !data?.["username"]) return;
+    navigateToConversation(String(data["authorID"]), String(data["username"]));
 }

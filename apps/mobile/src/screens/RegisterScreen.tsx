@@ -47,7 +47,7 @@ export function RegisterScreen({ navigation }: AuthScreenProps<"Register">) {
                 setLoading(false);
                 return;
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error");
             setLoading(false);
         }

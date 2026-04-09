@@ -40,7 +40,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                 setLoading(false);
                 return;
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error");
             setLoading(false);
         }

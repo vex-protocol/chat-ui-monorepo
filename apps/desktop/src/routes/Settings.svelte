@@ -102,7 +102,7 @@
       const data = new Uint8Array(await file.arrayBuffer())
       const result = await vexService.setAvatar(data)
       if (!result.ok) throw new Error(result.error ?? 'Upload failed')
-    } catch (err) {
+    } catch (err: unknown) {
       avatarError = err instanceof Error ? err.message : 'Upload failed'
     } finally {
       avatarUploading = false

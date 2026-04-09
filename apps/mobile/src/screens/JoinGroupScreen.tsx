@@ -37,7 +37,7 @@ export function JoinGroupScreen() {
             }
             // Navigate back — AppTabs will re-render with the new server
             if (navigation.canGoBack()) navigation.goBack();
-        } catch (err) {
+        } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to join server",
             );
