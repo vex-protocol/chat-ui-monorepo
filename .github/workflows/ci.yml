@@ -1,0 +1,204 @@
+name: CI
+
+on:
+    pull_request:
+        branches: [master]
+
+permissions:
+    contents: read
+
+jobs:
+    detect-changes:
+        runs-on: ubuntu-latest
+        outputs:
+            store: ${{ steps.changes.outputs.store }}
+            desktop: ${{ steps.changes.outputs.desktop }}
+            mobile: ${{ steps.changes.outputs.mobile }}
+            ui: ${{ steps.changes.outputs.ui }}
+            lint-config: ${{ steps.changes.outputs.lint-config }}
+            root: ${{ steps.changes.outputs.root }}
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: dorny/paths-filter@v3
+              id: changes
+              with:
+                  filters: |
+                      store:
+                        - 'packages/store/**'
+                      desktop:
+                        - 'apps/desktop/**'
+                      mobile:
+                        - 'apps/mobile/**'
+                      ui:
+                        - 'packages/ui/**'
+                      lint-config:
+                        - 'packages/eslint-config/**'
+                      root:
+                        - 'package.json'
+                        - 'pnpm-lock.yaml'
+                        - 'pnpm-workspace.yaml'
+                        - 'tsconfig.json'
+                        - 'eslint.config.js'
+
+    # ── Always runs — fast, catches formatting issues across all files ──────
+    format:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm format:check
+
+    # ── Lint — only affected packages ──────────────────────────────────────
+    lint:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.desktop == 'true' ||
+            needs.detect-changes.outputs.mobile == 'true' ||
+            needs.detect-changes.outputs.ui == 'true' ||
+            needs.detect-changes.outputs.lint-config == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Lint affected packages
+              run: |
+                  if [ "${{ needs.detect-changes.outputs.root }}" == "true" ] || \
+                     [ "${{ needs.detect-changes.outputs.lint-config }}" == "true" ]; then
+                    pnpm -r --if-present lint
+                  else
+                    pnpm --filter "...[origin/master]" --if-present lint
+                  fi
+
+    # ── Security — audit + lockfile integrity ──────────────────────────────
+    security:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Security audit
+              run: pnpm audit --audit-level=high || true
+            - name: License check
+              run: pnpm -r --if-present license:check
+
+    # ── Store — type check + test ──────────────────────────────────────────
+    check-store:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/store --if-present check
+            - run: pnpm --filter @vex-chat/store --if-present test
+
+    # ── Desktop — Svelte check (triggered by desktop OR store changes) ─────
+    check-desktop:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.desktop == 'true' ||
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Svelte check
+              run: pnpm --filter @vex-chat/desktop check
+
+    # ── Mobile — type check (triggered by mobile OR store changes) ─────────
+    check-mobile:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.mobile == 'true' ||
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/mobile --if-present check
+
+    # ── UI — Mitosis build (standalone, no dependents) ─────────────────────
+    check-ui:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.ui == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@v2
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@v4
+            - uses: pnpm/action-setup@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/ui build
