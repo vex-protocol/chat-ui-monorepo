@@ -61,9 +61,13 @@ export const base = tseslint.config(
 );
 
 /**
- * Import restriction rule for apps — ban direct imports from
- * @vex-chat/types and @vex-chat/crypto. Apps should only import
- * from @vex-chat/libvex or @vex-chat/store.
+ * Import restriction rules for apps — enforce SDK-only access to the Vex protocol.
+ *
+ * Apps must use @vex-chat/libvex (SDK) or @vex-chat/store for ALL server
+ * communication. Direct HTTP clients, WebSocket constructors, and internal
+ * SDK packages are banned. This ensures the SDK controls auth, encryption,
+ * codecs, and reconnection — whether the consumer is a bot, AI agent,
+ * Node script, mobile app, or desktop app.
  */
 export const appImportRestrictions = {
     "no-restricted-imports": [
@@ -75,7 +79,35 @@ export const appImportRestrictions = {
                     message:
                         "Import from @vex-chat/libvex or @vex-chat/store instead. Direct type/crypto imports are for SDK internals only.",
                 },
+                {
+                    group: ["axios", "ky", "ofetch", "got", "node-fetch", "undici"],
+                    message:
+                        "Direct HTTP clients are banned. Use @vex-chat/libvex Client methods for all server communication.",
+                },
+                {
+                    group: ["ws", "websocket", "sockjs-client", "socket.io-client"],
+                    message:
+                        "Direct WebSocket libraries are banned. The SDK manages WebSocket connections internally.",
+                },
             ],
+        },
+    ],
+    "no-restricted-globals": [
+        "error",
+        {
+            name: "fetch",
+            message:
+                "Direct fetch() is banned in apps. Use @vex-chat/libvex Client methods for all server communication.",
+        },
+        {
+            name: "XMLHttpRequest",
+            message:
+                "XMLHttpRequest is banned. Use @vex-chat/libvex Client methods for all server communication.",
+        },
+        {
+            name: "WebSocket",
+            message:
+                "Direct WebSocket construction is banned in apps. The SDK manages WebSocket connections internally.",
         },
     ],
 };
