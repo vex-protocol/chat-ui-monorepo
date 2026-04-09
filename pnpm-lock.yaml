@@ -10,8 +10,8 @@ catalogs:
       specifier: ^1.1.0
       version: 1.1.0
     '@vex-chat/libvex':
-      specifier: 1.2.0-rc.9
-      version: 1.2.0-rc.9
+      specifier: 1.2.0-rc.10
+      version: 1.2.0-rc.10
     dompurify:
       specifier: ^3.2.6
       version: 3.3.3
@@ -125,7 +125,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 1.2.0-rc.9(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 1.2.0-rc.10(better-sqlite3@11.10.0)(typescript@5.9.3)
       eslint-plugin-svelte:
         specifier: ^3.17.0
         version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
@@ -216,7 +216,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 1.2.0-rc.9(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 1.2.0-rc.10(better-sqlite3@11.10.0)(typescript@5.9.3)
       babel-preset-expo:
         specifier: ^55.0.15
         version: 55.0.15(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@55.0.13)(react-refresh@0.14.2)
@@ -252,7 +252,7 @@ importers:
         version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 1.2.0-rc.9(better-sqlite3@11.10.0)(typescript@6.0.2)
+        version: 1.2.0-rc.10(better-sqlite3@11.10.0)(typescript@6.0.2)
       nanostores:
         specifier: 'catalog:'
         version: 1.2.0
@@ -2325,8 +2325,8 @@ packages:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@1.2.0-rc.9':
-    resolution: {integrity: sha512-3dDjVPHN8rwQrvYXBOrSFm6TFbvCIQphmbJcSdu0EBEhXatQa6oB7yG9/1uWHkKc+NOA2sXy+yOkF2tg114ZUg==}
+  '@vex-chat/libvex@1.2.0-rc.10':
+    resolution: {integrity: sha512-uvx1VHzLHQiRan+7EZXjOFkVd3NDNErh6jqEEXSs9PE5dIyeV6640yYcpSGKhty3P9F893HG1i6K+JDjAzAbOQ==}
     engines: {node: '>=24.0.0', npm: '>=10.0.0'}
     peerDependencies:
       better-sqlite3: '>=11.0.0'
@@ -8039,7 +8039,9 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.4': {}
@@ -8790,7 +8792,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.2
 
-  '@vex-chat/libvex@1.2.0-rc.9(better-sqlite3@11.10.0)(typescript@5.9.3)':
+  '@vex-chat/libvex@1.2.0-rc.10(better-sqlite3@11.10.0)(typescript@5.9.3)':
     dependencies:
       '@vex-chat/crypto': 1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@5.9.3)
       '@vex-chat/types': 2.0.0-rc.2
@@ -8807,7 +8809,7 @@ snapshots:
       - debug
       - typescript
 
-  '@vex-chat/libvex@1.2.0-rc.9(better-sqlite3@11.10.0)(typescript@6.0.2)':
+  '@vex-chat/libvex@1.2.0-rc.10(better-sqlite3@11.10.0)(typescript@6.0.2)':
     dependencies:
       '@vex-chat/crypto': 1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@6.0.2)
       '@vex-chat/types': 2.0.0-rc.2
