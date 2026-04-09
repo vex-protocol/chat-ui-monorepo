@@ -73,6 +73,14 @@ export const appImportRestrictions = {
     "no-restricted-imports": [
         "error",
         {
+            paths: [
+                {
+                    name: "@vex-chat/libvex",
+                    allowTypeImports: true,
+                    message:
+                        "Only type imports are allowed from @vex-chat/libvex in apps. Use @vex-chat/store for runtime access. (Transport/storage subpath imports are fine.)",
+                },
+            ],
             patterns: [
                 {
                     group: ["@vex-chat/types", "@vex-chat/crypto"],
