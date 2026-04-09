@@ -2324,11 +2324,21 @@ Each team member:
 - Non-null assertions eliminated (for-of loops, destructuring defaults, nullish coalescing)
 - Repository URL fixed (was pointing to libvex-js)
 
-**libvex-js** (protocol-specs branch, 3 commits):
-- 98.17% type coverage (threshold 95% — 3200-line Client.ts has extensive `any`)
+**libvex-js** (protocol-specs branch, 10+ commits):
+- ESLint strictTypeChecked: **490 errors → 0 errors** (zero `any` in production code)
+- `useUnknownInCatchVariables: true` — all 24 catch blocks fixed with proper `unknown` narrowing
 - `@types/btoa` removed (global in Node 16+)
-- `useUnknownInCatchVariables: false` preserved — 21 catch blocks need fixing in beads-at4.12
 - Repository URL fixed (was vex-chat/vex-js → vex-protocol/libvex-js)
+- Typed WebSocket adapters: `BrowserWebSocket` + `NodeWebSocket` (createNodeWebSocket factory)
+- `EventEmitter<ClientEvents>` generic — no declaration merging
+- `Map<string, T>` replacing `Record` + `delete` — lint-clean, semantically correct
+- Kysely `ColumnType` for nullable insert columns — no `as Insertable` cast
+- Kysely `Dialect` IS exported — removed stale `as any` casts for dialect construction
+- `IStorage.ts` → `Storage.ts` — fixed 100+ cascading ESLint errors from module resolution
+- `decodeAxios()` accepts `unknown` — axios arraybuffer responses typed via generics
+- `isAxiosError()` type guard for catch blocks
+- `no-unused-vars` configured with `argsIgnorePattern: "^_"`
+- 12 remaining `eslint-disable` directives — all `no-unsafe-type-assertion` for msgpack decode casts (need Zod discriminated union to remove)
 
 **spire** (protocol-specs branch, 5 commits):
 - 96.52% type coverage (threshold 95%)
@@ -2368,7 +2378,7 @@ Each team member:
 
 12. **`eslint-plugin-n`** added to spire for Node.js-specific rules. Had to disable `n/no-missing-import` and `n/no-unpublished-import` (conflicts with TypeScript module resolution).
 
-### Full Progress (14 beads closed)
+### Full Progress (14 beads closed + ESLint/architecture work)
 
 - [x] types-js compliance gate (beads-at4.1) ✓
 - [x] crypto-js compliance gate (beads-at4.2) ✓
@@ -2383,8 +2393,22 @@ Each team member:
 - [x] changesets + publishing (beads-at4.23) ✓ — all 3 repos
 - [x] fast-check round-trip tests (beads-at4.20) ✓ — 11 tests, 2200 random inputs
 - [x] type boundary enforcement (beads-at4.8) ✓ — api-extractor, publint, attw, tsd
+- [x] Drop I-prefix from all type names (IUser → User) ✓ — across all repos
+- [x] Dates → ISO strings everywhere (lastSeen, timestamp, time) ✓
+- [x] decodeSafe() runtime validation on all HTTP responses ✓ — 14 E2E tests pass
+- [x] IStorage.ts → Storage.ts rename ✓ — fixed module resolution cascade
+- [x] libvex-js ESLint strictTypeChecked: 490 → 0 errors ✓ (2026-04-09)
+- [x] useUnknownInCatchVariables: true ✓ — all 24 catch blocks fixed
+- [x] Typed WebSocket adapters ✓ — BrowserWebSocket + NodeWebSocket (createNodeWebSocket factory)
+- [x] EventEmitter<ClientEvents> generic ✓ — no declaration merging
+- [x] Map<string, T> replacing Record + dynamic delete ✓
+- [x] Kysely ColumnType for nullable insert columns ✓
+- [x] Zero `any` in libvex production code ✓
+- [x] Kysely `as any` for dialect removed ✓ — Dialect interface IS exported
+- [x] ESLint base config: ban direct HTTP/WebSocket in apps ✓ — no-restricted-imports + no-restricted-globals
+- [x] @vex-chat/crypto rebuilt against renamed types (IBaseMsg → BaseMsg) ✓
 
-### Remaining Beads
+### Remaining Beads (specs/contract testing/docs — deferred)
 
 - [ ] beads-at4.7 — OpenAPI generation from Zod
 - [ ] beads-at4.9 — AsyncAPI generation from Zod
@@ -2397,6 +2421,59 @@ Each team member:
 - [ ] beads-at4.19 — Tauri desktop CI/CD
 - [ ] beads-at4.21 — Docs (TypeDoc + AsyncAPI + Swagger)
 - [ ] beads-956 — Shared ESLint config package
+
+### In Progress — Architecture Refactoring
+
+#### Remove PlatformPreset from libvex (SDK should be platform-agnostic)
+
+**Decision:** libvex only contains what's shared between ALL consumers (bots, AI agents, CLI, mobile, desktop). Platform-specific code moves to the apps. PlatformPreset type moves to the store.
+
+**Rationale:** Following Discord.js, Matrix, Signal, Prisma patterns — core SDK defines interfaces, consumers bring implementations. A bot shouldn't pull in expo-sqlite. An AI agent shouldn't see kysely-dialect-tauri.
+
+**What stays in libvex:**
+- Client.ts, codec, types, Storage interface, utils
+- preset/node.ts (SDK default for bots/CLI/tests)
+- preset/test.ts (test infrastructure)
+- storage/node.ts, storage/sqlite.ts, schema.ts (Node defaults + shared SQLite impl)
+- transport/browser.ts (zero-dep, shared by both GUI clients)
+- keystore/memory.ts (testing)
+
+**What moves to vex-chat monorepo apps:**
+- preset/tauri.ts + storage/tauri.ts → apps/desktop/src/lib/platform.ts
+- preset/expo.ts + storage/expo.ts → apps/mobile/src/lib/platform.ts
+- ambient.d.ts (ExpoDialect declaration) → apps/mobile/src/kysely-expo.d.ts
+
+**Store changes:**
+- Replace `PlatformPreset` with store-owned `BootstrapConfig` type
+- Fix `as any` cast in bootstrap.ts:250 — use `ClientOptions` type annotation
+- Split bootstrap.ts (361 lines) → auth.ts + client-init.ts + populate.ts
+- Fix all `catch (err: any)` → `catch (err: unknown)`
+- Export `BootstrapConfig` type for apps
+
+**App changes:**
+- Desktop: `tauriPreset()` → `desktopConfig()` (local platform.ts)
+- Mobile: `expoPreset()` → `mobileConfig()` (local platform.ts)
+- Mobile: fix hardcoded localhost:16777 → `__DEV__` conditional
+
+#### Remaining eslint-disable directives (12 in libvex)
+
+All 12 are `no-unsafe-type-assertion` for msgpack.decode() casts. Removal requires:
+- Add literal `type` fields to all WS message schemas in @vex-chat/types
+- Create `z.discriminatedUnion("type", [...])` in libvex
+- Replace `as ChallMsg` / `as SuccessMsg` with `wsMessage.parse()`
+- Also removes the unvalidated fast-path `decode()` in codec.ts
+
+This is deferred until the architecture refactoring is complete.
+
+#### ESLint SDK-only enforcement (DONE)
+
+`appImportRestrictions` in packages/eslint-config/base.js now bans:
+- Direct HTTP clients: axios, ky, ofetch, got, node-fetch, undici
+- Direct WebSocket: ws, websocket, sockjs-client, socket.io-client
+- Browser globals: fetch(), XMLHttpRequest, WebSocket (in apps only)
+- SDK internals: @vex-chat/types, @vex-chat/crypto
+
+Website exempted from no-restricted-globals (marketing site uses fetch for download metadata, privacy policies, invite previews).
 
 ### Additional Gotchas from Recent Work
 
@@ -2421,3 +2498,27 @@ Each team member:
 22. **`api-extractor` warns about bundled TS 5.9 vs project TS 6.0.** Works fine — just a version mismatch warning. Consider upgrading api-extractor when it supports TS 6.
 
 23. **`attw` flags CJS resolution warning for ESM-only package.** Expected — suppressed with `--ignore-rules cjs-resolves-to-esm`.
+
+24. **`preKey.index` is nullable from server** but schema had `z.number()`. Fixed with `z.number().nullable()` in types-js `keys.ts`. This is exactly the kind of bug `decodeSafe()` catches — the whole point of runtime validation.
+
+25. **Production API at `api.vex.wtf` still sends `Date` objects** for `actionToken.time` field. Spire source already has the fix (`new Date().toISOString()`) but hasn't been deployed. E2E tests fail against production until Spire is deployed.
+
+26. **`@vex-chat/crypto` dist had stale type names** (IBaseMsg instead of BaseMsg). Rebuilt crypto-js against updated types-js to fix. Must rebuild + republish crypto whenever types are renamed.
+
+27. **kysely-expo types conflict with Kysely's ESM build.** The `#private` class fields in CJS and ESM builds are incompatible. Installing kysely-expo as devDep does NOT fix the type mismatch. Ambient declaration with `implements Dialect` via indexed access types (`Dialect["createDriver"]`) is the workaround.
+
+28. **`while(true)` triggers `no-unnecessary-condition`.** Replaced with `for(;;)` — same semantics, no lint rule violation. The `postAuth()` infinite polling loop is a design smell (should be push-based via WebSocket notify events) but functional.
+
+29. **Mobile `config.ts` hardcoded to `localhost:16777`** — will not work in production. Must use `__DEV__` conditional or env vars.
+
+30. **Store `bootstrap.ts` has `as any` on Client.create() call** (line 250). ServerOptions fields are a subset of ClientOptions — fix by using a typed intermediate variable instead of spread + cast.
+
+31. **20 nanostores atoms across 18 files** — over-fragmented. `avatarHash.ts` is 7 lines. Could consolidate into 4-5 domain groups (auth, messaging, servers, presence).
+
+32. **Navigation typing is `any` across 7+ mobile screens.** Should use `NativeStackScreenProps<RootStackParamList>`.
+
+33. **Message persistence diverges between platforms.** Desktop uses Client's SQLite. Mobile uses AsyncStorage with manual memory restore. No shared abstraction.
+
+34. **`no-dynamic-delete` resolved with Map.** `Record<string, T>` + `delete obj[key]` replaced with `Map<string, T>` + `.delete()`. Map is semantically correct for sparse mutable lookups and avoids V8 dictionary mode deoptimization.
+
+35. **EventEmitter declaration merging resolved.** eventemitter3 v5 has a built-in `EventEmitter<EventTypes>` generic parameter. Define `ClientEvents` interface, pass as generic — typed events without interface+class merge. Discord.js uses the same pattern.
