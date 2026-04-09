@@ -13,6 +13,7 @@
         "format:check": "prettier --check .",
         "lint": "pnpm -r --if-present lint",
         "lint:fix": "pnpm -r --if-present lint:fix",
+        "license:check": "pnpm -r --if-present license:check",
         "preinstall": "npx only-allow pnpm"
     },
     "packageManager": "pnpm@10.30.3",

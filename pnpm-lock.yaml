@@ -153,9 +153,6 @@ importers:
             "@notifee/react-native":
                 specifier: ^9.1.8
                 version: 9.1.8(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))
-            "@react-native-async-storage/async-storage":
-                specifier: ^2.2.0
-                version: 2.2.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))
             "@react-navigation/bottom-tabs":
                 specifier: ^7.3.0
                 version: 7.15.9(@react-navigation/native@7.2.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native-screens@4.23.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
@@ -2222,14 +2219,6 @@ packages:
                 integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==,
             }
         engines: { node: ">=14" }
-
-    "@react-native-async-storage/async-storage@2.2.0":
-        resolution:
-            {
-                integrity: sha512-gvRvjR5JAaUZF8tv2Kcq/Gbt3JHwbKFYfmb445rhOj6NUMx3qPLixmDx5pZAyb9at1bYvJ4/eTUipU5aki45xw==,
-            }
-        peerDependencies:
-            react-native: ^0.0.0-0 || >=0.65 <1.0
 
     "@react-native-community/cli-clean@20.1.0":
         resolution:
@@ -6364,13 +6353,6 @@ packages:
             }
         engines: { node: ">=0.12.0" }
 
-    is-plain-obj@2.1.0:
-        resolution:
-            {
-                integrity: sha512-YWnfyRwxL/+SsrWYfOpUtz5b3YD+nyfkHvjbcanzk8zgyO4ASD67uVMRt8k5bM4lLMDnXfriRhOpemw+NfT1eA==,
-            }
-        engines: { node: ">=8" }
-
     is-reference@3.0.3:
         resolution:
             {
@@ -7107,13 +7089,6 @@ packages:
             {
                 integrity: sha512-/EuHYwAPdLtXwAwSZkh/Gutery6pD2KYd44oQLhAvQp/50mpyduZh8Q7PYHXTCJ+wuXxt7oij2LXyIJOOYFPog==,
             }
-
-    merge-options@3.0.4:
-        resolution:
-            {
-                integrity: sha512-2Sug1+knBjkaMsMgf1ctR1Ujx+Ayku4EdJN4Z+C2+JzoeF7A3OZ9KM2GY0CpQS51NR61LTurMJrRKPhSs3ZRTQ==,
-            }
-        engines: { node: ">=10" }
 
     merge-stream@2.0.0:
         resolution:
@@ -11657,11 +11632,6 @@ snapshots:
     "@pkgjs/parseargs@0.11.0":
         optional: true
 
-    "@react-native-async-storage/async-storage@2.2.0(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))":
-        dependencies:
-            merge-options: 3.0.4
-            react-native: 0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0)
-
     "@react-native-community/cli-clean@20.1.0":
         dependencies:
             "@react-native-community/cli-tools": 20.1.0
@@ -14761,8 +14731,6 @@ snapshots:
 
     is-number@7.0.0: {}
 
-    is-plain-obj@2.1.0: {}
-
     is-reference@3.0.3:
         dependencies:
             "@types/estree": 1.0.8
@@ -15214,10 +15182,6 @@ snapshots:
     memoizerific@1.11.3:
         dependencies:
             map-or-similar: 1.5.0
-
-    merge-options@3.0.4:
-        dependencies:
-            is-plain-obj: 2.1.0
 
     merge-stream@2.0.0: {}
 
