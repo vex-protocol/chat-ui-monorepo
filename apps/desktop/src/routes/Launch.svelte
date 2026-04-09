@@ -2,15 +2,14 @@
   import { onMount } from 'svelte'
   import { push } from 'svelte-spa-router'
 
-  import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
+  import { desktopConfig } from '../lib/platform.js'
   import Loading from '../lib/Loading.svelte'
   import { channels as channelsAtom, servers as serversAtom, user, vexService } from '../lib/store/index.js'
 
   onMount(async () => {
-    const result = await vexService.autoLogin(keyStore, tauriPreset(), getServerOptions())
+    const result = await vexService.autoLogin(keyStore, desktopConfig(), getServerOptions())
 
     if (!result.ok) {
       push('/login')

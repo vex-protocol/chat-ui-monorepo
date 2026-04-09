@@ -10,13 +10,12 @@ import {
     View,
 } from "react-native";
 
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
-
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
+import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
 import { vexService } from "../store";
 import { colors, typography } from "../theme";
@@ -73,7 +72,7 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
             const result = await vexService.register(
                 username,
                 password,
-                expoPreset(),
+                mobileConfig(),
                 getServerOptions(),
                 keychainKeyStore,
             );

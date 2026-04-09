@@ -11,9 +11,8 @@ import {
     View,
 } from "react-native";
 
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
-
 import { getServerOptions } from "../lib/config";
+import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
 import { vexService } from "../store";
 
@@ -37,7 +36,7 @@ export function RegisterScreen({ navigation }: { navigation: any }) {
             const result = await vexService.register(
                 username,
                 password,
-                expoPreset(),
+                mobileConfig(),
                 getServerOptions(),
                 keychainKeyStore,
             );

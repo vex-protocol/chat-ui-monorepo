@@ -3,13 +3,12 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
-
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
+import { mobileConfig } from "../lib/platform";
 import {
     clearCredentials,
     keychainKeyStore,
@@ -57,7 +56,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
 
             const result = await vexService.autoLogin(
                 keychainKeyStore,
-                expoPreset(),
+                mobileConfig(),
                 getServerOptions(),
             );
 

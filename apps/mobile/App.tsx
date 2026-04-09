@@ -11,9 +11,9 @@ import {
     $messages,
     $groupMessages,
 } from "./src/store";
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
 import { keychainKeyStore, clearCredentials } from "./src/lib/keychain";
 import { getServerOptions } from "./src/lib/config";
+import { mobileConfig } from "./src/lib/platform";
 import {
     saveFamiliars,
     saveDmMessages,
@@ -42,7 +42,7 @@ function App() {
     useEffect(() => {
         (async () => {
             await requestNotificationPermission();
-            await vexService.autoLogin(keychainKeyStore, expoPreset(), getServerOptions());
+            await vexService.autoLogin(keychainKeyStore, mobileConfig(), getServerOptions());
             // Familiars are populated by vexService.populateState() during bootstrap
         })();
     }, []);

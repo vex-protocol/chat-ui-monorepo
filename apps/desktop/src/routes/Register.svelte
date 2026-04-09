@@ -1,10 +1,9 @@
 <script lang="ts">
   import { push } from 'svelte-spa-router'
 
-  import { tauriPreset } from '@vex-chat/libvex/preset/tauri'
-
   import { getServerOptions } from '../lib/config.js'
   import { keyStore } from '../lib/keystore.js'
+  import { desktopConfig } from '../lib/platform.js'
   import { playError, playUnlock } from '../lib/sounds.js'
   import { user as userAtom, vexService } from '../lib/store/index.js'
 
@@ -35,7 +34,7 @@
 
     loading = true
 
-    const result = await vexService.register(username, password, tauriPreset(), getServerOptions(), keyStore)
+    const result = await vexService.register(username, password, desktopConfig(), getServerOptions(), keyStore)
 
     if (!result.ok) {
       errors = { form: result.error ?? 'Registration failed' }
