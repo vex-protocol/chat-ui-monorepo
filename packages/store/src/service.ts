@@ -94,25 +94,44 @@ class VexService {
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<AuthResult> {
-        const creds = await keyStore.load();
-        if (!creds) return { ok: false };
+        console.log("[vex-store] autoLogin: loading keyStore...");
+        let creds;
+        try {
+            creds = await keyStore.load();
+        } catch (loadErr: unknown) {
+            console.error("[vex-store] autoLogin: keyStore.load() threw:", loadErr);
+            return { error: errorMessage(loadErr), ok: false };
+        }
+        if (!creds) {
+            console.log("[vex-store] autoLogin: no creds found, returning ok:false");
+            return { ok: false };
+        }
+        console.log("[vex-store] autoLogin: creds found for", creds.username);
 
         try {
+            console.log("[vex-store] autoLogin: initClient...");
             await this.initClient(creds.deviceKey, config, options);
             const client = this.requireClient();
+            console.log("[vex-store] autoLogin: client created, calling loginWithDeviceKey...");
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
+            console.log("[vex-store] autoLogin: loginWithDeviceKey result:", authErr?.message ?? "success");
             if (authErr) {
-                await this.close();
+                console.log("[vex-store] autoLogin: auth failed, closing client...");
+                try { await this.close(); } catch { /* ignore close errors */ }
                 return { error: authErr.message, ok: false };
             }
 
+            console.log("[vex-store] autoLogin: connecting...");
             await client.connect();
             $userWritable.set(client.me.user());
+            console.log("[vex-store] autoLogin: populating state...");
             await this.populateState();
+            console.log("[vex-store] autoLogin: done, ok:true");
             return { ok: true };
         } catch (err: unknown) {
-            await this.close();
+            console.error("[vex-store] autoLogin: caught error:", errorMessage(err));
+            try { await this.close(); } catch { /* ignore close errors */ }
             if ($keyReplacedWritable.get()) {
                 return { keyReplaced: true, ok: false };
             }

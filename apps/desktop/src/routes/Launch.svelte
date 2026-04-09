@@ -8,38 +8,55 @@
   import Loading from '../lib/Loading.svelte'
   import { channels as channelsAtom, servers as serversAtom, user, vexService } from '../lib/store/index.js'
 
-  onMount(async () => {
-    try {
-      const result = await Promise.race([
-        vexService.autoLogin(keyStore, desktopConfig(), getServerOptions()),
-        new Promise<{ ok: false }>((resolve) =>
-          setTimeout(() => resolve({ ok: false }), 15_000),
-        ),
-      ])
+  console.log('[Launch] script loaded')
 
-      if (!result.ok) {
-        push('/login')
-        return
-      }
+  onMount(() => {
+    console.log('[Launch] onMount fired')
 
-      const u = user.get()
-      if (!u) { push('/login'); return }
+    void (async () => {
+      try {
+        console.log('[Launch] calling autoLogin...')
+        const result = await Promise.race([
+          vexService.autoLogin(keyStore, desktopConfig(), getServerOptions()),
+          new Promise<{ ok: false }>((resolve) =>
+            setTimeout(() => {
+              console.log('[Launch] 15s timeout hit')
+              resolve({ ok: false })
+            }, 15_000),
+          ),
+        ])
+        console.log('[Launch] autoLogin returned:', JSON.stringify(result))
 
-      const serverList = Object.values(serversAtom.get())
-      if (serverList.length > 0) {
-        const sid = serverList[0].serverID
-        const chs = channelsAtom.get()[sid] ?? []
-        if (chs.length > 0) {
-          push(`/server/${sid}/${chs[0].channelID}`)
+        if (!result.ok) {
+          console.log('[Launch] not ok, pushing /login')
+          push('/login')
+          return
+        }
+
+        const u = user.get()
+        if (!u) {
+          console.log('[Launch] no user, pushing /login')
+          push('/login')
+          return
+        }
+
+        const serverList = Object.values(serversAtom.get())
+        if (serverList.length > 0) {
+          const sid = serverList[0].serverID
+          const chs = channelsAtom.get()[sid] ?? []
+          if (chs.length > 0) {
+            push(`/server/${sid}/${chs[0].channelID}`)
+          } else {
+            push('/home')
+          }
         } else {
           push('/home')
         }
-      } else {
-        push('/home')
+      } catch (err) {
+        console.error('[Launch] caught error:', err)
+        push('/login')
       }
-    } catch {
-      push('/login')
-    }
+    })()
   })
 </script>
 
