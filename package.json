@@ -31,6 +31,7 @@
     },
     "pnpm": {
         "overrides": {
+            "@babel/plugin-transform-react-jsx": "7.27.1",
             "react": "19.2.3"
         },
         "peerDependencyRules": {
