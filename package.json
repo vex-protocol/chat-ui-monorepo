@@ -1,6 +1,6 @@
 {
     "name": "vex-chat",
-    "version": "1.0.0",
+    "version": "1.2.0-rc.7",
     "private": "true",
     "type": "module",
     "scripts": {
@@ -32,7 +32,6 @@
     },
     "pnpm": {
         "overrides": {
-            "@babel/plugin-transform-react-jsx": "7.27.1",
             "react": "19.2.0"
         },
         "peerDependencyRules": {

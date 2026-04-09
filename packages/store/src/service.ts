@@ -82,6 +82,7 @@ export interface ServerOptions {
 
 class VexService {
     private client: Client | null = null;
+    private readonly failedUserLookups = new Set<string>();
 
     // ── Auth flows ──────────────────────────────────────────────────────
 
@@ -541,6 +542,7 @@ class VexService {
 
     private resetAll(): void {
         this.client = null;
+        this.failedUserLookups.clear();
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
         $familiarsWritable.set({});
@@ -611,7 +613,10 @@ class VexService {
                     }
 
                     const otherUserID = threadKey;
-                    if (!$familiarsWritable.get()[otherUserID]) {
+                    if (
+                        !$familiarsWritable.get()[otherUserID] &&
+                        !this.failedUserLookups.has(otherUserID)
+                    ) {
                         $familiarsWritable.setKey(otherUserID, {
                             lastSeen: new Date(),
                             userID: otherUserID,
@@ -620,10 +625,15 @@ class VexService {
                         client.users
                             .retrieve(otherUserID)
                             .then(([u]) => {
-                                if (u)
+                                if (u) {
                                     $familiarsWritable.setKey(otherUserID, u);
+                                } else {
+                                    this.failedUserLookups.add(otherUserID);
+                                }
                             })
-                            .catch(() => {});
+                            .catch(() => {
+                                this.failedUserLookups.add(otherUserID);
+                            });
                     }
                 }
             }

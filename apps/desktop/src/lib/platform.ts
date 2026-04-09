@@ -45,6 +45,7 @@ export function desktopConfig(): BootstrapConfig {
             });
             const storage = new SqliteStorage(db, privateKey, storageLogger);
             await storage.init();
+            console.log("[platform] Storage initialized, testing savePreKeys...");
             return storage;
         },
         deviceName: navigator.platform,
