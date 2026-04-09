@@ -3,9 +3,8 @@
 
   import { push } from 'svelte-spa-router'
 
-  import { $totalDmUnread as totalDmUnread } from '@vex-chat/store'
-
   import CreateServerModal from './CreateServerModal.svelte'
+  import { totalDmUnread } from './store/index.js'
 
   let { activeServerID, channelMap, serverList }: { activeServerID?: string; channelMap?: Record<string, Channel[]>; serverList?: Server[]; } = $props()
 

@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { $groupMessages, $messages, shouldNotify } from "@vex-chat/store";
 
@@ -39,7 +39,7 @@ export function setupNotifications(
     let prevDmSnapshot = $messages.get();
     let prevGroupSnapshot = $groupMessages.get();
 
-    const handleNewMessage = async (msg: IMessage): Promise<void> => {
+    const handleNewMessage = async (msg: Message): Promise<void> => {
         let focused = false;
         try {
             focused = await getCurrentWindow().isFocused();

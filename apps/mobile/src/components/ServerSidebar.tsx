@@ -13,7 +13,7 @@ import { $totalDmUnread } from "@vex-chat/store";
 import { useStore } from "@nanostores/react";
 
 const vexLogo = require("../assets/images/vex-logo.png");
-import { $servers } from "../store";
+import { $servers } from "@vex-chat/store";
 import { colors } from "../theme";
 
 interface ServerSidebarProps {

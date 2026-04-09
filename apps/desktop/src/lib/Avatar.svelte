@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { avatarHue } from '@vex-chat/store'
+  import { avatarHue } from './store/index.js'
 
   interface Props {
     /** Display name or username for initials fallback */

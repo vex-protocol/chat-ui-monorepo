@@ -6,14 +6,13 @@
  * Components subscribe to readonly atom exports from domains/.
  */
 import type {
-    IClientAdapters,
-    IClientOptions,
-    IInvite,
-    ILogger,
-    IMessage,
-    IStorage,
-    IUser,
+    ClientOptions,
+    Invite,
     KeyStore,
+    Logger,
+    Message,
+    Storage,
+    User,
 } from "@vex-chat/libvex";
 
 import { Client } from "@vex-chat/libvex";
@@ -49,13 +48,13 @@ export interface AuthResult {
 
 /** App-provided platform configuration for client bootstrap. */
 export interface BootstrapConfig {
-    adapters: IClientAdapters;
     createStorage(
         dbName: string,
         privateKey: string,
-        logger: ILogger,
-    ): Promise<IStorage>;
+        logger: Logger,
+    ): Promise<Storage>;
     deviceName: string;
+    logger: Logger;
 }
 
 /** Result from any mutation operation. */
@@ -143,7 +142,7 @@ class VexService {
 
     // ── Server CRUD ─────────────────────────────────────────────────────
 
-    async createInvite(serverID: string, duration: string): Promise<IInvite> {
+    async createInvite(serverID: string, duration: string): Promise<Invite> {
         const client = this.requireClient();
         return client.invites.create(serverID, duration);
     }
@@ -177,12 +176,12 @@ class VexService {
         }
     }
 
-    async getChannelMembers(channelID: string): Promise<IUser[]> {
+    async getChannelMembers(channelID: string): Promise<User[]> {
         const client = this.requireClient();
         return client.channels.userList(channelID);
     }
 
-    async getInvites(serverID: string): Promise<IInvite[]> {
+    async getInvites(serverID: string): Promise<Invite[]> {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
@@ -225,9 +224,12 @@ class VexService {
             await this.initClient(privateKey, config, options);
             const client = this.requireClient();
 
-            const loginErr = await client.login(username, password);
-            if (loginErr) {
-                return { error: "Invalid username or password", ok: false };
+            const loginResult = await client.login(username, password);
+            if (!loginResult.ok) {
+                return {
+                    error: loginResult.error ?? "Invalid username or password",
+                    ok: false,
+                };
             }
 
             await client.connect();
@@ -281,7 +283,7 @@ class VexService {
         this.resetAll();
     }
 
-    async lookupUser(query: string): Promise<IUser | null> {
+    async lookupUser(query: string): Promise<null | User> {
         try {
             const client = this.requireClient();
             const [user] = await client.users.retrieve(query);
@@ -321,10 +323,12 @@ class VexService {
                 };
             }
 
-            const loginErr = await client.login(username, password);
-            if (loginErr) {
+            const loginResult = await client.login(username, password);
+            if (!loginResult.ok) {
                 return {
-                    error: "Registered but login failed: " + loginErr.message,
+                    error:
+                        "Registered but login failed: " +
+                        (loginResult.error ?? "unknown"),
                     ok: false,
                 };
             }
@@ -404,13 +408,13 @@ class VexService {
         const storage = await config.createStorage(
             "vex-client.db",
             privateKey,
-            config.adapters.logger,
+            config.logger,
         );
 
-        const clientOptions: IClientOptions = {
+        const clientOptions: ClientOptions = {
             ...options,
-            adapters: config.adapters,
             deviceName: config.deviceName,
+            logger: config.logger,
         };
 
         this.client = await Client.create(privateKey, clientOptions, storage);
@@ -434,7 +438,7 @@ class VexService {
     private log(message: string): void {
         const logger = this.client
             ? // @ts-expect-error -- accessing internal logger for debug output
-              (this.client as { log?: ILogger }).log
+              (this.client as { log?: Logger }).log
             : undefined;
         if (logger) {
             logger.warn("[vex-store] " + message);
@@ -551,7 +555,7 @@ class VexService {
     private wireEvents(): void {
         const client = this.requireClient();
 
-        client.on("message", (msg: IMessage) => {
+        client.on("message", (msg: Message) => {
             const me = $userWritable.get();
 
             if (msg.group) {
@@ -584,7 +588,7 @@ class VexService {
                             lastSeen: new Date(),
                             userID: otherUserID,
                             username: otherUserID.slice(0, 8),
-                        } as IUser);
+                        } as User);
                         client.users
                             .retrieve(otherUserID)
                             .then(([u]) => {
@@ -599,7 +603,7 @@ class VexService {
     }
 }
 
-function deduplicateMessages(messages: IMessage[]): IMessage[] {
+function deduplicateMessages(messages: Message[]): Message[] {
     const seen = new Set<string>();
     return messages.filter((m) => {
         if (seen.has(m.mailID)) return false;

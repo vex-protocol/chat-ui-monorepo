@@ -12,7 +12,7 @@ import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import type { AppStackParamList } from "../navigation/types";
-import { vexService } from "../store";
+import { vexService } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function AddServerScreen() {

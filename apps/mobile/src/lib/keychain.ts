@@ -4,25 +4,17 @@ import * as SecureStore from "expo-secure-store";
 
 const CREDS_KEY = "vex-device-credentials";
 
-export interface DeviceCredentials {
-    deviceID: string;
-    deviceKey: string; // hex-encoded Ed25519 secret key
-    preKey?: string;
-    token?: string; // JWT auth token for HTTP calls
-    username: string;
-}
-
 export async function clearCredentials(): Promise<void> {
     await SecureStore.deleteItemAsync(CREDS_KEY);
 }
 
-export async function loadCredentials(): Promise<DeviceCredentials | null> {
+export async function loadCredentials(): Promise<null | StoredCredentials> {
     const raw = await SecureStore.getItemAsync(CREDS_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as DeviceCredentials;
+    return JSON.parse(raw) as StoredCredentials;
 }
 
-export async function saveCredentials(creds: DeviceCredentials): Promise<void> {
+export async function saveCredentials(creds: StoredCredentials): Promise<void> {
     await SecureStore.setItemAsync(CREDS_KEY, JSON.stringify(creds));
 }
 
@@ -38,6 +30,6 @@ export const keychainKeyStore: KeyStore = {
         return loadCredentials();
     },
     async save(creds: StoredCredentials): Promise<void> {
-        await saveCredentials(creds as DeviceCredentials);
+        await saveCredentials(creds);
     },
 };

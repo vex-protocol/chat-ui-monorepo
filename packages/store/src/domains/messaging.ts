@@ -1,11 +1,11 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { computed, map, readonlyType } from "nanostores";
 
 // ── Writable (internal — only VexService imports these) ─────────────────────
 
-export const $messagesWritable = map<Record<string, IMessage[]>>({});
-export const $groupMessagesWritable = map<Record<string, IMessage[]>>({});
+export const $messagesWritable = map<Record<string, Message[]>>({});
+export const $groupMessagesWritable = map<Record<string, Message[]>>({});
 export const $dmUnreadCountsWritable = map<Record<string, number>>({});
 export const $channelUnreadCountsWritable = map<Record<string, number>>({});
 

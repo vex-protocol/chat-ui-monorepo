@@ -7,18 +7,12 @@ import {
     vexService,
     $keyReplaced,
     $user,
-    $familiars,
     $messages,
     $groupMessages,
-} from "./src/store";
+} from "@vex-chat/store";
 import { keychainKeyStore, clearCredentials } from "./src/lib/keychain";
 import { getServerOptions } from "./src/lib/config";
 import { mobileConfig } from "./src/lib/platform";
-import {
-    saveFamiliars,
-    saveDmMessages,
-    saveGroupMessages,
-} from "./src/lib/messages";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { navigationRef } from "./src/navigation/navigationRef";
 import {
@@ -47,29 +41,9 @@ function App() {
         })();
     }, []);
 
-    // Persist familiars whenever they change
-    const familiars = useStore($familiars);
-    useEffect(() => {
-        if (Object.keys(familiars).length > 0) {
-            saveFamiliars(familiars).catch(() => {});
-        }
-    }, [familiars]);
-
-    // Persist messages whenever they change
+    // Show local notifications for incoming messages by watching atom changes
     const allDms = useStore($messages);
     const allGroups = useStore($groupMessages);
-    useEffect(() => {
-        if (Object.keys(allDms).length > 0) {
-            saveDmMessages(allDms).catch(() => {});
-        }
-    }, [allDms]);
-    useEffect(() => {
-        if (Object.keys(allGroups).length > 0) {
-            saveGroupMessages(allGroups).catch(() => {});
-        }
-    }, [allGroups]);
-
-    // Show local notifications for incoming messages by watching atom changes
     const prevDmsRef = useRef(allDms);
     const prevGroupsRef = useRef(allGroups);
 

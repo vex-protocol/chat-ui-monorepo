@@ -1,4 +1,4 @@
-import type { IChannel as Channel } from "@vex-chat/libvex";
+import type { Channel } from "@vex-chat/libvex";
 
 import React from "react";
 import {
@@ -12,7 +12,7 @@ import {
 import { useStore } from "@nanostores/react";
 
 import type { AppScreenProps } from "../navigation/types";
-import { $channels } from "../store";
+import { $channels } from "@vex-chat/store";
 
 export function ChannelListScreen({
     navigation,

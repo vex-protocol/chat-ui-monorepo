@@ -3,11 +3,9 @@
 
   import { push } from 'svelte-spa-router'
 
-  import { $dmUnreadCounts as unreadCounts } from '@vex-chat/store'
-
   import Avatar from './Avatar.svelte'
   import { getServerUrl } from './config.js'
-  import { familiars, vexService } from './store/index.js'
+  import { dmUnreadCounts as unreadCounts, familiars, vexService } from './store/index.js'
 
   const serverUrl = getServerUrl()
 

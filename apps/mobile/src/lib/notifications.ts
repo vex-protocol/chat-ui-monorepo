@@ -1,13 +1,17 @@
-import type { IMessage as Message } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import { AppState } from "react-native";
 
 import { shouldNotify, vexService } from "@vex-chat/store";
+import { $channels, $familiars, $servers } from "@vex-chat/store";
 
-import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
+import notifee, {
+    AndroidImportance,
+    AuthorizationStatus,
+    EventType,
+} from "@notifee/react-native";
 
 import { navigateToConversation } from "../navigation/navigationRef";
-import { $channels, $familiars, $servers } from "../store";
 
 const CHANNEL_ID = "vex-messages";
 
@@ -17,7 +21,10 @@ let activeConversation: null | string = null;
 export async function requestNotificationPermission(): Promise<boolean> {
     const settings = await notifee.requestPermission();
     // authorizationStatus 1 = AUTHORIZED, 2 = PROVISIONAL
-    return settings.authorizationStatus >= 1;
+    return (
+        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+        settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
+    );
 }
 
 /** Call from screens to track which conversation the user is viewing. */
@@ -34,10 +41,11 @@ export function setupNotificationHandlers(): () => void {
     });
 
     // Background/killed events (app was closed or backgrounded)
-    notifee.onBackgroundEvent(async ({ detail, type }) => {
+    notifee.onBackgroundEvent(({ detail, type }) => {
         if (type === EventType.PRESS) {
             handleNotificationPress(detail.notification?.data);
         }
+        return Promise.resolve();
     });
 
     return unsubForeground;
@@ -114,6 +122,8 @@ async function ensureChannel(): Promise<void> {
 function handleNotificationPress(
     data: Record<string, number | object | string> | undefined,
 ): void {
-    if (!data?.["authorID"] || !data?.["username"]) return;
-    navigateToConversation(String(data["authorID"]), String(data["username"]));
+    const authorID = data?.["authorID"];
+    const username = data?.["username"];
+    if (typeof authorID !== "string" || typeof username !== "string") return;
+    navigateToConversation(authorID, username);
 }

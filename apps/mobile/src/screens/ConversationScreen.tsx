@@ -1,4 +1,4 @@
-import type { IMessage as Message } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -17,7 +17,7 @@ import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
 import type { AppScreenProps } from "../navigation/types";
-import { vexService, $messages, $user } from "../store";
+import { vexService, $messages, $user } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function ConversationScreen({

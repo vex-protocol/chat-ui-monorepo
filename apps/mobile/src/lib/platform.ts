@@ -2,19 +2,17 @@
  * Mobile (Expo / React Native) platform configuration.
  *
  * Constructs a BootstrapConfig for the Vex store using:
- * - WebSocket: BrowserWebSocket (React Native's global WebSocket)
+ * - WebSocket: native global (React Native provides global WebSocket)
  * - Storage:   createExpoStorage (Kysely + kysely-expo + expo-sqlite)
  * - Logger:    console wrapper with [vex] prefix
  * - deviceName: Platform.OS
  */
-import type { ILogger } from "@vex-chat/libvex";
+import type { Logger, Storage } from "@vex-chat/libvex";
 import type { BootstrapConfig } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
-import { BrowserWebSocket } from "@vex-chat/libvex/transport/browser";
-
-const logger: ILogger = {
+const logger: Logger = {
     debug(m) {
         console.debug(`[vex] ${m}`);
     },
@@ -31,15 +29,17 @@ const logger: ILogger = {
 
 export function mobileConfig(): BootstrapConfig {
     return {
-        adapters: {
-            logger,
-            WebSocket: BrowserWebSocket,
-        },
-        async createStorage(dbName, privateKey, _logger) {
-            const { createExpoStorage } =
-                await import("@vex-chat/libvex/storage/expo");
-            return createExpoStorage(dbName, privateKey, _logger ?? logger);
+        async createStorage(dbName, privateKey, _logger): Promise<Storage> {
+            const mod = (await import("@vex-chat/libvex/storage/expo")) as {
+                createExpoStorage: (
+                    db: string,
+                    pk: string,
+                    l: Logger,
+                ) => Storage;
+            };
+            return mod.createExpoStorage(dbName, privateKey, _logger);
         },
         deviceName: Platform.OS,
+        logger,
     };
 }

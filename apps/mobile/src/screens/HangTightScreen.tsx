@@ -4,7 +4,7 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { useStore } from "@nanostores/react";
 
 import { ScreenLayout } from "../components/ScreenLayout";
-import { $user } from "../store";
+import { $user } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function HangTightScreen() {

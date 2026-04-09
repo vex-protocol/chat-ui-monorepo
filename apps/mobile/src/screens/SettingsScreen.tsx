@@ -12,9 +12,8 @@ import { useStore } from "@nanostores/react";
 import notifee, { AndroidImportance } from "@notifee/react-native";
 
 import { clearCredentials } from "../lib/keychain";
-import { clearMessages } from "../lib/messages";
 import type { AppScreenProps } from "../navigation/types";
-import { vexService, $user } from "../store";
+import { vexService, $user } from "@vex-chat/store";
 
 export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
@@ -29,7 +28,6 @@ export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Sett
         } catch {
             /* ignore */
         }
-        await clearMessages();
     }
 
     function handleClearKeys() {
@@ -46,8 +44,7 @@ export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Sett
                             /* ignore */
                         }
                         await clearCredentials();
-                        await clearMessages();
-                    },
+                                    },
                     style: "destructive",
                     text: "Clear keys",
                 },

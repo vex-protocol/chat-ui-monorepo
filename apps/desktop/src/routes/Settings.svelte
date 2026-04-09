@@ -9,8 +9,7 @@
   import { keyStore } from '../lib/keystore.js'
   import { getNotificationsEnabled, setNotificationsEnabled } from '../lib/notifications.js'
   import { getSoundsEnabled, playNotify, setSoundsEnabled } from '../lib/sounds.js'
-  import { user, vexService } from '../lib/store/index.js'
-  import { $avatarHash as avatarHash } from '@vex-chat/store'
+  import { avatarHash, user, vexService } from '../lib/store/index.js'
   import { theme, toggleTheme } from '../lib/stores/theme.js'
   import { applyUpdate, checkForUpdates, type UpdateStatus } from '../lib/updater.js'
 
@@ -69,7 +68,7 @@
   let creds: null | StoredCredentials = $state(null)
   let fingerprint = $derived.by(() => {
     const key = creds?.deviceKey
-    key ? key.slice(0, 16).toUpperCase() : 'N/A';
+    return key ? key.slice(0, 16).toUpperCase() : 'N/A'
   })
 
   // Load credentials from KeyStore on mount
@@ -129,7 +128,6 @@
   // ── Danger zone ─────────────────────────────────────────────────────────────
 
   let confirmClear = $state(false)
-  let _clearError = $state('')
 
   async function handleLogout(): Promise<void> {
     try {
@@ -143,7 +141,6 @@
 
   function startClear(): void {
     confirmClear = true
-    _clearError = ''
   }
 
   async function confirmClearKeys(): Promise<void> {

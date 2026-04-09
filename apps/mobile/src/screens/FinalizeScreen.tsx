@@ -16,7 +16,7 @@ import { getServerOptions } from "../lib/config";
 import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
 import type { AuthScreenProps } from "../navigation/types";
-import { vexService } from "../store";
+import { vexService } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Finalize">;

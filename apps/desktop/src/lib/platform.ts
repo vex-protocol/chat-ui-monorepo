@@ -2,17 +2,15 @@
  * Desktop (Tauri) platform configuration.
  *
  * Constructs a BootstrapConfig for the Vex store using:
- * - WebSocket: BrowserWebSocket (Tauri webview uses browser-native WS)
+ * - WebSocket: native global (Tauri webview has browser-native WS)
  * - Storage:   createTauriStorage (Kysely + kysely-dialect-tauri + @tauri-apps/plugin-sql)
  * - Logger:    console wrapper with [vex] prefix
  * - deviceName: navigator.platform
  */
-import type { ILogger } from "@vex-chat/libvex";
+import type { Logger, Storage } from "@vex-chat/libvex";
 import type { BootstrapConfig } from "@vex-chat/store";
 
-import { BrowserWebSocket } from "@vex-chat/libvex/transport/browser";
-
-const logger: ILogger = {
+const logger: Logger = {
     debug(m) {
         console.debug(`[vex] ${m}`);
     },
@@ -29,15 +27,17 @@ const logger: ILogger = {
 
 export function desktopConfig(): BootstrapConfig {
     return {
-        adapters: {
-            logger,
-            WebSocket: BrowserWebSocket,
-        },
-        async createStorage(dbName, privateKey, _logger) {
-            const { createTauriStorage } =
-                await import("@vex-chat/libvex/storage/tauri");
-            return createTauriStorage(dbName, privateKey, _logger ?? logger);
+        async createStorage(dbName, privateKey, _logger): Promise<Storage> {
+            const mod = (await import("@vex-chat/libvex/storage/tauri")) as {
+                createTauriStorage: (
+                    db: string,
+                    pk: string,
+                    l: Logger,
+                ) => Storage;
+            };
+            return mod.createTauriStorage(dbName, privateKey, _logger);
         },
         deviceName: navigator.platform,
+        logger,
     };
 }

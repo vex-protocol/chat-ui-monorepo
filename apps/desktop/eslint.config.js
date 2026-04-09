@@ -19,6 +19,21 @@ export default [
         rules: {
             // Svelte uses import() type annotations in $props()
             "@typescript-eslint/consistent-type-imports": "off",
+            // Svelte components must use the barrel (lib/store/index.ts) for
+            // atoms — it strips the $ prefix so Svelte's reactive $ works.
+            // Plain .ts files may import @vex-chat/store directly.
+            "no-restricted-imports": [
+                "error",
+                {
+                    paths: [
+                        {
+                            name: "@vex-chat/store",
+                            message:
+                                "Svelte components must import from '$lib/store' (the barrel) so the $ prefix aliasing works correctly.",
+                        },
+                    ],
+                },
+            ],
         },
     },
     {

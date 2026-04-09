@@ -1,4 +1,4 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -13,8 +13,8 @@ export interface FileAttachment {
 
 export interface MessageChunk {
     authorID: string;
-    firstTime: Date;
-    messages: IMessage[];
+    firstTime: string;
+    messages: Message[];
 }
 
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
@@ -25,7 +25,7 @@ export function avatarHue(id: string): number {
 }
 
 export function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024) return String(bytes) + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
@@ -39,11 +39,14 @@ export function isImageType(contentType: string): boolean {
 export function parseFileExtra(extra: null | string): FileAttachment | null {
     if (!extra) return null;
     try {
-        const obj = JSON.parse(extra);
+        const obj: unknown = JSON.parse(extra);
         if (
-            obj &&
-            typeof obj.fileID === "string" &&
-            typeof obj.fileName === "string"
+            typeof obj === "object" &&
+            obj !== null &&
+            "fileID" in obj &&
+            typeof (obj as FileAttachment).fileID === "string" &&
+            "fileName" in obj &&
+            typeof (obj as FileAttachment).fileName === "string"
         ) {
             return obj as FileAttachment;
         }
@@ -60,9 +63,10 @@ const MAX_CHUNK_SIZE = 100;
  * Groups messages by sender into display chunks.
  * Starts a new chunk on: different sender, >5 min gap, or 100 message cap.
  */
-export function chunkMessages(messages: IMessage[]): MessageChunk[] {
+export function chunkMessages(messages: Message[]): MessageChunk[] {
     const sorted = [...messages].sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+        (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
     const chunks: MessageChunk[] = [];
 
@@ -72,7 +76,8 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
 
         const sameAuthor = last?.authorID === msg.authorID;
         const withinGap = lastMsg
-            ? msg.timestamp.getTime() - lastMsg.timestamp.getTime() <
+            ? new Date(msg.timestamp).getTime() -
+                  new Date(lastMsg.timestamp).getTime() <
               CHUNK_GAP_MS
             : false;
         const notFull = (last?.messages.length ?? 0) < MAX_CHUNK_SIZE;
@@ -127,7 +132,10 @@ const EMOJI: Record<string, string> = {
 
 /** Replaces :shortcode: with emoji characters. */
 export function applyEmoji(text: string): string {
-    return text.replace(/:(\w[+\w-]*):/g, (m, name) => EMOJI[name] ?? m);
+    return text.replace(
+        /:(\w[+\w-]*):/g,
+        (m, name: string) => EMOJI[name] ?? m,
+    );
 }
 
 // ── Date formatting ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import type { IMessage as Message } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";

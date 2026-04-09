@@ -1,13 +1,13 @@
-import type { IChannel, IPermission, IServer, IUser } from "@vex-chat/libvex";
+import type { Channel, Permission, Server, User } from "@vex-chat/libvex";
 
 import { map, readonlyType } from "nanostores";
 
 // ── Writable (internal — only VexService imports these) ─────────────────────
 
-export const $serversWritable = map<Record<string, IServer>>({});
-export const $channelsWritable = map<Record<string, IChannel[]>>({});
-export const $permissionsWritable = map<Record<string, IPermission>>({});
-export const $onlineListsWritable = map<Record<string, IUser[]>>({});
+export const $serversWritable = map<Record<string, Server>>({});
+export const $channelsWritable = map<Record<string, Channel[]>>({});
+export const $permissionsWritable = map<Record<string, Permission>>({});
+export const $onlineListsWritable = map<Record<string, User[]>>({});
 
 // ── Readable (public — components subscribe to these) ───────────────────────
 

@@ -9,7 +9,7 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import { vexService } from "../store";
+import { vexService } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function JoinGroupScreen() {

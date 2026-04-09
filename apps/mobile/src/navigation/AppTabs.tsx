@@ -14,7 +14,7 @@ import { DMListScreen } from "../screens/DMListScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
-import { $channels, $familiars, $servers } from "../store";
+import { $channels, $familiars, $servers } from "@vex-chat/store";
 import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";

@@ -1,5 +1,5 @@
-import type { IUser as User } from "@vex-chat/libvex";
-import type { IMessage as Message } from "@vex-chat/libvex";
+import type { User } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useRef, useState } from "react";
 import {
@@ -20,7 +20,7 @@ import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import type { AppScreenProps } from "../navigation/types";
-import { vexService, $familiars, $messages } from "../store";
+import { vexService, $familiars, $messages } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
