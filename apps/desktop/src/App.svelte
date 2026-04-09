@@ -5,12 +5,9 @@
   import { setupDeepLinks } from './lib/deeplink.js'
   import FamiliarsList from './lib/FamiliarsList.svelte'
   import MembersPanel from './lib/MembersPanel.svelte'
-  // TODO: Re-enable when VexService exposes message event subscriptions
-  // import { setupNotifications } from './lib/notifications.js'
+  import { setupNotifications } from './lib/notifications.js'
   import ServerBar from './lib/ServerBar.svelte'
   import { channels, familiars, keyReplaced, servers, user } from './lib/store/index.js'
-  // TODO: Re-enable when VexService exposes message event subscriptions
-  // import { setupTray } from './lib/tray.js'
   import UserMenu from './lib/UserMenu.svelte'
   import Home from './routes/Home.svelte'
   import Launch from './routes/Launch.svelte'
@@ -59,11 +56,22 @@
     : null
   )
 
-  // TODO: Desktop notifications and tray unread tracking need refactoring.
-  // Previously these subscribed to Client's "message" event, but Client is now
-  // private inside VexService. These features need VexService to expose an
-  // onMessage subscription, or the notification/tray logic should subscribe to
-  // the $messages/$groupMessages atoms instead.
+  // Desktop notifications — subscribe to message atoms, not Client events
+  $effect(() => {
+    if (!$user) return
+    const unsub = setupNotifications(
+      () => activeConversationKey,
+      (uid) => $familiars[uid]?.username,
+      (cid) => {
+        for (const [sid, chs] of Object.entries($channels)) {
+          const ch = chs.find(c => c.channelID === cid)
+          if (ch) return { channelName: ch.name, serverName: $servers[sid]?.name ?? 'Server' }
+        }
+        return undefined
+      },
+    )
+    return () => { unsub() }
+  })
 
   // Register vex:// deep-link handler
   $effect(() => {
