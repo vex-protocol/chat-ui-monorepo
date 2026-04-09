@@ -18,8 +18,9 @@ import { $channels, $familiars, $servers } from "../store";
 import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";
+import type { AppStackParamList } from "./types";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AppStackParamList>();
 
 export function AppTabs() {
     const insets = useSafeAreaInsets();
@@ -53,13 +54,13 @@ export function AppTabs() {
             <ServerSidebar
                 activeServerId={activeServerId}
                 onAddServer={() => {
-                    (navigationRef as any).navigate("App", {
+                    navigationRef.navigate("App", {
                         screen: "AddServer",
                     });
                 }}
                 onSelectHome={() => {
                     setActiveServerId(null);
-                    (navigationRef as any).navigate("App", {
+                    navigationRef.navigate("App", {
                         screen: "DMList",
                     });
                 }}
@@ -69,7 +70,7 @@ export function AppTabs() {
                     if (serverChannels.length > 0) {
                         // Go directly to the first channel
                         const ch = serverChannels[0]!;
-                        (navigationRef as any).navigate("App", {
+                        navigationRef.navigate("App", {
                             params: {
                                 channelID: ch.channelID,
                                 channelName: ch.name,
@@ -78,14 +79,14 @@ export function AppTabs() {
                             screen: "Channel",
                         });
                     } else {
-                        (navigationRef as any).navigate("App", {
+                        navigationRef.navigate("App", {
                             params: { serverID: id },
                             screen: "ChannelList",
                         });
                     }
                 }}
                 onSettings={() => {
-                    (navigationRef as any).navigate("App", {
+                    navigationRef.navigate("App", {
                         screen: "Settings",
                     });
                 }}
@@ -97,7 +98,7 @@ export function AppTabs() {
     );
 }
 
-function ContentStack({ initialRoute }: { initialRoute: string }) {
+function ContentStack({ initialRoute }: { initialRoute: keyof AppStackParamList }) {
     return (
         <Stack.Navigator
             initialRouteName={initialRoute}

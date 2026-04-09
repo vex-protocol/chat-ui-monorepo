@@ -3,17 +3,20 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { parseInviteID } from "@vex-chat/store";
 
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 import { useNavigation } from "@react-navigation/native";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
+import type { AppStackParamList } from "../navigation/types";
 import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
 export function AddServerScreen() {
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList, "AddServer">>();
     const [mode, setMode] = useState<"create" | "join" | "pick">("pick");
     const [name, setName] = useState("");
     const [inviteInput, setInviteInput] = useState("");

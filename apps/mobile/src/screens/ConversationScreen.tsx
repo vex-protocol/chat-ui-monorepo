@@ -16,20 +16,15 @@ import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
+import type { AppScreenProps } from "../navigation/types";
 import { vexService, $messages, $user } from "../store";
 import { colors, typography } from "../theme";
 
 export function ConversationScreen({
     navigation,
     route,
-}: {
-    navigation: any;
-    route: any;
-}) {
-    const { userID, username } = route.params as {
-        userID: string;
-        username: string;
-    };
+}: AppScreenProps<"Conversation">) {
+    const { userID, username } = route.params;
     const allMessages = useStore($messages);
     const user = useStore($user);
 

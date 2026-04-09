@@ -1,5 +1,3 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -7,9 +5,10 @@ import { HourglassIcon } from "../components/HourglassIcon";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
+import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "Welcome">;
+type Props = AuthScreenProps<"Welcome">;
 
 export function WelcomeScreen({ navigation }: Props) {
     return (

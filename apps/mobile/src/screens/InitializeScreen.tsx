@@ -1,5 +1,3 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -7,9 +5,10 @@ import { AuthMethodCard } from "../components/AuthMethodCard";
 import { BackButton } from "../components/BackButton";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { SectionDivider } from "../components/SectionDivider";
+import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "Initialize">;
+type Props = AuthScreenProps<"Initialize">;
 
 export function InitializeScreen({ navigation }: Props) {
     const goFinalize = (method: string) =>

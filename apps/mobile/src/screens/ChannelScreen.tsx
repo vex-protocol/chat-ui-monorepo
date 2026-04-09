@@ -15,21 +15,15 @@ import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
+import type { AppScreenProps } from "../navigation/types";
 import { vexService, $groupMessages, $user } from "../store";
 import { colors } from "../theme";
 
 export function ChannelScreen({
     navigation,
     route,
-}: {
-    navigation: any;
-    route: any;
-}) {
-    const { channelID, channelName, serverID } = route.params as {
-        channelID: string;
-        channelName: string;
-        serverID: string;
-    };
+}: AppScreenProps<"Channel">) {
+    const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
     const user = useStore($user);
 

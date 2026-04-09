@@ -2410,8 +2410,8 @@ Each team member:
 
 ### Remaining Beads (specs/contract testing/docs — deferred)
 
-- [ ] beads-at4.7 — OpenAPI generation from Zod
-- [ ] beads-at4.9 — AsyncAPI generation from Zod
+- [x] beads-at4.7 — OpenAPI generation from Zod ✓ (types-js/scripts/generate-openapi.ts)
+- [x] beads-at4.9 — AsyncAPI generation from Zod ✓ (types-js/scripts/generate-asyncapi.ts)
 - [ ] beads-at4.11 — Specs drift detection + ship in npm
 - [ ] beads-at4.13 — Spire serves specs live
 - [ ] beads-at4.15 — Microcks mock server (libvex CI)
@@ -2420,7 +2420,7 @@ Each team member:
 - [ ] beads-at4.18 — AsyncAPI examples for Microcks
 - [ ] beads-at4.19 — Tauri desktop CI/CD
 - [ ] beads-at4.21 — Docs (TypeDoc + AsyncAPI + Swagger)
-- [ ] beads-956 — Shared ESLint config package
+- [x] beads-956 — Shared ESLint config package ✓ (packages/eslint-config)
 
 ### In Progress — Architecture Refactoring
 

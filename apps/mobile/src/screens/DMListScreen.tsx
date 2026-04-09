@@ -19,10 +19,11 @@ import {
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
+import type { AppScreenProps } from "../navigation/types";
 import { vexService, $familiars, $messages } from "../store";
 import { colors, typography } from "../theme";
 
-export function DMListScreen({ navigation }: { navigation: any }) {
+export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
     const familiars = useStore($familiars);
     const allMessages = useStore($messages);
     const unreadCounts = useStore($dmUnreadCounts);

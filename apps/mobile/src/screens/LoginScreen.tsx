@@ -13,9 +13,10 @@ import {
 import { getServerOptions } from "../lib/config";
 import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
+import type { AuthScreenProps } from "../navigation/types";
 import { vexService } from "../store";
 
-export function LoginScreen({ navigation }: { navigation: any }) {
+export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");

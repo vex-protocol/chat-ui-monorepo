@@ -1,5 +1,3 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -7,9 +5,10 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
+import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "Authenticate">;
+type Props = AuthScreenProps<"Authenticate">;
 
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;

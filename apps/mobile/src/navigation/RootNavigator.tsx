@@ -7,8 +7,9 @@ import { $user } from "../store";
 
 import { AppTabs } from "./AppTabs";
 import { AuthStack } from "./AuthStack";
+import type { RootStackParamList } from "./types";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
     const user = useStore($user);

@@ -1,5 +1,3 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-
 import React, { useCallback, useRef, useState } from "react";
 import {
     ScrollView,
@@ -17,15 +15,16 @@ import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
 import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
+import type { AuthScreenProps } from "../navigation/types";
 import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "Finalize">;
+type Props = AuthScreenProps<"Finalize">;
 
 const AVATAR_PRESETS = ["🟥", "🔷", "🟢", "🟡", "🟣"] as const;
 
 export function FinalizeScreen({ navigation: _navigation, route }: Props) {
-    const method = (route.params as any)?.method ?? "username";
+    const method = route.params?.method ?? "username";
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");

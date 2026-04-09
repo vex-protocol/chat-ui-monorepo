@@ -11,19 +11,14 @@ import {
 
 import { useStore } from "@nanostores/react";
 
+import type { AppScreenProps } from "../navigation/types";
 import { $channels } from "../store";
 
 export function ChannelListScreen({
     navigation,
     route,
-}: {
-    navigation: any;
-    route: any;
-}) {
-    const { serverID, serverName: _serverName } = route.params as {
-        serverID: string;
-        serverName: string;
-    };
+}: AppScreenProps<"ChannelList">) {
+    const { serverID } = route.params;
     const allChannels = useStore($channels);
     const channels: Channel[] = allChannels[serverID] ?? [];
 

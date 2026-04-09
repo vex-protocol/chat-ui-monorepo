@@ -1,5 +1,3 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -14,10 +12,11 @@ import {
     keychainKeyStore,
     loadCredentials,
 } from "../lib/keychain";
+import type { AuthScreenProps } from "../navigation/types";
 import { vexService } from "../store";
 import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "WelcomeBack">;
+type Props = AuthScreenProps<"WelcomeBack">;
 
 interface SavedCreds {
     deviceID: string;

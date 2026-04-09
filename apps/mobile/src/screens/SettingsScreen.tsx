@@ -13,9 +13,10 @@ import notifee, { AndroidImportance } from "@notifee/react-native";
 
 import { clearCredentials } from "../lib/keychain";
 import { clearMessages } from "../lib/messages";
+import type { AppScreenProps } from "../navigation/types";
 import { vexService, $user } from "../store";
 
-export function SettingsScreen({ navigation: _navigation }: { navigation: any }) {
+export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [loggingOut, setLoggingOut] = useState(false);
 

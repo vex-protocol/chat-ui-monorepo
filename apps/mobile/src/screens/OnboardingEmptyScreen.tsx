@@ -2,11 +2,14 @@ import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 import { useNavigation } from "@react-navigation/native";
 
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexLogo } from "../components/VexLogo";
+import type { AppStackParamList } from "../navigation/types";
 import { colors, typography } from "../theme";
 
 interface ActionCardProps {
@@ -19,7 +22,7 @@ interface ActionCardProps {
 }
 
 export function OnboardingEmptyScreen() {
-    const navigation = useNavigation<any>();
+    const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList, "OnboardingEmpty">>();
 
     return (
         <ScreenLayout>

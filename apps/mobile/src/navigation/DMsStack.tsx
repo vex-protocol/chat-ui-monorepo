@@ -4,8 +4,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import { ConversationScreen } from "../screens/ConversationScreen";
 import { DMListScreen } from "../screens/DMListScreen";
+import type { DMsStackParamList } from "./types";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<DMsStackParamList>();
 
 export function DMsStack() {
     return (
@@ -23,7 +24,7 @@ export function DMsStack() {
             <Stack.Screen
                 component={ConversationScreen}
                 name="Conversation"
-                options={({ route }: { route: any }) => ({
+                options={({ route }) => ({
                     title: `@${route.params?.username ?? ""}`,
                 })}
             />

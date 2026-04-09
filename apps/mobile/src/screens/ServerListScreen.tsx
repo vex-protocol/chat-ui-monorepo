@@ -13,9 +13,12 @@ import { avatarHue } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+import type { ServersStackParamList } from "../navigation/types";
 import { $servers } from "../store";
 
-export function ServerListScreen({ navigation }: { navigation: any }) {
+export function ServerListScreen({ navigation }: NativeStackScreenProps<ServersStackParamList, "ServerList">) {
     const servers = useStore($servers);
     const serverList = Object.values(servers);
 

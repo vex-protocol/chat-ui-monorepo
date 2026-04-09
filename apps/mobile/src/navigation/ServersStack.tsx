@@ -5,8 +5,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
 import { ServerListScreen } from "../screens/ServerListScreen";
+import type { ServersStackParamList } from "./types";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<ServersStackParamList>();
 
 export function ServersStack() {
     return (
@@ -24,14 +25,14 @@ export function ServersStack() {
             <Stack.Screen
                 component={ChannelListScreen}
                 name="ChannelList"
-                options={({ route }: { route: any }) => ({
+                options={({ route }) => ({
                     title: route.params?.serverName ?? "Channels",
                 })}
             />
             <Stack.Screen
                 component={ChannelScreen}
                 name="Channel"
-                options={({ route }: { route: any }) => ({
+                options={({ route }) => ({
                     title: `#${route.params?.channelName ?? ""}`,
                 })}
             />
