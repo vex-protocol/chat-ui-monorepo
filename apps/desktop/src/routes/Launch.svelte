@@ -9,33 +9,37 @@
   import { channels as channelsAtom, servers as serversAtom, user, vexService } from '../lib/store/index.js'
 
   onMount(async () => {
-    let result: { ok: boolean }
     try {
-      result = await vexService.autoLogin(keyStore, desktopConfig(), getServerOptions())
-    } catch {
-      push('/login')
-      return
-    }
+      // Race autoLogin against a 15s timeout
+      const result = await Promise.race([
+        vexService.autoLogin(keyStore, desktopConfig(), getServerOptions()),
+        new Promise<{ ok: false }>((resolve) =>
+          setTimeout(() => resolve({ ok: false }), 15_000),
+        ),
+      ])
 
-    if (!result.ok) {
-      push('/login')
-      return
-    }
+      if (!result.ok) {
+        push('/login')
+        return
+      }
 
-    const u = user.get()
-    if (!u) { push('/login'); return }
+      const u = user.get()
+      if (!u) { push('/login'); return }
 
-    const serverList = Object.values(serversAtom.get())
-    if (serverList.length > 0) {
-      const sid = serverList[0].serverID
-      const chs = channelsAtom.get()[sid] ?? []
-      if (chs.length > 0) {
-        push(`/server/${sid}/${chs[0].channelID}`)
+      const serverList = Object.values(serversAtom.get())
+      if (serverList.length > 0) {
+        const sid = serverList[0].serverID
+        const chs = channelsAtom.get()[sid] ?? []
+        if (chs.length > 0) {
+          push(`/server/${sid}/${chs[0].channelID}`)
+        } else {
+          push('/home')
+        }
       } else {
         push('/home')
       }
-    } else {
-      push('/home')
+    } catch {
+      push('/login')
     }
   })
 </script>
