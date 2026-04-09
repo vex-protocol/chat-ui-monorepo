@@ -1,6 +1,5 @@
 <script lang="ts">
   import ChatInput from '../lib/ChatInput.svelte'
-  import { _keyStore } from '../lib/keystore.js'
   // Route: /server/:serverID/:channelID
   import MessageBox from '../lib/MessageBox.svelte'
   import { channels, groupMessages, user, vexService } from '../lib/store/index.js'

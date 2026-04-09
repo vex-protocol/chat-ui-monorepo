@@ -1,13 +1,11 @@
 <script lang="ts">
   import type { User } from '@vex-chat/libvex'
 
-  import { _onMount } from 'svelte'
-
   import Avatar from './Avatar.svelte'
   import { getServerUrl } from './config.js'
   import { vexService } from './store/index.js'
 
-  let { _serverID, channelID }: { channelID?: string; serverID?: string; } = $props()
+  let { channelID }: { channelID?: string } = $props()
 
   const ONLINE_THRESHOLD = 1000 * 60 * 5 // 5 minutes
 
