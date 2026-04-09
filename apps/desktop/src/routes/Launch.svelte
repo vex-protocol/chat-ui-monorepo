@@ -10,6 +10,7 @@
 
   onMount(async () => {
     try {
+      console.log('[Launch] Starting autoLogin...')
       // Race autoLogin against a 15s timeout
       const result = await Promise.race([
         vexService.autoLogin(keyStore, desktopConfig(), getServerOptions()),
@@ -17,8 +18,10 @@
           setTimeout(() => resolve({ ok: false }), 15_000),
         ),
       ])
+      console.log('[Launch] autoLogin result:', JSON.stringify(result))
 
       if (!result.ok) {
+        console.log('[Launch] Redirecting to /login')
         push('/login')
         return
       }
