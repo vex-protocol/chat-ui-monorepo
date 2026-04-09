@@ -10,7 +10,7 @@
     "@vex-chat/eslint-config": "workspace:*"
   },
   "dependencies": {
-    "@vex-chat/libvex": "1.2.0-rc.1",
+    "@vex-chat/libvex": "catalog:",
     "nanostores": "catalog:",
     "uuid": "catalog:"
   },

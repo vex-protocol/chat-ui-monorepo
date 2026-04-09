@@ -17,7 +17,7 @@
     "@tsconfig/svelte": "^5.0.6",
     "@types/node": "^24.10.1",
     "@vex-chat/eslint-config": "workspace:*",
-    "@vex-chat/libvex": "1.2.0-rc.1",
+    "@vex-chat/libvex": "catalog:",
     "eslint-plugin-svelte": "^3.17.0",
     "svelte": "^5.45.2",
     "svelte-check": "^4.3.4",
