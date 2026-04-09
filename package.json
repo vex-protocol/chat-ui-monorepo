@@ -1,54 +1,51 @@
 {
-  "name": "vex-chat",
-  "version": "1.0.0",
-  "private": "true",
-  "type": "module",
-  "scripts": {
-    "dev": "pnpm -r --parallel dev",
-    "prepare": "husky",
-    "registry": "npx verdaccio -c .verdaccio/config.yaml",
-    "publish:local": "./scripts/publish-local.sh",
-    "install:local": "./scripts/install-local.sh",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "pnpm -r --if-present lint",
-    "lint:fix": "pnpm -r --if-present lint:fix",
-    "preinstall": "npx only-allow pnpm"
-  },
-  "packageManager": "pnpm@10.30.3",
-  "lint-staged": {
-    "*.ts": ["eslint --fix", "prettier --write"]
-  },
-  "engines": {
-    "node": ">=24.0.0",
-    "pnpm": ">=10.0.0"
-  },
-  "devDependencies": {
-    "eslint": "^10.1.0",
-    "eslint-config-prettier": "^10.1.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.3.2",
-    "prettier": "^3.2.0",
-    "typescript": "catalog:",
-    "typescript-eslint": "^8.32.1"
-  },
-  "pnpm": {
-    "overrides": {
-      "react": "19.2.3"
+    "name": "vex-chat",
+    "version": "1.0.0",
+    "private": "true",
+    "type": "module",
+    "scripts": {
+        "dev": "pnpm -r --parallel dev",
+        "prepare": "husky",
+        "registry": "npx verdaccio -c .verdaccio/config.yaml",
+        "publish:local": "./scripts/publish-local.sh",
+        "install:local": "./scripts/install-local.sh",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "lint": "pnpm -r --if-present lint",
+        "lint:fix": "pnpm -r --if-present lint:fix",
+        "preinstall": "npx only-allow pnpm"
     },
-    "peerDependencyRules": {
-      "allowedVersions": {
-        "expo-sqlite": ">=16",
-        "typescript": ">=5",
-        "@sveltejs/vite-plugin-svelte": ">=2"
-      }
+    "packageManager": "pnpm@10.30.3",
+    "engines": {
+        "node": ">=24.0.0",
+        "pnpm": ">=10.0.0"
     },
-    "onlyBuiltDependencies": [
-      "sharp",
-      "better-sqlite3",
-      "esbuild",
-      "msgpackr-extract"
-    ]
-  },
-  "license": "AGPL-3.0-or-later"
+    "devDependencies": {
+        "eslint": "^10.1.0",
+        "eslint-config-prettier": "^10.1.0",
+        "husky": "^9.1.7",
+        "lint-staged": "^16.3.2",
+        "prettier": "^3.2.0",
+        "typescript": "catalog:",
+        "typescript-eslint": "^8.32.1"
+    },
+    "pnpm": {
+        "overrides": {
+            "react": "19.2.3"
+        },
+        "peerDependencyRules": {
+            "allowedVersions": {
+                "expo-sqlite": ">=16",
+                "typescript": ">=5",
+                "@sveltejs/vite-plugin-svelte": ">=2"
+            }
+        },
+        "onlyBuiltDependencies": [
+            "sharp",
+            "better-sqlite3",
+            "esbuild",
+            "msgpackr-extract"
+        ]
+    },
+    "license": "AGPL-3.0-or-later"
 }
