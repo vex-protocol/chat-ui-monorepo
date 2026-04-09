@@ -103,6 +103,7 @@ class VexService {
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
             if (authErr) {
+                await this.close();
                 return { error: authErr.message, ok: false };
             }
 
@@ -111,6 +112,7 @@ class VexService {
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
+            await this.close();
             if ($keyReplacedWritable.get()) {
                 return { keyReplaced: true, ok: false };
             }
