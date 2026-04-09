@@ -118,7 +118,8 @@ class VexService {
             console.log("[vex-store] autoLogin: loginWithDeviceKey result:", authErr?.message ?? "success");
             if (authErr) {
                 console.log("[vex-store] autoLogin: auth failed, closing client...");
-                try { await this.close(); } catch { /* ignore close errors */ }
+                await this.close();
+                console.log("[vex-store] autoLogin: client closed, returning ok:false");
                 return { error: authErr.message, ok: false };
             }
 
@@ -141,8 +142,14 @@ class VexService {
 
     async close(): Promise<void> {
         if (this.client) {
-            await this.client.close(true);
+            const c = this.client;
             this.client = null;
+            try {
+                await c.close(true);
+            } catch {
+                // Ignore close errors — the Client may have a
+                // half-open WebSocket that throws on teardown.
+            }
         }
     }
 
