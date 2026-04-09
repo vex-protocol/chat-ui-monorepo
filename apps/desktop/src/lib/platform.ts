@@ -2,8 +2,7 @@
  * Desktop (Tauri) platform configuration.
  *
  * Constructs a BootstrapConfig for the Vex store using:
- * - WebSocket: native global (Tauri webview has browser-native WS)
- * - Storage:   createTauriStorage (Kysely + kysely-dialect-tauri + @tauri-apps/plugin-sql)
+ * - Storage:   Kysely + kysely-dialect-tauri + @tauri-apps/plugin-sql
  * - Logger:    console wrapper with [vex] prefix
  * - deviceName: navigator.platform
  */
@@ -11,31 +10,42 @@ import type { Logger, Storage } from "@vex-chat/libvex";
 import type { BootstrapConfig } from "@vex-chat/store";
 
 const logger: Logger = {
-    debug(m) {
+    debug(m: string) {
         console.debug(`[vex] ${m}`);
     },
-    error(m) {
+    error(m: string) {
         console.error(`[vex] ${m}`);
     },
-    info(m) {
+    info(m: string) {
         console.log(`[vex] ${m}`);
     },
-    warn(m) {
+    warn(m: string) {
         console.warn(`[vex] ${m}`);
     },
 };
 
 export function desktopConfig(): BootstrapConfig {
     return {
-        async createStorage(dbName, privateKey, _logger): Promise<Storage> {
-            const mod = (await import("@vex-chat/libvex/storage/tauri")) as {
-                createTauriStorage: (
-                    db: string,
-                    pk: string,
-                    l: Logger,
-                ) => Storage;
-            };
-            return mod.createTauriStorage(dbName, privateKey, _logger);
+        async createStorage(
+            dbName: string,
+            privateKey: string,
+            storageLogger: Logger,
+        ): Promise<Storage> {
+            const { Kysely } = await import("kysely");
+            const { TauriSqliteDialect } = await import("kysely-dialect-tauri");
+            const { default: Database } =
+                await import("@tauri-apps/plugin-sql");
+            const { SqliteStorage } =
+                await import("@vex-chat/libvex/storage/sqlite");
+
+            const db = new Kysely({
+                dialect: new TauriSqliteDialect({
+                    database: () => Database.load(`sqlite:${dbName}`),
+                }),
+            });
+            const storage = new SqliteStorage(db, privateKey, storageLogger);
+            await storage.init();
+            return storage;
         },
         deviceName: navigator.platform,
         logger,

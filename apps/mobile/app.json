@@ -1,24 +1,22 @@
 {
-  "expo": {
-    "name": "Vex",
-    "slug": "vex-mobile",
-    "version": "0.1.0",
-    "scheme": "vex",
-    "newArchEnabled": true,
-    "platforms": ["ios", "android"],
-    "ios": {
-      "bundleIdentifier": "chat.vex.mobile",
-      "supportsTablet": false,
-      "infoPlist": {
-        "NSFaceIDUsageDescription": "Authenticate to access your encryption keys"
-      }
-    },
-    "android": {
-      "package": "chat.vex.mobile",
-      "permissions": ["INTERNET", "POST_NOTIFICATIONS"]
-    },
-    "plugins": [
-      "expo-secure-store"
-    ]
-  }
+    "expo": {
+        "name": "Vex",
+        "slug": "vex-mobile",
+        "version": "0.1.0",
+        "scheme": "vex",
+        "newArchEnabled": true,
+        "platforms": ["ios", "android"],
+        "ios": {
+            "bundleIdentifier": "chat.vex.mobile",
+            "supportsTablet": false,
+            "infoPlist": {
+                "NSFaceIDUsageDescription": "Authenticate to access your encryption keys"
+            }
+        },
+        "android": {
+            "package": "chat.vex.mobile",
+            "permissions": ["INTERNET", "POST_NOTIFICATIONS"]
+        },
+        "plugins": ["expo-secure-store", "expo-sqlite"]
+    }
 }
