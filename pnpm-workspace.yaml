@@ -5,7 +5,7 @@ packages:
 catalog:
   typescript: ^6.0.2
   '@types/node': ^25.3.3
-  '@vex-chat/libvex': 1.2.0-rc.7
+  '@vex-chat/libvex': 1.2.0-rc.8
   nanostores: "^1.2.0"
   "@nanostores/react": "^1.1.0"
   uuid: "^11.0.0"
