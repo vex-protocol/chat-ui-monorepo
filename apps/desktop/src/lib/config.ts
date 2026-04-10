@@ -4,11 +4,8 @@
 import type { ServerOptions } from "@vex-chat/store";
 
 const SERVER_URL_KEY = "vex-server-url";
-// In dev mode, use Vite's dev server so requests go through its proxy to spire.
-// In production (Tauri build), use the real server URL.
-const DEFAULT_SERVER_URL =
-    import.meta.env.VITE_SERVER_URL ||
-    (import.meta.env.DEV ? "localhost:5180" : "api.vex.wtf");
+// Default to production unless explicitly overridden by env/local settings.
+const DEFAULT_SERVER_URL = import.meta.env.VITE_SERVER_URL || "api.vex.wtf";
 
 export function getServerUrl(): string {
     return localStorage.getItem(SERVER_URL_KEY) ?? DEFAULT_SERVER_URL;
