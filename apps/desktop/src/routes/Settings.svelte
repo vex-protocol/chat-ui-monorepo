@@ -147,15 +147,18 @@
     if (creds?.username) {
       try { await keyStore.clear(creds.username) } catch { /* ignore */ }
     }
-    // Delete the local SQLite database file
+    // Drop all tables in the local SQLite database
     try {
-      const { remove, BaseDirectory } = await import('@tauri-apps/plugin-fs')
-      // The db file is named after the user's public key
-      const dbName = creds?.deviceKey
-        ? creds.deviceKey.slice(0, 64) + '.sqlite'
-        : 'vex-client.db'
-      await remove(dbName, { baseDir: BaseDirectory.AppData })
-    } catch { /* file may not exist */ }
+      const { default: Database } = await import('@tauri-apps/plugin-sql')
+      const db = await Database.load('sqlite:vex-client.db')
+      const tables = await db.select<{ name: string }[]>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+      )
+      for (const { name } of tables) {
+        await db.execute(`DROP TABLE IF EXISTS "${name}"`)
+      }
+      await db.close()
+    } catch { /* db may not exist */ }
     clearSession()
     confirmDeleteAll = false
     // Force a full reload to clear all in-memory state
