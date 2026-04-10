@@ -2413,7 +2413,7 @@ Each team member:
 - [x] beads-at4.7 — OpenAPI generation from Zod ✓ (types-js/scripts/generate-openapi.ts)
 - [x] beads-at4.9 — AsyncAPI generation from Zod ✓ (types-js/scripts/generate-asyncapi.ts)
 - [ ] beads-at4.11 — Specs drift detection + ship in npm
-- [ ] beads-at4.13 — Spire serves specs live
+- [x] beads-at4.13 — Spire serves specs live ✓ (serves generated OpenAPI + AsyncAPI from @vex-chat/types)
 - [ ] beads-at4.15 — Microcks mock server (libvex CI)
 - [ ] beads-at4.16 — Microcks conformance (spire CI)
 - [ ] beads-at4.17 — Dev-mode AJV validator (spire)
