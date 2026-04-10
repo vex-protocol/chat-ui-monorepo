@@ -24,7 +24,6 @@
     import Settings from "./routes/Settings.svelte";
 
     const routes = new Map([
-        ["*", Launch],
         ["/", Launch],
         ["/home", Home],
         ["/launch", Launch],
@@ -33,6 +32,7 @@
         ["/register", Register],
         ["/server/:serverID/:channelID", ServerChannel],
         ["/settings", Settings],
+        ["*", Launch],
     ]);
 
     // Auth routes show no sidebars
