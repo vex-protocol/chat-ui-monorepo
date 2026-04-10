@@ -127,7 +127,6 @@
 
   // ── Danger zone ─────────────────────────────────────────────────────────────
 
-  let confirmClear = $state(false)
   let confirmDeleteAll = $state(false)
 
   async function handleLogout(): Promise<void> {
@@ -138,18 +137,6 @@
     if (creds) await keyStore.save({ ...creds, token: undefined })
     clearSession()
     push('/login')
-  }
-
-  function startClear(): void {
-    confirmClear = true
-  }
-
-  async function confirmClearKeys(): Promise<void> {
-    if (creds?.username) {
-      await keyStore.clear(creds.username)
-    }
-    confirmClear = false
-    push('/register')
   }
 
   async function handleDeleteAllData(): Promise<void> {
@@ -376,22 +363,6 @@
           <span class="settings-row__desc">Disconnect and return to the login screen</span>
         </div>
         <button class="settings-btn settings-btn--danger" onclick={handleLogout}>Sign out</button>
-      </div>
-
-      <div class="settings-row">
-        <div class="settings-row__info">
-          <span class="settings-row__label">Clear device keys</span>
-          <span class="settings-row__desc">Permanently delete your device key from this device. You will need to re-register.</span>
-        </div>
-        {#if confirmClear}
-          <div class="settings-confirm">
-            <span class="settings-confirm__msg">Are you sure?</span>
-            <button class="settings-btn settings-btn--danger" onclick={confirmClearKeys}>Yes, clear keys</button>
-            <button class="settings-btn" onclick={() => { confirmClear = false }}>Cancel</button>
-          </div>
-        {:else}
-          <button class="settings-btn settings-btn--danger" onclick={startClear}>Clear keys</button>
-        {/if}
       </div>
 
       <div class="settings-row">
