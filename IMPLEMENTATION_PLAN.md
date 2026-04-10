@@ -2435,7 +2435,7 @@ Each team member:
 - preset/node.ts (SDK default for bots/CLI/tests)
 - preset/test.ts (test infrastructure)
 - storage/node.ts, storage/sqlite.ts, schema.ts (Node defaults + shared SQLite impl)
-- transport/browser.ts (zero-dep, shared by both GUI clients)
+- transport/websocket.ts (zero-dep, shared by both GUI clients)
 - keystore/memory.ts (testing)
 
 **What moves to vex-chat monorepo apps:**

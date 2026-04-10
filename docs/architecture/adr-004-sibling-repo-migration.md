@@ -283,7 +283,7 @@ Adds adapters, storage backends, keystore reference implementations, and the bot
 
 | New file | Purpose |
 |---|---|
-| `src/transport/browser.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
+| `src/transport/websocket.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
 | `src/transport/native.ts` | `reactNativeAdapters()` → `{ logger: rnLogger, WebSocket: globalThis.WebSocket }` |
 | `src/storage/memory.ts` | `MemoryStorage` — in-memory `IStorage` for unit tests |
 | `src/keystore/node.ts` | `nodeKeyStore(path, password)` — file-backed, wraps `saveKeyFile`/`loadKeyFile` (Node condition only) |
