@@ -100,11 +100,16 @@ class VexService {
         try {
             creds = await keyStore.load();
         } catch (loadErr: unknown) {
-            console.error("[vex-store] autoLogin: keyStore.load() threw:", loadErr);
+            console.error(
+                "[vex-store] autoLogin: keyStore.load() threw:",
+                loadErr,
+            );
             return { error: errorMessage(loadErr), ok: false };
         }
         if (!creds) {
-            console.log("[vex-store] autoLogin: no creds found, returning ok:false");
+            console.log(
+                "[vex-store] autoLogin: no creds found, returning ok:false",
+            );
             return { ok: false };
         }
         console.log("[vex-store] autoLogin: creds found for", creds.username);
@@ -113,14 +118,23 @@ class VexService {
             console.log("[vex-store] autoLogin: initClient...");
             await this.initClient(creds.deviceKey, config, options);
             const client = this.requireClient();
-            console.log("[vex-store] autoLogin: client created, calling loginWithDeviceKey...");
+            console.log(
+                "[vex-store] autoLogin: client created, calling loginWithDeviceKey...",
+            );
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
-            console.log("[vex-store] autoLogin: loginWithDeviceKey result:", authErr?.message ?? "success");
+            console.log(
+                "[vex-store] autoLogin: loginWithDeviceKey result:",
+                authErr?.message ?? "success",
+            );
             if (authErr) {
-                console.log("[vex-store] autoLogin: auth failed, closing client...");
+                console.log(
+                    "[vex-store] autoLogin: auth failed, closing client...",
+                );
                 await this.close();
-                console.log("[vex-store] autoLogin: client closed, returning ok:false");
+                console.log(
+                    "[vex-store] autoLogin: client closed, returning ok:false",
+                );
                 return { error: authErr.message, ok: false };
             }
 
@@ -132,8 +146,15 @@ class VexService {
             console.log("[vex-store] autoLogin: done, ok:true");
             return { ok: true };
         } catch (err: unknown) {
-            console.error("[vex-store] autoLogin: caught error:", errorMessage(err));
-            try { await this.close(); } catch { /* ignore close errors */ }
+            console.error(
+                "[vex-store] autoLogin: caught error:",
+                errorMessage(err),
+            );
+            try {
+                await this.close();
+            } catch {
+                /* ignore close errors */
+            }
             if ($keyReplacedWritable.get()) {
                 return { keyReplaced: true, ok: false };
             }
@@ -189,6 +210,19 @@ class VexService {
         }
     }
 
+    /** Delete all local data — message history, sessions, credentials. */
+    async deleteAllData(): Promise<void> {
+        if (this.client) {
+            try {
+                await this.client.messages.purge();
+            } catch {
+                /* ignore */
+            }
+        }
+        await this.close();
+        this.resetAll();
+    }
+
     async deleteServer(serverID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -210,12 +244,12 @@ class VexService {
         return client.channels.userList(channelID);
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     async getInvites(serverID: string): Promise<Invite[]> {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     async joinInvite(inviteID: string): Promise<OperationResult> {
         try {
@@ -235,6 +269,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     /**
      * Login with username/password → register device if needed → connect.
@@ -303,17 +339,6 @@ class VexService {
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
-    }
-
-    // ── Messaging ───────────────────────────────────────────────────────
-
-    /** Delete all local data — message history, sessions, credentials. */
-    async deleteAllData(): Promise<void> {
-        if (this.client) {
-            try { await this.client.messages.purge(); } catch { /* ignore */ }
-        }
-        await this.close();
-        this.resetAll();
     }
 
     async logout(): Promise<void> {
@@ -627,10 +652,10 @@ class VexService {
                         !this.failedUserLookups.has(otherUserID)
                     ) {
                         $familiarsWritable.setKey(otherUserID, {
-                            lastSeen: new Date(),
+                            lastSeen: new Date().toISOString(),
                             userID: otherUserID,
                             username: otherUserID.slice(0, 8),
-                        } as User);
+                        });
                         client.users
                             .retrieve(otherUserID)
                             .then(([u]) => {
