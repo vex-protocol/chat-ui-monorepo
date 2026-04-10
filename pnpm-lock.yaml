@@ -128,6 +128,9 @@ importers:
             eslint-plugin-svelte:
                 specifier: ^3.17.0
                 version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
+            prettier-plugin-svelte:
+                specifier: ^3.5.1
+                version: 3.5.1(prettier@3.8.1)(svelte@5.55.1)
             svelte:
                 specifier: ^5.45.2
                 version: 5.55.1
@@ -279,7 +282,7 @@ importers:
                 version: 8.6.18(react-dom@19.2.5(react@19.2.0))(react@19.2.0)(rollup@4.60.1)(storybook@8.6.18(prettier@2.8.8))(typescript@6.0.2)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@storybook/svelte-vite":
                 specifier: ^8.6.0
-                version: 8.6.18(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+                version: 8.6.18(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@vex-chat/eslint-config":
                 specifier: workspace:*
                 version: link:../eslint-config
@@ -8022,6 +8025,15 @@ packages:
             prettier: ^1.16.4 || ^2.0.0
             svelte: ^3.2.0 || ^4.0.0-next.0
 
+    prettier-plugin-svelte@3.5.1:
+        resolution:
+            {
+                integrity: sha512-65+fr5+cgIKWKiqM1Doum4uX6bY8iFCdztvvp2RcF+AJoieaw9kJOFMNcJo/bkmKYsxFaM9OsVZK/gWauG/5mg==,
+            }
+        peerDependencies:
+            prettier: ^3.0.0
+            svelte: ^3.2.0 || ^4.0.0-next.0 || ^5.0.0-next.0
+
     prettier@2.8.8:
         resolution:
             {
@@ -12356,7 +12368,7 @@ snapshots:
         optionalDependencies:
             typescript: 6.0.2
 
-    "@storybook/svelte-vite@8.6.18(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))":
+    "@storybook/svelte-vite@8.6.18(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))":
         dependencies:
             "@storybook/builder-vite": 8.6.18(storybook@8.6.18(prettier@2.8.8))(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@storybook/svelte": 8.6.18(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)
@@ -12364,7 +12376,7 @@ snapshots:
             magic-string: 0.30.21
             storybook: 8.6.18(prettier@2.8.8)
             svelte: 5.55.1
-            svelte-preprocess: 5.1.4(@babel/core@7.29.0)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3)
+            svelte-preprocess: 5.1.4(@babel/core@7.14.5)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3)
             svelte2tsx: 0.7.53(svelte@5.55.1)(typescript@5.9.3)
             sveltedoc-parser: 4.2.1
             ts-dedent: 2.2.0
@@ -15803,6 +15815,11 @@ snapshots:
             prettier: 2.8.8
             svelte: 3.59.2
 
+    prettier-plugin-svelte@3.5.1(prettier@3.8.1)(svelte@5.55.1):
+        dependencies:
+            prettier: 3.8.1
+            svelte: 5.55.1
+
     prettier@2.8.8: {}
 
     prettier@3.8.1: {}
@@ -16567,7 +16584,7 @@ snapshots:
             postcss-load-config: 3.1.4(postcss@8.5.8)
             typescript: 5.9.3
 
-    svelte-preprocess@5.1.4(@babel/core@7.29.0)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3):
+    svelte-preprocess@5.1.4(@babel/core@7.14.5)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3):
         dependencies:
             "@types/pug": 2.0.10
             detect-indent: 6.1.0
@@ -16576,7 +16593,7 @@ snapshots:
             strip-indent: 3.0.0
             svelte: 5.55.1
         optionalDependencies:
-            "@babel/core": 7.29.0
+            "@babel/core": 7.14.5
             postcss: 8.5.8
             postcss-load-config: 3.1.4(postcss@8.5.8)
             typescript: 5.9.3

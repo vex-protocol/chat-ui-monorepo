@@ -22,6 +22,7 @@
         "@vex-chat/eslint-config": "workspace:*",
         "@vex-chat/libvex": "catalog:",
         "eslint-plugin-svelte": "^3.17.0",
+        "prettier-plugin-svelte": "^3.5.1",
         "svelte": "^5.45.2",
         "svelte-check": "^4.3.4",
         "svelte-eslint-parser": "^1.6.0",
