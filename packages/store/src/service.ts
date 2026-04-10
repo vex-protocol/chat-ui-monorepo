@@ -210,16 +210,16 @@ class VexService {
         }
     }
 
-    /** Delete all local data — message history, sessions, credentials. */
+    /** Delete all local data — message history, sessions, keys. Credentials (keychain) cleared by consumer. */
     async deleteAllData(): Promise<void> {
         if (this.client) {
             try {
-                await this.client.messages.purge();
+                await this.client.deleteAllData();
             } catch {
-                /* ignore */
+                /* ignore — may fail if not connected */
             }
         }
-        await this.close();
+        this.client = null;
         this.resetAll();
     }
 
