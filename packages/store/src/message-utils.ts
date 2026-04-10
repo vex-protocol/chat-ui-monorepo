@@ -141,19 +141,21 @@ export function applyEmoji(text: string): string {
 // ── Date formatting ─────────────────────────────────────────────────────────
 
 /**
- * Formats a Date for display.
+ * Formats a timestamp for display.
+ * Accepts a Date object or an ISO 8601 string.
  * Same day → "HH:mm". Earlier → "MMM D HH:mm".
  */
-export function formatTime(date: Date): string {
+export function formatTime(date: Date | string): string {
+    const d = typeof date === "string" ? new Date(date) : date;
     const now = new Date();
-    const sameDay = date.toDateString() === now.toDateString();
-    const hhmm = date.toLocaleTimeString([], {
+    const sameDay = d.toDateString() === now.toDateString();
+    const hhmm = d.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
     });
     if (sameDay) return hhmm;
     return (
-        date.toLocaleDateString([], { day: "numeric", month: "short" }) +
+        d.toLocaleDateString([], { day: "numeric", month: "short" }) +
         " " +
         hhmm
     );

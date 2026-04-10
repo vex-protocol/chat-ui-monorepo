@@ -1,13 +1,13 @@
 packages:
-  - 'apps/*'
-  - 'packages/*'
+    - "apps/*"
+    - "packages/*"
 
 catalog:
-  typescript: ^6.0.2
-  '@types/node': ^25.3.3
-  '@vex-chat/libvex': 1.2.0-rc.13
-  nanostores: "^1.2.0"
-  "@nanostores/react": "^1.1.0"
-  uuid: "^11.0.0"
-  marked: "^15.0.12"
-  dompurify: "^3.2.6"
+    typescript: ^6.0.2
+    "@types/node": ^25.3.3
+    "@vex-chat/libvex": 1.2.0-rc.15
+    nanostores: "^1.2.0"
+    "@nanostores/react": "^1.1.0"
+    uuid: "^11.0.0"
+    marked: "^15.0.12"
+    dompurify: "^3.2.6"

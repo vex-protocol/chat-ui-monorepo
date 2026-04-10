@@ -23,8 +23,8 @@
   })
 
   function initials(id: string, displayName?: string): string {
-    if (displayName) { displayName.slice(0, 2).toUpperCase(); return; }
-    id.slice(0, 2).toUpperCase();
+    if (displayName) return displayName.slice(0, 2).toUpperCase();
+    return id.slice(0, 2).toUpperCase();
   }
 </script>
 

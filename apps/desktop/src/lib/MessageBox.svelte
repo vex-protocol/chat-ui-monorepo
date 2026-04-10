@@ -6,6 +6,7 @@
   import Avatar from './Avatar.svelte'
   import { getServerUrl } from './config.js'
   import { user } from './store/index.js'
+  import { chunkMessages, formatTime, handleLinkClick, renderContent } from './utils/messages.js'
 
   const serverUrl = getServerUrl()
 
@@ -56,30 +57,27 @@
   {/if}
 
   {#each chunks as chunk (chunk.messages[0]?.mailID ?? chunk.firstTime + chunk.authorID)}
-    <!-- TODO: system message support — needs Message.mailType from SDK -->
-    {#if false}
-      <div class="message-chunk">
-        <div class="message-chunk__header">
-          <Avatar userID={chunk.authorID} size={36} {serverUrl} />
-          <div class="message-chunk__meta">
-            <span
-              class="message-chunk__author"
-              class:message-chunk__author--self={chunk.authorID === $user?.userID}
-            >
-              {chunk.authorID === $user?.userID ? 'You' : (usernames[chunk.authorID] ?? chunk.authorID.slice(0, 8))}
-            </span>
-            <span class="message-chunk__time">{formatTime(chunk.firstTime)}</span>
-          </div>
+    <div class="message-chunk">
+      <div class="message-chunk__header">
+        <Avatar userID={chunk.authorID} size={36} {serverUrl} />
+        <div class="message-chunk__meta">
+          <span
+            class="message-chunk__author"
+            class:message-chunk__author--self={chunk.authorID === $user?.userID}
+          >
+            {chunk.authorID === $user?.userID ? 'You' : (usernames[chunk.authorID] ?? chunk.authorID.slice(0, 8))}
+          </span>
+          <span class="message-chunk__time">{formatTime(chunk.firstTime)}</span>
         </div>
-
-        {#each chunk.messages as msg (msg.mailID)}
-          <!-- TODO: file attachment support — needs Message.extra from SDK -->
-          <div class="message">
-            {@html renderContent(msg.message)}
-          </div>
-        {/each}
       </div>
-    {/if}
+
+      {#each chunk.messages as msg (msg.mailID)}
+        <div class="message">
+          <!-- eslint-disable-next-line svelte/no-at-html-tags -- DOMPurify-sanitized in renderContent() -->
+          {@html renderContent(msg.message)}
+        </div>
+      {/each}
+    </div>
   {/each}
 </div>
 
