@@ -128,6 +128,7 @@
   // ── Danger zone ─────────────────────────────────────────────────────────────
 
   let confirmClear = $state(false)
+  let confirmDeleteAll = $state(false)
 
   async function handleLogout(): Promise<void> {
     try {
@@ -149,6 +150,29 @@
     }
     confirmClear = false
     push('/register')
+  }
+
+  async function handleDeleteAllData(): Promise<void> {
+    try {
+      await vexService.logout()
+    } catch { /* ignore */ }
+    // Clear keychain credentials
+    if (creds?.username) {
+      try { await keyStore.clear(creds.username) } catch { /* ignore */ }
+    }
+    // Delete the local SQLite database file
+    try {
+      const { remove, BaseDirectory } = await import('@tauri-apps/plugin-fs')
+      // The db file is named after the user's public key
+      const dbName = creds?.deviceKey
+        ? creds.deviceKey.slice(0, 64) + '.sqlite'
+        : 'vex-client.db'
+      await remove(dbName, { baseDir: BaseDirectory.AppData })
+    } catch { /* file may not exist */ }
+    clearSession()
+    confirmDeleteAll = false
+    // Force a full reload to clear all in-memory state
+    window.location.href = '/'
   }
 </script>
 
@@ -367,6 +391,22 @@
           </div>
         {:else}
           <button class="settings-btn settings-btn--danger" onclick={startClear}>Clear keys</button>
+        {/if}
+      </div>
+
+      <div class="settings-row">
+        <div class="settings-row__info">
+          <span class="settings-row__label">Delete all data</span>
+          <span class="settings-row__desc">Delete message history, encryption sessions, device keys, and credentials from this device. The app will restart fresh.</span>
+        </div>
+        {#if confirmDeleteAll}
+          <div class="settings-confirm">
+            <span class="settings-confirm__msg">This cannot be undone.</span>
+            <button class="settings-btn settings-btn--danger" onclick={handleDeleteAllData}>Delete everything</button>
+            <button class="settings-btn" onclick={() => { confirmDeleteAll = false }}>Cancel</button>
+          </div>
+        {:else}
+          <button class="settings-btn settings-btn--danger" onclick={() => { confirmDeleteAll = true }}>Delete all data</button>
         {/if}
       </div>
     </section>
