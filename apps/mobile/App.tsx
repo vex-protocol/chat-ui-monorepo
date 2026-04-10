@@ -26,6 +26,8 @@ function App() {
     const keyReplaced = useStore($keyReplaced);
     const user = useStore($user);
 
+    const x = "x"
+
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
         return () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
-    import { replace } from "svelte-spa-router";
+    import { push } from "svelte-spa-router";
 
     import { getServerOptions } from "../lib/config.js";
     import { keyStore } from "../lib/keystore.js";
@@ -29,14 +29,14 @@
 
                 if (!result.ok) {
                     await tick();
-                    replace("/login");
+                    push("/login");
                     return;
                 }
 
                 const u = user.get();
                 if (!u) {
                     await tick();
-                    replace("/login");
+                    push("/login");
                     return;
                 }
 
@@ -49,18 +49,18 @@
                     if (chs.length > 0) {
                         const target = `/server/${sid}/${chs[0]!.channelID}`;
                         console.log("[launch] navigating to", target);
-                        replace(target);
+                        push(target);
                     } else {
                         console.log("[launch] no channels, going to /home");
-                        replace("/home");
+                        push("/home");
                     }
                 } else {
                     console.log("[launch] no servers, going to /home");
-                    replace("/home");
+                    push("/home");
                 }
             } catch {
                 await tick();
-                replace("/login");
+                push("/login");
             }
         })();
     });
