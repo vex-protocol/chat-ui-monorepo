@@ -41,15 +41,21 @@
                 }
 
                 const serverList = Object.values(serversAtom.get());
+                console.log("[launch] servers:", serverList.length, "user:", u.username);
                 if (serverList.length > 0) {
-                    const sid = serverList[0].serverID;
+                    const sid = serverList[0]!.serverID;
                     const chs = channelsAtom.get()[sid] ?? [];
+                    console.log("[launch] channels for", sid, ":", chs.length);
                     if (chs.length > 0) {
-                        replace(`/server/${sid}/${chs[0].channelID}`);
+                        const target = `/server/${sid}/${chs[0]!.channelID}`;
+                        console.log("[launch] navigating to", target);
+                        replace(target);
                     } else {
+                        console.log("[launch] no channels, going to /home");
                         replace("/home");
                     }
                 } else {
+                    console.log("[launch] no servers, going to /home");
                     replace("/home");
                 }
             } catch {
