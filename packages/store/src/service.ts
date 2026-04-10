@@ -307,6 +307,15 @@ class VexService {
 
     // ── Messaging ───────────────────────────────────────────────────────
 
+    /** Delete all local data — message history, sessions, credentials. */
+    async deleteAllData(): Promise<void> {
+        if (this.client) {
+            try { await this.client.messages.purge(); } catch { /* ignore */ }
+        }
+        await this.close();
+        this.resetAll();
+    }
+
     async logout(): Promise<void> {
         await this.close();
         this.resetAll();

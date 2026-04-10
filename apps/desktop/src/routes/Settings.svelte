@@ -140,28 +140,12 @@
   }
 
   async function handleDeleteAllData(): Promise<void> {
-    try {
-      await vexService.logout()
-    } catch { /* ignore */ }
-    // Clear keychain credentials
+    try { await vexService.deleteAllData() } catch { /* ignore */ }
     if (creds?.username) {
       try { await keyStore.clear(creds.username) } catch { /* ignore */ }
     }
-    // Drop all tables in the local SQLite database
-    try {
-      const { default: Database } = await import('@tauri-apps/plugin-sql')
-      const db = await Database.load('sqlite:vex-client.db')
-      const tables = await db.select<{ name: string }[]>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-      )
-      for (const { name } of tables) {
-        await db.execute(`DROP TABLE IF EXISTS "${name}"`)
-      }
-      await db.close()
-    } catch { /* db may not exist */ }
     clearSession()
     confirmDeleteAll = false
-    // Force a full reload to clear all in-memory state
     window.location.href = '/'
   }
 </script>
