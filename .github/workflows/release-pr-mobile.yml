@@ -87,11 +87,8 @@ jobs:
                     echo "changed=false" >> $GITHUB_OUTPUT
                   fi
 
-            - name: Reset release branch to master
-              if: steps.changes.outputs.changed == 'true'
-              run: git checkout -B release-mobile
-
-            - name: Generate release PR content with Claude
+            - name: Decide release with Claude
+              id: claude
               if: steps.changes.outputs.changed == 'true'
               uses: anthropics/claude-code-action@21302532c2959a4f8f5e445004f617ef8b7b1dd7 # v1
               timeout-minutes: 10
@@ -104,42 +101,51 @@ jobs:
                       You are the release engineer for vex-chat mobile — a
                       private-forever Android app sideloaded via GitHub Releases.
                       The release notes you write go directly into a GitHub
-                      Release body; the sole audience is the developer and a
-                      handful of early testers deciding whether to install.
+                      Release body; the audience is the developer and a handful
+                      of early testers deciding whether to install.
                       </role>
 
                       <inputs>
-                      - $PREV_TAG env var: previous release tag (mobile-v*), or
-                        empty string on first release
+                      - $PREV_TAG env var: previous release tag (mobile-v*),
+                        or empty string on first release
                       - apps/mobile/package.json: current version lives here
                       - git log and diff since $PREV_TAG
+                      - gh api for resolving commit SHAs to PR numbers + authors
                       </inputs>
+
+                      <task>
+                      Read the diff since $PREV_TAG, apply the user-visibility
+                      filter, pick a semver bump, resolve each user-facing
+                      commit to its originating PR, and return a single JSON
+                      object matching the schema. Do not write files, do not
+                      commit — return structured output only and stop.
+                      </task>
 
                       ## Step 1 — gather the baseline
 
                       Read apps/mobile/package.json for the current version.
-                      Note the value of $PREV_TAG.
+                      Note $PREV_TAG.
 
                       ## Step 2 — read the changes
 
                       If $PREV_TAG is non-empty:
 
-                          git log "$PREV_TAG"..HEAD --format='%h %s%n%b%n---'
-                          git diff --stat "$PREV_TAG"...HEAD
+                          git log "$PREV_TAG"..HEAD --format='%H %h %s'
                           git diff --name-only "$PREV_TAG"...HEAD
+                          git diff --stat "$PREV_TAG"...HEAD
 
                       If $PREV_TAG is empty (first release):
 
-                          git log --format='%h %s%n%b%n---' -30
+                          git log --format='%H %h %s' -30
                           git diff --stat HEAD~30 HEAD || true
 
-                      ## Step 3 — user-visibility filter (run this first)
+                      ## Step 3 — user-visibility filter
 
-                      Classify every commit in the range by whether it changes
-                      what the user observes on their phone after installing
-                      the new APK. The test: "If I diffed the installed APK
-                      byte-for-byte, would this change show up in the binary
-                      or in observable behavior?"
+                      Classify every commit by whether it changes what the
+                      user observes after installing the new APK. The test:
+                      "If I diffed the installed APK byte-for-byte, would
+                      this change show up in the binary or in observable
+                      behavior?"
 
                       User-facing (becomes a bullet):
 
@@ -152,29 +158,47 @@ jobs:
                       - Android permission / manifest / intent-filter changes
                       - minSdk / targetSdk changes
 
-                      Not user-facing (skip entirely):
+                      Not user-facing (skip):
 
                       - apps/desktop/**, packages/eslint-config/**
-                      - .github/**, CI config, scorecard, codeql, dependabot
+                      - .github/**, CI, scorecard, codeql, dependabot
                       - *.md, docs/, scripts/, .tool-versions
                       - Dev-only devDependencies (eslint-*, prettier-*,
                         @types/*, vitest, playwright)
                       - Formatter / linter config, autofix-only commits
 
                       Borderline → prefer writing a bullet. A surprised user
-                      is worse than one extra "Bump libvex from 2.0 to 2.1" line.
+                      is worse than one extra "Bump libvex from 2.0 to 2.1".
 
                       Bucket each user-facing change into {Changed, Added,
                       Removed, Fixed}.
 
-                      ## Step 4 — pick the version bump
+                      ## Step 4 — resolve PR attribution
 
-                      vex-chat mobile is at 0.x. Ignore the Cargo convention
-                      that "minor means breaking at 0.y.z" — this project uses
-                      the same semver rules at 0.x as it would at 1.x. Reason:
-                      the only reader is a human deciding whether a new APK is
-                      risky to install, and patch/minor/major should mean what
-                      they mean everywhere else.
+                      For each user-facing commit, look up the PR number and
+                      author via the commits→pulls API:
+
+                          gh api repos/${{ github.repository }}/commits/<full-sha>/pulls
+
+                      The response is an array of PR objects — take the first.
+                      Extract `.number` and `.user.login`.
+
+                      - PR found → attribution is `(#<number> by @<user.login>)`
+                      - No PR (direct push, rare) → attribution is `(<short-sha>)`
+                      - Multiple commits share one PR → cite the PR once on
+                        the bullet that best represents the change
+
+                      Known contributors for reference: `@dream9x` (primary),
+                      `@YukiXBT`.
+
+                      ## Step 5 — pick the version bump
+
+                      vex-chat mobile is at 0.x. Ignore the Cargo "minor means
+                      breaking at 0.y.z" convention — this project uses the
+                      same semver rules at 0.x as it would at 1.x. Reason:
+                      the only reader is a human deciding whether a new APK
+                      is risky to install, and patch/minor/major should mean
+                      what they mean everywhere else.
 
                       - **patch** (0.1.1 → 0.1.2): bug fixes, dep bumps with
                         no observable behavior change, internal refactors.
@@ -187,71 +211,66 @@ jobs:
                         protocol bump invalidating existing sessions,
                         mandatory permission re-prompt.
 
-                      Decision tree, applied against the Step 3 buckets:
+                      Decision tree against Step 3 buckets:
 
-                      - Zero user-facing buckets → patch (Step 5 will produce
-                        an empty-release notice).
-                      - Only Fixed entries → patch.
-                      - Any Added entry → minor.
+                      - Zero user-facing buckets → patch (release_notes
+                        becomes a maintenance notice)
+                      - Only Fixed entries → patch
+                      - Any Added entry → minor
                       - Any Removed entry or "Breaking:"-labeled Changed entry
-                        → major.
+                        → major
 
                       First-release rule: if $PREV_TAG is empty, bump at least
-                      a patch (e.g. 0.1.0 → 0.1.1). Same version = no commit
-                      = no PR, so the first release needs a bump even if the
-                      current package.json version looked fine. Treat any
-                      pre-existing version as pre-release history.
+                      a patch (e.g. 0.1.0 → 0.1.1). Same version means nothing
+                      to commit and no PR gets created. Treat any pre-existing
+                      version as pre-release history.
 
-                      Write the chosen version to /tmp/new-version.txt as a
-                      bare string.
+                      ## Step 6 — compose release notes markdown
 
-                      ## Step 5 — write the release notes
-
-                      Write /tmp/release-notes.md using impact-first category
-                      order. Omit any section with zero bullets.
+                      Use impact-first category order. Omit any section with
+                      zero bullets.
 
                       <output_format>
                       ## What's new
 
                       ### Changed
-                      - <imperative bullet>
+                      - <imperative bullet> (#N by @user)
 
                       ### Added
-                      - <imperative bullet>
+                      - <imperative bullet> (#N by @user)
 
                       ### Removed
-                      - <imperative bullet>
+                      - <imperative bullet> (#N by @user)
 
                       ### Fixed
-                      - <imperative bullet>
+                      - <imperative bullet> (#N by @user)
                       </output_format>
 
                       Bullet rules:
 
-                      - Imperative mood, present-tense verb first: "Add typing
-                        indicators to DMs", "Fix crash on cold start with
-                        biometric lock", "Bump libvex from 2.0 to 2.1". Not
-                        past tense, not noun phrases, not gerunds.
+                      - Imperative mood, present-tense verb first: "Add
+                        typing indicators to DMs", "Fix crash on cold start
+                        with biometric lock", "Bump libvex from 2.0 to 2.1".
+                        Not past tense, not noun phrases, not gerunds.
                       - Each bullet is self-describing without its category
                         heading — a reader scrolling past "Changed" still
                         understands the line.
-                      - One line, ≤100 chars. If you need two sentences, the
-                        second belongs in the commit, not the release notes.
-                      - Lead with the user-visible outcome, not the internal
-                        module.
-                      - 1-4 bullets per section. If you have more than 4,
-                        you're listing commits — re-cluster by user outcome.
+                      - One line, ≤120 chars including the attribution suffix.
+                      - Lead with user-visible outcome, not internal module.
+                      - 1-4 bullets per section. More than 4 means you're
+                        listing commits — re-cluster by user outcome.
                       - Security fixes go in Fixed with a leading
                         "**Security:**" label.
                       - Breaking changes go in Changed or Removed with a
                         leading "**Breaking:**" label.
-                      - No PR/commit links, no contributor attribution — the
-                        audience doesn't need them.
+                      - Every bullet ends with PR attribution — `(#N by
+                        @user)` for PR-merged commits, `(<short-sha>)` for
+                        direct pushes.
 
                       Empty-release fallback: if Step 3 produced zero
-                      user-facing bullets, replace the entire "## What's new"
-                      section with a single italicized notice. Pick whichever
-                      is accurate:
+                      user-facing bullets, set release_notes to a single
+                      italicized notice (no sections, no bullets). Pick
+                      whichever is accurate:
 
                           _Maintenance release. No user-facing changes._
 
@@ -261,49 +280,89 @@ jobs:
                           _First mobile release._   (on the very first
                           mobile-v* tag, combined with any bullets if present)
 
-                      Notices stand alone — no headings, no bullets, no mixing.
+                      ## Step 7 — return the JSON
 
-                      ## Step 6 — update apps/mobile/package.json
+                      Return a single JSON object matching the schema:
 
-                      Read the file, modify only the `version` field to match
-                      /tmp/new-version.txt, write it back. Preserve all other
-                      fields and the 4-space indentation.
+                          {
+                            "bump_type": "patch" | "minor" | "major",
+                            "current_version": "<string from package.json>",
+                            "new_version": "<string after bump>",
+                            "release_notes": "<markdown string>"
+                          }
 
-                      ## Step 7 — commit
-
-                          git add apps/mobile/package.json
-                          git commit -m "chore: release mobile v$(cat /tmp/new-version.txt)"
-
-                      If `git commit` reports "nothing to commit", stop
-                      immediately and report that as the final answer — do not
-                      try to "fix" the problem by creating a dummy change or
-                      exploring the repo.
-
-                      Do not push — the workflow handles that. Do not modify
-                      files other than apps/mobile/package.json,
-                      /tmp/new-version.txt, and /tmp/release-notes.md.
+                      Use literal \n for newlines inside the release_notes
+                      string. The workflow unescapes them with jq -r before
+                      writing the file.
 
                       <budget>
-                      Keep under 15 tool calls total. Read a handful of files,
-                      2-3 git commands, 2 writes, 1 commit. Don't explore the
-                      repo beyond what's needed to bucket the diff.
+                      Keep under 30 tool calls total. Expect: 1 package.json
+                      read, 3-4 git commands, 1 `gh api commits/<sha>/pulls`
+                      call per user-facing commit (typically 5-15), 0 file
+                      writes, 0 commits. Don't explore the repo beyond what's
+                      needed to bucket the diff and resolve PR numbers.
                       </budget>
                   claude_args: |
                       --model claude-sonnet-4-6
-                      --max-turns 15
-                      --allowedTools "Bash(git log:*),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(ls:*),Bash(cat:*),Read,Write,Grep,Glob"
+                      --max-turns 30
+                      --json-schema '{"type":"object","required":["bump_type","new_version","release_notes"],"properties":{"bump_type":{"type":"string","enum":["patch","minor","major"]},"current_version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},"new_version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},"release_notes":{"type":"string","minLength":1}}}'
+                      --allowedTools "Bash(git log:*),Bash(git diff:*),Bash(gh api:*),Bash(gh pr list:*),Read,Grep,Glob"
 
-            - name: Force-push release branch
+            - name: Extract Claude decision
+              id: decision
               if: steps.changes.outputs.changed == 'true'
-              run: git push origin +release-mobile
+              env:
+                  CLAUDE_OUT: ${{ steps.claude.outputs.structured_output }}
+              run: |
+                  if [ -z "$CLAUDE_OUT" ] || [ "$CLAUDE_OUT" = "null" ]; then
+                    echo "Claude returned no structured output — failing"
+                    exit 1
+                  fi
+                  NEW=$(jq -r '.new_version' <<< "$CLAUDE_OUT")
+                  BUMP=$(jq -r '.bump_type' <<< "$CLAUDE_OUT")
+                  if [ -z "$NEW" ] || [ "$NEW" = "null" ]; then
+                    echo "Missing new_version in Claude output"
+                    echo "$CLAUDE_OUT"
+                    exit 1
+                  fi
+                  echo "new_version=$NEW" >> $GITHUB_OUTPUT
+                  echo "bump_type=$BUMP" >> $GITHUB_OUTPUT
+                  jq -r '.release_notes' <<< "$CLAUDE_OUT" > /tmp/release-notes.md
+                  echo "--- decision ---"
+                  echo "bump: $BUMP"
+                  echo "new version: $NEW"
+                  echo ""
+                  echo "--- release notes ---"
+                  cat /tmp/release-notes.md
+
+            - name: Apply version bump + push release branch
+              if: steps.changes.outputs.changed == 'true'
+              env:
+                  NEW_VERSION: ${{ steps.decision.outputs.new_version }}
+              run: |
+                  git checkout -B release-mobile
+                  node -e "
+                    const fs = require('fs');
+                    const p = 'apps/mobile/package.json';
+                    const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+                    pkg.version = process.env.NEW_VERSION;
+                    fs.writeFileSync(p, JSON.stringify(pkg, null, 4) + '\\n');
+                  "
+                  git add apps/mobile/package.json
+                  if git diff --cached --quiet; then
+                    echo "No version change to commit — Claude picked the same version"
+                    exit 1
+                  fi
+                  git commit -m "chore: release mobile v${NEW_VERSION}"
+                  git push origin +release-mobile
 
             - name: Create or update release PR
               if: steps.changes.outputs.changed == 'true'
               env:
                   GH_TOKEN: ${{ secrets.RELEASE_BOT_PAT || secrets.GITHUB_TOKEN }}
+                  NEW_VERSION: ${{ steps.decision.outputs.new_version }}
               run: |
-                  VERSION=$(cat /tmp/new-version.txt)
-                  TITLE="chore: release mobile v${VERSION}"
+                  TITLE="chore: release mobile v${NEW_VERSION}"
                   if gh pr view release-mobile --json number -q .number > /dev/null 2>&1; then
                     gh pr edit release-mobile \
                       --title "$TITLE" \
