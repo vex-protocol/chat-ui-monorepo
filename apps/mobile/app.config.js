@@ -15,9 +15,9 @@
 
 const pkg = require("./package.json");
 
-// Replace with the real projectId after running `eas init` from apps/mobile.
 // EAS Update requires a stable project id to resolve the update channel.
-const EAS_PROJECT_ID = "PLACEHOLDER-RUN-EAS-INIT";
+// Created via the Expo dashboard — paired with EXPO_TOKEN in CI secrets.
+const EAS_PROJECT_ID = "e0d4cba7-1f2a-4c26-9e66-1fd60178ad20";
 
 module.exports = ({ config }) => {
     const devMode = process.env.EAS_BUILD_PROFILE === "development";
