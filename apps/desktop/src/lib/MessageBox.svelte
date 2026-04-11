@@ -19,6 +19,9 @@
         messages,
         usernames,
     }: { messages: Message[]; usernames?: Record<string, string> } = $props();
+    // Fallback resolved outside the destructure — eslint --fix
+    // silently strips destructure defaults on svelte files.
+    const usernameMap = $derived(usernames ?? {});
 
     const chunks = $derived(chunkMessages(messages));
 
@@ -79,7 +82,7 @@
                     >
                         {chunk.authorID === $user?.userID
                             ? "You"
-                            : (usernames[chunk.authorID] ??
+                            : (usernameMap[chunk.authorID] ??
                               chunk.authorID.slice(0, 8))}
                     </span>
                     <span class="message-chunk__time"

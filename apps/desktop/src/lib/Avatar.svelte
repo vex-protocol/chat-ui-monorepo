@@ -12,6 +12,9 @@
     }
 
     let { name, serverUrl, size, userID, version }: Props = $props();
+    // Fallback resolved outside the destructure — eslint --fix
+    // silently strips destructure defaults on svelte files.
+    const resolvedSize = $derived(size ?? 36);
 
     let failed = $state(false);
 
@@ -32,10 +35,10 @@
     <img
         src="{serverUrl}/avatar/{userID}?v={version}"
         alt={name ?? userID}
-        width={size}
-        height={size}
+        width={resolvedSize}
+        height={resolvedSize}
         class="avatar"
-        style="width:{size}px;height:{size}px;border-radius:50%"
+        style="width:{resolvedSize}px;height:{resolvedSize}px;border-radius:50%"
         onerror={() => {
             failed = true;
         }}
@@ -43,8 +46,8 @@
 {:else}
     <div
         class="avatar avatar--fallback"
-        style="width:{size}px;height:{size}px;font-size:{Math.round(
-            size * 0.4,
+        style="width:{resolvedSize}px;height:{resolvedSize}px;font-size:{Math.round(
+            resolvedSize * 0.4,
         )}px;background:hsl({avatarHue(userID)},45%,40%)"
         aria-label={name ?? userID}
     >
