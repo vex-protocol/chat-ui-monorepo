@@ -210,3 +210,37 @@ jobs:
                   cache: pnpm
             - run: pnpm install --frozen-lockfile --ignore-scripts
             - run: pnpm --filter @vex-chat/ui build
+
+    # ── CI OK — single umbrella check for branch protection ───────────────
+    # Green only when every other job above either succeeded or was
+    # legitimately skipped (path-filter didn't match). Failed or cancelled
+    # jobs fail this check. Set "CI OK" as the required status in the
+    # master branch protection rule — you get one knob that tracks the
+    # whole pipeline, and adding / removing CI jobs doesn't need a
+    # branch-protection config edit.
+    ci-ok:
+        name: CI OK
+        needs:
+            - detect-changes
+            - format
+            - lint
+            - security
+            - check-store
+            - check-desktop
+            - check-mobile
+            - check-ui
+        if: always()
+        runs-on: ubuntu-latest
+        timeout-minutes: 2
+        steps:
+            - name: Fail on any upstream failure or cancellation
+              if: >-
+                  contains(needs.*.result, 'failure') ||
+                  contains(needs.*.result, 'cancelled')
+              run: |
+                  echo "One or more CI jobs failed or were cancelled."
+                  echo "Job results:"
+                  echo '${{ toJSON(needs) }}'
+                  exit 1
+            - name: Report success
+              run: echo "All CI jobs passed or were legitimately skipped."
