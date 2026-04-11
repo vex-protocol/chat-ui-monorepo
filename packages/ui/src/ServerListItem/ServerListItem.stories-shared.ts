@@ -1,18 +1,18 @@
 export const meta = {
-    title: "ServerListItem",
     argTypes: {
-        name: { control: "text" },
         avatarUrl: { control: "text" },
         isActive: { control: "boolean" },
+        name: { control: "text" },
     },
+    title: "ServerListItem",
 };
 
-export const Default = { args: { name: "My Server", isActive: false } };
-export const Active = { args: { name: "My Server", isActive: true } };
+export const Default = { args: { isActive: false, name: "My Server" } };
+export const Active = { args: { isActive: true, name: "My Server" } };
 export const WithAvatar = {
     args: {
-        name: "My Server",
         avatarUrl: "https://i.pravatar.cc/48",
         isActive: false,
+        name: "My Server",
     },
 };

@@ -1,21 +1,17 @@
+import type { Message } from "@vex-chat/libvex";
+
+import { $groupMessages, $messages, shouldNotify } from "@vex-chat/store";
+
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
     isPermissionGranted,
     requestPermission,
     sendNotification,
 } from "@tauri-apps/plugin-notification";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import type { IMessage } from "@vex-chat/libvex";
-import { shouldNotify } from "@vex-chat/store";
+
 import { playNotify } from "./sounds.js";
 
-/** Minimal interface needed to subscribe/unsubscribe to mail events. */
-interface MailEventEmitter {
-    on(event: "mail", handler: (mail: IMessage) => void): void;
-    off(event: "mail", handler: (mail: IMessage) => void): void;
-    getUser(userID: string): Promise<{ username: string } | null>;
-}
-
-// ── Preference ────────────────────────────────────────────────────────────────
+// ── Preference ──────────────────────────────────────────────────────────────
 
 const NOTIF_KEY = "vex-notifications-enabled";
 
@@ -27,7 +23,77 @@ export function setNotificationsEnabled(enabled: boolean): void {
     localStorage.setItem(NOTIF_KEY, String(enabled));
 }
 
-// ── Permission ────────────────────────────────────────────────────────────────
+// ── Atom-based notification watcher ─────────────────────────────────────────
+
+/**
+ * Subscribes to message atoms and fires desktop notifications for new messages.
+ * Returns an unsubscribe function.
+ */
+export function setupNotifications(
+    activeConversation: () => null | string,
+    resolveAuthorName?: (userID: string) => string | undefined,
+    resolveChannelInfo?: (
+        channelID: string,
+    ) => undefined | { channelName: string; serverName: string },
+): () => void {
+    let prevDmSnapshot = $messages.get();
+    let prevGroupSnapshot = $groupMessages.get();
+
+    const handleNewMessage = async (msg: Message): Promise<void> => {
+        let focused = false;
+        try {
+            focused = await getCurrentWindow().isFocused();
+        } catch {}
+
+        const payload = shouldNotify(
+            msg,
+            activeConversation(),
+            focused,
+            resolveAuthorName,
+            resolveChannelInfo,
+        );
+        if (!payload) return;
+        if (!getNotificationsEnabled()) return;
+
+        playNotify();
+
+        if (!focused) {
+            const granted = await ensurePermission();
+            if (granted) {
+                sendNotification({ body: payload.body, title: payload.title });
+            }
+        }
+    };
+
+    const unsubDm = $messages.subscribe((next) => {
+        for (const [threadKey, msgs] of Object.entries(next)) {
+            const prev = prevDmSnapshot[threadKey] ?? [];
+            if (msgs.length > prev.length) {
+                const newMsg = msgs[msgs.length - 1];
+                if (newMsg) void handleNewMessage(newMsg);
+            }
+        }
+        prevDmSnapshot = next;
+    });
+
+    const unsubGroup = $groupMessages.subscribe((next) => {
+        for (const [channelID, msgs] of Object.entries(next)) {
+            const prev = prevGroupSnapshot[channelID] ?? [];
+            if (msgs.length > prev.length) {
+                const newMsg = msgs[msgs.length - 1];
+                if (newMsg) void handleNewMessage(newMsg);
+            }
+        }
+        prevGroupSnapshot = next;
+    });
+
+    return () => {
+        unsubDm();
+        unsubGroup();
+    };
+}
+
+// ── Permission ──────────────────────────────────────────────────────────────
 
 async function ensurePermission(): Promise<boolean> {
     try {
@@ -40,70 +106,4 @@ async function ensurePermission(): Promise<boolean> {
     } catch {
         return false;
     }
-}
-
-// ── Wire up to Client ────────────────────────────────────────────────────────
-
-/**
- * Attaches a mail listener that fires desktop notifications using the shared
- * shouldNotify() decision logic. Returns an unsubscribe function.
- */
-export function setupNotifications(
-    client: MailEventEmitter,
-    activeConversation: () => string | null,
-    resolveAuthorName?: (userID: string) => string | undefined,
-    resolveChannelInfo?: (
-        channelID: string,
-    ) => { channelName: string; serverName: string } | undefined,
-): () => void {
-    const handler = async (mail: IMessage): Promise<void> => {
-        let focused = false;
-        try {
-            focused = await getCurrentWindow().isFocused();
-        } catch {}
-
-        const payload = shouldNotify(
-            mail,
-            activeConversation(),
-            focused,
-            resolveAuthorName,
-            resolveChannelInfo,
-        );
-        if (!payload) return;
-
-        if (!getNotificationsEnabled()) return;
-
-        // If author name wasn't resolved (or is just a truncated UUID), fetch from server
-        const knownName = resolveAuthorName?.(mail.authorID);
-        if (!knownName || knownName === mail.authorID.slice(0, 8)) {
-            try {
-                const user = await client.getUser(mail.authorID);
-                if (user) {
-                    const name = user.username;
-                    if (mail.group) {
-                        const info = resolveChannelInfo?.(mail.group);
-                        payload.title = info
-                            ? `${name} (#${info.channelName}, ${info.serverName})`
-                            : `${name} (#channel)`;
-                    } else {
-                        payload.title = name;
-                    }
-                }
-            } catch {}
-        }
-
-        playNotify();
-
-        if (!focused) {
-            const granted = await ensurePermission();
-            if (granted) {
-                sendNotification({ title: payload.title, body: payload.body });
-            }
-        }
-    };
-
-    client.on("mail", handler);
-    return () => {
-        client.off("mail", handler);
-    };
 }

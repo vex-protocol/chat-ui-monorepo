@@ -1,13 +1,29 @@
 packages:
-  - 'apps/*'
-  - 'packages/*'
+    - apps/*
+    - packages/*
+
+blockExoticSubdeps: true
 
 catalog:
-  typescript: ^5.9.3
-  '@types/node': ^25.3.3
-  nanostores: "^1.2.0"
-  "@nanostores/react": "^1.1.0"
-  uuid: "^11.0.0"
-  "@types/uuid": "^10.0.0"
-  marked: "^15.0.12"
-  dompurify: "^3.2.6"
+    "@nanostores/react": ^1.1.0
+    "@types/node": ^24.10.1
+    "@vex-chat/libvex": 2.0.0
+    dompurify: ^3.2.6
+    kysely: ^0.28.15
+    marked: ^15.0.12
+    nanostores: ^1.2.0
+    react: 19.2.0
+    react-dom: 19.2.0
+    svelte: ^5.45.2
+    typescript: ~5.9.3
+    uuid: ^11.0.0
+    vitest: 3.2.4
+
+catalogMode: strict
+
+minimumReleaseAge: 10080
+
+minimumReleaseAgeExclude:
+    - "@vex-chat/libvex"
+    - "@vex-chat/types"
+    - "@vex-chat/crypto"

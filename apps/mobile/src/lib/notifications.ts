@@ -1,38 +1,66 @@
-import notifee, { AndroidImportance, EventType } from "@notifee/react-native";
+import type { Message } from "@vex-chat/libvex";
+
 import { AppState } from "react-native";
-import type { IMessage } from "@vex-chat/libvex";
-import { shouldNotify } from "@vex-chat/store";
-import { $familiars, $channels, $servers, $client } from "../store";
+
+import { shouldNotify, vexService } from "@vex-chat/store";
+import { $channels, $familiars, $servers } from "@vex-chat/store";
+
+import * as Notifications from "expo-notifications";
+import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
+
 import { navigateToConversation } from "../navigation/navigationRef";
 
 const CHANNEL_ID = "vex-messages";
 
 let channelReady = false;
-let activeConversation: string | null = null;
+let activeConversation: null | string = null;
+
+// Show banner + play sound when a notification arrives while the app is open.
+Notifications.setNotificationHandler({
+    handleNotification: () =>
+        Promise.resolve({
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+        }),
+});
+
+export async function requestNotificationPermission(): Promise<boolean> {
+    const settings = await Notifications.requestPermissionsAsync({
+        ios: { allowAlert: true, allowBadge: true, allowSound: true },
+    });
+    return (
+        settings.granted ||
+        settings.ios?.status === IosAuthorizationStatus.PROVISIONAL
+    );
+}
 
 /** Call from screens to track which conversation the user is viewing. */
-export function setActiveConversation(key: string | null): void {
+export function setActiveConversation(key: null | string): void {
     activeConversation = key;
 }
 
-async function ensureChannel(): Promise<void> {
-    if (channelReady) return;
-    await notifee.createChannel({
-        id: CHANNEL_ID,
-        name: "Messages",
-        importance: AndroidImportance.HIGH,
-        sound: "default",
-    });
-    channelReady = true;
+export function setupNotificationHandlers(): () => void {
+    // Single listener covers foreground, background, and cold-start taps.
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+            handleNotificationPress(response.notification.request.content.data);
+        },
+    );
+
+    // If the app was launched by tapping a notification, replay it.
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) {
+        handleNotificationPress(lastResponse.notification.request.content.data);
+    }
+
+    return () => {
+        subscription.remove();
+    };
 }
 
-export async function requestNotificationPermission(): Promise<boolean> {
-    const settings = await notifee.requestPermission();
-    // authorizationStatus 1 = AUTHORIZED, 2 = PROVISIONAL
-    return settings.authorizationStatus >= 1;
-}
-
-export async function showMessageNotification(mail: IMessage): Promise<void> {
+export async function showMessageNotification(mail: Message): Promise<void> {
     const appFocused = AppState.currentState === "active";
     const familiars = $familiars.get();
 
@@ -40,9 +68,7 @@ export async function showMessageNotification(mail: IMessage): Promise<void> {
     let authorName = familiars[mail.authorID]?.username;
     if (!authorName) {
         try {
-            const [user] = (await $client
-                .get()
-                ?.users.retrieve(mail.authorID)) ?? [null];
+            const user = await vexService.lookupUser(mail.authorID);
             if (user) authorName = user.username;
         } catch {}
     }
@@ -73,45 +99,35 @@ export async function showMessageNotification(mail: IMessage): Promise<void> {
 
     await ensureChannel();
 
-    await notifee.displayNotification({
-        title: payload.title,
-        body: payload.body,
-        data: {
-            authorID: payload.authorID,
-            username: payload.title,
-        },
-        android: {
-            channelId: CHANNEL_ID,
-            pressAction: { id: "default" },
+    await Notifications.scheduleNotificationAsync({
+        content: {
+            body: payload.body,
+            data: {
+                authorID: payload.authorID,
+                username: payload.title,
+            },
             sound: "default",
+            title: payload.title,
         },
-        ios: {
-            sound: "default",
-        },
+        trigger: { channelId: CHANNEL_ID },
     });
+}
+
+async function ensureChannel(): Promise<void> {
+    if (channelReady) return;
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+        importance: AndroidImportance.HIGH,
+        name: "Messages",
+        sound: "default",
+    });
+    channelReady = true;
 }
 
 function handleNotificationPress(
-    data: Record<string, string | number | object> | undefined,
+    data: Record<string, unknown> | undefined,
 ): void {
-    if (!data?.authorID || !data?.username) return;
-    navigateToConversation(String(data.authorID), String(data.username));
-}
-
-export function setupNotificationHandlers(): () => void {
-    // Foreground events (app is open, user taps notification from notification center)
-    const unsubForeground = notifee.onForegroundEvent(({ type, detail }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-    });
-
-    // Background/killed events (app was closed or backgrounded)
-    notifee.onBackgroundEvent(async ({ type, detail }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-    });
-
-    return unsubForeground;
+    const authorID = data?.["authorID"];
+    const username = data?.["username"];
+    if (typeof authorID !== "string" || typeof username !== "string") return;
+    navigateToConversation(authorID, username);
 }

@@ -1,21 +1,8 @@
-import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { push } from "svelte-spa-router";
+
 import { parseVexLink } from "@vex-chat/store";
 
-function handleDeepLink(url: string): void {
-    const link = parseVexLink(url);
-    switch (link.type) {
-        case "invite":
-            push(`/invite/${link.inviteID}`);
-            break;
-        case "user":
-            push(`/messaging/${link.userID}`);
-            break;
-        case "server":
-            push(`/server/${link.serverID}`);
-            break;
-    }
-}
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 /**
  * Registers the deep-link listener. Returns an unsubscribe function.
@@ -27,4 +14,19 @@ export async function setupDeepLinks(): Promise<() => void> {
         }
     });
     return unlisten;
+}
+
+function handleDeepLink(url: string): void {
+    const link = parseVexLink(url);
+    switch (link.type) {
+        case "invite":
+            void push(`/invite/${link.inviteID}`);
+            break;
+        case "server":
+            void push(`/server/${link.serverID}`);
+            break;
+        case "user":
+            void push(`/messaging/${link.userID}`);
+            break;
+    }
 }

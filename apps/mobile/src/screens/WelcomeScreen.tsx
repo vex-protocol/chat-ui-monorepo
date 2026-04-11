@@ -1,13 +1,15 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { colors, typography } from "../theme";
+import { StyleSheet, Text, View } from "react-native";
+
+import { HourglassIcon } from "../components/HourglassIcon";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
-import { HourglassIcon } from "../components/HourglassIcon";
+import { colors, typography } from "../theme";
 
-type Props = NativeStackScreenProps<any, "Welcome">;
+type Props = AuthScreenProps<"Welcome">;
 
 export function WelcomeScreen({ navigation }: Props) {
     return (
@@ -36,14 +38,18 @@ export function WelcomeScreen({ navigation }: Props) {
                 {/* Actions */}
                 <View style={styles.actions}>
                     <VexButton
-                        title="Get Started"
-                        onPress={() => navigation.navigate("Initialize")}
-                        variant="outline"
                         glow
+                        onPress={() => {
+                            navigation.navigate("Initialize");
+                        }}
+                        title="Get Started"
+                        variant="outline"
                     />
                     <Text
+                        onPress={() => {
+                            navigation.navigate("Login");
+                        }}
                         style={styles.signInLink}
-                        onPress={() => navigation.navigate("Login")}
                     >
                         Sign in
                     </Text>
@@ -61,74 +67,74 @@ export function WelcomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: "space-between",
+    actions: {
         alignItems: "center",
-    },
-    logo: {
-        marginTop: 16,
+        gap: 16,
+        width: "100%",
     },
     center: {
         alignItems: "center",
         gap: 12,
     },
-    iconRow: {
-        flexDirection: "row",
+    container: {
         alignItems: "center",
-        gap: 0,
-        marginBottom: 24,
-    },
-    node: {
-        width: 10,
-        height: 10,
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: colors.accent,
+        flex: 1,
+        justifyContent: "space-between",
     },
     dashedLine: {
-        width: 48,
-        height: 0,
-        borderTopWidth: 1,
+        borderColor: colors.accent,
         borderStyle: "dashed",
-        borderColor: colors.accent,
+        borderTopWidth: 1,
+        height: 0,
+        width: 48,
     },
-    hourglassBox: {
-        width: 64,
-        height: 64,
-        borderWidth: 1,
-        borderColor: colors.accent,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: colors.bg,
+    footer: {
+        ...typography.body,
+        color: colors.accent,
+        fontSize: 10,
+        lineHeight: 16,
+        textAlign: "center",
+    },
+    footerLink: {
+        color: colors.accent,
+        textDecorationLine: "underline",
     },
     heading: {
         ...typography.heading,
         color: colors.text,
     },
-    subtitle: {
-        ...typography.body,
-        color: colors.muted,
-        letterSpacing: 2,
-    },
-    actions: {
-        width: "100%",
-        gap: 16,
+    hourglassBox: {
         alignItems: "center",
+        backgroundColor: colors.bg,
+        borderColor: colors.accent,
+        borderWidth: 1,
+        height: 64,
+        justifyContent: "center",
+        width: 64,
+    },
+    iconRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 0,
+        marginBottom: 24,
+    },
+    logo: {
+        marginTop: 16,
+    },
+    node: {
+        borderColor: colors.accent,
+        borderRadius: 5,
+        borderWidth: 1,
+        height: 10,
+        width: 10,
     },
     signInLink: {
         ...typography.button,
         color: colors.muted,
     },
-    footer: {
+    subtitle: {
         ...typography.body,
-        color: colors.accent,
-        textAlign: "center",
-        fontSize: 10,
-        lineHeight: 16,
-    },
-    footerLink: {
-        color: colors.accent,
-        textDecorationLine: "underline",
+        color: colors.muted,
+        letterSpacing: 2,
     },
 });

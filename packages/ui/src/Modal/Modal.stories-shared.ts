@@ -1,9 +1,9 @@
 export const meta = {
-    title: "Modal",
     argTypes: {
         isOpen: { control: "boolean" },
         title: { control: "text" },
     },
+    title: "Modal",
 };
 
 export const Open = { args: { isOpen: true, title: "Confirm Action" } };

@@ -1,6 +1,21 @@
-import type { IMessage } from "@vex-chat/libvex";
+import type { Message } from "@vex-chat/libvex";
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
+
+export interface FileAttachment {
+    contentType: string;
+    fileID: string;
+    fileName: string;
+    fileSize: number;
+}
+
+// ── File attachment parsing ──────────────────────────────────────────────────
+
+export interface MessageChunk {
+    authorID: string;
+    firstTime: string;
+    messages: Message[];
+}
 
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
 export function avatarHue(id: string): number {
@@ -9,23 +24,29 @@ export function avatarHue(id: string): number {
     return Math.abs(h) % 360;
 }
 
-// ── File attachment parsing ──────────────────────────────────────────────────
-
-export interface FileAttachment {
-    fileID: string;
-    fileName: string;
-    fileSize: number;
-    contentType: string;
+export function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return String(bytes) + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export function parseFileExtra(extra: string | null): FileAttachment | null {
+export function isImageType(contentType: string): boolean {
+    return contentType.startsWith("image/");
+}
+
+// ── Message chunking ─────────────────────────────────────────────────────────
+
+export function parseFileExtra(extra: null | string): FileAttachment | null {
     if (!extra) return null;
     try {
-        const obj = JSON.parse(extra);
+        const obj: unknown = JSON.parse(extra);
         if (
-            obj &&
-            typeof obj.fileID === "string" &&
-            typeof obj.fileName === "string"
+            typeof obj === "object" &&
+            obj !== null &&
+            "fileID" in obj &&
+            typeof (obj as FileAttachment).fileID === "string" &&
+            "fileName" in obj &&
+            typeof (obj as FileAttachment).fileName === "string"
         ) {
             return obj as FileAttachment;
         }
@@ -35,24 +56,6 @@ export function parseFileExtra(extra: string | null): FileAttachment | null {
     return null;
 }
 
-export function isImageType(contentType: string): boolean {
-    return contentType.startsWith("image/");
-}
-
-export function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-}
-
-// ── Message chunking ─────────────────────────────────────────────────────────
-
-export interface MessageChunk {
-    authorID: string;
-    messages: IMessage[];
-    firstTime: Date;
-}
-
 const CHUNK_GAP_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_CHUNK_SIZE = 100;
 
@@ -60,9 +63,10 @@ const MAX_CHUNK_SIZE = 100;
  * Groups messages by sender into display chunks.
  * Starts a new chunk on: different sender, >5 min gap, or 100 message cap.
  */
-export function chunkMessages(messages: IMessage[]): MessageChunk[] {
+export function chunkMessages(messages: Message[]): MessageChunk[] {
     const sorted = [...messages].sort(
-        (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
+        (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
     const chunks: MessageChunk[] = [];
 
@@ -72,7 +76,8 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
 
         const sameAuthor = last?.authorID === msg.authorID;
         const withinGap = lastMsg
-            ? msg.timestamp.getTime() - lastMsg.timestamp.getTime() <
+            ? new Date(msg.timestamp).getTime() -
+                  new Date(lastMsg.timestamp).getTime() <
               CHUNK_GAP_MS
             : false;
         const notFull = (last?.messages.length ?? 0) < MAX_CHUNK_SIZE;
@@ -82,8 +87,8 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
         } else {
             chunks.push({
                 authorID: msg.authorID,
-                messages: [msg],
                 firstTime: msg.timestamp,
+                messages: [msg],
             });
         }
     }
@@ -94,58 +99,66 @@ export function chunkMessages(messages: IMessage[]): MessageChunk[] {
 // ── Emoji shortcodes ────────────────────────────────────────────────────────
 
 const EMOJI: Record<string, string> = {
-    smile: "😊",
-    grin: "😁",
-    laugh: "😂",
-    joy: "😂",
-    heart: "❤️",
-    thumbsup: "👍",
-    "+1": "👍",
-    thumbsdown: "👎",
     "-1": "👎",
-    fire: "🔥",
-    rocket: "🚀",
-    wave: "👋",
-    check: "✅",
-    x: "❌",
-    star: "⭐",
-    eyes: "👀",
-    tada: "🎉",
-    clap: "👏",
-    pray: "🙏",
-    muscle: "💪",
-    cool: "😎",
-    think: "🤔",
-    shrug: "🤷",
-    ok: "👌",
-    zzz: "😴",
-    cry: "😢",
+    "+1": "👍",
     angry: "😠",
+    check: "✅",
+    clap: "👏",
     confused: "😕",
+    cool: "😎",
+    cry: "😢",
     dizzy: "😵",
+    eyes: "👀",
+    fire: "🔥",
+    grin: "😁",
+    heart: "❤️",
+    joy: "😂",
+    laugh: "😂",
+    muscle: "💪",
+    ok: "👌",
+    pray: "🙏",
+    rocket: "🚀",
+    shrug: "🤷",
+    smile: "😊",
+    star: "⭐",
+    tada: "🎉",
+    think: "🤔",
+    thumbsdown: "👎",
+    thumbsup: "👍",
+    wave: "👋",
+    x: "❌",
+    zzz: "😴",
 };
 
-/** Replaces :shortcode: with emoji characters. */
+/** Replaces :shortcode: with emoji characters. Accepts word-char or
+ * leading `+`/`-` (so `:+1:` and `:-1:` work alongside `:thumbsup:`).
+ * Leading `-` is placed first in the character class so it's treated
+ * as a literal, not a range. */
 export function applyEmoji(text: string): string {
-    return text.replace(/:(\w[+\w-]*):/g, (m, name) => EMOJI[name] ?? m);
+    return text.replace(
+        /:([-+\w][-+\w]*):/g,
+        (m, name: string) => EMOJI[name] ?? m,
+    );
 }
 
 // ── Date formatting ─────────────────────────────────────────────────────────
 
 /**
- * Formats a Date for display.
+ * Formats a timestamp for display.
+ * Accepts a Date object or an ISO 8601 string.
  * Same day → "HH:mm". Earlier → "MMM D HH:mm".
  */
-export function formatTime(date: Date): string {
+export function formatTime(date: Date | string): string {
+    const d = typeof date === "string" ? new Date(date) : date;
     const now = new Date();
-    const sameDay = date.toDateString() === now.toDateString();
-    const hhmm = date.toLocaleTimeString([], {
+    const sameDay = d.toDateString() === now.toDateString();
+    const hhmm = d.toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
     });
     if (sameDay) return hhmm;
     return (
-        date.toLocaleDateString([], { month: "short", day: "numeric" }) +
+        d.toLocaleDateString([], { day: "numeric", month: "short" }) +
         " " +
         hhmm
     );

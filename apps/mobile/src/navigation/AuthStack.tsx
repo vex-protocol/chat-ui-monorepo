@@ -1,15 +1,19 @@
-import React, { useState, useEffect } from "react";
+import type { AuthStackParamList } from "./types";
+
+import React, { useEffect, useState } from "react";
+
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+
 import { loadCredentials } from "../lib/keychain";
-import { WelcomeScreen } from "../screens/WelcomeScreen";
-import { InitializeScreen } from "../screens/InitializeScreen";
+import { AuthenticateScreen } from "../screens/AuthenticateScreen";
 import { FinalizeScreen } from "../screens/FinalizeScreen";
 import { HangTightScreen } from "../screens/HangTightScreen";
-import { WelcomeBackScreen } from "../screens/WelcomeBackScreen";
-import { AuthenticateScreen } from "../screens/AuthenticateScreen";
+import { InitializeScreen } from "../screens/InitializeScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { WelcomeBackScreen } from "../screens/WelcomeBackScreen";
+import { WelcomeScreen } from "../screens/WelcomeScreen";
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export function AuthStack() {
     const [initialRoute, setInitialRoute] = useState<
@@ -17,7 +21,7 @@ export function AuthStack() {
     >(null);
 
     useEffect(() => {
-        loadCredentials().then((creds) => {
+        void loadCredentials().then((creds) => {
             setInitialRoute(creds ? "WelcomeBack" : "Welcome");
         });
     }, []);
@@ -26,25 +30,16 @@ export function AuthStack() {
 
     return (
         <Stack.Navigator
-            screenOptions={{ headerShown: false }}
             initialRouteName={initialRoute}
+            screenOptions={{ headerShown: false }}
         >
-            <Stack.Screen name="Welcome" component={WelcomeScreen as any} />
-            <Stack.Screen
-                name="Initialize"
-                component={InitializeScreen as any}
-            />
-            <Stack.Screen name="Finalize" component={FinalizeScreen as any} />
-            <Stack.Screen name="HangTight" component={HangTightScreen} />
-            <Stack.Screen
-                name="WelcomeBack"
-                component={WelcomeBackScreen as any}
-            />
-            <Stack.Screen
-                name="Authenticate"
-                component={AuthenticateScreen as any}
-            />
-            <Stack.Screen name="Login" component={LoginScreen as any} />
+            <Stack.Screen component={WelcomeScreen} name="Welcome" />
+            <Stack.Screen component={InitializeScreen} name="Initialize" />
+            <Stack.Screen component={FinalizeScreen} name="Finalize" />
+            <Stack.Screen component={HangTightScreen} name="HangTight" />
+            <Stack.Screen component={WelcomeBackScreen} name="WelcomeBack" />
+            <Stack.Screen component={AuthenticateScreen} name="Authenticate" />
+            <Stack.Screen component={LoginScreen} name="Login" />
         </Stack.Navigator>
     );
 }

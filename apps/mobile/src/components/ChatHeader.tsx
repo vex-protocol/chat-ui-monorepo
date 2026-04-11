@@ -1,14 +1,15 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
 import { colors, typography } from "../theme";
 
 interface ChatHeaderProps {
-    title: string;
-    subtitle?: string;
     onBack?: () => void;
+    subtitle?: string;
+    title: string;
 }
 
-export function ChatHeader({ title, subtitle, onBack }: ChatHeaderProps) {
+export function ChatHeader({ onBack, subtitle, title }: ChatHeaderProps) {
     return (
         <View style={styles.container}>
             <View style={styles.breadcrumb}>
@@ -17,13 +18,13 @@ export function ChatHeader({ title, subtitle, onBack }: ChatHeaderProps) {
                         <Text style={styles.backArrow}>←</Text>
                     </TouchableOpacity>
                 )}
-                <Text style={styles.title} numberOfLines={1}>
+                <Text numberOfLines={1} style={styles.title}>
                     {title}
                 </Text>
                 {subtitle && (
                     <>
                         <Text style={styles.separator}>|</Text>
-                        <Text style={styles.subtitle} numberOfLines={1}>
+                        <Text numberOfLines={1} style={styles.subtitle}>
                             {subtitle}
                         </Text>
                     </>
@@ -42,33 +43,41 @@ export function ChatHeader({ title, subtitle, onBack }: ChatHeaderProps) {
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flexDirection: "row",
+    actionBtn: {
         alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.borderSubtle,
-        backgroundColor: colors.bg,
+        height: 36,
+        justifyContent: "center",
+        width: 36,
     },
-    breadcrumb: {
-        flex: 1,
+    actionIcon: {
+        fontSize: 18,
+    },
+    actions: {
         flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
-    },
-    backBtn: {
-        marginRight: 4,
+        gap: 4,
     },
     backArrow: {
         color: colors.text,
         fontSize: 18,
     },
-    title: {
-        ...typography.button,
-        color: colors.text,
-        fontSize: 16,
+    backBtn: {
+        marginRight: 4,
+    },
+    breadcrumb: {
+        alignItems: "center",
+        flex: 1,
+        flexDirection: "row",
+        gap: 8,
+    },
+    container: {
+        alignItems: "center",
+        backgroundColor: colors.bg,
+        borderBottomColor: colors.borderSubtle,
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingVertical: 10,
     },
     separator: {
         color: colors.muted,
@@ -79,17 +88,9 @@ const styles = StyleSheet.create({
         color: colors.muted,
         flex: 1,
     },
-    actions: {
-        flexDirection: "row",
-        gap: 4,
-    },
-    actionBtn: {
-        width: 36,
-        height: 36,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    actionIcon: {
-        fontSize: 18,
+    title: {
+        ...typography.button,
+        color: colors.text,
+        fontSize: 16,
     },
 });

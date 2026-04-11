@@ -1,8 +1,8 @@
 # ADR-004: Migrate to Sibling Repos via Platform Adapter Injection + Mobile Expo Prebuild
 
-**Status:** Proposed (draft)
+**Status:** Accepted — Implemented 2026-04-06
 **Date:** 2026-04-05
-**Deciders:** @dgill
+**Deciders:** @dream
 **Supersedes:** None (supplements ADR-001)
 **Related:** ADR-001 (monorepo consolidation), ADR-003 (thin-shell apps)
 
@@ -12,7 +12,7 @@
 
 The vex-chat monorepo currently contains workspace-internal copies of `@vex-chat/libvex`, `@vex-chat/crypto`, `@vex-chat/types` under `packages/`. These were a clean-room rewrite on `@noble/*` crypto libraries, with ESM + hex-string wire formats and a proposed `SessionManager`/`DecryptedMail`/`KeyStore` architecture.
 
-Meanwhile, the canonical standalone sibling repos at `/Users/dgill/Public/{libvex-js, crypto-js, types-js, spire}` have been independently modernized (all now merged to `master`). Reading them today reveals that they are **further along than the monorepo rewrite**, with a different architectural direction:
+Meanwhile, the canonical standalone sibling repos (`libvex-js`, `crypto-js`, `types-js`, `spire`) have been independently modernized (all now merged to `master`). Reading them today reveals that they are **further along than the monorepo rewrite**, with a different architectural direction:
 
 **`libvex-js@master`** (v1.0.0-rc.0, TS 6, pure ESM, Vitest):
 - Monolithic 3172-line `Client` class with full protocol implementation
@@ -283,7 +283,7 @@ Adds adapters, storage backends, keystore reference implementations, and the bot
 
 | New file | Purpose |
 |---|---|
-| `src/transport/browser.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
+| `src/transport/websocket.ts` | `browserAdapters()` → `{ logger: consoleLogger, WebSocket: globalThis.WebSocket }` |
 | `src/transport/native.ts` | `reactNativeAdapters()` → `{ logger: rnLogger, WebSocket: globalThis.WebSocket }` |
 | `src/storage/memory.ts` | `MemoryStorage` — in-memory `IStorage` for unit tests |
 | `src/keystore/node.ts` | `nodeKeyStore(path, password)` — file-backed, wraps `saveKeyFile`/`loadKeyFile` (Node condition only) |

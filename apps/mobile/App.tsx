@@ -1,39 +1,31 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { StatusBar } from "react-native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
-import { NavigationContainer } from "@react-navigation/native";
-import { useStore } from "@nanostores/react";
+
 import {
-    autoLogin,
-    $keyReplaced,
-    $user,
-    $client,
-    $familiars,
-    $messages,
     $groupMessages,
-} from "./src/store";
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
-import { keychainKeyStore, clearCredentials } from "./src/lib/keychain";
+    $keyReplaced,
+    $messages,
+    vexService,
+} from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
+import { NavigationContainer } from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import { getServerOptions } from "./src/lib/config";
-import {
-    loadFamiliars,
-    saveFamiliars,
-    saveDmMessages,
-    saveGroupMessages,
-} from "./src/lib/messages";
-import { RootNavigator } from "./src/navigation/RootNavigator";
-import { navigationRef } from "./src/navigation/navigationRef";
+import { clearCredentials, keychainKeyStore } from "./src/lib/keychain";
 import {
     requestNotificationPermission,
-    showMessageNotification,
     setupNotificationHandlers,
+    showMessageNotification,
 } from "./src/lib/notifications";
+import { mobileConfig } from "./src/lib/platform";
+import { navigationRef } from "./src/navigation/navigationRef";
+import { RootNavigator } from "./src/navigation/RootNavigator";
 import { colors, fontFamilies } from "./src/theme";
 
 function App() {
     const keyReplaced = useStore($keyReplaced);
-    const user = useStore($user);
-    const client = useStore($client);
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -43,53 +35,51 @@ function App() {
     }, []);
 
     useEffect(() => {
-        (async () => {
+        void (async () => {
             await requestNotificationPermission();
-            await autoLogin(keychainKeyStore, expoPreset(), getServerOptions());
-
-            // Load persisted familiars AFTER bootstrap (resetAll clears atoms)
-            const saved = await loadFamiliars();
-            for (const [id, u] of Object.entries(saved)) {
-                $familiars.setKey(id, u);
-            }
+            await vexService.autoLogin(
+                keychainKeyStore,
+                mobileConfig(),
+                getServerOptions(),
+            );
+            // Familiars are populated by vexService.populateState() during bootstrap
         })();
     }, []);
 
-    // Persist familiars whenever they change
-    const familiars = useStore($familiars);
-    useEffect(() => {
-        if (Object.keys(familiars).length > 0) {
-            saveFamiliars(familiars).catch(() => {});
-        }
-    }, [familiars]);
-
-    // Persist messages whenever they change
+    // Show local notifications for incoming messages by watching atom changes
     const allDms = useStore($messages);
     const allGroups = useStore($groupMessages);
+    const prevDmsRef = useRef(allDms);
+    const prevGroupsRef = useRef(allGroups);
+
     useEffect(() => {
-        if (Object.keys(allDms).length > 0) {
-            saveDmMessages(allDms).catch(() => {});
+        const prev = prevDmsRef.current;
+        prevDmsRef.current = allDms;
+        for (const [threadID, thread] of Object.entries(allDms)) {
+            const prevThread = prev[threadID] ?? [];
+            if (thread.length > prevThread.length) {
+                const newMsg = thread[thread.length - 1];
+                if (newMsg) void showMessageNotification(newMsg);
+            }
         }
     }, [allDms]);
+
     useEffect(() => {
-        if (Object.keys(allGroups).length > 0) {
-            saveGroupMessages(allGroups).catch(() => {});
+        const prev = prevGroupsRef.current;
+        prevGroupsRef.current = allGroups;
+        for (const [channelID, thread] of Object.entries(allGroups)) {
+            const prevThread = prev[channelID] ?? [];
+            if (thread.length > prevThread.length) {
+                const newMsg = thread[thread.length - 1];
+                if (newMsg) void showMessageNotification(newMsg);
+            }
         }
     }, [allGroups]);
-
-    // Show local notifications for incoming messages when app is backgrounded
-    useEffect(() => {
-        if (!client) return;
-        (client as any).on("message", showMessageNotification);
-        return () => {
-            (client as any).off("message", showMessageNotification);
-        };
-    }, [client]);
 
     useEffect(() => {
         if (keyReplaced) {
             // Key was replaced server-side — clear stored credentials and force re-auth
-            clearCredentials();
+            void clearCredentials();
             // Navigation auto-redirects to Auth via $user becoming null
         }
     }, [keyReplaced]);
@@ -100,24 +90,16 @@ function App() {
             <NavigationContainer
                 ref={navigationRef}
                 theme={{
-                    dark: true,
                     colors: {
-                        primary: colors.accentMuted,
                         background: colors.bg,
-                        card: colors.card,
-                        text: colors.textSecondary,
                         border: colors.borderSubtle,
+                        card: colors.card,
                         notification: colors.error,
+                        primary: colors.accentMuted,
+                        text: colors.textSecondary,
                     },
+                    dark: true,
                     fonts: {
-                        regular: {
-                            fontFamily: fontFamilies.mono,
-                            fontWeight: "300",
-                        },
-                        medium: {
-                            fontFamily: fontFamilies.body,
-                            fontWeight: "500",
-                        },
                         bold: {
                             fontFamily: fontFamilies.heading,
                             fontWeight: "500",
@@ -125,6 +107,14 @@ function App() {
                         heavy: {
                             fontFamily: fontFamilies.heading,
                             fontWeight: "500",
+                        },
+                        medium: {
+                            fontFamily: fontFamilies.body,
+                            fontWeight: "500",
+                        },
+                        regular: {
+                            fontFamily: fontFamilies.mono,
+                            fontWeight: "300",
                         },
                     },
                 }}

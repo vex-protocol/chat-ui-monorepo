@@ -1,33 +1,34 @@
 {
-  "name": "@vex-chat/ui",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    "./react/*": "./output/react/src/*",
-    "./svelte/*": "./output/svelte/src/*"
-  },
-  "scripts": {
-    "build": "mitosis build && tsx scripts/gen-story-wrappers.ts",
-    "build:react": "mitosis build --targets react",
-    "build:svelte": "mitosis build --targets svelte",
-    "gen-stories": "tsx scripts/gen-story-wrappers.ts",
-    "storybook": "concurrently \"storybook dev -p 6001 -c .storybook-react\" \"storybook dev -p 6002 -c .storybook-svelte\" \"wait-on http://localhost:6001 http://localhost:6002 && storybook dev -p 6000 -c .storybook\""
-  },
-  "devDependencies": {
-    "@builder.io/mitosis": "^0.12.1",
-    "@builder.io/mitosis-cli": "^0.13.0",
-    "@storybook/addon-essentials": "^8.6.0",
-    "@storybook/react-vite": "^8.6.0",
-    "@storybook/svelte-vite": "^8.6.0",
-    "concurrently": "^9.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "storybook": "^8.6.0",
-    "svelte": "^5.0.0",
-    "tsx": "^4.19.0",
-    "vite": "^6.0.0",
-    "wait-on": "^8.0.0"
-  },
-  "license": "AGPL-3.0-or-later"
+    "name": "@vex-chat/ui",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        "./react/*": "./output/react/src/*",
+        "./svelte/*": "./output/svelte/src/*"
+    },
+    "scripts": {
+        "build": "mitosis build && tsx scripts/gen-story-wrappers.ts",
+        "build:react": "mitosis build --targets react",
+        "build:svelte": "mitosis build --targets svelte",
+        "gen-stories": "tsx scripts/gen-story-wrappers.ts",
+        "storybook": "concurrently \"storybook dev -p 6001 -c .storybook-react\" \"storybook dev -p 6002 -c .storybook-svelte\" \"wait-on http://localhost:6001 http://localhost:6002 && storybook dev -p 6000 -c .storybook\""
+    },
+    "devDependencies": {
+        "@builder.io/mitosis": "^0.12.1",
+        "@builder.io/mitosis-cli": "^0.13.0",
+        "@storybook/addon-essentials": "^8.6.0",
+        "@storybook/react-vite": "^8.6.0",
+        "@storybook/svelte-vite": "^8.6.0",
+        "@vex-chat/eslint-config": "workspace:*",
+        "concurrently": "^9.1.0",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+        "storybook": "^8.6.0",
+        "svelte": "catalog:",
+        "tsx": "^4.19.0",
+        "vite": "^6.0.0",
+        "wait-on": "^8.0.0"
+    },
+    "license": "AGPL-3.0-or-later"
 }

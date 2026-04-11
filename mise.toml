@@ -7,3 +7,17 @@ node = "24.14.0"
 rust = "1.93.1"
 ruby = { version = "3.3", os = ["macos"] }
 cocoapods = { version = "latest", os = ["macos"] }
+java = "temurin-17"
+
+# Android SDK lives under the homebrew-cask `android-commandlinetools` prefix.
+# `sdkmanager` / `avdmanager` are already symlinked into $(brew --prefix)/bin
+# by the cask, so cmdline-tools/latest/bin does not need to be on PATH here.
+# platform-tools + emulator are installed by sdkmanager into $ANDROID_HOME
+# and must be added explicitly. See scripts/bootstrap.sh.
+[env]
+ANDROID_HOME = "/opt/homebrew/share/android-commandlinetools"
+ANDROID_SDK_ROOT = "/opt/homebrew/share/android-commandlinetools"
+_.path = [
+    "/opt/homebrew/share/android-commandlinetools/platform-tools",
+    "/opt/homebrew/share/android-commandlinetools/emulator",
+]

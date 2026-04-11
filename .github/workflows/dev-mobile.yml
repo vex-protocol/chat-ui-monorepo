@@ -1,0 +1,209 @@
+name: Mobile — Dev
+
+# Maintains the continuously-updated dev APK. On every push to master:
+#
+#   fingerprint unchanged → eas update (OTA push only, ~30s)
+#   fingerprint changed   → eas build + two GitHub prereleases:
+#                             - mobile-dev-v<version>-<sha>  (durable)
+#                             - mobile-dev-latest             (rolling)
+#
+# "Fingerprint changed" means the diff carries one of the reasons
+# bareRncliAutolinking / expoAutolinkingAndroid / expoAutolinkingIos —
+# matching Bluesky's reason-filtered fingerprint diff. Whitespace edits
+# and pod reshuffles do NOT trigger a rebuild. See scripts/fingerprint-diff.mjs.
+#
+# The dev APK has updates.enabled:true + runtimeVersion:fingerprint in
+# app.config.js, so installed dev APKs receive OTAs automatically until
+# the fingerprint boundary is crossed.
+#
+# Fingerprint persistence: the full JSON is attached as a release asset
+# on mobile-dev-latest (not embedded in the release body) so the next
+# run can download and diff it.
+#
+# Concurrency: cancel-in-progress:false — matches Bluesky's pattern.
+# Canceling a build mid-upload corrupts EAS versionCode state.
+#
+# Secrets: EXPO_TOKEN, GITHUB_TOKEN (automatic).
+
+on:
+    push:
+        branches: [master]
+        # Only fire when something that affects the mobile runtime
+        # changed. GitHub filters at the trigger level so no runner
+        # is allocated for desktop-only / docs-only pushes.
+        paths:
+            - "apps/mobile/**"
+            - "packages/store/**"
+            - "packages/ui/**"
+            - "pnpm-workspace.yaml"
+    workflow_dispatch:
+
+concurrency:
+    group: dev-mobile
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+jobs:
+    dev-mobile:
+        if: >-
+            github.actor != 'github-actions[bot]' ||
+            github.event_name == 'workflow_dispatch'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version-file: .tool-versions
+                  cache: pnpm
+
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+
+            - name: Compute current fingerprint
+              id: fp
+              working-directory: apps/mobile
+              run: |
+                  npx @expo/fingerprint@latest . > /tmp/current-fingerprint.json
+                  HASH=$(node -pe "require('/tmp/current-fingerprint.json').hash")
+                  echo "hash=$HASH" >> $GITHUB_OUTPUT
+                  echo "Current fingerprint hash: $HASH"
+
+            - name: Download previous fingerprint asset
+              id: prev_fp
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  if gh release download mobile-dev-latest \
+                        --pattern 'fingerprint.json' \
+                        --output /tmp/prev-fingerprint.json 2>/dev/null; then
+                    PREV_HASH=$(node -pe "require('/tmp/prev-fingerprint.json').hash")
+                    echo "hash=$PREV_HASH" >> $GITHUB_OUTPUT
+                    echo "exists=true" >> $GITHUB_OUTPUT
+                    echo "Previous fingerprint hash: $PREV_HASH"
+                  else
+                    echo "exists=false" >> $GITHUB_OUTPUT
+                    echo "No previous fingerprint asset — will build"
+                  fi
+
+            - name: Decide path (reason-filtered diff)
+              id: decide
+              run: |
+                  if [ "${{ steps.prev_fp.outputs.exists }}" = "true" ]; then
+                    PATH_DECISION=$(node scripts/fingerprint-diff.mjs /tmp/current-fingerprint.json /tmp/prev-fingerprint.json)
+                  else
+                    PATH_DECISION=build
+                  fi
+                  echo "path=$PATH_DECISION" >> $GITHUB_OUTPUT
+                  echo "Decision: $PATH_DECISION"
+
+            # ── OTA path ──────────────────────────────────────────────
+
+            - name: Install EAS CLI (OTA path)
+              if: steps.decide.outputs.path == 'ota'
+              run: npm install -g eas-cli@latest
+
+            - name: Push OTA update
+              if: steps.decide.outputs.path == 'ota'
+              working-directory: apps/mobile
+              env:
+                  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+                  EAS_BUILD_PROFILE: development
+              run: |
+                  eas update \
+                    --branch development \
+                    --message "main ${GITHUB_SHA::8}" \
+                    --non-interactive
+
+            # ── Build path ────────────────────────────────────────────
+
+            # TODO: pin setup-java + setup-android to SHA once scorecard flags
+            # them. Tag refs for now.
+            - name: Setup Java (Temurin 17)
+              if: steps.decide.outputs.path == 'build'
+              uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "17"
+
+            - name: Setup Android SDK
+              if: steps.decide.outputs.path == 'build'
+              uses: android-actions/setup-android@v3
+              with:
+                  cmdline-tools-version: "13114758"
+
+            - name: Install EAS CLI + local build plugin
+              if: steps.decide.outputs.path == 'build'
+              run: npm install -g eas-cli@latest eas-cli-local-build-plugin@latest
+
+            - name: Build dev APK (local)
+              if: steps.decide.outputs.path == 'build'
+              working-directory: apps/mobile
+              env:
+                  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+                  EAS_BUILD_PROFILE: development
+              run: |
+                  eas build \
+                    --profile development \
+                    --platform android \
+                    --local \
+                    --non-interactive \
+                    --output "${{ github.workspace }}/dev.apk"
+
+            - name: Read mobile version
+              if: steps.decide.outputs.path == 'build'
+              id: version
+              run: |
+                  VERSION=$(node -pe "require('./apps/mobile/package.json').version")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+            - name: Create durable prerelease
+              if: steps.decide.outputs.path == 'build'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  SHORT_SHA=${GITHUB_SHA::8}
+                  TAG="mobile-dev-v${{ steps.version.outputs.version }}-${SHORT_SHA}"
+                  NOTES=$(cat <<EOF
+                  Vex Dev APK built from commit ${SHORT_SHA}. Installs with package id \`chat.vex.mobile.dev\` so it coexists with the release APK. Receives OTAs until the next native fingerprint change.
+                  EOF
+                  )
+                  cp /tmp/current-fingerprint.json fingerprint.json
+                  gh release create "$TAG" dev.apk fingerprint.json \
+                    --prerelease \
+                    --title "Mobile Dev ${{ steps.version.outputs.version }} (${SHORT_SHA})" \
+                    --notes "$NOTES"
+
+            - name: Update rolling mobile-dev-latest pointer
+              if: steps.decide.outputs.path == 'build'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  SHORT_SHA=${GITHUB_SHA::8}
+                  NOTES=$(cat <<EOF
+                  **Always-current Vex Dev APK** (commit ${SHORT_SHA}).
+
+                  Rebuilt whenever the native fingerprint changes (new plugin, new dep with native code, native config tweak). Install once from this page and you'll receive OTAs on every JS-only merge to master until the next fingerprint boundary.
+
+                  \`\`\`
+                  gh release download mobile-dev-latest --pattern '*.apk' -R \${{ github.repository }}
+                  \`\`\`
+                  EOF
+                  )
+                  gh release delete mobile-dev-latest --cleanup-tag --yes 2>/dev/null || true
+                  gh release create mobile-dev-latest dev.apk fingerprint.json \
+                    --prerelease \
+                    --target "$GITHUB_SHA" \
+                    --title "Mobile Dev (latest)" \
+                    --notes "$NOTES"

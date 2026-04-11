@@ -5,29 +5,29 @@
 storage: ./storage
 
 uplinks:
-  npmjs:
-    url: https://registry.npmjs.org/
-    maxage: 60m
+    npmjs:
+        url: https://registry.npmjs.org/
+        maxage: 60m
 
 packages:
-  '@vex-chat/*':
-    access: $all
-    publish: $all
-    unpublish: $all
-    # Fall through to npm for packages not published locally (types, crypto).
-    proxy: npmjs
+    "@vex-chat/*":
+        access: $all
+        publish: $all
+        unpublish: $all
+        # Fall through to npm for packages not published locally (types, crypto).
+        proxy: npmjs
 
-  '**':
-    access: $all
-    proxy: npmjs
+    "**":
+        access: $all
+        proxy: npmjs
 
 # No auth required for local dev
 auth:
-  htpasswd:
-    file: ./htpasswd
-    max_users: -1
+    htpasswd:
+        file: ./htpasswd
+        max_users: -1
 
 server:
-  keepAliveTimeout: 60
+    keepAliveTimeout: 60
 
 log: { type: stdout, format: pretty, level: warn }

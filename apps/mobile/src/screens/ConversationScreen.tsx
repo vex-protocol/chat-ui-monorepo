@@ -1,33 +1,31 @@
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import type { AppScreenProps } from "../navigation/types";
+import type { Message } from "@vex-chat/libvex";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    View,
-    Text,
     FlatList,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
+    Text,
+    View,
 } from "react-native";
+
+import { $messages, $user, vexService } from "@vex-chat/store";
+
 import { useStore } from "@nanostores/react";
-import type { IMessage } from "@vex-chat/libvex";
-import { $messages, $user } from "../store";
-import { sendDirectMessage, markRead } from "@vex-chat/store";
-import { setActiveConversation } from "../lib/notifications";
-import { colors, typography } from "../theme";
+
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { setActiveConversation } from "../lib/notifications";
+import { colors, typography } from "../theme";
 
 export function ConversationScreen({
-    route,
     navigation,
-}: {
-    route: any;
-    navigation: any;
-}) {
-    const { userID, username } = route.params as {
-        userID: string;
-        username: string;
-    };
+    route,
+}: AppScreenProps<"Conversation">) {
+    const { userID, username } = route.params;
     const allMessages = useStore($messages);
     const user = useStore($user);
 
@@ -40,7 +38,7 @@ export function ConversationScreen({
     // Track active conversation for notification suppression + mark read
     useEffect(() => {
         setActiveConversation(userID);
-        markRead(userID);
+        vexService.markRead(userID);
         return () => {
             setActiveConversation(null);
         };
@@ -48,7 +46,7 @@ export function ConversationScreen({
 
     // Mark read whenever new messages arrive while viewing
     useEffect(() => {
-        if (messages.length > 0) markRead(userID);
+        if (messages.length > 0) vexService.markRead(userID);
     }, [messages.length, userID]);
 
     const [text, setText] = useState("");
@@ -62,37 +60,39 @@ export function ConversationScreen({
         setText("");
         setError("");
         try {
-            const result = await sendDirectMessage(userID, content);
+            const result = await vexService.sendDM(userID, content);
             if (!result.ok) {
                 setError(result.error ?? "Failed to send");
             }
-        } catch (err) {
+        } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to send");
         }
         setSending(false);
     }, [text, user, userID]);
 
-    function renderMessage({ item }: { item: IMessage }) {
+    function renderMessage({ item }: { item: Message }) {
         const isOwn = item.authorID === user?.userID;
         return (
             <MessageBubbleRN
-                message={item}
-                isOwn={isOwn}
                 authorName={isOwn ? "You" : username}
+                isOwn={isOwn}
+                message={item}
             />
         );
     }
 
     return (
         <KeyboardAvoidingView
-            style={styles.container}
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             keyboardVerticalOffset={0}
+            style={styles.container}
         >
             <ChatHeader
-                title="Home"
+                onBack={() => {
+                    navigation.goBack();
+                }}
                 subtitle={`@${username}`}
-                onBack={() => navigation.goBack()}
+                title="Home"
             />
 
             {messages.length === 0 ? (
@@ -104,11 +104,11 @@ export function ConversationScreen({
                 </View>
             ) : (
                 <FlatList
+                    contentContainerStyle={styles.list}
                     data={messages}
+                    inverted
                     keyExtractor={(m) => m.mailID}
                     renderItem={renderMessage}
-                    inverted
-                    contentContainerStyle={styles.list}
                 />
             )}
 
@@ -119,11 +119,11 @@ export function ConversationScreen({
             )}
 
             <MessageInputBar
-                value={text}
                 onChangeText={setText}
-                onSend={sendMessage}
+                onSend={() => void sendMessage()}
                 placeholder={`Message @${username}`}
                 sending={sending}
+                value={text}
             />
         </KeyboardAvoidingView>
     );
@@ -131,21 +131,13 @@ export function ConversationScreen({
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
         backgroundColor: colors.bg,
-    },
-    list: {
-        paddingVertical: 8,
+        flex: 1,
     },
     empty: {
-        flex: 1,
         alignItems: "center",
+        flex: 1,
         justifyContent: "center",
-    },
-    emptyText: {
-        ...typography.body,
-        color: colors.mutedDark,
-        fontStyle: "italic",
     },
     emptyHint: {
         ...typography.body,
@@ -153,13 +145,21 @@ const styles = StyleSheet.create({
         fontSize: 11,
         marginTop: 4,
     },
+    emptyText: {
+        ...typography.body,
+        color: colors.mutedDark,
+        fontStyle: "italic",
+    },
     errorBar: {
+        backgroundColor: "rgba(229, 57, 53, 0.15)",
         paddingHorizontal: 12,
         paddingVertical: 6,
-        backgroundColor: "rgba(229, 57, 53, 0.15)",
     },
     errorText: {
         ...typography.body,
         color: colors.error,
+    },
+    list: {
+        paddingVertical: 8,
     },
 });

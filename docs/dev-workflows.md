@@ -87,7 +87,7 @@ After the first build (~2-5 min), subsequent launches are fast. JS changes hot-r
 npx expo start             # opens in Expo Go on device/simulator
 ```
 
-Expo Go has a fixed set of native modules. Packages with custom native code (`@notifee/react-native`, etc.) will crash in Expo Go — use a development build instead. See `docs/explanation/platform-strategy.md` for the full Expo Go vs dev build comparison.
+Expo Go has a fixed set of native modules. Packages with custom native code (`expo-sqlite`, `expo-notifications`, etc.) will crash in Expo Go — use a development build instead. See `docs/explanation/platform-strategy.md` for the full Expo Go vs dev build comparison.
 
 ### Metro bundler (standalone)
 
@@ -97,55 +97,21 @@ npx expo start --dev-client   # connects to an existing development build
 
 Useful if the app needs to reconnect to the bundler after the native binary is already running.
 
----
+### Server URL configuration
 
-## Website (SvelteKit)
+The mobile app always defaults to the production API at `api.vex.wtf`. To point at a different server, set `EXPO_PUBLIC_SERVER_URL` before starting Metro — **do not** edit `src/lib/config.ts`. Release builds throw at startup if the resolved URL looks like a dev host, so a forgotten localhost can never ship.
 
-Marketing site at vex.wtf — SvelteKit + Tailwind, deployed to Vercel.
+| Target                              | Command                              |
+| ----------------------------------- | ------------------------------------ |
+| Production (default)                | `pnpm -F mobile dev`                 |
+| iOS simulator → local spire         | `pnpm -F mobile dev:local`           |
+| Android emulator → local spire      | `pnpm -F mobile dev:android-reverse` |
+| Physical device, same Wi-Fi         | `pnpm -F mobile dev:lan`             |
+| Physical device, off-LAN (Tailscale) | Put the 100.x IP in `apps/mobile/.env.local`, then `pnpm -F mobile dev` |
 
-### Run dev
+Personal overrides live in `apps/mobile/.env.local` (gitignored). `apps/mobile/.env.example` documents the available variables.
 
-```bash
-pnpm --filter @vex-chat/website dev
-```
-
-### Build + preview (production)
-
-```bash
-pnpm --filter @vex-chat/website build && pnpm --filter @vex-chat/website preview
-```
-
-Run Lighthouse against the preview URL (not dev server) for accurate performance scores. The dev server serves unminified, unbundled JS.
-
-### SEO testing
-
-1. Build and preview:
-   ```bash
-   pnpm --filter @vex-chat/website build && pnpm --filter @vex-chat/website preview
-   ```
-2. Open Chrome DevTools → Lighthouse tab
-3. Run audit against `http://localhost:4173`
-4. Check: Performance, Accessibility, SEO scores
-
-Key SEO files:
-- `src/lib/seo/Meta.svelte` — OG tags, Twitter cards, canonical URLs
-- `src/lib/seo/JsonLd.svelte` — Structured data
-- `src/routes/sitemap.xml/+server.ts` — Sitemap
-- `src/lib/data/competitors.ts` — Competitor page data
-
-### Optimize orb images
-
-```bash
-node apps/website/scripts/optimize-orbs.mjs
-```
-
-Converts all images in `static/orbs/` to WebP at 200px, quality 60.
-
-### Type check
-
-```bash
-pnpm --filter @vex-chat/website check
-```
+`dev:android-reverse` runs `adb reverse tcp:16777 tcp:16777` first, which must be re-run after every emulator restart — bake it into your flow or re-run this script.
 
 ---
 
@@ -209,7 +175,7 @@ These have no build step -- apps import TypeScript source directly.
 pnpm dev
 ```
 
-Runs all client apps in parallel (desktop, website, mobile). The server (spire) runs separately from its own repo.
+Runs all client apps in parallel (desktop, mobile). The server (spire) runs separately from its own repo.
 
 ---
 
@@ -232,23 +198,18 @@ pnpm --filter @vex-chat/desktop dev
 
 Edit `apps/desktop/src/*.svelte` → Vite HMR updates the Tauri window.
 
-### Deploy website
-
-Push to `main` → Vercel auto-deploys.
-
 ---
 
 ## Dependency Graph
 
 ```
-apps/desktop ─── packages/store ─── ../libvex-js ─── ../crypto-js
-                      │                                    │
-                      └──────── ../types-js ◄──────────────┘
+apps/desktop ─── packages/store ─── @vex-chat/libvex ─── @vex-chat/crypto
+                      │                                        │
+                      └──────── @vex-chat/types ◄──────────────┘
 apps/mobile ──── packages/store
-apps/website ─── ../types-js
 packages/ui ──── (standalone, compiles to React + Svelte)
 
-Sibling repos (linked via pnpm workspace):
+Sibling repos (published to npm, consumed via verdaccio or registry):
 ../types-js   (@vex-chat/types)
 ../crypto-js  (@vex-chat/crypto)
 ../libvex-js  (@vex-chat/libvex)

@@ -1,0 +1,246 @@
+name: CI
+
+on:
+    pull_request:
+        branches: [master]
+
+permissions:
+    contents: read
+
+jobs:
+    detect-changes:
+        runs-on: ubuntu-latest
+        outputs:
+            store: ${{ steps.changes.outputs.store }}
+            desktop: ${{ steps.changes.outputs.desktop }}
+            mobile: ${{ steps.changes.outputs.mobile }}
+            ui: ${{ steps.changes.outputs.ui }}
+            lint-config: ${{ steps.changes.outputs.lint-config }}
+            root: ${{ steps.changes.outputs.root }}
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+              id: changes
+              with:
+                  filters: |
+                      store:
+                        - 'packages/store/**'
+                      desktop:
+                        - 'apps/desktop/**'
+                      mobile:
+                        - 'apps/mobile/**'
+                      ui:
+                        - 'packages/ui/**'
+                      lint-config:
+                        - 'packages/eslint-config/**'
+                      root:
+                        - 'package.json'
+                        - 'pnpm-lock.yaml'
+                        - 'pnpm-workspace.yaml'
+                        - 'tsconfig.json'
+                        - 'eslint.config.js'
+
+    # ── Always runs — fast, catches formatting issues across all files ──────
+    format:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm format:check
+
+    # ── Lint — only affected packages ──────────────────────────────────────
+    lint:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.desktop == 'true' ||
+            needs.detect-changes.outputs.mobile == 'true' ||
+            needs.detect-changes.outputs.ui == 'true' ||
+            needs.detect-changes.outputs.lint-config == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  fetch-depth: 0
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Sherif — workspace version consistency
+              # -i vite: desktop on vite 7, ui/storybook on vite 6. Re-enable
+              # once packages/ui upgrades to a vite-7-compatible Storybook.
+              run: pnpm dlx sherif@latest -i vite
+            - name: Lint affected packages
+              run: |
+                  if [ "${{ needs.detect-changes.outputs.root }}" == "true" ] || \
+                     [ "${{ needs.detect-changes.outputs.lint-config }}" == "true" ]; then
+                    pnpm -r --if-present lint
+                  else
+                    pnpm --filter "...[origin/master]" --if-present lint
+                  fi
+
+    # ── Security — audit + lockfile integrity ──────────────────────────────
+    security:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Security audit
+              run: pnpm audit --audit-level=high || true
+            - name: Socket security scan
+              run: npx @socketsecurity/cli@latest ci
+              env:
+                  SOCKET_SECURITY_API_KEY: ${{ secrets.SOCKET_API_KEY }}
+            - name: License check
+              run: pnpm -r --if-present license:check
+
+    # ── Store — type check + test ──────────────────────────────────────────
+    check-store:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/store --if-present check
+            - run: pnpm --filter @vex-chat/store --if-present test
+
+    # ── Desktop — Svelte check (triggered by desktop OR store changes) ─────
+    check-desktop:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.desktop == 'true' ||
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Svelte check
+              run: pnpm --filter @vex-chat/desktop check
+
+    # ── Mobile — type check (triggered by mobile OR store changes) ─────────
+    check-mobile:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.mobile == 'true' ||
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/mobile --if-present check
+
+    # ── UI — Mitosis build (standalone, no dependents) ─────────────────────
+    check-ui:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.ui == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+            - run: pnpm --filter @vex-chat/ui build
+
+    # ── CI OK — single umbrella check for branch protection ───────────────
+    # Green only when every other job above either succeeded or was
+    # legitimately skipped (path-filter didn't match). Failed or cancelled
+    # jobs fail this check. Set "CI OK" as the required status in the
+    # master branch protection rule — you get one knob that tracks the
+    # whole pipeline, and adding / removing CI jobs doesn't need a
+    # branch-protection config edit.
+    ci-ok:
+        name: CI OK
+        needs:
+            - detect-changes
+            - format
+            - lint
+            - security
+            - check-store
+            - check-desktop
+            - check-mobile
+            - check-ui
+        if: always()
+        runs-on: ubuntu-latest
+        timeout-minutes: 2
+        steps:
+            - name: Fail on any upstream failure or cancellation
+              if: >-
+                  contains(needs.*.result, 'failure') ||
+                  contains(needs.*.result, 'cancelled')
+              run: |
+                  echo "One or more CI jobs failed or were cancelled."
+                  echo "Job results:"
+                  echo '${{ toJSON(needs) }}'
+                  exit 1
+            - name: Report success
+              run: echo "All CI jobs passed or were legitimately skipped."

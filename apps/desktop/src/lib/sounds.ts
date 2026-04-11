@@ -19,22 +19,65 @@ export function setSoundsEnabled(enabled: boolean): void {
 // Lazy AudioContext — created on first use to avoid autoplay policy issues
 let ctx: AudioContext | null = null;
 
+type OscType = "sawtooth" | "sine" | "square" | "triangle";
+
+interface Tone {
+    duration: number; // seconds
+    endFreq?: number; // if set, sweep from freq to endFreq
+    freq: number;
+    gain?: number;
+    start: number; // seconds from now
+    type?: OscType;
+}
+
+/** Played on auth error / failed login — short descending buzz. */
+export function playError(): void {
+    play([
+        {
+            duration: 0.12,
+            endFreq: 180,
+            freq: 220,
+            gain: 0.1,
+            start: 0,
+            type: "square",
+        },
+        {
+            duration: 0.12,
+            endFreq: 150,
+            freq: 180,
+            gain: 0.08,
+            start: 0.14,
+            type: "square",
+        },
+    ]);
+}
+
+/** Played on logout — single falling tone. */
+export function playLock(): void {
+    play([{ duration: 0.25, endFreq: 330, freq: 440, gain: 0.14, start: 0 }]);
+}
+
+/** Played on incoming message — soft two-tone ping. */
+export function playNotify(): void {
+    play([
+        { duration: 0.1, freq: 880, gain: 0.12, start: 0 },
+        { duration: 0.14, freq: 1046, gain: 0.1, start: 0.08 },
+    ]);
+}
+
+/** Played on successful login / registration — rising two-note chime. */
+export function playUnlock(): void {
+    play([
+        { duration: 0.12, freq: 523, start: 0 }, // C5
+        { duration: 0.18, freq: 784, start: 0.1 }, // G5
+    ]);
+}
+
 function getCtx(): AudioContext {
     if (!ctx || ctx.state === "closed") {
         ctx = new AudioContext();
     }
     return ctx;
-}
-
-type OscType = "sine" | "square" | "triangle" | "sawtooth";
-
-interface Tone {
-    freq: number;
-    endFreq?: number; // if set, sweep from freq to endFreq
-    type?: OscType;
-    start: number; // seconds from now
-    duration: number; // seconds
-    gain?: number;
 }
 
 function play(tones: Tone[]): void {
@@ -67,47 +110,4 @@ function play(tones: Tone[]): void {
         osc.start(now + t.start);
         osc.stop(now + t.start + t.duration);
     }
-}
-
-/** Played on successful login / registration — rising two-note chime. */
-export function playUnlock(): void {
-    play([
-        { freq: 523, duration: 0.12, start: 0 }, // C5
-        { freq: 784, duration: 0.18, start: 0.1 }, // G5
-    ]);
-}
-
-/** Played on logout — single falling tone. */
-export function playLock(): void {
-    play([{ freq: 440, endFreq: 330, duration: 0.25, start: 0, gain: 0.14 }]);
-}
-
-/** Played on auth error / failed login — short descending buzz. */
-export function playError(): void {
-    play([
-        {
-            freq: 220,
-            endFreq: 180,
-            type: "square",
-            duration: 0.12,
-            start: 0,
-            gain: 0.1,
-        },
-        {
-            freq: 180,
-            endFreq: 150,
-            type: "square",
-            duration: 0.12,
-            start: 0.14,
-            gain: 0.08,
-        },
-    ]);
-}
-
-/** Played on incoming message — soft two-tone ping. */
-export function playNotify(): void {
-    play([
-        { freq: 880, duration: 0.1, start: 0, gain: 0.12 },
-        { freq: 1046, duration: 0.14, start: 0.08, gain: 0.1 },
-    ]);
 }

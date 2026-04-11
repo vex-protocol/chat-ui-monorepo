@@ -1,23 +1,35 @@
 {
-  "name": "@vex-chat/store",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@vex-chat/libvex": "^1.1.0",
-    "nanostores": "catalog:",
-    "uuid": "catalog:"
-  },
-  "peerDependencies": {
-    "@nanostores/react": ">=0.8"
-  },
-  "peerDependenciesMeta": {
-    "@nanostores/react": {
-      "optional": true
-    }
-  },
-  "license": "AGPL-3.0-or-later"
+    "name": "@vex-chat/store",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        ".": "./src/index.ts"
+    },
+    "scripts": {
+        "lint": "eslint src/",
+        "lint:fix": "eslint src/ --fix",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit",
+        "license:check": "npx @onebeyond/license-checker scan --allowOnly MIT ISC BSD-2-Clause BSD-3-Clause Apache-2.0 0BSD MPL-2.0 CC0-1.0 CC-BY-4.0 Unlicense BlueOak-1.0.0 Python-2.0 Zlib PSF-2.0 Artistic-2.0 AGPL-3.0-or-later WTFPL --ignoreRootPackageLicense --disableReport"
+    },
+    "devDependencies": {
+        "@vex-chat/eslint-config": "workspace:*",
+        "vitest": "catalog:"
+    },
+    "dependencies": {
+        "@vex-chat/libvex": "catalog:",
+        "nanostores": "catalog:",
+        "uuid": "catalog:"
+    },
+    "peerDependencies": {
+        "@nanostores/react": ">=0.8"
+    },
+    "peerDependenciesMeta": {
+        "@nanostores/react": {
+            "optional": true
+        }
+    },
+    "license": "AGPL-3.0-or-later"
 }

@@ -1,45 +1,47 @@
 import React from "react";
 import {
-    TouchableOpacity,
-    Text,
-    StyleSheet,
-    type ViewStyle,
     ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    type ViewStyle,
 } from "react-native";
+
 import { colors, typography } from "../theme";
+
 import { CornerBracketBox } from "./CornerBracketBox";
 
 interface VexButtonProps {
-    title: string;
-    onPress: () => void;
-    variant?: "primary" | "outline";
+    disabled?: boolean;
     glow?: boolean;
     loading?: boolean;
-    disabled?: boolean;
+    onPress: () => void;
     style?: ViewStyle;
+    title: string;
+    variant?: "outline" | "primary";
 }
 
 export function VexButton({
-    title,
-    onPress,
-    variant = "primary",
+    disabled = false,
     glow = false,
     loading = false,
-    disabled = false,
+    onPress,
     style,
+    title,
+    variant = "primary",
 }: VexButtonProps) {
     const isPrimary = variant === "primary";
 
     return (
         <CornerBracketBox
-            size={8}
             color={isPrimary ? colors.accent : colors.border}
+            size={8}
             style={StyleSheet.flatten([glow && styles.glow, style])}
         >
             <TouchableOpacity
-                onPress={onPress}
-                disabled={disabled || loading}
                 activeOpacity={0.7}
+                disabled={disabled || loading}
+                onPress={onPress}
                 style={[
                     styles.button,
                     isPrimary ? styles.primary : styles.outline,
@@ -62,34 +64,34 @@ export function VexButton({
 
 const styles = StyleSheet.create({
     button: {
-        paddingVertical: 14,
-        paddingHorizontal: 48,
         alignItems: "center",
         justifyContent: "center",
-    },
-    primary: {
-        backgroundColor: colors.accent,
-    },
-    outline: {
-        backgroundColor: colors.transparent,
-        borderWidth: 1,
-        borderColor: colors.border,
+        paddingHorizontal: 48,
+        paddingVertical: 14,
     },
     disabled: {
         opacity: 0.4,
     },
-    text: {
-        ...typography.button,
-        color: colors.text,
+    glow: {
+        elevation: 12,
+        shadowColor: colors.accent,
+        shadowOffset: { height: 6, width: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 20,
+    },
+    outline: {
+        backgroundColor: colors.transparent,
+        borderColor: colors.border,
+        borderWidth: 1,
     },
     outlineText: {
         color: colors.text,
     },
-    glow: {
-        shadowColor: colors.accent,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.8,
-        shadowRadius: 20,
-        elevation: 12,
+    primary: {
+        backgroundColor: colors.accent,
+    },
+    text: {
+        ...typography.button,
+        color: colors.text,
     },
 });

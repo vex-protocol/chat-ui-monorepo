@@ -1,20 +1,18 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
-  "identifier": "default",
-  "description": "enables the default permissions",
-  "windows": [
-    "main"
-  ],
-  "permissions": [
-    "core:default",
-    "opener:default",
-    "notification:default",
-    "deep-link:default",
-    "updater:default",
-    "process:default",
-    "sql:default",
-    "sql:allow-execute",
-    "keyring:default",
-    "log:default"
-  ]
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "default",
+    "description": "enables the default permissions",
+    "windows": ["main"],
+    "permissions": [
+        "core:default",
+        "opener:default",
+        "notification:default",
+        "deep-link:default",
+        "updater:default",
+        "process:default",
+        "sql:default",
+        "sql:allow-execute",
+        "keyring:default",
+        "log:default"
+    ]
 }

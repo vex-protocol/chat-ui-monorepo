@@ -1,18 +1,19 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { useStore } from "@nanostores/react";
-import { $client, $servers, $channels } from "../store";
-import { colors, typography } from "../theme";
-import { ScreenLayout } from "../components/ScreenLayout";
-import { BackButton } from "../components/BackButton";
-import { VexButton } from "../components/VexButton";
-import { CornerBracketBox } from "../components/CornerBracketBox";
+import { StyleSheet, Text, TextInput, View } from "react-native";
+
 import { parseInviteID } from "@vex-chat/store";
+import { vexService } from "@vex-chat/store";
+
+import { useNavigation } from "@react-navigation/native";
+
+import { BackButton } from "../components/BackButton";
+import { CornerBracketBox } from "../components/CornerBracketBox";
+import { ScreenLayout } from "../components/ScreenLayout";
+import { VexButton } from "../components/VexButton";
+import { colors, typography } from "../theme";
 
 export function JoinGroupScreen() {
     const navigation = useNavigation();
-    const client = useStore($client);
     const [input, setInput] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
@@ -23,28 +24,20 @@ export function JoinGroupScreen() {
             setError("Please enter a valid invite link or code");
             return;
         }
-        if (!client) {
-            setError("Not connected");
-            return;
-        }
 
         setLoading(true);
         setError("");
 
         try {
-            const permission = await client.invites.redeem(inviteID);
-            const serverID = permission.resourceID;
-            const server = await client.servers.retrieveByID(serverID);
-            if (server) {
-                $servers.setKey(server.serverID, server);
-                const channels = await client.channels.retrieve(
-                    server.serverID,
-                );
-                $channels.setKey(server.serverID, channels);
+            const result = await vexService.joinInvite(inviteID);
+            if (!result.ok) {
+                setError(result.error || "Failed to join server");
+                setLoading(false);
+                return;
             }
             // Navigate back — AppTabs will re-render with the new server
             if (navigation.canGoBack()) navigation.goBack();
-        } catch (err) {
+        } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to join server",
             );
@@ -72,30 +65,30 @@ export function JoinGroupScreen() {
 
                 <View style={styles.field}>
                     <Text style={styles.label}>INVITE CODE</Text>
-                    <CornerBracketBox size={8} color={colors.border}>
+                    <CornerBracketBox color={colors.border} size={8}>
                         <TextInput
-                            style={styles.input}
-                            value={input}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!loading}
                             onChangeText={(t) => {
                                 setInput(t);
                                 setError("");
                             }}
                             placeholder="Paste invite link or code"
                             placeholderTextColor={colors.mutedDark}
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
+                            style={styles.input}
+                            value={input}
                         />
                     </CornerBracketBox>
                 </View>
 
                 <View style={styles.buttonRow}>
                     <VexButton
-                        title="Join"
-                        onPress={handleJoin}
-                        loading={loading}
                         disabled={!input.trim()}
                         glow
+                        loading={loading}
+                        onPress={() => void handleJoin()}
+                        title="Join"
                     />
                 </View>
             </View>
@@ -104,24 +97,13 @@ export function JoinGroupScreen() {
 }
 
 const styles = StyleSheet.create({
+    buttonRow: {
+        alignItems: "center",
+    },
     content: {
         flex: 1,
-        justifyContent: "center",
         gap: 24,
-    },
-    header: {
-        alignItems: "center",
-        gap: 8,
-    },
-    heading: {
-        ...typography.heading,
-        color: colors.text,
-        textAlign: "center",
-    },
-    subtitle: {
-        ...typography.body,
-        color: colors.muted,
-        textAlign: "center",
+        justifyContent: "center",
     },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
@@ -136,18 +118,29 @@ const styles = StyleSheet.create({
     field: {
         gap: 6,
     },
+    header: {
+        alignItems: "center",
+        gap: 8,
+    },
+    heading: {
+        ...typography.heading,
+        color: colors.text,
+        textAlign: "center",
+    },
+    input: {
+        backgroundColor: colors.surface,
+        color: colors.textSecondary,
+        fontSize: 14,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
     label: {
         ...typography.label,
         color: colors.muted,
     },
-    input: {
-        color: colors.textSecondary,
-        fontSize: 14,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        backgroundColor: colors.surface,
-    },
-    buttonRow: {
-        alignItems: "center",
+    subtitle: {
+        ...typography.body,
+        color: colors.muted,
+        textAlign: "center",
     },
 });

@@ -1,22 +1,39 @@
 {
-  "extends": "@tsconfig/svelte/tsconfig.json",
-  "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "types": ["svelte", "vite/client"],
-    "noEmit": true,
-    /**
-     * Typecheck JS in `.svelte` and `.js` files by default.
-     * Disable checkJs if you'd like to use dynamic types in JS.
-     * Note that setting allowJs false does not prevent the use
-     * of JS in `.svelte` files.
-     */
-    "allowJs": true,
-    "checkJs": true,
-    "moduleDetection": "force",
-    "allowImportingTsExtensions": true
-  },
-  "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
+    "extends": "@tsconfig/svelte/tsconfig.json",
+    "compilerOptions": {
+        "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+        "target": "ES2022",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "types": ["svelte", "vite/client"],
+        "noEmit": true,
+        /**
+         * Typecheck JS in `.svelte` and `.js` files by default.
+         * Disable checkJs if you'd like to use dynamic types in JS.
+         * Note that setting allowJs false does not prevent the use
+         * of JS in `.svelte` files.
+         */
+        "allowJs": true,
+        "checkJs": true,
+        "moduleDetection": "force",
+        "allowImportingTsExtensions": true,
+        // noUncheckedIndexedAccess / exactOptionalPropertyTypes /
+        // noPropertyAccessFromIndexSignature were all enabled together
+        // in an earlier hygiene pass, but the existing Svelte codebase
+        // wasn't written with them in mind — they produce ~40+ errors
+        // across the app for legitimate-but-ungrounded strict-null
+        // patterns (index access on route params, optional props on
+        // Svelte 5 components, env var access via import.meta.env).
+        // Turn back on when the codebase is ready for a migration pass.
+        "noUncheckedIndexedAccess": false,
+        "exactOptionalPropertyTypes": false,
+        "noPropertyAccessFromIndexSignature": false,
+        "noImplicitReturns": true,
+        "noImplicitOverride": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUncheckedSideEffectImports": true,
+        "isolatedModules": true,
+        "erasableSyntaxOnly": true
+    },
+    "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
 }

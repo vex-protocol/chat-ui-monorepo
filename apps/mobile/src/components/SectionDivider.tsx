@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+
 import { colors, typography } from "../theme";
 
 interface SectionDividerProps {
@@ -24,29 +25,29 @@ export function SectionDivider({ label }: SectionDividerProps) {
 
 const styles = StyleSheet.create({
     container: {
-        flexDirection: "row",
         alignItems: "center",
+        flexDirection: "row",
         gap: 8,
         paddingVertical: 16,
     },
-    lineSection: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 8,
+    label: {
+        ...typography.label,
+        color: colors.muted,
     },
     line: {
+        backgroundColor: colors.border,
         flex: 1,
         height: 1,
-        backgroundColor: colors.border,
+    },
+    lineSection: {
+        alignItems: "center",
+        flex: 1,
+        flexDirection: "row",
+        gap: 8,
     },
     plus: {
         ...typography.label,
         color: colors.muted,
         fontSize: 10,
-    },
-    label: {
-        ...typography.label,
-        color: colors.muted,
     },
 });

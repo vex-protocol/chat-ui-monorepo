@@ -1,21 +1,36 @@
-import React, { useEffect, useRef } from "react";
-import { View, Text, Animated, Easing, StyleSheet } from "react-native";
+import React, { useEffect, useMemo } from "react";
+import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+
+import { $user } from "@vex-chat/store";
+
 import { useStore } from "@nanostores/react";
-import { $user } from "../store";
-import { colors, typography } from "../theme";
+
 import { ScreenLayout } from "../components/ScreenLayout";
+import { colors, typography } from "../theme";
 
 export function HangTightScreen() {
-    const user = useStore($user);
-    const spin = useRef(new Animated.Value(0)).current;
-    const pulse = useRef(new Animated.Value(1)).current;
+    const _user = useStore($user);
+    // Use useMemo instead of useRef(...).current so the eslint
+    // react-hooks/refs rule is satisfied (it flags accessing .current
+    // during render). Animated.Value is stable across renders so
+    // useMemo with an empty dep array is equivalent in behavior.
+    const spin = useMemo(() => new Animated.Value(0), []);
+    const pulse = useMemo(() => new Animated.Value(1), []);
+    const rotation = useMemo(
+        () =>
+            spin.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "360deg"],
+            }),
+        [spin],
+    );
 
     useEffect(() => {
         Animated.loop(
             Animated.timing(spin, {
-                toValue: 1,
                 duration: 3000,
                 easing: Easing.linear,
+                toValue: 1,
                 useNativeDriver: true,
             }),
         ).start();
@@ -23,13 +38,13 @@ export function HangTightScreen() {
         Animated.loop(
             Animated.sequence([
                 Animated.timing(pulse, {
-                    toValue: 1.1,
                     duration: 1000,
+                    toValue: 1.1,
                     useNativeDriver: true,
                 }),
                 Animated.timing(pulse, {
-                    toValue: 1,
                     duration: 1000,
+                    toValue: 1,
                     useNativeDriver: true,
                 }),
             ]),
@@ -38,11 +53,6 @@ export function HangTightScreen() {
 
     // Auto-transition handled by RootNavigator when $user becomes non-null
     // This screen is just a visual holding state
-
-    const rotation = spin.interpolate({
-        inputRange: [0, 1],
-        outputRange: ["0deg", "360deg"],
-    });
 
     return (
         <ScreenLayout>
@@ -66,19 +76,19 @@ export function HangTightScreen() {
 
 const styles = StyleSheet.create({
     container: {
-        flex: 1,
-        justifyContent: "center",
         alignItems: "center",
+        flex: 1,
         gap: 12,
-    },
-    icon: {
-        fontSize: 48,
-        color: colors.accent,
-        marginBottom: 24,
+        justifyContent: "center",
     },
     heading: {
         ...typography.heading,
         color: colors.text,
+    },
+    icon: {
+        color: colors.accent,
+        fontSize: 48,
+        marginBottom: 24,
     },
     subtitle: {
         ...typography.body,

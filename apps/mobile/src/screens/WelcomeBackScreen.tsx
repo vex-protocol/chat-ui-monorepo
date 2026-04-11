@@ -1,36 +1,39 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet } from "react-native";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { autoLogin } from "../store";
-import { expoPreset } from "@vex-chat/libvex/preset/expo";
+import type { AuthScreenProps } from "../navigation/types";
+
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+
+import { vexService } from "@vex-chat/store";
+
+import { BackButton } from "../components/BackButton";
+import { CornerBracketBox } from "../components/CornerBracketBox";
+import { ScreenLayout } from "../components/ScreenLayout";
+import { VexButton } from "../components/VexButton";
+import { getServerOptions } from "../lib/config";
 import {
-    loadCredentials,
     clearCredentials,
     keychainKeyStore,
+    loadCredentials,
 } from "../lib/keychain";
-import { getServerOptions } from "../lib/config";
+import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
-import { ScreenLayout } from "../components/ScreenLayout";
-import { BackButton } from "../components/BackButton";
-import { VexButton } from "../components/VexButton";
-import { CornerBracketBox } from "../components/CornerBracketBox";
 
-type Props = NativeStackScreenProps<any, "WelcomeBack">;
+type Props = AuthScreenProps<"WelcomeBack">;
 
 interface SavedCreds {
-    username: string;
     deviceID: string;
     deviceKey: string;
     preKey?: string;
+    username: string;
 }
 
 export function WelcomeBackScreen({ navigation }: Props) {
-    const [creds, setCreds] = useState<SavedCreds | null>(null);
+    const [creds, setCreds] = useState<null | SavedCreds>(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        loadCredentials().then((c) => {
+        void loadCredentials().then((c) => {
             if (c) {
                 setCreds(c);
             } else {
@@ -38,6 +41,10 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 navigation.replace("Welcome");
             }
         });
+        // navigation reference is stable from the Stack.Navigator but the
+        // exhaustive-deps rule can't see that. Intentional empty deps —
+        // we only want to run the credential check once on mount.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function handleContinue() {
@@ -52,9 +59,9 @@ export function WelcomeBackScreen({ navigation }: Props) {
         try {
             navigation.navigate("HangTight");
 
-            const result = await autoLogin(
+            const result = await vexService.autoLogin(
                 keychainKeyStore,
-                expoPreset(),
+                mobileConfig(),
                 getServerOptions(),
             );
 
@@ -65,7 +72,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 return;
             }
             // Success — RootNavigator auto-switches to App when $user becomes non-null
-        } catch (err) {
+        } catch (err: unknown) {
             // Navigate back so the user sees the error instead of being stuck on HangTight
             if (navigation.canGoBack()) navigation.goBack();
             setError(err instanceof Error ? err.message : "Failed to sign in");
@@ -99,12 +106,11 @@ export function WelcomeBackScreen({ navigation }: Props) {
 
                 {/* User card */}
                 {creds ? (
-                    <CornerBracketBox size={10} color={colors.border}>
+                    <CornerBracketBox color={colors.border} size={10}>
                         <View style={styles.userCard}>
                             <View style={styles.avatar}>
                                 <Text style={styles.avatarText}>
-                                    {creds.username?.charAt(0).toUpperCase() ??
-                                        "?"}
+                                    {creds.username.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
                             <View style={styles.userInfo}>
@@ -126,12 +132,12 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 {/* Continue button */}
                 <View style={styles.buttonRow}>
                     <VexButton
-                        title="Continue"
-                        onPress={handleContinue}
-                        variant="outline"
-                        loading={loading}
                         disabled={!creds}
                         glow
+                        loading={loading}
+                        onPress={() => void handleContinue()}
+                        title="Continue"
+                        variant="outline"
                     />
                 </View>
             </View>
@@ -141,8 +147,8 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 <View style={styles.footerSection}>
                     <Text style={styles.footerLabel}>Not you?</Text>
                     <Text
+                        onPress={() => void handleSwitchAccount()}
                         style={styles.footerLink}
-                        onPress={handleSwitchAccount}
                     >
                         Sign in with a different account
                     </Text>
@@ -153,8 +159,10 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 <View style={styles.footerSection}>
                     <Text style={styles.footerLabel}>New here?</Text>
                     <Text
+                        onPress={() => {
+                            navigation.navigate("Initialize");
+                        }}
                         style={styles.footerLink}
-                        onPress={() => navigation.navigate("Initialize")}
                     >
                         Create an account
                     </Text>
@@ -165,24 +173,34 @@ export function WelcomeBackScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+    avatar: {
+        alignItems: "center",
+        backgroundColor: colors.accentDark,
+        height: 48,
+        justifyContent: "center",
+        width: 48,
+    },
+    avatarText: {
+        ...typography.headingSmall,
+        color: colors.text,
+        fontSize: 20,
+    },
+    buttonRow: {
+        alignItems: "center",
+    },
     content: {
         flex: 1,
-        justifyContent: "center",
         gap: 24,
+        justifyContent: "center",
     },
-    header: {
-        alignItems: "center",
-        gap: 8,
-    },
-    heading: {
-        ...typography.heading,
-        color: colors.text,
-        textAlign: "center",
-    },
-    subtitle: {
+    deviceId: {
         ...typography.body,
         color: colors.muted,
-        textAlign: "center",
+    },
+    divider: {
+        backgroundColor: colors.border,
+        height: 1,
+        width: 80,
     },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
@@ -194,54 +212,10 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.error,
     },
-    userCard: {
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 20,
-        backgroundColor: colors.surface,
-        gap: 16,
-    },
-    avatar: {
-        width: 48,
-        height: 48,
-        backgroundColor: colors.accentDark,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    avatarText: {
-        ...typography.headingSmall,
-        color: colors.text,
-        fontSize: 20,
-    },
-    userInfo: {
-        gap: 4,
-    },
-    handle: {
-        ...typography.button,
-        color: colors.text,
-        fontSize: 16,
-    },
-    deviceId: {
-        ...typography.body,
-        color: colors.muted,
-    },
-    buttonRow: {
-        alignItems: "center",
-    },
-    noCredsText: {
-        ...typography.body,
-        color: colors.muted,
-        textAlign: "center",
-        paddingVertical: 32,
-    },
     footer: {
         alignItems: "center",
         gap: 16,
         paddingBottom: 16,
-    },
-    footerSection: {
-        alignItems: "center",
-        gap: 4,
     },
     footerLabel: {
         ...typography.body,
@@ -251,9 +225,43 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.accent,
     },
-    divider: {
-        width: 80,
-        height: 1,
-        backgroundColor: colors.border,
+    footerSection: {
+        alignItems: "center",
+        gap: 4,
+    },
+    handle: {
+        ...typography.button,
+        color: colors.text,
+        fontSize: 16,
+    },
+    header: {
+        alignItems: "center",
+        gap: 8,
+    },
+    heading: {
+        ...typography.heading,
+        color: colors.text,
+        textAlign: "center",
+    },
+    noCredsText: {
+        ...typography.body,
+        color: colors.muted,
+        paddingVertical: 32,
+        textAlign: "center",
+    },
+    subtitle: {
+        ...typography.body,
+        color: colors.muted,
+        textAlign: "center",
+    },
+    userCard: {
+        alignItems: "center",
+        backgroundColor: colors.surface,
+        flexDirection: "row",
+        gap: 16,
+        padding: 20,
+    },
+    userInfo: {
+        gap: 4,
     },
 });

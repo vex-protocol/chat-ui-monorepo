@@ -1,35 +1,36 @@
+import type { AppScreenProps } from "../navigation/types";
+
 import React, { useState } from "react";
 import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
     Alert,
+    ScrollView,
     StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { useStore } from "@nanostores/react";
-import notifee, { AndroidImportance } from "@notifee/react-native";
-import { $user, $client } from "../store";
-import { resetAll } from "@vex-chat/store";
-import { clearCredentials } from "../lib/keychain";
-import { clearMessages } from "../lib/messages";
 
-export function SettingsScreen({ navigation }: { navigation: any }) {
+import { $user, vexService } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
+import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
+
+import { clearCredentials } from "../lib/keychain";
+
+export function SettingsScreen({
+    navigation: _navigation,
+}: AppScreenProps<"Settings">) {
     const user = useStore($user);
-    const client = useStore($client);
     const [loggingOut, setLoggingOut] = useState(false);
 
-    async function handleLogout() {
+    function handleLogout() {
         setLoggingOut(true);
-        // Don't call client.logout() — that invalidates the server session token.
-        // Just disconnect locally so autoLogin can reuse the saved token.
-        try {
-            client?.close();
-        } catch {
+        // Close connection + reset atoms so navigation redirects to auth.
+        // This does NOT invalidate the server session — autoLogin can reuse saved credentials.
+        void vexService.logout().catch(() => {
             /* ignore */
-        }
-        await clearMessages();
-        resetAll();
+        });
     }
 
     function handleClearKeys() {
@@ -37,29 +38,51 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             "Clear device keys",
             "This will permanently delete your device key from this device. You will need to re-register.",
             [
-                { text: "Cancel", style: "cancel" },
+                { style: "cancel", text: "Cancel" },
                 {
-                    text: "Clear keys",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await client?.logout();
-                        } catch {
-                            /* ignore */
-                        }
-                        await clearCredentials();
-                        await clearMessages();
-                        resetAll();
+                    onPress: () => {
+                        void (async () => {
+                            try {
+                                await vexService.logout();
+                            } catch {
+                                /* ignore */
+                            }
+                            await clearCredentials();
+                        })();
                     },
+                    style: "destructive",
+                    text: "Clear keys",
                 },
             ],
         );
     }
 
+    function handleSendTestNotification() {
+        void (async () => {
+            await Notifications.setNotificationChannelAsync("vex-messages", {
+                importance: AndroidImportance.HIGH,
+                name: "Messages",
+                sound: "default",
+            });
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    body: "This is a test notification from Vex.",
+                    data: {
+                        authorID: "test",
+                        username: "Test User",
+                    },
+                    sound: "default",
+                    title: "Test User",
+                },
+                trigger: { channelId: "vex-messages" },
+            });
+        })();
+    }
+
     return (
         <ScrollView
-            style={styles.container}
             contentContainerStyle={styles.content}
+            style={styles.container}
         >
             {/* Account section */}
             <View style={styles.section}>
@@ -73,7 +96,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                 <View style={styles.row}>
                     <Text style={styles.label}>User ID</Text>
                     <Text style={[styles.value, styles.mono]}>
-                        {user?.userID?.slice(0, 16) ?? "—"}…
+                        {user?.userID.slice(0, 16) ?? "—"}…
                     </Text>
                 </View>
             </View>
@@ -95,29 +118,8 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                         </Text>
                     </View>
                     <TouchableOpacity
+                        onPress={handleSendTestNotification}
                         style={styles.testBtn}
-                        onPress={async () => {
-                            await notifee.createChannel({
-                                id: "vex-messages",
-                                name: "Messages",
-                                importance: AndroidImportance.HIGH,
-                                sound: "default",
-                            });
-                            await notifee.displayNotification({
-                                title: "Test User",
-                                body: "This is a test notification from Vex.",
-                                data: {
-                                    authorID: "test",
-                                    username: "Test User",
-                                },
-                                android: {
-                                    channelId: "vex-messages",
-                                    pressAction: { id: "default" },
-                                    sound: "default",
-                                },
-                                ios: { sound: "default" },
-                            });
-                        }}
                     >
                         <Text style={styles.testBtnText}>Test</Text>
                     </TouchableOpacity>
@@ -136,9 +138,9 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                         </Text>
                     </View>
                     <TouchableOpacity
-                        style={styles.dangerBtn}
-                        onPress={handleLogout}
                         disabled={loggingOut}
+                        onPress={handleLogout}
+                        style={styles.dangerBtn}
                     >
                         <Text style={styles.dangerBtnText}>
                             {loggingOut ? "Signing out…" : "Sign out"}
@@ -154,8 +156,8 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                         </Text>
                     </View>
                     <TouchableOpacity
-                        style={styles.dangerBtn}
                         onPress={handleClearKeys}
+                        style={styles.dangerBtn}
                     >
                         <Text style={styles.dangerBtnText}>Clear keys</Text>
                     </TouchableOpacity>
@@ -166,86 +168,86 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#1a1a1a" },
-    content: { padding: 16, gap: 16 },
-    section: {
-        backgroundColor: "#141414",
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: "#2a2a2a",
-        overflow: "hidden",
-    },
-    dangerSection: {
-        borderColor: "rgba(229, 57, 53, 0.4)",
-    },
-    sectionTitle: {
-        fontSize: 11,
-        fontWeight: "700",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        color: "#666666",
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 6,
-        borderBottomWidth: 1,
-        borderBottomColor: "#2a2a2a",
-    },
-    row: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#2a2a2a",
-        gap: 12,
-    },
-    rowLast: {
-        borderBottomWidth: 0,
-    },
-    rowInfo: {
-        flex: 1,
-        gap: 2,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#e8e8e8",
-    },
-    desc: {
-        fontSize: 12,
-        color: "#666666",
-    },
-    value: {
-        fontSize: 13,
-        color: "#a0a0a0",
-    },
-    mono: {
-        fontFamily: "Courier",
-        fontSize: 12,
-    },
+    container: { backgroundColor: "#1a1a1a", flex: 1 },
+    content: { gap: 16, padding: 16 },
     dangerBtn: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
+        borderColor: "rgba(229, 57, 53, 0.5)",
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: "rgba(229, 57, 53, 0.5)",
+        paddingHorizontal: 14,
+        paddingVertical: 6,
     },
     dangerBtnText: {
         color: "#e53935",
         fontSize: 13,
         fontWeight: "600",
     },
+    dangerSection: {
+        borderColor: "rgba(229, 57, 53, 0.4)",
+    },
+    desc: {
+        color: "#666666",
+        fontSize: 12,
+    },
+    label: {
+        color: "#e8e8e8",
+        fontSize: 14,
+        fontWeight: "600",
+    },
+    mono: {
+        fontFamily: "Courier",
+        fontSize: 12,
+    },
+    row: {
+        alignItems: "center",
+        borderBottomColor: "#2a2a2a",
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    rowInfo: {
+        flex: 1,
+        gap: 2,
+    },
+    rowLast: {
+        borderBottomWidth: 0,
+    },
+    section: {
+        backgroundColor: "#141414",
+        borderColor: "#2a2a2a",
+        borderRadius: 8,
+        borderWidth: 1,
+        overflow: "hidden",
+    },
+    sectionTitle: {
+        borderBottomColor: "#2a2a2a",
+        borderBottomWidth: 1,
+        color: "#666666",
+        fontSize: 11,
+        fontWeight: "700",
+        letterSpacing: 0.5,
+        paddingBottom: 6,
+        paddingHorizontal: 16,
+        paddingTop: 10,
+        textTransform: "uppercase",
+    },
     testBtn: {
-        paddingHorizontal: 14,
-        paddingVertical: 6,
+        borderColor: "#3a3a3a",
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: "#3a3a3a",
+        paddingHorizontal: 14,
+        paddingVertical: 6,
     },
     testBtnText: {
         color: "#a0a0a0",
         fontSize: 13,
         fontWeight: "600",
+    },
+    value: {
+        color: "#a0a0a0",
+        fontSize: 13,
     },
 });

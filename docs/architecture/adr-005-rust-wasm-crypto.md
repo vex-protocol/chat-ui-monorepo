@@ -2,7 +2,7 @@
 
 **Status:** Exploration (draft)
 **Date:** 2026-04-05
-**Deciders:** @dgill
+**Deciders:** @dream
 **Related:** ADR-004 (sibling-repo migration, Phase A.5)
 
 ---

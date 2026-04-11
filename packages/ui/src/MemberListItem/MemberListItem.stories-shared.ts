@@ -1,30 +1,30 @@
 export const meta = {
-    title: "MemberListItem",
     argTypes: {
-        userID: { control: "text" },
-        username: { control: "text" },
         avatarSrc: { control: "text" },
         status: {
             control: "select",
             options: ["online", "away", "offline", "dnd"],
         },
+        userID: { control: "text" },
+        username: { control: "text" },
     },
+    title: "MemberListItem",
 };
 
 export const Online = {
-    args: { userID: "abc-123", username: "alice", status: "online" },
+    args: { status: "online", userID: "abc-123", username: "alice" },
 };
 export const Away = {
-    args: { userID: "def-456", username: "bob", status: "away" },
+    args: { status: "away", userID: "def-456", username: "bob" },
 };
 export const Offline = {
-    args: { userID: "ghi-789", username: "charlie", status: "offline" },
+    args: { status: "offline", userID: "ghi-789", username: "charlie" },
 };
 export const WithAvatar = {
     args: {
-        userID: "jkl-012",
-        username: "diana",
         avatarSrc: "https://i.pravatar.cc/48",
         status: "online",
+        userID: "jkl-012",
+        username: "diana",
     },
 };

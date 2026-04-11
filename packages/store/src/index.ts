@@ -1,74 +1,54 @@
-// Client singleton
-export { $client } from "./client.ts";
+// ── VexService (primary API for apps) ───────────────────────────────────────
 
-// Auth flows (register, login, auto-login — each creates Client + wires events + connects)
+export { parseInviteID, parseVexLink } from "./deeplink.ts";
+export type { VexLink } from "./deeplink.ts";
+
+// ── Domain atoms (readonly — apps can subscribe, not write) ─────────────────
+
 export {
-    registerAndBootstrap,
-    loginAndBootstrap,
-    autoLogin,
-} from "./bootstrap.ts";
-export type { ServerOptions, AuthResult } from "./bootstrap.ts";
-export { $keyReplaced } from "./key-replaced.ts";
+    $avatarHash,
+    $devices,
+    $familiars,
+    $keyReplaced,
+    $user,
+} from "./domains/identity.ts";
 
-// State atoms
-export { $user } from "./user.ts";
-export { $familiars } from "./familiars.ts";
-export { $messages, $groupMessages } from "./messages.ts";
-export { $servers } from "./servers.ts";
-export { $channels } from "./channels.ts";
-export { $permissions } from "./permissions.ts";
-export { $devices } from "./devices.ts";
-export { $onlineLists } from "./onlineLists.ts";
-export { $avatarHash } from "./avatarHash.ts";
 export {
-    $verifiedKeys,
-    markVerified,
-    unmarkVerified,
-    isVerified,
-} from "./verifiedKeys.ts";
+    $channelUnreadCounts,
+    $dmUnreadCounts,
+    $groupMessages,
+    $messages,
+    $totalChannelUnread,
+    $totalDmUnread,
+} from "./domains/messaging.ts";
 
-// Send DM
-export { sendDirectMessage } from "./send-dm.ts";
-export type { SendDMOptions, SendDMResult } from "./send-dm.ts";
+export {
+    $channels,
+    $onlineLists,
+    $permissions,
+    $servers,
+} from "./domains/servers.ts";
 
-// Send group message
-export { sendGroupMessage } from "./send-group-message.ts";
-export type {
-    SendGroupMessageOptions,
-    SendGroupMessageResult,
-} from "./send-group-message.ts";
+// ── Utilities (pure functions, no state) ────────────────────────────────────
 
-// Notification decisions
+export {
+    applyEmoji,
+    avatarHue,
+    chunkMessages,
+    formatFileSize,
+    formatTime,
+    isImageType,
+    parseFileExtra,
+} from "./message-utils.ts";
+export type { FileAttachment, MessageChunk } from "./message-utils.ts";
+
 export { shouldNotify } from "./notifications.ts";
 export type { NotificationPayload } from "./notifications.ts";
 
-// Unread counts
-export {
-    $dmUnreadCounts,
-    $channelUnreadCounts,
-    $totalDmUnread,
-    $totalChannelUnread,
-    incrementDmUnread,
-    incrementChannelUnread,
-    markRead,
-    resetAllUnread,
-} from "./unread.ts";
-
-// Message utilities
-export {
-    avatarHue,
-    chunkMessages,
-    parseFileExtra,
-    isImageType,
-    formatFileSize,
-    applyEmoji,
-    formatTime,
-} from "./message-utils.ts";
-export type { MessageChunk, FileAttachment } from "./message-utils.ts";
-
-// Deep link parsing
-export { parseVexLink, parseInviteID } from "./deeplink.ts";
-export type { VexLink } from "./deeplink.ts";
-
-// Reset
-export { resetAll } from "./reset.ts";
+export { vexService } from "./service.ts";
+export type {
+    AuthResult,
+    BootstrapConfig,
+    OperationResult,
+    ServerOptions,
+} from "./service.ts";
