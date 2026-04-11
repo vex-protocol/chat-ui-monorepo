@@ -34,7 +34,7 @@ export function getServerUrl(): string {
 
 function readOverride(): string | undefined {
     const raw = (
-        process.env.EXPO_PUBLIC_SERVER_URL as string | undefined
+        process.env["EXPO_PUBLIC_SERVER_URL"] as string | undefined
     )?.trim();
     return raw && raw.length > 0 ? raw : undefined;
 }

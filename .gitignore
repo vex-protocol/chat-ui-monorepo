@@ -11,6 +11,11 @@ AGENTS.md
 apps/mobile/ios/
 apps/mobile/android/
 
+# Per-app env overrides — only .env.example is committed
+.env
+.env.local
+.env.*.local
+
 # Dolt database files
 .dolt/
 *.db
