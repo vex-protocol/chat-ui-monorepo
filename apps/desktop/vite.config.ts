@@ -1,44 +1,44 @@
-import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { defineConfig } from "vite";
 
-const SPIRE_URL = process.env.VITE_SERVER_URL || "http://localhost:16777";
-const spire = { target: SPIRE_URL, changeOrigin: true } as const;
+const SPIRE_URL = process.env.VITE_SERVER_URL || "https://api.vex.wtf";
+const spire = { changeOrigin: true, target: SPIRE_URL } as const;
 
 // https://vite.dev/config/
 export default defineConfig({
+    build: {
+        // Don't minify for debug builds
+        minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
+        sourcemap: !!process.env.TAURI_ENV_DEBUG,
+        // Tauri supports es2021
+        target: "es2021",
+    },
+    // Hide native browser env APIs from Tauri frontend
+    envPrefix: ["VITE_", "TAURI_ENV_*"],
     plugins: [svelte()],
     // Tauri expects a fixed port and doesn't need the browser to open
     server: {
         port: 5180,
-        strictPort: true,
         // Proxy API requests to spire so the WebView never makes cross-origin HTTP requests
         proxy: {
-            "/token": spire,
-            "/register": spire,
             "/auth": spire,
-            "/whoami": spire,
-            "/goodbye": spire,
-            "/user": spire,
-            "/device": spire,
-            "/server": spire,
-            "/channel": spire,
-            "/file": spire,
             "/avatar": spire,
-            "/invite": spire,
-            "/emoji": spire,
-            "/permission": spire,
-            "/userList": spire,
+            "/channel": spire,
+            "/device": spire,
             "/deviceList": spire,
-            "/socket": { target: SPIRE_URL, changeOrigin: true, ws: true },
+            "/emoji": spire,
+            "/file": spire,
+            "/goodbye": spire,
+            "/invite": spire,
+            "/permission": spire,
+            "/register": spire,
+            "/server": spire,
+            "/socket": { changeOrigin: true, target: SPIRE_URL, ws: true },
+            "/token": spire,
+            "/user": spire,
+            "/userList": spire,
+            "/whoami": spire,
         },
-    },
-    // Hide native browser env APIs from Tauri frontend
-    envPrefix: ["VITE_", "TAURI_ENV_*"],
-    build: {
-        // Tauri supports es2021
-        target: "es2021",
-        // Don't minify for debug builds
-        minify: process.env.TAURI_ENV_DEBUG ? false : "esbuild",
-        sourcemap: !!process.env.TAURI_ENV_DEBUG,
+        strictPort: true,
     },
 });

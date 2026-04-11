@@ -259,7 +259,7 @@
                         class="settings-input"
                         type="url"
                         bind:value={serverUrl}
-                        placeholder="http://localhost:16777"
+                        placeholder="api.vex.wtf"
                     />
                     <button
                         class="settings-btn"
