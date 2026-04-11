@@ -130,10 +130,13 @@ const EMOJI: Record<string, string> = {
     zzz: "😴",
 };
 
-/** Replaces :shortcode: with emoji characters. */
+/** Replaces :shortcode: with emoji characters. Accepts word-char or
+ * leading `+`/`-` (so `:+1:` and `:-1:` work alongside `:thumbsup:`).
+ * Leading `-` is placed first in the character class so it's treated
+ * as a literal, not a range. */
 export function applyEmoji(text: string): string {
     return text.replace(
-        /:(\w[+\w-]*):/g,
+        /:([-+\w][-+\w]*):/g,
         (m, name: string) => EMOJI[name] ?? m,
     );
 }

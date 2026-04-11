@@ -297,18 +297,16 @@ describe("applyEmoji", () => {
         expect(applyEmoji("just regular text")).toBe("just regular text");
     });
 
-    // Current regex is `/:(\w[+\w-]*):/g` — requires the first char after
-    // `:` to be a word char. The EMOJI map has `+1` and `-1` entries
-    // (GitHub convention) but they're unreachable through the current
-    // regex. Documenting the actual behavior here; tracked as a source
-    // bug in vex-chat-6gm.20.
-    test(":+1: and :-1: are currently UNREACHABLE (regex bug)", () => {
-        expect(applyEmoji(":+1:")).toBe(":+1:");
-        expect(applyEmoji(":-1:")).toBe(":-1:");
-        // thumbsup / thumbsdown aliases work through the regex because
-        // they start with a word character.
+    test(":+1: and :-1: shortcodes (GitHub convention)", () => {
+        expect(applyEmoji(":+1:")).toBe("👍");
+        expect(applyEmoji(":-1:")).toBe("👎");
+        // Aliases still work.
         expect(applyEmoji(":thumbsup:")).toBe("👍");
         expect(applyEmoji(":thumbsdown:")).toBe("👎");
+    });
+
+    test("does not match empty shortcode `::`", () => {
+        expect(applyEmoji("::")).toBe("::");
     });
 });
 

@@ -108,4 +108,43 @@ export default [
             ],
         },
     },
+    // Svelte 5 + TypeScript 5.9.3 narrowing false positives. When we
+    // downgraded the catalog typescript from ^6.0.2 → ~5.9.3 (needed
+    // because Expo SDK 55 doesn't support TS 6), typescript-eslint's
+    // type narrowing through svelte-eslint-parser started reporting
+    // Svelte 5 runes types as more specific than they are. The rules
+    // below produce false positives ONLY on .svelte files — plain .ts
+    // files in apps/desktop (keystore.ts, config.ts, stores/theme.ts)
+    // still get the full check.
+    //
+    // Specific false positives observed:
+    //   - no-unnecessary-condition: $props() optional destructuring
+    //     (`let { onclick }: { onclick?: () => void } = $props()`)
+    //     reported as "always truthy"
+    //   - only-throw-error: plain `throw new Error("...")` reported
+    //     as "expected an error object to be thrown"
+    //   - no-unsafe-unary-minus: `tabindex={-1}` reported because the
+    //     literal `1` is narrowed to the literal type `1` instead of
+    //     `number`
+    //   - restrict-plus-operands: `"a" + "b"` where both are `string`
+    //     reported as invalid operand type
+    //   - no-meaningless-void-operator: `void stringVar` (used to
+    //     force Svelte reactive dep tracking) reported as meaningless
+    //
+    // Remove this override when either:
+    //   - apps/desktop moves to TS 6.0.2 (blocked on svelte-check TS 6
+    //     support; track upstream at sveltejs/svelte-check)
+    //   - svelte-eslint-parser fixes rune-type narrowing under TS 5.9
+    //
+    // Tracked in vex-chat-6gm.21.
+    {
+        files: ["**/*.svelte"],
+        rules: {
+            "@typescript-eslint/no-meaningless-void-operator": "off",
+            "@typescript-eslint/no-unnecessary-condition": "off",
+            "@typescript-eslint/no-unsafe-unary-minus": "off",
+            "@typescript-eslint/only-throw-error": "off",
+            "@typescript-eslint/restrict-plus-operands": "off",
+        },
+    },
 ];
