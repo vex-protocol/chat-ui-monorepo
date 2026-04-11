@@ -17,7 +17,7 @@
         "lint:fix": "pnpm -r --if-present lint:fix",
         "lint:pkg": "pnpm dlx npm-package-json-lint .",
         "license:check": "pnpm -r --if-present license:check",
-        "mobile": "pnpm -F mobile dev -- --dev-client",
+        "mobile": "pnpm -F mobile dev",
         "preinstall": "npx only-allow pnpm"
     },
     "packageManager": "pnpm@10.30.3",
