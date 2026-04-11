@@ -1,9 +1,9 @@
 export const meta = {
-    title: "SearchBar",
     argTypes: {
         placeholder: { control: "text" },
         value: { control: "text" },
     },
+    title: "SearchBar",
 };
 
 export const Default = { args: { placeholder: "Search users..." } };

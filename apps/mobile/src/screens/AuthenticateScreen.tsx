@@ -1,3 +1,5 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -5,7 +7,6 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Authenticate">;
@@ -22,7 +23,9 @@ export function AuthenticateScreen({ navigation: _navigation }: Props) {
         const timer = setInterval(() => {
             setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
         }, 1000);
-        return () => { clearInterval(timer); };
+        return () => {
+            clearInterval(timer);
+        };
     }, []);
 
     const minutes = Math.floor(secondsLeft / 60)
@@ -72,7 +75,9 @@ export function AuthenticateScreen({ navigation: _navigation }: Props) {
                     autoFocus
                     keyboardType="number-pad"
                     maxLength={CODE_LENGTH}
-                    onChangeText={(t) => { setCode(t.slice(0, CODE_LENGTH)); }}
+                    onChangeText={(t) => {
+                        setCode(t.slice(0, CODE_LENGTH));
+                    }}
                     ref={inputRef}
                     style={styles.hiddenInput}
                     value={code}

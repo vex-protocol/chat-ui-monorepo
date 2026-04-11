@@ -1,15 +1,15 @@
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
-
+import type { AppStackParamList } from "../navigation/types";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
 import { useNavigation } from "@react-navigation/native";
+import Svg, { Path } from "react-native-svg";
 
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexLogo } from "../components/VexLogo";
-import type { AppStackParamList } from "../navigation/types";
 import { colors, typography } from "../theme";
 
 interface ActionCardProps {
@@ -22,7 +22,10 @@ interface ActionCardProps {
 }
 
 export function OnboardingEmptyScreen() {
-    const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList, "OnboardingEmpty">>();
+    const navigation =
+        useNavigation<
+            NativeStackNavigationProp<AppStackParamList, "OnboardingEmpty">
+        >();
 
     return (
         <ScreenLayout>
@@ -76,7 +79,9 @@ export function OnboardingEmptyScreen() {
                     accentColor="#FFC107"
                     badge="JOIN"
                     icon={<JoinIcon color="#FFC107" />}
-                    onPress={() => navigation.navigate("JoinGroup")}
+                    onPress={() => {
+                        navigation.navigate("JoinGroup");
+                    }}
                     subtitle="Enter an invite code"
                     title="Join group"
                 />

@@ -1,11 +1,11 @@
 export const meta = {
-    title: "StatusDot",
     argTypes: {
         status: {
             control: "select",
             options: ["online", "away", "offline", "dnd"],
         },
     },
+    title: "StatusDot",
 };
 
 export const Online = { args: { status: "online" } };

@@ -1,3 +1,5 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -5,7 +7,6 @@ import { HourglassIcon } from "../components/HourglassIcon";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
-import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Welcome">;
@@ -38,12 +39,16 @@ export function WelcomeScreen({ navigation }: Props) {
                 <View style={styles.actions}>
                     <VexButton
                         glow
-                        onPress={() => { navigation.navigate("Initialize"); }}
+                        onPress={() => {
+                            navigation.navigate("Initialize");
+                        }}
                         title="Get Started"
                         variant="outline"
                     />
                     <Text
-                        onPress={() => { navigation.navigate("Login"); }}
+                        onPress={() => {
+                            navigation.navigate("Login");
+                        }}
                         style={styles.signInLink}
                     >
                         Sign in

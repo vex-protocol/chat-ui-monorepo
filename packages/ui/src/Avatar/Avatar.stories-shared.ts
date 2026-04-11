@@ -1,15 +1,15 @@
 export const meta = {
-    title: "Avatar",
     argTypes: {
-        size: { control: "select", options: ["xs", "sm", "md", "lg"] },
-        src: { control: "text" },
         alt: { control: "text" },
         initials: { control: "text" },
+        size: { control: "select", options: ["xs", "sm", "md", "lg"] },
+        src: { control: "text" },
     },
+    title: "Avatar",
 };
 
 export const WithImage = {
-    args: { src: "https://i.pravatar.cc/64", alt: "User", size: "md" },
+    args: { alt: "User", size: "md", src: "https://i.pravatar.cc/64" },
 };
 export const WithInitials = { args: { initials: "AB", size: "md" } };
 export const Small = { args: { initials: "AB", size: "sm" } };

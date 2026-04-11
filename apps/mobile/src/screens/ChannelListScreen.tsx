@@ -1,3 +1,4 @@
+import type { AppScreenProps } from "../navigation/types";
 import type { Channel } from "@vex-chat/libvex";
 
 import React from "react";
@@ -9,10 +10,9 @@ import {
     View,
 } from "react-native";
 
-import { useStore } from "@nanostores/react";
-
-import type { AppScreenProps } from "../navigation/types";
 import { $channels } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
 
 export function ChannelListScreen({
     navigation,
@@ -25,13 +25,13 @@ export function ChannelListScreen({
     function renderChannel({ item }: { item: Channel }) {
         return (
             <TouchableOpacity
-                onPress={() =>
+                onPress={() => {
                     navigation.navigate("Channel", {
                         channelID: item.channelID,
                         channelName: item.name,
                         serverID,
-                    })
-                }
+                    });
+                }}
                 style={styles.row}
             >
                 <Text style={styles.hash}>#</Text>

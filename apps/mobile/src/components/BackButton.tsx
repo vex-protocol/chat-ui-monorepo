@@ -18,7 +18,12 @@ export function BackButton({ onPress }: BackButtonProps) {
         <CornerBracketBox color={colors.border} size={6}>
             <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={onPress ?? (() => { navigation.goBack(); })}
+                onPress={
+                    onPress ??
+                    (() => {
+                        navigation.goBack();
+                    })
+                }
                 style={styles.button}
             >
                 <Text style={styles.arrow}>←</Text>

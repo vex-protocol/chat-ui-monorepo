@@ -1,14 +1,14 @@
 export const meta = {
-    title: "TextInput",
     argTypes: {
+        disabled: { control: "boolean" },
+        label: { control: "text" },
+        placeholder: { control: "text" },
         type: {
             control: "select",
             options: ["text", "password", "email", "search"],
         },
-        placeholder: { control: "text" },
-        label: { control: "text" },
-        disabled: { control: "boolean" },
     },
+    title: "TextInput",
 };
 
 export const Default = {
@@ -22,5 +22,5 @@ export const Password = {
     },
 };
 export const Disabled = {
-    args: { label: "Disabled", placeholder: "Cannot edit", disabled: true },
+    args: { disabled: true, label: "Disabled", placeholder: "Cannot edit" },
 };

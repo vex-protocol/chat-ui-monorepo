@@ -1,3 +1,5 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
@@ -5,14 +7,14 @@ import { AuthMethodCard } from "../components/AuthMethodCard";
 import { BackButton } from "../components/BackButton";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { SectionDivider } from "../components/SectionDivider";
-import type { AuthScreenProps } from "../navigation/types";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Initialize">;
 
 export function InitializeScreen({ navigation }: Props) {
-    const goFinalize = (method: string) =>
-        { navigation.navigate("Finalize", { method }); };
+    const goFinalize = (method: string) => {
+        navigation.navigate("Finalize", { method });
+    };
 
     return (
         <ScreenLayout>
@@ -31,7 +33,9 @@ export function InitializeScreen({ navigation }: Props) {
                     <AuthMethodCard
                         badge="3RD PARTY"
                         icon={<Text style={styles.icon}>G</Text>}
-                        onPress={() => { goFinalize("google"); }}
+                        onPress={() => {
+                            goFinalize("google");
+                        }}
                         privacyLabel="LOW PRIVACY"
                         privacyLevel={1}
                         title="Google"
@@ -39,7 +43,9 @@ export function InitializeScreen({ navigation }: Props) {
                     <AuthMethodCard
                         badge="3RD PARTY"
                         icon={<Text style={styles.icon}></Text>}
-                        onPress={() => { goFinalize("apple"); }}
+                        onPress={() => {
+                            goFinalize("apple");
+                        }}
                         privacyLabel="LOW PRIVACY"
                         privacyLevel={1}
                         title="Apple"
@@ -51,21 +57,27 @@ export function InitializeScreen({ navigation }: Props) {
                 <View style={styles.cards}>
                     <AuthMethodCard
                         icon={<Text style={styles.icon}>@</Text>}
-                        onPress={() => { goFinalize("email"); }}
+                        onPress={() => {
+                            goFinalize("email");
+                        }}
                         privacyLabel="STANDARD"
                         privacyLevel={2}
                         title="Email"
                     />
                     <AuthMethodCard
                         icon={<Text style={styles.icon}>◆</Text>}
-                        onPress={() => { goFinalize("wallet"); }}
+                        onPress={() => {
+                            goFinalize("wallet");
+                        }}
                         privacyLabel="HIGH PRIVACY"
                         privacyLevel={3}
                         title="Wallet Connect"
                     />
                     <AuthMethodCard
                         icon={<Text style={styles.icon}>⊕</Text>}
-                        onPress={() => { goFinalize("username"); }}
+                        onPress={() => {
+                            goFinalize("username");
+                        }}
                         privacyLabel="MAX PRIVACY"
                         privacyLevel={4}
                         title="Username"
@@ -73,7 +85,9 @@ export function InitializeScreen({ navigation }: Props) {
                 </View>
 
                 <Text
-                    onPress={() => { navigation.navigate("WelcomeBack"); }}
+                    onPress={() => {
+                        navigation.navigate("WelcomeBack");
+                    }}
                     style={styles.footer}
                 >
                     Already have an account? Log in

@@ -1,13 +1,14 @@
+import type { RootStackParamList } from "./types";
+
 import React from "react";
+
+import { $user } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import { $user } from "@vex-chat/store";
-
 import { AppTabs } from "./AppTabs";
 import { AuthStack } from "./AuthStack";
-import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 

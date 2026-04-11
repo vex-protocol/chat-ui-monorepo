@@ -88,12 +88,24 @@ export const appImportRestrictions = {
                         "Import from @vex-chat/libvex or @vex-chat/store instead. Direct type/crypto imports are for SDK internals only.",
                 },
                 {
-                    group: ["axios", "ky", "ofetch", "got", "node-fetch", "undici"],
+                    group: [
+                        "axios",
+                        "ky",
+                        "ofetch",
+                        "got",
+                        "node-fetch",
+                        "undici",
+                    ],
                     message:
                         "Direct HTTP clients are banned. Use @vex-chat/libvex Client methods for all server communication.",
                 },
                 {
-                    group: ["ws", "websocket", "sockjs-client", "socket.io-client"],
+                    group: [
+                        "ws",
+                        "websocket",
+                        "sockjs-client",
+                        "socket.io-client",
+                    ],
                     message:
                         "Direct WebSocket libraries are banned. The SDK manages WebSocket connections internally.",
                 },

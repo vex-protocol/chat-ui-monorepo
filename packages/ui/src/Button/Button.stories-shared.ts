@@ -1,27 +1,27 @@
 export const meta = {
-    title: "Button",
     argTypes: {
+        children: { control: "text" },
+        disabled: { control: "boolean" },
+        size: { control: "select", options: ["sm", "md", "lg"] },
         variant: {
             control: "select",
             options: ["primary", "secondary", "ghost"],
         },
-        size: { control: "select", options: ["sm", "md", "lg"] },
-        disabled: { control: "boolean" },
-        children: { control: "text" },
     },
+    title: "Button",
 };
 
-export const Primary = { args: { variant: "primary", children: "Click me" } };
+export const Primary = { args: { children: "Click me", variant: "primary" } };
 export const Secondary = {
-    args: { variant: "secondary", children: "Click me" },
+    args: { children: "Click me", variant: "secondary" },
 };
-export const Ghost = { args: { variant: "ghost", children: "Click me" } };
+export const Ghost = { args: { children: "Click me", variant: "ghost" } };
 export const Small = {
-    args: { variant: "primary", size: "sm", children: "Small" },
+    args: { children: "Small", size: "sm", variant: "primary" },
 };
 export const Large = {
-    args: { variant: "primary", size: "lg", children: "Large" },
+    args: { children: "Large", size: "lg", variant: "primary" },
 };
 export const Disabled = {
-    args: { variant: "primary", disabled: true, children: "Disabled" },
+    args: { children: "Disabled", disabled: true, variant: "primary" },
 };

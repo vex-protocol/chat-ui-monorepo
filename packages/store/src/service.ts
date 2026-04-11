@@ -514,13 +514,23 @@ class VexService {
         const client = this.requireClient();
         try {
             const servers = await client.servers.retrieve();
-            console.log("[vex-store] populateState: found", servers.length, "servers");
+            console.log(
+                "[vex-store] populateState: found",
+                servers.length,
+                "servers",
+            );
             for (const server of servers) {
                 $serversWritable.setKey(server.serverID, server);
                 const channels = await client.channels.retrieve(
                     server.serverID,
                 );
-                console.log("[vex-store] server", server.name, "has", channels.length, "channels");
+                console.log(
+                    "[vex-store] server",
+                    server.name,
+                    "has",
+                    channels.length,
+                    "channels",
+                );
                 $channelsWritable.setKey(server.serverID, channels);
 
                 for (const channel of channels) {
@@ -528,16 +538,31 @@ class VexService {
                         const msgs = await client.messages.retrieveGroup(
                             channel.channelID,
                         );
-                        console.log("[vex-store] channel", channel.name, "(", channel.channelID, ") has", msgs.length, "local messages");
+                        console.log(
+                            "[vex-store] channel",
+                            channel.name,
+                            "(",
+                            channel.channelID,
+                            ") has",
+                            msgs.length,
+                            "local messages",
+                        );
                         if (msgs.length > 0) {
-                            console.log("[vex-store] first msg:", JSON.stringify(msgs[0], null, 2));
+                            console.log(
+                                "[vex-store] first msg:",
+                                JSON.stringify(msgs[0], null, 2),
+                            );
                             $groupMessagesWritable.setKey(
                                 channel.channelID,
                                 deduplicateMessages(msgs),
                             );
                         }
                     } catch (e: unknown) {
-                        console.error("[vex-store] retrieveGroup failed for", channel.channelID, e);
+                        console.error(
+                            "[vex-store] retrieveGroup failed for",
+                            channel.channelID,
+                            e,
+                        );
                     }
                 }
             }
@@ -628,18 +653,28 @@ class VexService {
                 authorID: msg.authorID,
                 direction: msg.direction,
                 group: msg.group,
-                mailID: msg.mailID?.slice(0, 8),
-                message: msg.message?.slice(0, 50),
+                mailID: msg.mailID.slice(0, 8),
+                message: msg.message.slice(0, 50),
                 timestamp: msg.timestamp,
             });
             const me = $userWritable.get();
 
             if (msg.group) {
                 const prev = $groupMessagesWritable.get()[msg.group] ?? [];
-                console.log("[vex-store] group msg for channel", msg.group, "prev count:", prev.length, "dupe:", prev.some((m) => m.mailID === msg.mailID));
+                console.log(
+                    "[vex-store] group msg for channel",
+                    msg.group,
+                    "prev count:",
+                    prev.length,
+                    "dupe:",
+                    prev.some((m) => m.mailID === msg.mailID),
+                );
                 if (!prev.some((m) => m.mailID === msg.mailID)) {
                     $groupMessagesWritable.setKey(msg.group, [...prev, msg]);
-                    console.log("[vex-store] stored. new count:", $groupMessagesWritable.get()[msg.group]?.length);
+                    console.log(
+                        "[vex-store] stored. new count:",
+                        $groupMessagesWritable.get()[msg.group]?.length,
+                    );
                     if (me && msg.authorID !== me.userID) {
                         const count =
                             ($channelUnreadCountsWritable.get()[msg.group] ??

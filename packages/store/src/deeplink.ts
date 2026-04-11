@@ -4,9 +4,9 @@
  */
 
 export type VexLink =
-    | { inviteID: string; type: "invite"; }
-    | { raw: string; type: "unknown"; }
-    | { serverID: string; type: "server"; }
+    | { inviteID: string; type: "invite" }
+    | { raw: string; type: "unknown" }
+    | { serverID: string; type: "server" }
     | { type: "user"; userID: string };
 
 const UUID_RE =
