@@ -1,0 +1,34 @@
+# Generated build artefacts
+dist/
+docs/
+
+# Package manager / lockfiles
+pnpm-lock.yaml
+package-lock.json
+
+# Plain-text tool version pins (asdf / setup-node / mise)
+.tool-versions
+
+# Local-only Claude Code state
+.claude/settings.local.json
+
+# Agent/tool state
+.beads/
+
+# Tauri native build output
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# Expo / RN native build output
+apps/mobile/android/build/
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/ios/build/
+apps/mobile/ios/Pods/
+apps/mobile/.expo/
+
+# Mitosis compiled output
+packages/ui/output/
+
+# License checker failure reports
+license-error-*.md
