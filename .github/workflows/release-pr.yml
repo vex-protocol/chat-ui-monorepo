@@ -1,0 +1,231 @@
+name: Release PR
+
+# Maintains a rolling "chore: release mobile vX.Y.Z" PR against master.
+# On every push to master, Claude reads the diff since the last mobile-v*
+# tag, picks a semver bump, bumps apps/mobile/package.json, and writes
+# release notes into the PR body. Merging the PR triggers release-apk.yml
+# which builds the APK and creates the GitHub Release with those notes.
+#
+# Skipped when: the push is from the release bot (loop prevention),
+# there are no material changes since the last tag, or the commit
+# message contains [skip release].
+#
+# Secrets: ANTHROPIC_API_KEY. Optional: RELEASE_BOT_PAT (a fine-grained
+# PAT with contents:write + pull-requests:write; if unset, falls back to
+# GITHUB_TOKEN but CI won't trigger on the release PR because GITHUB_TOKEN
+# pushes don't fire workflows).
+
+on:
+    push:
+        branches: [master]
+    workflow_dispatch:
+
+concurrency:
+    group: release-pr
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+    pull-requests: read
+
+jobs:
+    maintain-release-pr:
+        if: >-
+            github.actor != 'github-actions[bot]' &&
+            !contains(github.event.head_commit.message, '[skip release]')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+            pull-requests: write
+            id-token: write
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.RELEASE_BOT_PAT || secrets.GITHUB_TOKEN }}
+
+            - uses: pnpm/action-setup@b307475762933b98ed359c036b0e51f26b63b74b # v5.0.0
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version-file: .tool-versions
+                  cache: pnpm
+
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+
+            - name: Configure git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - name: Detect release-worthy changes
+              id: changes
+              run: |
+                  PREV_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 2>/dev/null || echo '')
+                  echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+                  if [ -z "$PREV_TAG" ]; then
+                    echo "reason=first-release" >> $GITHUB_OUTPUT
+                    echo "changed=true" >> $GITHUB_OUTPUT
+                  elif ! git diff --quiet "$PREV_TAG" HEAD -- \
+                          apps/mobile packages/store packages/ui pnpm-workspace.yaml; then
+                    echo "reason=material-changes" >> $GITHUB_OUTPUT
+                    echo "changed=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "changed=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Reset release branch to master
+              if: steps.changes.outputs.changed == 'true'
+              run: git checkout -B release-mobile
+
+            - name: Generate release PR content with Claude
+              if: steps.changes.outputs.changed == 'true'
+              uses: anthropics/claude-code-action@21302532c2959a4f8f5e445004f617ef8b7b1dd7 # v1
+              env:
+                  PREV_TAG: ${{ steps.changes.outputs.prev_tag }}
+              with:
+                  anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+                  prompt: |
+                      You are the release engineer for vex-chat mobile. Prepare a
+                      "chore: release mobile vX.Y.Z" PR that bumps the mobile app's
+                      version and writes release notes.
+
+                      ## Step 1 — read the rules of engagement
+
+                      1. Read `AGENTS.md` for voice conventions.
+                      2. Read `apps/mobile/package.json` to get the CURRENT version.
+                      3. The previous release tag is in env var $PREV_TAG (empty
+                         string means this is the first release).
+
+                      ## Step 2 — read the changes since last release
+
+                      If $PREV_TAG is non-empty:
+
+                          git log "$PREV_TAG"..HEAD --format='%h %s%n%b%n---'
+                          git diff --stat "$PREV_TAG"...HEAD
+                          git diff --name-only "$PREV_TAG"...HEAD
+
+                      If $PREV_TAG is empty (first release):
+
+                          git log --format='%h %s%n%b%n---' -30
+                          git diff --stat HEAD~30 HEAD || true
+
+                      ## Step 3 — decide the version bump
+
+                      Rules for mobile semver:
+
+                      - **patch**: bug fixes, internal refactors, dep bumps with
+                        no user-visible impact.
+                      - **minor**: new user-visible features — new screens,
+                        flows, settings, expanded UI surface. Backward-compat.
+                      - **major**: breaking changes requiring migration — schema
+                        changes forcing re-login, removed flows, incompatible
+                        libvex protocol changes.
+
+                      Bias toward patch. Only go minor when there's a clearly
+                      user-visible addition. Only go major for known breakage.
+
+                      Changes confined to the following paths do NOT affect
+                      mobile and should not drive the bump alone:
+
+                      - apps/desktop/**
+                      - packages/eslint-config/**
+                      - .github/**, .tool-versions, tsconfig*, eslint.config.*,
+                        prettier configs, *.md, scripts/**
+
+                      Changes in apps/mobile, packages/store, packages/ui, and
+                      pnpm-workspace.yaml's libvex catalog entry DO affect mobile.
+
+                      ## Step 4 — compute the new version
+
+                      Read apps/mobile/package.json's current version. Apply the
+                      bump. Write the new version to `/tmp/new-version.txt` as
+                      just the bare string, e.g. `0.2.0`.
+
+                      If $PREV_TAG is empty and the current version already looks
+                      valid, keep it as-is for the first release — but still
+                      write it to /tmp/new-version.txt.
+
+                      ## Step 5 — update apps/mobile/package.json
+
+                      Read the file, modify ONLY the `version` field, write it
+                      back. Preserve all other fields and indentation (4 spaces).
+
+                      ## Step 6 — write release notes
+
+                      Write `/tmp/release-notes.md` with this structure (only
+                      include sections that have content):
+
+                          ## What's new
+
+                          ### Added
+                          - <user-facing bullet>
+
+                          ### Changed
+                          - <user-facing bullet>
+
+                          ### Fixed
+                          - <user-facing bullet>
+
+                      Bullet rules:
+
+                      - Lead with what the user can DO differently, not what
+                        changed internally. "Added typing indicators to DMs",
+                        not "Extracted TypingIndicator from Chat.svelte".
+                      - Skip infra/dep/CI chores. If there's truly nothing
+                        user-facing, write a single bullet: "Internal maintenance
+                        release (no user-facing changes)".
+                      - 1-5 bullets per section. No sub-bullets, no preamble,
+                        no thank-yous.
+
+                      ## Step 7 — commit the version bump
+
+                          git add apps/mobile/package.json
+                          git commit -m "chore: release mobile v$(cat /tmp/new-version.txt)"
+
+                      Do NOT push — the workflow handles that.
+                      Do NOT modify files other than apps/mobile/package.json,
+                      /tmp/new-version.txt, and /tmp/release-notes.md.
+
+                      ## Budget
+
+                      Under 15 tool calls. Read a handful of files, 2-3 git
+                      commands, 3 writes, 1 commit.
+                  claude_args: |
+                      --allowedTools "Bash(git log:*),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(ls:*),Bash(cat:*),Read,Write,Grep,Glob"
+
+            - name: Force-push release branch
+              if: steps.changes.outputs.changed == 'true'
+              run: git push origin +release-mobile
+
+            - name: Create or update release PR
+              if: steps.changes.outputs.changed == 'true'
+              env:
+                  GH_TOKEN: ${{ secrets.RELEASE_BOT_PAT || secrets.GITHUB_TOKEN }}
+              run: |
+                  VERSION=$(cat /tmp/new-version.txt)
+                  TITLE="chore: release mobile v${VERSION}"
+                  if gh pr view release-mobile --json number -q .number > /dev/null 2>&1; then
+                    gh pr edit release-mobile \
+                      --title "$TITLE" \
+                      --body-file /tmp/release-notes.md
+                  else
+                    gh pr create \
+                      --base master \
+                      --head release-mobile \
+                      --title "$TITLE" \
+                      --body-file /tmp/release-notes.md
+                  fi
+
+            - name: Close stale release PR when nothing to ship
+              if: steps.changes.outputs.changed == 'false'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  if gh pr view release-mobile --json number -q .number > /dev/null 2>&1; then
+                    gh pr close release-mobile --comment "Nothing to release — last tag is still current."
+                  fi
