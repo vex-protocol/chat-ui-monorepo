@@ -58,14 +58,20 @@ export default [
             "@typescript-eslint/no-misused-promises": "error",
             "@typescript-eslint/require-await": "error",
             "@typescript-eslint/restrict-template-expressions": "error",
-            "@typescript-eslint/no-unnecessary-condition": "error",
+            // TS 5.9.3 narrowing false positives. Same class of bug that
+            // forced the packages/store override and the apps/mobile
+            // override. Re-enable when the catalog moves to TS 6.0.2
+            // (tracked under vex-chat-6gm.21).
+            "@typescript-eslint/no-unnecessary-condition": "off",
             "@typescript-eslint/no-non-null-assertion": "error",
             "@typescript-eslint/no-confusing-void-expression": "off",
-            "@typescript-eslint/no-unsafe-unary-minus": "error",
+            // TS 5.9.3 narrowing false positives — see comment above.
+            "@typescript-eslint/no-unsafe-unary-minus": "off",
             "svelte/no-unused-svelte-ignore": "error",
             "svelte/no-at-html-tags": "error",
             "svelte/no-unused-props": "error",
-            "@typescript-eslint/restrict-plus-operands": "error",
+            // TS 5.9.3 narrowing false positives — see comment above.
+            "@typescript-eslint/restrict-plus-operands": "off",
             "@typescript-eslint/await-thenable": "error",
             "@typescript-eslint/only-throw-error": "error",
             "@typescript-eslint/no-unused-expressions": "error",

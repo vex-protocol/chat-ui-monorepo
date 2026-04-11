@@ -58,6 +58,14 @@ export function desktopConfig(): BootstrapConfig {
             );
             return storage;
         },
+        // navigator.platform is formally deprecated but the modern
+        // replacement (navigator.userAgentData.platform) is Chromium-
+        // only and missing on Safari/WebKit and all iOS browsers.
+        // Tauri's WebView is OS-specific so coverage gaps are real.
+        // Keeping .platform until there's a universally supported
+        // alternative — the value is purely informational for the
+        // device name surface.
+        // eslint-disable-next-line @typescript-eslint/no-deprecated
         deviceName: navigator.platform,
         logger,
     };
