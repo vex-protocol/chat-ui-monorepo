@@ -1,3 +1,5 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React, { useCallback, useRef, useState } from "react";
 import {
     ScrollView,
@@ -8,15 +10,15 @@ import {
     View,
 } from "react-native";
 
+import { vexService } from "@vex-chat/store";
+
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
-import { mobileConfig } from "../lib/platform";
 import { keychainKeyStore } from "../lib/keychain";
-import type { AuthScreenProps } from "../navigation/types";
-import { vexService } from "@vex-chat/store";
+import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Finalize">;
@@ -24,7 +26,7 @@ type Props = AuthScreenProps<"Finalize">;
 const AVATAR_PRESETS = ["🟥", "🔷", "🟢", "🟡", "🟣"] as const;
 
 export function FinalizeScreen({ navigation: _navigation, route }: Props) {
-    const method = route.params?.method ?? "username";
+    const method = route.params.method;
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
@@ -36,19 +38,15 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
 
     const checkAvailability = useCallback((name: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (!name || name.length < 3) {
+        if (name.length < 3) {
             setAvailable(null);
             return;
         }
-        debounceRef.current = setTimeout(async () => {
-            try {
-                // TODO: Client.checkUsername() was removed from the public API.
-                // For now, skip client-side availability checks; the server will
-                // reject duplicate usernames during registration.
-                setAvailable(null);
-            } catch {
-                setAvailable(null);
-            }
+        debounceRef.current = setTimeout(() => {
+            // TODO: Client.checkUsername() was removed from the public API.
+            // For now, skip client-side availability checks; the server will
+            // reject duplicate usernames during registration.
+            setAvailable(null);
         }, 400);
     }, []);
 
@@ -174,7 +172,9 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                         {AVATAR_PRESETS.map((emoji, i) => (
                             <TouchableOpacity
                                 key={i}
-                                onPress={() => { setSelectedAvatar(i); }}
+                                onPress={() => {
+                                    setSelectedAvatar(i);
+                                }}
                             >
                                 <CornerBracketBox
                                     color={
@@ -212,7 +212,7 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                     disabled={!username || !password || !confirm}
                     glow
                     loading={loading}
-                    onPress={handleComplete}
+                    onPress={() => void handleComplete()}
                     style={styles.completeBtn}
                     title="Complete Setup"
                 />

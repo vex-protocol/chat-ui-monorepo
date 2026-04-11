@@ -1,4 +1,5 @@
 import React from "react";
+
 import Svg, { Polygon } from "react-native-svg";
 
 import { colors } from "../theme";

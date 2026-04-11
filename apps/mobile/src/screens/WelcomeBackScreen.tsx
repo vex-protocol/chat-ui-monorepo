@@ -1,19 +1,21 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+
+import { vexService } from "@vex-chat/store";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
-import { mobileConfig } from "../lib/platform";
 import {
     clearCredentials,
     keychainKeyStore,
     loadCredentials,
 } from "../lib/keychain";
-import type { AuthScreenProps } from "../navigation/types";
-import { vexService } from "@vex-chat/store";
+import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"WelcomeBack">;
@@ -31,7 +33,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        loadCredentials().then((c) => {
+        void loadCredentials().then((c) => {
             if (c) {
                 setCreds(c);
             } else {
@@ -39,6 +41,10 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 navigation.replace("Welcome");
             }
         });
+        // navigation reference is stable from the Stack.Navigator but the
+        // exhaustive-deps rule can't see that. Intentional empty deps —
+        // we only want to run the credential check once on mount.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function handleContinue() {
@@ -104,8 +110,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
                         <View style={styles.userCard}>
                             <View style={styles.avatar}>
                                 <Text style={styles.avatarText}>
-                                    {creds.username?.charAt(0).toUpperCase() ??
-                                        "?"}
+                                    {creds.username.charAt(0).toUpperCase()}
                                 </Text>
                             </View>
                             <View style={styles.userInfo}>
@@ -130,7 +135,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
                         disabled={!creds}
                         glow
                         loading={loading}
-                        onPress={handleContinue}
+                        onPress={() => void handleContinue()}
                         title="Continue"
                         variant="outline"
                     />
@@ -142,7 +147,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 <View style={styles.footerSection}>
                     <Text style={styles.footerLabel}>Not you?</Text>
                     <Text
-                        onPress={handleSwitchAccount}
+                        onPress={() => void handleSwitchAccount()}
                         style={styles.footerLink}
                     >
                         Sign in with a different account
@@ -154,7 +159,9 @@ export function WelcomeBackScreen({ navigation }: Props) {
                 <View style={styles.footerSection}>
                     <Text style={styles.footerLabel}>New here?</Text>
                     <Text
-                        onPress={() => { navigation.navigate("Initialize"); }}
+                        onPress={() => {
+                            navigation.navigate("Initialize");
+                        }}
                         style={styles.footerLink}
                     >
                         Create an account

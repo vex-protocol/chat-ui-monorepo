@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { parseInviteID } from "@vex-chat/store";
+import { vexService } from "@vex-chat/store";
 
 import { useNavigation } from "@react-navigation/native";
 
@@ -9,7 +10,6 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import { vexService } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function JoinGroupScreen() {
@@ -87,7 +87,7 @@ export function JoinGroupScreen() {
                         disabled={!input.trim()}
                         glow
                         loading={loading}
-                        onPress={handleJoin}
+                        onPress={() => void handleJoin()}
                         title="Join"
                     />
                 </View>

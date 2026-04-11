@@ -1,3 +1,4 @@
+import type { AppScreenProps } from "../navigation/types";
 import type { User } from "@vex-chat/libvex";
 import type { Message } from "@vex-chat/libvex";
 
@@ -11,16 +12,12 @@ import {
     View,
 } from "react-native";
 
-import {
-    $dmUnreadCounts,
-    avatarHue,
-} from "@vex-chat/store";
+import { $dmUnreadCounts, avatarHue } from "@vex-chat/store";
+import { $familiars, $messages, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
-import type { AppScreenProps } from "../navigation/types";
-import { vexService, $familiars, $messages } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
@@ -35,25 +32,24 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 
     const familiarList = Object.values(familiars);
 
-    const onSearch = useCallback(
-        (text: string) => {
-            setQuery(text);
-            if (timerRef.current) clearTimeout(timerRef.current);
-            const q = text.trim();
-            if (!q) {
-                setResults([]);
-                return;
-            }
-            setSearching(true);
-            timerRef.current = setTimeout(async () => {
+    const onSearch = useCallback((text: string) => {
+        setQuery(text);
+        if (timerRef.current) clearTimeout(timerRef.current);
+        const q = text.trim();
+        if (!q) {
+            setResults([]);
+            return;
+        }
+        setSearching(true);
+        timerRef.current = setTimeout(() => {
+            void (async () => {
                 const user = await vexService.lookupUser(q);
                 const found = user ? [user] : [];
                 setResults(found);
                 setSearching(false);
-            }, 300);
-        },
-        [],
-    );
+            })();
+        }, 300);
+    }, []);
 
     function openConversation(user: User) {
         // Familiars atom is readonly; vexService will add the user to familiars
@@ -76,7 +72,9 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
         const unread = unreadCounts[item.userID] ?? 0;
         return (
             <TouchableOpacity
-                onPress={() => { openConversation(item); }}
+                onPress={() => {
+                    openConversation(item);
+                }}
                 style={styles.row}
             >
                 <View
@@ -113,7 +111,9 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
     function renderResult({ item }: { item: User }) {
         return (
             <TouchableOpacity
-                onPress={() => { openConversation(item); }}
+                onPress={() => {
+                    openConversation(item);
+                }}
                 style={styles.resultRow}
             >
                 <View

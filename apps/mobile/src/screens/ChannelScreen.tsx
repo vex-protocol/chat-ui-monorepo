@@ -1,3 +1,4 @@
+import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -7,16 +8,16 @@ import {
     Platform,
     StyleSheet,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { $groupMessages, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
-import type { AppScreenProps } from "../navigation/types";
-import { vexService, $groupMessages, $user } from "@vex-chat/store";
 import { colors } from "../theme";
 
 export function ChannelScreen({
@@ -71,7 +72,10 @@ export function ChannelScreen({
         setSendError("");
         setText("");
         try {
-            const result = await vexService.sendGroupMessage(channelID, content);
+            const result = await vexService.sendGroupMessage(
+                channelID,
+                content,
+            );
             if (!result.ok) {
                 setSendError(result.error ?? "Failed to send");
             }
@@ -104,7 +108,9 @@ export function ChannelScreen({
             style={styles.container}
         >
             <ChatHeader
-                onBack={() => navigation.navigate("ChannelList", { serverID })}
+                onBack={() => {
+                    navigation.navigate("ChannelList", { serverID });
+                }}
                 title={`# ${channelName}`}
             />
 
@@ -118,7 +124,7 @@ export function ChannelScreen({
 
             <MessageInputBar
                 onChangeText={setText}
-                onSend={sendMessage}
+                onSend={() => void sendMessage()}
                 placeholder={`Message #${channelName}`}
                 sending={sending}
                 value={text}

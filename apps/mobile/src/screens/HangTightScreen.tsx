@@ -1,16 +1,29 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+
+import { $user } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
 import { ScreenLayout } from "../components/ScreenLayout";
-import { $user } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function HangTightScreen() {
     const _user = useStore($user);
-    const spin = useRef(new Animated.Value(0)).current;
-    const pulse = useRef(new Animated.Value(1)).current;
+    // Use useMemo instead of useRef(...).current so the eslint
+    // react-hooks/refs rule is satisfied (it flags accessing .current
+    // during render). Animated.Value is stable across renders so
+    // useMemo with an empty dep array is equivalent in behavior.
+    const spin = useMemo(() => new Animated.Value(0), []);
+    const pulse = useMemo(() => new Animated.Value(1), []);
+    const rotation = useMemo(
+        () =>
+            spin.interpolate({
+                inputRange: [0, 1],
+                outputRange: ["0deg", "360deg"],
+            }),
+        [spin],
+    );
 
     useEffect(() => {
         Animated.loop(
@@ -40,11 +53,6 @@ export function HangTightScreen() {
 
     // Auto-transition handled by RootNavigator when $user becomes non-null
     // This screen is just a visual holding state
-
-    const rotation = spin.interpolate({
-        inputRange: [0, 1],
-        outputRange: ["0deg", "360deg"],
-    });
 
     return (
         <ScreenLayout>

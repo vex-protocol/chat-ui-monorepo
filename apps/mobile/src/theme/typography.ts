@@ -1,15 +1,19 @@
 import { Platform, type TextStyle } from "react-native";
 
 export const fontFamilies = {
-    body: Platform.select({ android: "Inter-Medium", ios: "Inter-Medium" })!,
-    heading: Platform.select({
-        android: "SpaceGrotesk-Medium",
-        ios: "SpaceGrotesk-Medium",
-    })!,
-    mono: Platform.select({
-        android: "ChivoMono-Light",
-        ios: "ChivoMono-Light",
-    })!,
+    body:
+        Platform.select({ android: "Inter-Medium", ios: "Inter-Medium" }) ??
+        "Inter-Medium",
+    heading:
+        Platform.select({
+            android: "SpaceGrotesk-Medium",
+            ios: "SpaceGrotesk-Medium",
+        }) ?? "SpaceGrotesk-Medium",
+    mono:
+        Platform.select({
+            android: "ChivoMono-Light",
+            ios: "ChivoMono-Light",
+        }) ?? "ChivoMono-Light",
 } as const;
 
 export const typography = {

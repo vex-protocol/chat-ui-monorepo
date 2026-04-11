@@ -1,9 +1,13 @@
+import type { AppStackParamList } from "./types";
+
 import React, { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { $channels, $familiars, $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ServerSidebar } from "../components/ServerSidebar";
 import { AddServerScreen } from "../screens/AddServerScreen";
@@ -14,11 +18,9 @@ import { DMListScreen } from "../screens/DMListScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
-import { $channels, $familiars, $servers } from "@vex-chat/store";
 import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";
-import type { AppStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
@@ -67,9 +69,9 @@ export function AppTabs() {
                 onSelectServer={(id) => {
                     setActiveServerId(id);
                     const serverChannels = channels[id] ?? [];
-                    if (serverChannels.length > 0) {
+                    const ch = serverChannels[0];
+                    if (ch) {
                         // Go directly to the first channel
-                        const ch = serverChannels[0]!;
                         navigationRef.navigate("App", {
                             params: {
                                 channelID: ch.channelID,
@@ -98,7 +100,11 @@ export function AppTabs() {
     );
 }
 
-function ContentStack({ initialRoute }: { initialRoute: keyof AppStackParamList }) {
+function ContentStack({
+    initialRoute,
+}: {
+    initialRoute: keyof AppStackParamList;
+}) {
     return (
         <Stack.Navigator
             initialRouteName={initialRoute}

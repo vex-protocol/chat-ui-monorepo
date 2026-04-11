@@ -1,3 +1,5 @@
+import type { AuthScreenProps } from "../navigation/types";
+
 import React, { useState } from "react";
 import {
     ActivityIndicator,
@@ -10,11 +12,11 @@ import {
     View,
 } from "react-native";
 
-import { getServerOptions } from "../lib/config";
-import { mobileConfig } from "../lib/platform";
-import { keychainKeyStore } from "../lib/keychain";
-import type { AuthScreenProps } from "../navigation/types";
 import { vexService } from "@vex-chat/store";
+
+import { getServerOptions } from "../lib/config";
+import { keychainKeyStore } from "../lib/keychain";
+import { mobileConfig } from "../lib/platform";
 
 export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     const [username, setUsername] = useState("");
@@ -67,7 +69,9 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                         autoCapitalize="none"
                         autoCorrect={false}
                         editable={!loading}
-                        onChange={(e) => { setUsername(e.nativeEvent.text); }}
+                        onChange={(e) => {
+                            setUsername(e.nativeEvent.text);
+                        }}
                         onChangeText={setUsername}
                         placeholder="your username"
                         placeholderTextColor="#666666"
@@ -80,7 +84,9 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                     <Text style={styles.label}>PASSWORD</Text>
                     <TextInput
                         editable={!loading}
-                        onChange={(e) => { setPassword(e.nativeEvent.text); }}
+                        onChange={(e) => {
+                            setPassword(e.nativeEvent.text);
+                        }}
                         onChangeText={setPassword}
                         placeholder="••••••••"
                         placeholderTextColor="#666666"
@@ -92,7 +98,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
 
                 <TouchableOpacity
                     disabled={loading || !username || !password}
-                    onPress={handleLogin}
+                    onPress={() => void handleLogin()}
                     style={[styles.button, loading && styles.buttonDisabled]}
                 >
                     {loading ? (
@@ -107,7 +113,9 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                         Don't have an account?{" "}
                     </Text>
                     <TouchableOpacity
-                        onPress={() => navigation.navigate("Initialize")}
+                        onPress={() => {
+                            navigation.navigate("Initialize");
+                        }}
                     >
                         <Text style={styles.link}>Create account</Text>
                     </TouchableOpacity>

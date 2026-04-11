@@ -1,3 +1,4 @@
+import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,14 +11,14 @@ import {
     View,
 } from "react-native";
 
+import { $messages, $user, vexService } from "@vex-chat/store";
+
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
-import type { AppScreenProps } from "../navigation/types";
-import { vexService, $messages, $user } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function ConversationScreen({
@@ -87,7 +88,9 @@ export function ConversationScreen({
             style={styles.container}
         >
             <ChatHeader
-                onBack={() => navigation.goBack()}
+                onBack={() => {
+                    navigation.goBack();
+                }}
                 subtitle={`@${username}`}
                 title="Home"
             />
@@ -117,7 +120,7 @@ export function ConversationScreen({
 
             <MessageInputBar
                 onChangeText={setText}
-                onSend={sendMessage}
+                onSend={() => void sendMessage()}
                 placeholder={`Message @${username}`}
                 sending={sending}
                 value={text}

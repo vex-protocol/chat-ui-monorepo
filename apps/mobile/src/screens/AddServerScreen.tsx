@@ -1,9 +1,11 @@
+import type { AppStackParamList } from "../navigation/types";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
 import React, { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
 import { parseInviteID } from "@vex-chat/store";
-
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { vexService } from "@vex-chat/store";
 
 import { useNavigation } from "@react-navigation/native";
 
@@ -11,12 +13,13 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
-import type { AppStackParamList } from "../navigation/types";
-import { vexService } from "@vex-chat/store";
 import { colors, typography } from "../theme";
 
 export function AddServerScreen() {
-    const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList, "AddServer">>();
+    const navigation =
+        useNavigation<
+            NativeStackNavigationProp<AppStackParamList, "AddServer">
+        >();
     const [mode, setMode] = useState<"create" | "join" | "pick">("pick");
     const [name, setName] = useState("");
     const [inviteInput, setInviteInput] = useState("");
@@ -81,11 +84,15 @@ export function AddServerScreen() {
                     <View style={styles.options}>
                         <VexButton
                             glow
-                            onPress={() => { setMode("create"); }}
+                            onPress={() => {
+                                setMode("create");
+                            }}
                             title="Create a server"
                         />
                         <VexButton
-                            onPress={() => { setMode("join"); }}
+                            onPress={() => {
+                                setMode("join");
+                            }}
                             title="Join via invite"
                             variant="outline"
                         />
@@ -142,7 +149,7 @@ export function AddServerScreen() {
                             disabled={!name.trim()}
                             glow
                             loading={loading}
-                            onPress={handleCreate}
+                            onPress={() => void handleCreate()}
                             title="Create"
                         />
                     </View>
@@ -198,7 +205,7 @@ export function AddServerScreen() {
                         disabled={!inviteInput.trim()}
                         glow
                         loading={loading}
-                        onPress={handleJoin}
+                        onPress={() => void handleJoin()}
                         title="Join"
                     />
                 </View>

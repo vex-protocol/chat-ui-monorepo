@@ -9,11 +9,11 @@ import {
 } from "react-native";
 
 import { $totalDmUnread } from "@vex-chat/store";
+import { $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
-const vexLogo = require("../assets/images/vex-logo.png");
-import { $servers } from "@vex-chat/store";
+import vexLogo from "../assets/images/vex-logo.png";
 import { colors } from "../theme";
 
 interface ServerSidebarProps {
@@ -65,14 +65,16 @@ export function ServerSidebar({
                     return (
                         <TouchableOpacity
                             key={server.serverID}
-                            onPress={() => { onSelectServer(server.serverID); }}
+                            onPress={() => {
+                                onSelectServer(server.serverID);
+                            }}
                             style={[
                                 styles.serverBtn,
                                 active && styles.serverBtnActive,
                             ]}
                         >
                             <Text style={styles.serverInitial}>
-                                {(server.name ?? "S").charAt(0).toUpperCase()}
+                                {server.name.charAt(0).toUpperCase()}
                             </Text>
                         </TouchableOpacity>
                     );
