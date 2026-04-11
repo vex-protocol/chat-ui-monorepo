@@ -13,7 +13,8 @@
     "format:check": "prettier --check .",
     "lint": "pnpm -r --if-present lint",
     "lint:fix": "pnpm -r --if-present lint:fix",
-    "preinstall": "npx only-allow pnpm"
+    "preinstall": "npx only-allow pnpm",
+    "mobile": "pnpm -F mobile dev -- --dev-client"
   },
   "packageManager": "pnpm@10.30.3",
   "lint-staged": {

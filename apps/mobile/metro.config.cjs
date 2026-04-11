@@ -4,12 +4,14 @@ const { getDefaultConfig } = require('expo/metro-config')
 const projectRoot = __dirname
 const monorepoRoot = path.resolve(projectRoot, '../..')
 
-// Sibling repos linked via pnpm workspace (outside the monorepo root)
-const siblingRepos = [
-  path.resolve(monorepoRoot, '../libvex-js'),
-  path.resolve(monorepoRoot, '../crypto-js'),
-  path.resolve(monorepoRoot, '../types-js'),
-]
+// Sibling repos linked via pnpm workspace (outside the monorepo root).
+// Commented out locally because these directories do not exist on this machine.
+// const siblingRepos = [
+//   path.resolve(monorepoRoot, '../libvex-js'),
+//   path.resolve(monorepoRoot, '../crypto-js'),
+//   path.resolve(monorepoRoot, '../types-js'),
+// ]
+const siblingRepos = []
 
 const config = getDefaultConfig(projectRoot)
 
