@@ -34,9 +34,7 @@ module.exports = ({ config }) => {
         },
         android: {
             ...config.android,
-            package: devMode
-                ? "chat.vex.mobile.dev"
-                : config.android?.package,
+            package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
         },
         updates: devMode
             ? {

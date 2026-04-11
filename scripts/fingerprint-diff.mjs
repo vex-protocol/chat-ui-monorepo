@@ -33,9 +33,7 @@ const REBUILD_REASONS = new Set([
 const [, , currentPath, prevPath] = process.argv;
 
 if (!currentPath) {
-    console.error(
-        "usage: fingerprint-diff.mjs <current.json> [<prev.json>]",
-    );
+    console.error("usage: fingerprint-diff.mjs <current.json> [<prev.json>]");
     process.exit(2);
 }
 
@@ -43,7 +41,9 @@ let current;
 try {
     current = JSON.parse(readFileSync(currentPath, "utf8"));
 } catch (err) {
-    console.error(`Could not read current fingerprint at ${currentPath}: ${err.message}`);
+    console.error(
+        `Could not read current fingerprint at ${currentPath}: ${err.message}`,
+    );
     process.exit(2);
 }
 
@@ -57,7 +57,9 @@ let prev;
 try {
     prev = JSON.parse(readFileSync(prevPath, "utf8"));
 } catch (err) {
-    console.error(`Could not read prev fingerprint at ${prevPath}: ${err.message}`);
+    console.error(
+        `Could not read prev fingerprint at ${prevPath}: ${err.message}`,
+    );
     console.log("build");
     process.exit(0);
 }
@@ -94,9 +96,7 @@ const relevant = [...changedReasons].filter((r) => REBUILD_REASONS.has(r));
 console.error(
     `All changed reasons: ${[...changedReasons].join(", ") || "(none)"}`,
 );
-console.error(
-    `Relevant rebuild reasons: ${relevant.join(", ") || "(none)"}`,
-);
+console.error(`Relevant rebuild reasons: ${relevant.join(", ") || "(none)"}`);
 
 console.log(relevant.length > 0 ? "build" : "ota");
 
@@ -111,6 +111,7 @@ function sourceId(src) {
     // the stable identity field. Type is always present.
     if (src.filePath) return `${src.type}:${src.filePath}`;
     if (src.dir) return `${src.type}:${src.dir}`;
-    if (src.contents) return `${src.type}:contents:${src.contents.slice(0, 128)}`;
+    if (src.contents)
+        return `${src.type}:contents:${src.contents.slice(0, 128)}`;
     return `${src.type}:${JSON.stringify(src).slice(0, 128)}`;
 }
