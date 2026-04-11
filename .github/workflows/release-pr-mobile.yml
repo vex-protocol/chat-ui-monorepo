@@ -296,15 +296,15 @@ jobs:
                       writing the file.
 
                       <budget>
-                      Keep under 30 tool calls total. Expect: 1 package.json
+                      Keep under 50 tool calls total. Expect: 1 package.json
                       read, 3-4 git commands, 1 `gh api commits/<sha>/pulls`
-                      call per user-facing commit (typically 5-15), 0 file
+                      call per user-facing commit (typically 5-20), 0 file
                       writes, 0 commits. Don't explore the repo beyond what's
                       needed to bucket the diff and resolve PR numbers.
                       </budget>
                   claude_args: |
                       --model claude-sonnet-4-6
-                      --max-turns 30
+                      --max-turns 50
                       --json-schema '{"type":"object","required":["bump_type","new_version","release_notes"],"properties":{"bump_type":{"type":"string","enum":["patch","minor","major"]},"current_version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},"new_version":{"type":"string","pattern":"^\\d+\\.\\d+\\.\\d+$"},"release_notes":{"type":"string","minLength":1}}}'
                       --allowedTools "Bash(git log:*),Bash(git diff:*),Bash(gh api:*),Bash(gh pr list:*),Read,Grep,Glob"
 
