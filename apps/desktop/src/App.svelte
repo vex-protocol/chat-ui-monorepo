@@ -24,6 +24,7 @@
     import Settings from "./routes/Settings.svelte";
 
     const routes = new Map([
+        ["*", Launch],
         ["/", Launch],
         ["/home", Home],
         ["/launch", Launch],
@@ -32,7 +33,6 @@
         ["/register", Register],
         ["/server/:serverID/:channelID", ServerChannel],
         ["/settings", Settings],
-        ["*", Launch],
     ]);
 
     // Auth routes show no sidebars
@@ -59,7 +59,7 @@
     // Handle key replaced — server rotated our key; force re-login
     $effect(() => {
         if ($keyReplaced) {
-            push("/login");
+            void push("/login");
         }
     });
 
@@ -98,7 +98,7 @@
     // Register vex:// deep-link handler
     $effect(() => {
         let unsub: (() => void) | undefined;
-        setupDeepLinks().then((fn) => {
+        void setupDeepLinks().then((fn) => {
             unsub = fn;
         });
         return () => {
@@ -111,7 +111,7 @@
         if (activeServerID && !activeChannelID) {
             const first = activeChannels[0];
             if (first) {
-                push(`/server/${activeServerID}/${first.channelID}`);
+                void push(`/server/${activeServerID}/${first.channelID}`);
             }
         }
     });

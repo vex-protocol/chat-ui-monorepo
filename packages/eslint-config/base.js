@@ -29,6 +29,17 @@ export const base = tseslint.config(
             ],
             "@typescript-eslint/consistent-type-exports": "error",
 
+            // Allow number interpolation in template literals. Strict default
+            // is overly hostile to idiomatic CSS pixel/size generation
+            // (`${px}px`), timing strings (`${ms}ms`), and general
+            // format-string usage. Nullish interpolation (`${maybe}` where
+            // maybe is string|undefined) is still caught and must be
+            // handled with `?? ''` or narrowing.
+            "@typescript-eslint/restrict-template-expressions": [
+                "error",
+                { allowNumber: true },
+            ],
+
             "perfectionist/sort-imports": [
                 "error",
                 {

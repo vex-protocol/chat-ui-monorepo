@@ -23,7 +23,7 @@
     } = $props();
 
     function navToChannel(channelID: string): void {
-        push(`/server/${serverID}/${channelID}`);
+        void push(`/server/${serverID ?? ""}/${channelID}`);
     }
 
     // ── Server menu ───────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@
         confirmDelete = false;
         menuOpen = false;
         deleting = false;
-        push(dest);
+        void push(dest);
     }
 
     // ── Add channel ─────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@
             const newChan = updatedChannels[updatedChannels.length - 1];
             addingChannel = false;
             newChannelName = "";
-            if (newChan) push(`/server/${serverID}/${newChan.channelID}`);
+            if (newChan) void push(`/server/${serverID}/${newChan.channelID}`);
         } catch (err: unknown) {
             addingError = err instanceof Error ? err.message : "Failed";
         }
@@ -184,7 +184,6 @@
     </div>
 
     {#if menuOpen}
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
         <div
             class="channel-bar__backdrop"
             role="presentation"

@@ -80,32 +80,34 @@ const LS_PREFIX = "vex-ks-";
 const LS_ACTIVE = "vex-active-user";
 
 class LocalStorageKeyStore implements KeyStore {
-    async clear(username: string): Promise<void> {
+    clear(username: string): Promise<void> {
         localStorage.removeItem(LS_PREFIX + username);
         if (localStorage.getItem(LS_ACTIVE) === username) {
             localStorage.removeItem(LS_ACTIVE);
         }
+        return Promise.resolve();
     }
 
-    async load(username?: string): Promise<null | StoredCredentials> {
+    load(username?: string): Promise<null | StoredCredentials> {
         const user = username ?? localStorage.getItem(LS_ACTIVE);
-        if (!user) return null;
+        if (!user) return Promise.resolve(null);
         const raw = localStorage.getItem(LS_PREFIX + user);
-        if (!raw) return null;
+        if (!raw) return Promise.resolve(null);
         try {
-            return JSON.parse(raw) as StoredCredentials;
+            return Promise.resolve(JSON.parse(raw) as StoredCredentials);
         } catch {
-            return null;
+            return Promise.resolve(null);
         }
     }
 
-    async loadActive(): Promise<null | StoredCredentials> {
+    loadActive(): Promise<null | StoredCredentials> {
         return this.load();
     }
 
-    async save(creds: StoredCredentials): Promise<void> {
+    save(creds: StoredCredentials): Promise<void> {
         localStorage.setItem(LS_PREFIX + creds.username, JSON.stringify(creds));
         localStorage.setItem(LS_ACTIVE, creds.username);
+        return Promise.resolve();
     }
 }
 

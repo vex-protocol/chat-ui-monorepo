@@ -1,6 +1,6 @@
 <script lang="ts">
     import { onMount, tick } from "svelte";
-    import { push, replace } from "svelte-spa-router";
+    import { push } from "svelte-spa-router";
 
     import { getServerOptions } from "../lib/config.js";
     import { keyStore } from "../lib/keystore.js";
@@ -29,25 +29,37 @@
 
                 if (!result.ok) {
                     await tick();
-                    push("/login");
+                    void push("/login");
                     return;
                 }
 
                 const u = user.get();
                 if (!u) {
                     await tick();
-                    push("/login");
+                    void push("/login");
                     return;
                 }
 
                 const serverList = Object.values(serversAtom.get());
-                console.log("[launch] servers:", serverList.length, "user:", u.username);
+                console.log(
+                    "[launch] servers:",
+                    serverList.length,
+                    "user:",
+                    u.username,
+                );
                 if (serverList.length > 0) {
-                    const sid = serverList[0]!.serverID;
+                    const firstServer = serverList[0];
+                    if (!firstServer) {
+                        await tick();
+                        window.location.hash = "#/home";
+                        return;
+                    }
+                    const sid = firstServer.serverID;
                     const chs = channelsAtom.get()[sid] ?? [];
                     console.log("[launch] channels for", sid, ":", chs.length);
-                    if (chs.length > 0) {
-                        const target = `/server/${sid}/${chs[0]!.channelID}`;
+                    const firstChannel = chs[0];
+                    if (firstChannel) {
+                        const target = `/server/${sid}/${firstChannel.channelID}`;
                         console.log("[launch] navigating to", target);
                         await tick();
                         window.location.hash = `#${target}`;
@@ -63,7 +75,7 @@
                 }
             } catch {
                 await tick();
-                push("/login");
+                void push("/login");
             }
         })();
     });

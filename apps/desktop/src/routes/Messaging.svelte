@@ -28,7 +28,7 @@
     $effect(() => {
         if (!targetUserID) return;
         // TODO: fetchKeyBundle and getFingerprint not yet exposed in public API
-        targetUserID;
+        void targetUserID;
     });
 
     // TODO: verified key UI removed — needs secure storage re-implementation

@@ -25,12 +25,12 @@
         // VexService.logout() resets all state internally.
         // SQLite storage is per-device-key; no manual clear needed on logout
         clearSession();
-        push("/login");
+        void push("/login");
     }
 
     function openSettings(): void {
         menuOpen = false;
-        push("/settings");
+        void push("/settings");
     }
 </script>
 
@@ -93,7 +93,6 @@
 </div>
 
 {#if menuOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
         class="user-menu__backdrop"
         role="presentation"

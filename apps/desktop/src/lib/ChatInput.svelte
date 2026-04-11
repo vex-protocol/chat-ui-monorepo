@@ -19,7 +19,7 @@
         if (!textareaEl) return;
         textareaEl.style.height = "auto";
         // 6 rows x 24px line-height = 144px max
-        textareaEl.style.height = Math.min(textareaEl.scrollHeight, 144) + "px";
+        textareaEl.style.height = `${Math.min(textareaEl.scrollHeight, 144)}px`;
     }
 
     function handleKeyDown(e: KeyboardEvent): void {
@@ -61,9 +61,9 @@
     }
 
     function formatSize(bytes: number): string {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     }
 </script>
 

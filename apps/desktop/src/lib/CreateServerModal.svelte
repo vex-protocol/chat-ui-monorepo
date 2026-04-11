@@ -30,14 +30,14 @@
                 const serverChannels = channels.get()[newServer.serverID] ?? [];
                 const firstChannel = serverChannels[0];
                 if (firstChannel) {
-                    push(
+                    void push(
                         `/server/${newServer.serverID}/${firstChannel.channelID}`,
                     );
                 } else {
-                    push(`/server/${newServer.serverID}/`);
+                    void push(`/server/${newServer.serverID}/`);
                 }
             } else {
-                push("/home");
+                void push("/home");
             }
         } catch (err: unknown) {
             error =
@@ -54,9 +54,7 @@
 
 <svelte:window {onkeydown} />
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="modal-backdrop" onclick={onclose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
         class="modal"
         onclick={(e) => e.stopPropagation()}

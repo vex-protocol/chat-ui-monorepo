@@ -7,7 +7,7 @@
         if (onclick) {
             onclick();
         } else {
-            pop();
+            void pop();
         }
     }
 </script>

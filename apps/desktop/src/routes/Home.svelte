@@ -35,13 +35,13 @@
             if (last) {
                 const chs = channels.get()[last.serverID] ?? [];
                 const first = chs[0];
-                push(
+                void push(
                     first
                         ? `/server/${last.serverID}/${first.channelID}`
                         : "/home",
                 );
             } else {
-                push("/home");
+                void push("/home");
             }
         } catch (err: unknown) {
             joinError =

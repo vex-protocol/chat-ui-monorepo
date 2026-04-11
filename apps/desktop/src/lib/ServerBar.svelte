@@ -17,12 +17,12 @@
     } = $props();
 
     function navigateToServer(serverID: string): void {
-        const chans = channelMap[serverID] ?? [];
+        const chans = channelMap?.[serverID] ?? [];
         const first = chans[0];
         if (first) {
-            push(`/server/${serverID}/${first.channelID}`);
+            void push(`/server/${serverID}/${first.channelID}`);
         } else {
-            push(`/server/${serverID}/`);
+            void push(`/server/${serverID}/`);
         }
     }
 
@@ -36,7 +36,7 @@
                 class="server-bar__item server-bar__item--home {!activeServerID
                     ? 'server-bar__item--active'
                     : ''}"
-                onclick={() => push("/home")}
+                onclick={() => void push("/home")}
                 title="Direct Messages"
                 aria-label="Direct Messages"
             >

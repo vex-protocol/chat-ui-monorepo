@@ -20,13 +20,13 @@ function handleDeepLink(url: string): void {
     const link = parseVexLink(url);
     switch (link.type) {
         case "invite":
-            push(`/invite/${link.inviteID}`);
+            void push(`/invite/${link.inviteID}`);
             break;
         case "server":
-            push(`/server/${link.serverID}`);
+            void push(`/server/${link.serverID}`);
             break;
         case "user":
-            push(`/messaging/${link.userID}`);
+            void push(`/messaging/${link.userID}`);
             break;
     }
 }

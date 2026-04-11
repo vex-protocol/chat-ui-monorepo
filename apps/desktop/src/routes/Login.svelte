@@ -40,16 +40,18 @@
         if (userAtom.get()) {
             playUnlock();
             const serverList = Object.values(serversAtom.get());
-            if (serverList.length > 0) {
-                const sid = serverList[0].serverID;
+            const firstServer = serverList[0];
+            if (firstServer) {
+                const sid = firstServer.serverID;
                 const chs = channelsAtom.get()[sid] ?? [];
-                if (chs.length > 0) {
-                    push(`/server/${sid}/${chs[0].channelID}`);
+                const firstChannel = chs[0];
+                if (firstChannel) {
+                    void push(`/server/${sid}/${firstChannel.channelID}`);
                 } else {
-                    push("/home");
+                    void push("/home");
                 }
             } else {
-                push("/home");
+                void push("/home");
             }
         } else {
             error = "Could not verify credentials after login";

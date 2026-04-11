@@ -62,7 +62,7 @@
 
         if (userAtom.get()) {
             playUnlock();
-            push("/home");
+            void push("/home");
         } else {
             errors = {
                 form: "Registration succeeded but could not connect to server",

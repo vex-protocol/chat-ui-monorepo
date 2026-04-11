@@ -33,12 +33,12 @@
     let deleteError = $state("");
 
     // TODO: device management — needs Devices.list() and proper delete API
-    async function loadDevices(): Promise<void> {
+    function loadDevices(): void {
         devicesLoading = false;
         devicesError = "Device listing not yet supported by SDK";
     }
 
-    async function handleDeleteDevice(_deviceID: string): Promise<void> {
+    function handleDeleteDevice(_deviceID: string): void {
         deleteError = "Device deletion not yet supported by SDK";
     }
 
@@ -85,7 +85,7 @@
     });
 
     // Load credentials from KeyStore on mount
-    keyStore.loadActive().then((c) => {
+    void keyStore.loadActive().then((c) => {
         creds = c;
     });
 
@@ -155,7 +155,7 @@
         // Clear the stored JWT so auto-login won't fire, but keep device keys
         if (creds) await keyStore.save({ ...creds, token: undefined });
         clearSession();
-        push("/login");
+        void push("/login");
     }
 
     async function handleDeleteAllData(): Promise<void> {
@@ -183,7 +183,7 @@
             class="settings-page__back"
             onclick={() => {
                 if (window.history.length > 1) history.back();
-                else push("/home");
+                else void push("/home");
             }}
             aria-label="Go back">←</button
         >
@@ -325,7 +325,7 @@
             <div class="settings-row">
                 <span class="settings-row__label">User ID</span>
                 <span class="settings-row__value settings-row__value--mono"
-                    >{$user?.userID?.slice(0, 8) ?? "—"}…</span
+                    >{$user?.userID.slice(0, 8) ?? "—"}…</span
                 >
             </div>
             <div class="settings-row">

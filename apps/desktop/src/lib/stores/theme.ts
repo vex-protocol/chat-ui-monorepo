@@ -2,7 +2,7 @@ import { writable } from "svelte/store";
 
 export type Theme = "dark" | "light";
 
-const saved = (localStorage.getItem("vex-theme") as Theme) ?? "dark";
+const saved = (localStorage.getItem("vex-theme") ?? "dark") as Theme;
 
 export const theme = writable<Theme>(saved);
 

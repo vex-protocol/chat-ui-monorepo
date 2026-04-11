@@ -64,7 +64,7 @@
         addFamiliar(user);
         query = "";
         results = [];
-        push(`/messaging/${user.userID}`);
+        void push(`/messaging/${user.userID}`);
     }
 
     const familiarList = $derived(Object.values($familiars));

@@ -42,7 +42,7 @@
     }
 
     function copyLink(inviteID: string): void {
-        navigator.clipboard.writeText(inviteID);
+        void navigator.clipboard.writeText(inviteID);
         copied = inviteID;
         setTimeout(() => {
             if (copied === inviteID) copied = "";
@@ -54,15 +54,13 @@
     }
 
     $effect(() => {
-        if (serverID) loadInvites();
+        if (serverID) void loadInvites();
     });
 </script>
 
 <svelte:window {onkeydown} />
 
-<!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
 <div class="modal-backdrop" onclick={onclose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
         class="modal"
         onclick={(e) => e.stopPropagation()}
