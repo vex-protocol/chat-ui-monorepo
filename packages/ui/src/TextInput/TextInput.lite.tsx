@@ -1,38 +1,38 @@
-import { useDefaultProps } from '@builder.io/mitosis'
+import { useDefaultProps } from "@builder.io/mitosis";
 
 export interface TextInputProps {
-  value?: string
-  placeholder?: string
-  type?: 'text' | 'password' | 'email' | 'search'
-  label?: string
-  disabled?: boolean
-  className?: string
-  onInput?: (value: string) => void
-  onChange?: (value: string) => void
+    className?: string;
+    disabled?: boolean;
+    label?: string;
+    onChange?: (value: string) => void;
+    onInput?: (value: string) => void;
+    placeholder?: string;
+    type?: "email" | "password" | "search" | "text";
+    value?: string;
 }
 
 export default function TextInput(props: TextInputProps) {
-  useDefaultProps<TextInputProps>({
-    value: '',
-    placeholder: '',
-    type: 'text',
-    label: '',
-    disabled: false,
-    className: '',
-  })
+    useDefaultProps<TextInputProps>({
+        className: "",
+        disabled: false,
+        label: "",
+        placeholder: "",
+        type: "text",
+        value: "",
+    });
 
-  return (
-    <div class={`text-input ${props.className}`}>
-      <label class="text-input__label">{props.label}</label>
-      <input
-        class="text-input__field"
-        type={props.type}
-        value={props.value}
-        placeholder={props.placeholder}
-        disabled={props.disabled}
-        onInput={(e: any) => props.onInput?.(e.target.value)}
-        onChange={(e: any) => props.onChange?.(e.target.value)}
-      />
-    </div>
-  )
+    return (
+        <div class={`text-input ${props.className}`}>
+            <label class="text-input__label">{props.label}</label>
+            <input
+                class="text-input__field"
+                disabled={props.disabled}
+                onChange={(e: any) => props.onChange?.(e.target.value)}
+                onInput={(e: any) => props.onInput?.(e.target.value)}
+                placeholder={props.placeholder}
+                type={props.type}
+                value={props.value}
+            />
+        </div>
+    );
 }

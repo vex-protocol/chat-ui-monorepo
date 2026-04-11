@@ -1,37 +1,39 @@
-import { useDefaultProps } from '@builder.io/mitosis'
+import { useDefaultProps } from "@builder.io/mitosis";
 
 export interface ServerListItemProps {
-  name?: string
-  avatarUrl?: string
-  isActive?: boolean
-  className?: string
-  onClick?: () => void
+    avatarUrl?: string;
+    className?: string;
+    isActive?: boolean;
+    name?: string;
+    onClick?: () => void;
 }
 
 export default function ServerListItem(props: ServerListItemProps) {
-  useDefaultProps<ServerListItemProps>({
-    name: '',
-    avatarUrl: '',
-    isActive: false,
-    className: '',
-  })
+    useDefaultProps<ServerListItemProps>({
+        avatarUrl: "",
+        className: "",
+        isActive: false,
+        name: "",
+    });
 
-  return (
-    <button
-      class={`server-list-item ${props.isActive ? 'server-list-item--active' : ''} ${props.className}`}
-      type="button"
-      title={props.name}
-      onClick={() => props.onClick?.()}
-    >
-      <img
-        class="server-list-item__avatar"
-        src={props.avatarUrl}
-        alt={props.name}
-        onError={(e: any) => {
-          e.currentTarget.style.display = 'none'
-        }}
-      />
-      <span class="server-list-item__initial">{props.name ? props.name[0] : ''}</span>
-    </button>
-  )
+    return (
+        <button
+            class={`server-list-item ${props.isActive ? "server-list-item--active" : ""} ${props.className}`}
+            onClick={() => props.onClick?.()}
+            title={props.name}
+            type="button"
+        >
+            <img
+                alt={props.name}
+                class="server-list-item__avatar"
+                onError={(e: any) => {
+                    e.currentTarget.style.display = "none";
+                }}
+                src={props.avatarUrl}
+            />
+            <span class="server-list-item__initial">
+                {props.name ? props.name[0] : ""}
+            </span>
+        </button>
+    );
 }
