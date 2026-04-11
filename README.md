@@ -89,7 +89,7 @@ The server (spire) runs separately from its own repo. See the [spire repo](https
 | [`adr-009-vexservice-facade.md`](docs/architecture/adr-009-vexservice-facade.md)                           | VexService singleton as sole gateway between apps and SDK                                              |
 | [`adr-010-domain-atom-consolidation.md`](docs/architecture/adr-010-domain-atom-consolidation.md)           | Domain atom grouping + readonly boundaries via `readonlyType()`                                        |
 | [`adr-011-platform-config-ownership.md`](docs/architecture/adr-011-platform-config-ownership.md)           | Store owns BootstrapConfig; apps provide platform adapters                                             |
-| [`adr-012-supply-chain-security.md`](docs/architecture/adr-014-supply-chain-security.md)                   | Defense-in-depth supply chain security posture                                                         |
+| [`adr-012-supply-chain-security.md`](docs/architecture/adr-012-supply-chain-security.md)                   | Defense-in-depth supply chain security posture                                                         |
 
 **`docs/explanation/`** — why decisions were made, strategy and rationale
 

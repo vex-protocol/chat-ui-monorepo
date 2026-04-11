@@ -1,6 +1,6 @@
 # ADR-004: Migrate to Sibling Repos via Platform Adapter Injection + Mobile Expo Prebuild
 
-**Status:** Proposed (draft)
+**Status:** Accepted — Implemented 2026-04-06
 **Date:** 2026-04-05
 **Deciders:** @dream
 **Supersedes:** None (supplements ADR-001)
