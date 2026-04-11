@@ -86,6 +86,10 @@ jobs:
                   node-version: 24
                   cache: pnpm
             - run: pnpm install --frozen-lockfile --ignore-scripts
+            - name: Sherif — workspace version consistency
+              # -i vite: desktop on vite 7, ui/storybook on vite 6. Re-enable
+              # once packages/ui upgrades to a vite-7-compatible Storybook.
+              run: pnpm dlx sherif@latest -i vite
             - name: Lint affected packages
               run: |
                   if [ "${{ needs.detect-changes.outputs.root }}" == "true" ] || \

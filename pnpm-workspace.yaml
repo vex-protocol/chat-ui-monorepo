@@ -2,6 +2,17 @@ packages:
     - "apps/*"
     - "packages/*"
 
+# Supply-chain guardrails (pnpm 10+)
+# - minimumReleaseAge: block installs of packages published in the last N
+#   seconds. Mitigates fast-moving supply-chain attacks (Sha1-Hulud style).
+#   Set to 604800 (7 days) — gives advisories time to surface before we
+#   pull a compromised release.
+# - blockExoticSubdeps: reject transitive deps that aren't plain registry
+#   versions (git://, tarball URLs, file: specs). Guards against typosquats
+#   and fork-based exfil pivots.
+minimumReleaseAge: 604800
+blockExoticSubdeps: true
+
 catalog:
     typescript: ^6.0.2
     "@types/node": ^25.3.3

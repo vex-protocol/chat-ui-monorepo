@@ -1,7 +1,7 @@
 {
     "name": "vex-chat",
     "version": "1.2.0-rc.7",
-    "private": "true",
+    "private": true,
     "type": "module",
     "scripts": {
         "dev": "pnpm -r --parallel dev",
