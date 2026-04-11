@@ -1,60 +1,29 @@
 packages:
-    - "apps/*"
-    - "packages/*"
+    - apps/*
+    - packages/*
 
-# Supply-chain guardrails (pnpm 10+)
-# - minimumReleaseAge: block installs of packages published in the last N
-#   **minutes** (not seconds — pnpm's unit). Mitigates fast-moving supply-
-#   chain attacks (Sha1-Hulud style). Set to 10080 (7 days in minutes) —
-#   gives advisories time to surface before we pull a compromised release.
-# - blockExoticSubdeps: reject transitive deps that aren't plain registry
-#   versions (git://, tarball URLs, file: specs). Guards against typosquats
-#   and fork-based exfil pivots.
-# - catalogMode: strict — any dependency listed in the catalog MUST be
-#   referenced via `catalog:` in consuming workspaces. Prevents the
-#   "catalog exists but someone forgot to use it" drift class that
-#   Sherif catches after the fact. Strict is enforceable here because we
-#   only put deps in the catalog once every consumer can use them — vite
-#   and the Storybook chain are NOT in the catalog (packages/ui blocked
-#   on vite-7-compatible Storybook) so strict doesn't force them.
+blockExoticSubdeps: true
+
+catalog:
+    "@nanostores/react": ^1.1.0
+    "@types/node": ^24.10.1
+    "@vex-chat/libvex": 2.0.0
+    dompurify: ^3.2.6
+    kysely: ^0.28.15
+    marked: ^15.0.12
+    nanostores: ^1.2.0
+    react: 19.2.0
+    react-dom: 19.2.0
+    svelte: ^5.45.2
+    typescript: ~5.9.3
+    uuid: ^11.0.0
+    vitest: 3.2.4
+
+catalogMode: strict
+
 minimumReleaseAge: 10080
-# First-party packages we publish ourselves are exempt from the freshness
-# filter. The filter's purpose is to protect against third-party supply
-# chain attacks by waiting for advisories to surface — but we ARE the
-# advisory source for our own publishes. Blocking fresh clones from
-# installing a libvex we just released is pure operational friction.
+
 minimumReleaseAgeExclude:
     - "@vex-chat/libvex"
     - "@vex-chat/types"
     - "@vex-chat/crypto"
-blockExoticSubdeps: true
-catalogMode: strict
-
-catalog:
-    # TypeScript stays on 5.x across the monorepo because Expo SDK 55 and
-    # the current svelte-check don't yet support TS 6. The four sibling
-    # library repos (types/crypto/libvex/spire) use TS 6.0.2 — they have
-    # tighter control over their toolchain. vex-chat's app layer follows
-    # the RN/Expo/Svelte compat floor.
-    typescript: ~5.9.3
-    # @types/node tracks apps/desktop's Tauri runtime (Node 24). Mobile/
-    # Expo and packages/* don't use Node types directly.
-    "@types/node": ^24.10.1
-    "@vex-chat/libvex": 2.0.0
-    # UI state layer — single version across mobile + store.
-    nanostores: "^1.2.0"
-    "@nanostores/react": "^1.1.0"
-    # Shared between desktop + mobile for SQLite wire-protocol queries.
-    # Storage adapters (kysely-dialect-tauri vs kysely-expo) are
-    # per-platform and not cataloged.
-    kysely: ^0.28.15
-    # Pinned by pnpm.overrides in root package.json — catalog entry is
-    # belt-and-braces so Sherif and any new workspace are aligned.
-    react: 19.2.0
-    "react-dom": 19.2.0
-    # Svelte 5 runes shared between apps/desktop (Svelte runtime) and
-    # packages/ui (Mitosis's Svelte target).
-    svelte: ^5.45.2
-    uuid: "^11.0.0"
-    marked: "^15.0.12"
-    dompurify: "^3.2.6"
