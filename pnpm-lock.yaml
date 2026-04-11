@@ -10,8 +10,8 @@ catalogs:
             specifier: ^1.1.0
             version: 1.1.0
         "@vex-chat/libvex":
-            specifier: 1.2.0-rc.15
-            version: 1.2.0-rc.15
+            specifier: 2.0.0
+            version: 2.0.0
         dompurify:
             specifier: ^3.2.6
             version: 3.3.3
@@ -124,7 +124,7 @@ importers:
                 version: link:../../packages/eslint-config
             "@vex-chat/libvex":
                 specifier: "catalog:"
-                version: 1.2.0-rc.15(better-sqlite3@11.10.0)(typescript@5.9.3)
+                version: 2.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)
             eslint-plugin-svelte:
                 specifier: ^3.17.0
                 version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
@@ -218,7 +218,7 @@ importers:
                 version: link:../../packages/eslint-config
             "@vex-chat/libvex":
                 specifier: "catalog:"
-                version: 1.2.0-rc.15(better-sqlite3@11.10.0)(typescript@5.9.3)
+                version: 2.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)
             babel-preset-expo:
                 specifier: ^55.0.15
                 version: 55.0.15(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@55.0.13)(react-refresh@0.14.2)
@@ -254,7 +254,7 @@ importers:
                 version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
             "@vex-chat/libvex":
                 specifier: "catalog:"
-                version: 1.2.0-rc.15(better-sqlite3@11.10.0)(typescript@6.0.2)
+                version: 2.0.0(better-sqlite3@11.10.0)(typescript@6.0.2)
             nanostores:
                 specifier: "catalog:"
                 version: 1.2.0
@@ -282,7 +282,7 @@ importers:
                 version: 8.6.18(react-dom@19.2.5(react@19.2.0))(react@19.2.0)(rollup@4.60.1)(storybook@8.6.18(prettier@2.8.8))(typescript@6.0.2)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@storybook/svelte-vite":
                 specifier: ^8.6.0
-                version: 8.6.18(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+                version: 8.6.18(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@vex-chat/eslint-config":
                 specifier: workspace:*
                 version: link:../eslint-config
@@ -3501,23 +3501,23 @@ packages:
                 integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==,
             }
 
-    "@vex-chat/crypto@1.2.0-rc.2":
+    "@vex-chat/crypto@2.0.0":
         resolution:
             {
-                integrity: sha512-FZIal30idzhVSr1fY69i5jrcDnYPi9rgtQHSlfRYJ2/tOay454QMxXPWSRAuVjB99IGOtSq40zkotiMyVpiN4Q==,
+                integrity: sha512-bEOH8a+nFvkUbHvmD1N4laQV9NwSKOJVE5EnoJoAEJIc+n0Wk+JjvA+vtvafBogRoPjZyEa/LvR1umE7U4dd8g==,
             }
         engines: { node: ">=24.0.0", npm: ">=10.0.0" }
         peerDependencies:
-            "@vex-chat/types": ^2.0.0-rc.0
+            "@vex-chat/types": ^2.0.0
             typescript: ">=5.9.0 || >=6.0.0"
         peerDependenciesMeta:
             typescript:
                 optional: true
 
-    "@vex-chat/libvex@1.2.0-rc.15":
+    "@vex-chat/libvex@2.0.0":
         resolution:
             {
-                integrity: sha512-7h3gNAYrRq2u8I/G+TCk0//XcIgbGDZMFT3onSzLLQAiMmDGzWBFWvKeR07c2n898lP3CgNW//Lmo8UGXYZOBw==,
+                integrity: sha512-vk8INUC/wjbB93Y/pkjke+CecAK92q2NmTnNvOikxysAN/46Apx9PFClf5Hqes6iCy6Q7KYQB/tyxxcf439+bQ==,
             }
         engines: { node: ">=24.0.0", npm: ">=10.0.0" }
         peerDependencies:
@@ -3526,10 +3526,10 @@ packages:
             better-sqlite3:
                 optional: true
 
-    "@vex-chat/types@2.0.0-rc.2":
+    "@vex-chat/types@2.0.0":
         resolution:
             {
-                integrity: sha512-ANWGsvKN0z8CpcXDkq5LaIw+PvAIY/optXMuEj8vpaIsHTMKRdK2sQ75jMlCy5IozJ/iXp0tnPXUlZU8CEh8sA==,
+                integrity: sha512-+eCPT6oEH6wUWmWjHKM8xif6tlDgylQvOUtkN9NrwQgteQ/NjQ2HVQEf8wj8OvF8gPcD8LjxEA45Ei6EC0eM/g==,
             }
         engines: { node: ">=18.0.0", npm: ">=10.0.0" }
 
@@ -3853,6 +3853,12 @@ packages:
         resolution:
             {
                 integrity: sha512-3Y8yrqLSwjuzpXuZ0oIYZ/XGgLwUIBU3uLvbcpb0pidD9ctpShJd43KSlEEkVQg6DS0G9NKyzOvBfUtDKEyHvQ==,
+            }
+
+    axios@1.15.0:
+        resolution:
+            {
+                integrity: sha512-wWyJDlAatxk30ZJer+GeCWS209sA42X+N5jU2jy6oHTp7ufw8uzUTVFBX9+wTfAlhiJXGS0Bq7X6efruWjuK9Q==,
             }
 
     axobject-query@4.1.0:
@@ -6738,6 +6744,13 @@ packages:
             }
         engines: { node: ">=20.0.0" }
 
+    kysely@0.28.16:
+        resolution:
+            {
+                integrity: sha512-3i5pmOiZvMDj00qhrIVbH0AnioVTx22DMP7Vn5At4yJO46iy+FM8Y/g61ltenLVSo3fiO8h8Q3QOFgf/gQ72ww==,
+            }
+        engines: { node: ">=20.0.0" }
+
     lan-network@0.2.1:
         resolution:
             {
@@ -7397,6 +7410,12 @@ packages:
         resolution:
             {
                 integrity: sha512-bC4UGzHhVvgDNS7kn9tV8fAucIYUBuGojcaLiz7v+P63Lmtm0Xeji8B/8tYKddALXxJLpwIeBmUN3u64C4YkRA==,
+            }
+
+    msgpackr@1.11.9:
+        resolution:
+            {
+                integrity: sha512-FkoAAyyA6HM8wL882EcEyFZ9s7hVADSwG9xrVx3dxxNQAtgADTrJoEWivID82Iv1zWDsv/OtbrrcZAzGzOMdNw==,
             }
 
     multitars@0.2.4:
@@ -12368,7 +12387,7 @@ snapshots:
         optionalDependencies:
             typescript: 6.0.2
 
-    "@storybook/svelte-vite@8.6.18(@babel/core@7.14.5)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))":
+    "@storybook/svelte-vite@8.6.18(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))":
         dependencies:
             "@storybook/builder-vite": 8.6.18(storybook@8.6.18(prettier@2.8.8))(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
             "@storybook/svelte": 8.6.18(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)
@@ -12376,7 +12395,7 @@ snapshots:
             magic-string: 0.30.21
             storybook: 8.6.18(prettier@2.8.8)
             svelte: 5.55.1
-            svelte-preprocess: 5.1.4(@babel/core@7.14.5)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3)
+            svelte-preprocess: 5.1.4(@babel/core@7.29.0)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3)
             svelte2tsx: 0.7.53(svelte@5.55.1)(typescript@5.9.3)
             sveltedoc-parser: 4.2.1
             ts-dedent: 2.2.0
@@ -12706,39 +12725,39 @@ snapshots:
 
     "@ungap/structured-clone@1.3.0": {}
 
-    "@vex-chat/crypto@1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@5.9.3)":
+    "@vex-chat/crypto@2.0.0(@vex-chat/types@2.0.0)(typescript@5.9.3)":
         dependencies:
             "@noble/hashes": 2.0.1
             "@stablelib/base64": 2.0.1
             "@stablelib/utf8": 2.1.0
-            "@vex-chat/types": 2.0.0-rc.2
+            "@vex-chat/types": 2.0.0
             bip39: 3.1.0
             ed2curve: 0.3.0
-            msgpackr: 1.11.8
+            msgpackr: 1.11.9
             tweetnacl: 1.0.3
         optionalDependencies:
             typescript: 5.9.3
 
-    "@vex-chat/crypto@1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@6.0.2)":
+    "@vex-chat/crypto@2.0.0(@vex-chat/types@2.0.0)(typescript@6.0.2)":
         dependencies:
             "@noble/hashes": 2.0.1
             "@stablelib/base64": 2.0.1
             "@stablelib/utf8": 2.1.0
-            "@vex-chat/types": 2.0.0-rc.2
+            "@vex-chat/types": 2.0.0
             bip39: 3.1.0
             ed2curve: 0.3.0
-            msgpackr: 1.11.8
+            msgpackr: 1.11.9
             tweetnacl: 1.0.3
         optionalDependencies:
             typescript: 6.0.2
 
-    "@vex-chat/libvex@1.2.0-rc.15(better-sqlite3@11.10.0)(typescript@5.9.3)":
+    "@vex-chat/libvex@2.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)":
         dependencies:
-            "@vex-chat/crypto": 1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@5.9.3)
-            "@vex-chat/types": 2.0.0-rc.2
-            axios: 1.14.0(debug@4.4.3)
+            "@vex-chat/crypto": 2.0.0(@vex-chat/types@2.0.0)(typescript@5.9.3)
+            "@vex-chat/types": 2.0.0
+            axios: 1.15.0
             eventemitter3: 5.0.4
-            kysely: 0.28.15
+            kysely: 0.28.16
             msgpackr: 1.11.8
             uuid: 8.3.2
             winston: 3.19.0
@@ -12749,13 +12768,13 @@ snapshots:
             - debug
             - typescript
 
-    "@vex-chat/libvex@1.2.0-rc.15(better-sqlite3@11.10.0)(typescript@6.0.2)":
+    "@vex-chat/libvex@2.0.0(better-sqlite3@11.10.0)(typescript@6.0.2)":
         dependencies:
-            "@vex-chat/crypto": 1.2.0-rc.2(@vex-chat/types@2.0.0-rc.2)(typescript@6.0.2)
-            "@vex-chat/types": 2.0.0-rc.2
-            axios: 1.14.0(debug@4.4.3)
+            "@vex-chat/crypto": 2.0.0(@vex-chat/types@2.0.0)(typescript@6.0.2)
+            "@vex-chat/types": 2.0.0
+            axios: 1.15.0
             eventemitter3: 5.0.4
-            kysely: 0.28.15
+            kysely: 0.28.16
             msgpackr: 1.11.8
             uuid: 8.3.2
             winston: 3.19.0
@@ -12766,7 +12785,7 @@ snapshots:
             - debug
             - typescript
 
-    "@vex-chat/types@2.0.0-rc.2":
+    "@vex-chat/types@2.0.0":
         dependencies:
             zod: 4.3.6
 
@@ -12953,6 +12972,14 @@ snapshots:
     await-lock@2.2.2: {}
 
     axios@1.14.0(debug@4.4.3):
+        dependencies:
+            follow-redirects: 1.15.11(debug@4.4.3)
+            form-data: 4.0.5
+            proxy-from-env: 2.1.0
+        transitivePeerDependencies:
+            - debug
+
+    axios@1.15.0:
         dependencies:
             follow-redirects: 1.15.11(debug@4.4.3)
             form-data: 4.0.5
@@ -15002,6 +15029,8 @@ snapshots:
 
     kysely@0.28.15: {}
 
+    kysely@0.28.16: {}
+
     lan-network@0.2.1: {}
 
     launch-editor@2.13.2:
@@ -15459,6 +15488,10 @@ snapshots:
         optional: true
 
     msgpackr@1.11.8:
+        optionalDependencies:
+            msgpackr-extract: 3.0.3
+
+    msgpackr@1.11.9:
         optionalDependencies:
             msgpackr-extract: 3.0.3
 
@@ -16584,7 +16617,7 @@ snapshots:
             postcss-load-config: 3.1.4(postcss@8.5.8)
             typescript: 5.9.3
 
-    svelte-preprocess@5.1.4(@babel/core@7.14.5)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3):
+    svelte-preprocess@5.1.4(@babel/core@7.29.0)(postcss-load-config@3.1.4(postcss@8.5.8))(postcss@8.5.8)(svelte@5.55.1)(typescript@5.9.3):
         dependencies:
             "@types/pug": 2.0.10
             detect-indent: 6.1.0
@@ -16593,7 +16626,7 @@ snapshots:
             strip-indent: 3.0.0
             svelte: 5.55.1
         optionalDependencies:
-            "@babel/core": 7.14.5
+            "@babel/core": 7.29.0
             postcss: 8.5.8
             postcss-load-config: 3.1.4(postcss@8.5.8)
             typescript: 5.9.3
