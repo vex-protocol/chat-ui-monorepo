@@ -1,9 +1,9 @@
-name: Release PR
+name: Mobile — Release PR
 
 # Maintains a rolling "chore: release mobile vX.Y.Z" PR against master.
 # On every push to master, Claude reads the diff since the last mobile-v*
 # tag, picks a semver bump, bumps apps/mobile/package.json, and writes
-# release notes into the PR body. Merging the PR triggers release-apk.yml
+# release notes into the PR body. Merging the PR triggers release-mobile.yml
 # which builds the APK and creates the GitHub Release with those notes.
 #
 # Skipped when: the push is from the release bot (loop prevention),
@@ -30,7 +30,7 @@ on:
     workflow_dispatch:
 
 concurrency:
-    group: release-pr
+    group: release-pr-mobile
     cancel-in-progress: true
 
 permissions:
@@ -103,11 +103,10 @@ jobs:
                       "chore: release mobile vX.Y.Z" PR that bumps the mobile app's
                       version and writes release notes.
 
-                      ## Step 1 — read the rules of engagement
+                      ## Step 1 — gather the baseline
 
-                      1. Read `AGENTS.md` for voice conventions.
-                      2. Read `apps/mobile/package.json` to get the CURRENT version.
-                      3. The previous release tag is in env var $PREV_TAG (empty
+                      1. Read `apps/mobile/package.json` to get the CURRENT version.
+                      2. The previous release tag is in env var $PREV_TAG (empty
                          string means this is the first release).
 
                       ## Step 2 — read the changes since last release
@@ -155,9 +154,12 @@ jobs:
                       bump. Write the new version to `/tmp/new-version.txt` as
                       just the bare string, e.g. `0.2.0`.
 
-                      If $PREV_TAG is empty and the current version already looks
-                      valid, keep it as-is for the first release — but still
-                      write it to /tmp/new-version.txt.
+                      **First-release rule**: if $PREV_TAG is empty, always bump
+                      at least a patch (e.g. 0.1.0 → 0.1.1). Keeping the same
+                      version leaves the workflow with nothing to commit and the
+                      release PR is never created. The very first mobile-v* tag
+                      ships as whatever the first bumped version is — treat any
+                      pre-existing package.json version as pre-release history.
 
                       ## Step 5 — update apps/mobile/package.json
 

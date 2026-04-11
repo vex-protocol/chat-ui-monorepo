@@ -1,9 +1,9 @@
-name: Release APK
+name: Mobile — Release
 
 # Builds the production APK and creates a GitHub Release when the release-
-# mobile PR (maintained by release-pr.yml) is merged to master. Trigger is
-# a version change in apps/mobile/package.json on master — the merged PR's
-# body is extracted and used as the release notes.
+# mobile PR (maintained by release-pr-mobile.yml) is merged to master.
+# Trigger is a version change in apps/mobile/package.json on master — the
+# merged PR's body is extracted and used as the release notes.
 #
 # Builds via `eas build --local` on ubuntu-latest (with setup-java + Android
 # SDK installed at job time) so we dodge EAS cloud free-tier quotas entirely.
@@ -27,7 +27,7 @@ on:
             - "apps/mobile/package.json"
 
 concurrency:
-    group: release-apk
+    group: release-mobile
     cancel-in-progress: false
 
 permissions:

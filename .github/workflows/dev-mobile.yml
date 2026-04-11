@@ -1,4 +1,4 @@
-name: Dev APK
+name: Mobile — Dev
 
 # Maintains the continuously-updated dev APK. On every push to master:
 #
@@ -39,14 +39,14 @@ on:
     workflow_dispatch:
 
 concurrency:
-    group: dev-apk
+    group: dev-mobile
     cancel-in-progress: false
 
 permissions:
     contents: read
 
 jobs:
-    dev-apk:
+    dev-mobile:
         if: >-
             github.actor != 'github-actions[bot]' ||
             github.event_name == 'workflow_dispatch'
