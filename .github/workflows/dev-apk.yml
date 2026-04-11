@@ -28,6 +28,14 @@ name: Dev APK
 on:
     push:
         branches: [master]
+        # Only fire when something that affects the mobile runtime
+        # changed. GitHub filters at the trigger level so no runner
+        # is allocated for desktop-only / docs-only pushes.
+        paths:
+            - "apps/mobile/**"
+            - "packages/store/**"
+            - "packages/ui/**"
+            - "pnpm-workspace.yaml"
     workflow_dispatch:
 
 concurrency:

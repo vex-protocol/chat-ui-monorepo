@@ -18,6 +18,15 @@ name: Release PR
 on:
     push:
         branches: [master]
+        # Only fire when something that could plausibly affect a mobile
+        # release actually changed. GitHub filters at the trigger level
+        # so no runner is allocated for desktop-only / docs-only pushes.
+        # workflow_dispatch below bypasses this for manual refreshes.
+        paths:
+            - "apps/mobile/**"
+            - "packages/store/**"
+            - "packages/ui/**"
+            - "pnpm-workspace.yaml"
     workflow_dispatch:
 
 concurrency:
