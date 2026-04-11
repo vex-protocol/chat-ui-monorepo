@@ -1,3 +1,5 @@
+import type { AppScreenProps } from "../navigation/types";
+
 import React, { useState } from "react";
 import {
     Alert,
@@ -8,26 +10,27 @@ import {
     View,
 } from "react-native";
 
+import { $user, vexService } from "@vex-chat/store";
+
 import { useStore } from "@nanostores/react";
-import notifee, { AndroidImportance } from "@notifee/react-native";
+import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
 
 import { clearCredentials } from "../lib/keychain";
-import type { AppScreenProps } from "../navigation/types";
-import { vexService, $user } from "@vex-chat/store";
 
-export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Settings">) {
+export function SettingsScreen({
+    navigation: _navigation,
+}: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [loggingOut, setLoggingOut] = useState(false);
 
-    async function handleLogout() {
+    function handleLogout() {
         setLoggingOut(true);
         // Close connection + reset atoms so navigation redirects to auth.
         // This does NOT invalidate the server session — autoLogin can reuse saved credentials.
-        try {
-            await vexService.logout();
-        } catch {
+        void vexService.logout().catch(() => {
             /* ignore */
-        }
+        });
     }
 
     function handleClearKeys() {
@@ -37,19 +40,43 @@ export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Sett
             [
                 { style: "cancel", text: "Cancel" },
                 {
-                    onPress: async () => {
-                        try {
-                            await vexService.logout();
-                        } catch {
-                            /* ignore */
-                        }
-                        await clearCredentials();
-                                    },
+                    onPress: () => {
+                        void (async () => {
+                            try {
+                                await vexService.logout();
+                            } catch {
+                                /* ignore */
+                            }
+                            await clearCredentials();
+                        })();
+                    },
                     style: "destructive",
                     text: "Clear keys",
                 },
             ],
         );
+    }
+
+    function handleSendTestNotification() {
+        void (async () => {
+            await Notifications.setNotificationChannelAsync("vex-messages", {
+                importance: AndroidImportance.HIGH,
+                name: "Messages",
+                sound: "default",
+            });
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    body: "This is a test notification from Vex.",
+                    data: {
+                        authorID: "test",
+                        username: "Test User",
+                    },
+                    sound: "default",
+                    title: "Test User",
+                },
+                trigger: { channelId: "vex-messages" },
+            });
+        })();
     }
 
     return (
@@ -69,7 +96,7 @@ export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Sett
                 <View style={styles.row}>
                     <Text style={styles.label}>User ID</Text>
                     <Text style={[styles.value, styles.mono]}>
-                        {user?.userID?.slice(0, 16) ?? "—"}…
+                        {user?.userID.slice(0, 16) ?? "—"}…
                     </Text>
                 </View>
             </View>
@@ -91,28 +118,7 @@ export function SettingsScreen({ navigation: _navigation }: AppScreenProps<"Sett
                         </Text>
                     </View>
                     <TouchableOpacity
-                        onPress={async () => {
-                            await notifee.createChannel({
-                                id: "vex-messages",
-                                importance: AndroidImportance.HIGH,
-                                name: "Messages",
-                                sound: "default",
-                            });
-                            await notifee.displayNotification({
-                                android: {
-                                    channelId: "vex-messages",
-                                    pressAction: { id: "default" },
-                                    sound: "default",
-                                },
-                                body: "This is a test notification from Vex.",
-                                data: {
-                                    authorID: "test",
-                                    username: "Test User",
-                                },
-                                ios: { sound: "default" },
-                                title: "Test User",
-                            });
-                        }}
+                        onPress={handleSendTestNotification}
                         style={styles.testBtn}
                     >
                         <Text style={styles.testBtnText}>Test</Text>

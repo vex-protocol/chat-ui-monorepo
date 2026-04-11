@@ -5,11 +5,8 @@ import { AppState } from "react-native";
 import { shouldNotify, vexService } from "@vex-chat/store";
 import { $channels, $familiars, $servers } from "@vex-chat/store";
 
-import notifee, {
-    AndroidImportance,
-    AuthorizationStatus,
-    EventType,
-} from "@notifee/react-native";
+import * as Notifications from "expo-notifications";
+import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 
 import { navigateToConversation } from "../navigation/navigationRef";
 
@@ -18,12 +15,24 @@ const CHANNEL_ID = "vex-messages";
 let channelReady = false;
 let activeConversation: null | string = null;
 
+// Show banner + play sound when a notification arrives while the app is open.
+Notifications.setNotificationHandler({
+    handleNotification: () =>
+        Promise.resolve({
+            shouldPlaySound: true,
+            shouldSetBadge: false,
+            shouldShowBanner: true,
+            shouldShowList: true,
+        }),
+});
+
 export async function requestNotificationPermission(): Promise<boolean> {
-    const settings = await notifee.requestPermission();
-    // authorizationStatus 1 = AUTHORIZED, 2 = PROVISIONAL
+    const settings = await Notifications.requestPermissionsAsync({
+        ios: { allowAlert: true, allowBadge: true, allowSound: true },
+    });
     return (
-        settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
-        settings.authorizationStatus === AuthorizationStatus.PROVISIONAL
+        settings.granted ||
+        settings.ios?.status === IosAuthorizationStatus.PROVISIONAL
     );
 }
 
@@ -33,22 +42,22 @@ export function setActiveConversation(key: null | string): void {
 }
 
 export function setupNotificationHandlers(): () => void {
-    // Foreground events (app is open, user taps notification from notification center)
-    const unsubForeground = notifee.onForegroundEvent(({ detail, type }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-    });
+    // Single listener covers foreground, background, and cold-start taps.
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+        (response) => {
+            handleNotificationPress(response.notification.request.content.data);
+        },
+    );
 
-    // Background/killed events (app was closed or backgrounded)
-    notifee.onBackgroundEvent(({ detail, type }) => {
-        if (type === EventType.PRESS) {
-            handleNotificationPress(detail.notification?.data);
-        }
-        return Promise.resolve();
-    });
+    // If the app was launched by tapping a notification, replay it.
+    const lastResponse = Notifications.getLastNotificationResponse();
+    if (lastResponse) {
+        handleNotificationPress(lastResponse.notification.request.content.data);
+    }
 
-    return unsubForeground;
+    return () => {
+        subscription.remove();
+    };
 }
 
 export async function showMessageNotification(mail: Message): Promise<void> {
@@ -90,28 +99,23 @@ export async function showMessageNotification(mail: Message): Promise<void> {
 
     await ensureChannel();
 
-    await notifee.displayNotification({
-        android: {
-            channelId: CHANNEL_ID,
-            pressAction: { id: "default" },
+    await Notifications.scheduleNotificationAsync({
+        content: {
+            body: payload.body,
+            data: {
+                authorID: payload.authorID,
+                username: payload.title,
+            },
             sound: "default",
+            title: payload.title,
         },
-        body: payload.body,
-        data: {
-            authorID: payload.authorID,
-            username: payload.title,
-        },
-        ios: {
-            sound: "default",
-        },
-        title: payload.title,
+        trigger: { channelId: CHANNEL_ID },
     });
 }
 
 async function ensureChannel(): Promise<void> {
     if (channelReady) return;
-    await notifee.createChannel({
-        id: CHANNEL_ID,
+    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
         importance: AndroidImportance.HIGH,
         name: "Messages",
         sound: "default",
@@ -120,7 +124,7 @@ async function ensureChannel(): Promise<void> {
 }
 
 function handleNotificationPress(
-    data: Record<string, number | object | string> | undefined,
+    data: Record<string, unknown> | undefined,
 ): void {
     const authorID = data?.["authorID"];
     const username = data?.["username"];
