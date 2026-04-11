@@ -18,6 +18,15 @@ packages:
 #   and the Storybook chain are NOT in the catalog (packages/ui blocked
 #   on vite-7-compatible Storybook) so strict doesn't force them.
 minimumReleaseAge: 10080
+# First-party packages we publish ourselves are exempt from the freshness
+# filter. The filter's purpose is to protect against third-party supply
+# chain attacks by waiting for advisories to surface — but we ARE the
+# advisory source for our own publishes. Blocking fresh clones from
+# installing a libvex we just released is pure operational friction.
+minimumReleaseAgeExclude:
+    - "@vex-chat/libvex"
+    - "@vex-chat/types"
+    - "@vex-chat/crypto"
 blockExoticSubdeps: true
 catalogMode: strict
 
@@ -28,10 +37,24 @@ catalog:
     # tighter control over their toolchain. vex-chat's app layer follows
     # the RN/Expo/Svelte compat floor.
     typescript: ~5.9.3
-    "@types/node": ^25.3.3
+    # @types/node tracks apps/desktop's Tauri runtime (Node 24). Mobile/
+    # Expo and packages/* don't use Node types directly.
+    "@types/node": ^24.10.1
     "@vex-chat/libvex": 2.0.0
+    # UI state layer — single version across mobile + store.
     nanostores: "^1.2.0"
     "@nanostores/react": "^1.1.0"
+    # Shared between desktop + mobile for SQLite wire-protocol queries.
+    # Storage adapters (kysely-dialect-tauri vs kysely-expo) are
+    # per-platform and not cataloged.
+    kysely: ^0.28.15
+    # Pinned by pnpm.overrides in root package.json — catalog entry is
+    # belt-and-braces so Sherif and any new workspace are aligned.
+    react: 19.2.0
+    "react-dom": 19.2.0
+    # Svelte 5 runes shared between apps/desktop (Svelte runtime) and
+    # packages/ui (Mitosis's Svelte target).
+    svelte: ^5.45.2
     uuid: "^11.0.0"
     marked: "^15.0.12"
     dompurify: "^3.2.6"
