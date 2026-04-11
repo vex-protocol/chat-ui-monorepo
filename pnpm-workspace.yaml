@@ -4,17 +4,30 @@ packages:
 
 # Supply-chain guardrails (pnpm 10+)
 # - minimumReleaseAge: block installs of packages published in the last N
-#   seconds. Mitigates fast-moving supply-chain attacks (Sha1-Hulud style).
-#   Set to 604800 (7 days) — gives advisories time to surface before we
-#   pull a compromised release.
+#   **minutes** (not seconds — pnpm's unit). Mitigates fast-moving supply-
+#   chain attacks (Sha1-Hulud style). Set to 10080 (7 days in minutes) —
+#   gives advisories time to surface before we pull a compromised release.
 # - blockExoticSubdeps: reject transitive deps that aren't plain registry
 #   versions (git://, tarball URLs, file: specs). Guards against typosquats
 #   and fork-based exfil pivots.
-minimumReleaseAge: 604800
+# - catalogMode: strict — any dependency listed in the catalog MUST be
+#   referenced via `catalog:` in consuming workspaces. Prevents the
+#   "catalog exists but someone forgot to use it" drift class that
+#   Sherif catches after the fact. Strict is enforceable here because we
+#   only put deps in the catalog once every consumer can use them — vite
+#   and the Storybook chain are NOT in the catalog (packages/ui blocked
+#   on vite-7-compatible Storybook) so strict doesn't force them.
+minimumReleaseAge: 10080
 blockExoticSubdeps: true
+catalogMode: strict
 
 catalog:
-    typescript: ^6.0.2
+    # TypeScript stays on 5.x across the monorepo because Expo SDK 55 and
+    # the current svelte-check don't yet support TS 6. The four sibling
+    # library repos (types/crypto/libvex/spire) use TS 6.0.2 — they have
+    # tighter control over their toolchain. vex-chat's app layer follows
+    # the RN/Expo/Svelte compat floor.
+    typescript: ~5.9.3
     "@types/node": ^25.3.3
     "@vex-chat/libvex": 2.0.0
     nanostores: "^1.2.0"
