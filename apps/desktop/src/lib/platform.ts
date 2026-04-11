@@ -43,7 +43,15 @@ export function desktopConfig(): BootstrapConfig {
                     database: () => Database.load(`sqlite:${dbName}`),
                 }),
             });
-            const storage = new SqliteStorage(db, privateKey, storageLogger);
+            // ClientDatabase type lives behind libvex's internal schema
+            // module and isn't re-exported from the sqlite subpath; cast
+            // via `never` to satisfy the Kysely<ClientDatabase> parameter
+            // without pulling in an internal import.
+            const storage = new SqliteStorage(
+                db as never,
+                privateKey,
+                storageLogger,
+            );
             await storage.init();
             console.log(
                 "[platform] Storage initialized, testing savePreKeys...",

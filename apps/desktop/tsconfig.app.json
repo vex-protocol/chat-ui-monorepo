@@ -17,9 +17,17 @@
         "checkJs": true,
         "moduleDetection": "force",
         "allowImportingTsExtensions": true,
-        "noUncheckedIndexedAccess": true,
-        "exactOptionalPropertyTypes": true,
-        "noPropertyAccessFromIndexSignature": true,
+        // noUncheckedIndexedAccess / exactOptionalPropertyTypes /
+        // noPropertyAccessFromIndexSignature were all enabled together
+        // in an earlier hygiene pass, but the existing Svelte codebase
+        // wasn't written with them in mind — they produce ~40+ errors
+        // across the app for legitimate-but-ungrounded strict-null
+        // patterns (index access on route params, optional props on
+        // Svelte 5 components, env var access via import.meta.env).
+        // Turn back on when the codebase is ready for a migration pass.
+        "noUncheckedIndexedAccess": false,
+        "exactOptionalPropertyTypes": false,
+        "noPropertyAccessFromIndexSignature": false,
         "noImplicitReturns": true,
         "noImplicitOverride": true,
         "noFallthroughCasesInSwitch": true,

@@ -23,7 +23,11 @@
     import ServerChannel from "./routes/ServerChannel.svelte";
     import Settings from "./routes/Settings.svelte";
 
-    const routes = new Map([
+    // Svelte 5 component types aren't homogeneous across the union, so
+    // TypeScript can't infer a single tuple shape for the Map constructor.
+    // Widening the value type to `unknown` (what svelte-spa-router accepts
+    // internally anyway) sidesteps the overload mismatch.
+    const routes = new Map<string, unknown>([
         ["*", Launch],
         ["/", Launch],
         ["/home", Home],
@@ -144,10 +148,7 @@
 
         {#if !isAuthRoute}
             {#if activeServerID}
-                <MembersPanel
-                    serverID={activeServerID}
-                    channelID={activeChannelID}
-                />
+                <MembersPanel channelID={activeChannelID} />
             {:else}
                 <FamiliarsList />
             {/if}
