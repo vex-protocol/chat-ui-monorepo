@@ -16,31 +16,39 @@ config.resolver.unstable_enablePackageExports = true;
 
 // Stub Node-only modules that libvex@2.0.0 drags into the import graph.
 //
-// libvex's main index re-exports ./Client.js, which unconditionally
-// imports ./storage/node.js, which imports better-sqlite3, which
-// requires Node's "fs" module. React Native has no "fs", so Metro
-// bundling dies with "Unable to resolve module fs" unless we stub the
-// upstream require. apps/mobile uses expo-sqlite via kysely-expo for
-// persistence — libvex's node storage backend is dead code on mobile.
+// libvex's main index imports Client.js, which imports (at least):
+//   - storage/node.js  → better-sqlite3  → "fs"
+//   - utils/createLogger.js → winston → "os", "fs", "net", "tls", ...
 //
-// Instead of { type: "empty" } (which gives back an empty object and
-// would crash cryptically if anything tried to `new` the constructor),
-// resolve better-sqlite3 to a local stub that exports a real
-// constructor which throws a loud, descriptive error if actually
-// instantiated. That should never happen on mobile but gives us a
-// clear signal if libvex ever changes behavior.
+// React Native has none of those Node builtins, so Metro dies at
+// bundle time ("Unable to resolve module fs / os / ..."). Each entry
+// below redirects a single top-level Node package to a local stub,
+// short-circuiting the chain before Metro walks into Node-only code.
 //
-// Proper fix lives in libvex: either conditional `exports` with a
-// "react-native" key pointing at a non-Node storage backend, or
-// splitting storage into explicit submodules and not re-exporting
-// them from the main index. Remove this stub when libvex ships either.
-const betterSqlite3Stub = path.resolve(
-    projectRoot,
-    "src/lib/stubs/better-sqlite3.js",
-);
+// Design choices:
+//   - Stubs are real constructors / functions, not { type: "empty" },
+//     so a surprise `new X()` at module load gives a clear error
+//     instead of a cryptic "object is not a constructor" crash.
+//   - Stubs are in src/lib/stubs/<name>.js so they're tree-shakeable
+//     into the bundle with sensible file paths in stack traces.
+//
+// Adding another stub: create apps/mobile/src/lib/stubs/<name>.js,
+// add the entry to nodeStubs below. Done.
+//
+// Proper fix lives in libvex itself (conditional exports or a
+// platform-agnostic logger). Remove this block when libvex ships
+// either.
+const nodeStubs = {
+    "better-sqlite3": path.resolve(
+        projectRoot,
+        "src/lib/stubs/better-sqlite3.js",
+    ),
+    winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
+};
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-    if (moduleName === "better-sqlite3") {
-        return context.resolveRequest(context, betterSqlite3Stub, platform);
+    const stub = nodeStubs[moduleName];
+    if (stub !== undefined) {
+        return context.resolveRequest(context, stub, platform);
     }
     return context.resolveRequest(context, moduleName, platform);
 };
