@@ -1,32 +1,27 @@
 name: Mobile — Release PR
 
-# Maintains a rolling "chore: release mobile vX.Y.Z" PR against master.
-# On every push to master, Claude reads the diff since the last mobile-v*
-# tag, picks a semver bump, bumps apps/mobile/package.json, and writes
-# release notes into the PR body. Merging the PR triggers release-mobile.yml
-# which builds the APK and creates the GitHub Release with those notes.
+# Manually-triggered release PR workflow. When you're ready to cut a
+# release, run this from the Actions tab ("Run workflow" button).
+# Claude examines the diff since the last mobile-v* tag, picks a semver
+# bump, writes Common Changelog-style release notes with PR attribution,
+# bumps apps/mobile/package.json, commits everything to a rolling
+# `release-mobile` branch, and opens (or refreshes) a release PR. Merging
+# that PR triggers release-mobile.yml to build the APK and create the
+# GitHub Release with those notes.
 #
-# Skipped when: the push is from the release bot (loop prevention),
-# there are no material changes since the last tag, or the commit
-# message contains [skip release].
+# Why manual-only: anthropics/claude-code-action@v1 doesn't support
+# `push` events (only PR-scoped events + workflow_dispatch). Since we
+# decided against a PAT-based two-workflow chicken-and-egg, the trigger
+# is a single human click. Cadence is yours — typically every couple
+# weeks when enough has accumulated to warrant a new APK.
 #
-# Secrets: ANTHROPIC_API_KEY. Optional: RELEASE_BOT_PAT (a fine-grained
-# PAT with contents:write + pull-requests:write; if unset, falls back to
-# GITHUB_TOKEN but CI won't trigger on the release PR because GITHUB_TOKEN
-# pushes don't fire workflows).
+# Secrets: ANTHROPIC_API_KEY.
+# No PAT required — the resulting PR is reviewed and merged manually
+# by you (human click), which is outside GitHub's GITHUB_TOKEN
+# loop-prevention rule, so release-mobile.yml fires on that merge
+# without any special token.
 
 on:
-    push:
-        branches: [master]
-        # Only fire when something that could plausibly affect a mobile
-        # release actually changed. GitHub filters at the trigger level
-        # so no runner is allocated for desktop-only / docs-only pushes.
-        # workflow_dispatch below bypasses this for manual refreshes.
-        paths:
-            - "apps/mobile/**"
-            - "packages/store/**"
-            - "packages/ui/**"
-            - "pnpm-workspace.yaml"
     workflow_dispatch:
 
 concurrency:
@@ -38,10 +33,7 @@ permissions:
     pull-requests: read
 
 jobs:
-    maintain-release-pr:
-        if: >-
-            github.actor != 'github-actions[bot]' &&
-            !contains(github.event.head_commit.message, '[skip release]')
+    release-pr:
         runs-on: ubuntu-latest
         permissions:
             contents: write
@@ -56,7 +48,6 @@ jobs:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
               with:
                   fetch-depth: 0
-                  token: ${{ secrets.RELEASE_BOT_PAT || secrets.GITHUB_TOKEN }}
 
             - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
             - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
@@ -71,29 +62,26 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-            - name: Detect release-worthy changes
-              id: changes
+            - name: Find previous release tag
+              id: prev_tag
               run: |
-                  PREV_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 2>/dev/null || echo '')
-                  echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
-                  if [ -z "$PREV_TAG" ]; then
-                    echo "reason=first-release" >> $GITHUB_OUTPUT
-                    echo "changed=true" >> $GITHUB_OUTPUT
-                  elif ! git diff --quiet "$PREV_TAG" HEAD -- \
-                          apps/mobile packages/store packages/ui pnpm-workspace.yaml; then
-                    echo "reason=material-changes" >> $GITHUB_OUTPUT
-                    echo "changed=true" >> $GITHUB_OUTPUT
+                  PREV=$(git describe --tags --match='mobile-v*' --abbrev=0 2>/dev/null || echo '')
+                  echo "prev_tag=$PREV" >> $GITHUB_OUTPUT
+                  if [ -n "$PREV" ]; then
+                    echo "Previous release tag: $PREV"
                   else
-                    echo "changed=false" >> $GITHUB_OUTPUT
+                    echo "No previous mobile-v* tag — treating as first release"
                   fi
+
+            - name: Reset release branch to master
+              run: git checkout -B release-mobile
 
             - name: Decide release with Claude
               id: claude
-              if: steps.changes.outputs.changed == 'true'
               uses: anthropics/claude-code-action@21302532c2959a4f8f5e445004f617ef8b7b1dd7 # v1
               timeout-minutes: 10
               env:
-                  PREV_TAG: ${{ steps.changes.outputs.prev_tag }}
+                  PREV_TAG: ${{ steps.prev_tag.outputs.prev_tag }}
               with:
                   anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
                   prompt: |
@@ -310,7 +298,6 @@ jobs:
 
             - name: Extract Claude decision
               id: decision
-              if: steps.changes.outputs.changed == 'true'
               env:
                   CLAUDE_OUT: ${{ steps.claude.outputs.structured_output }}
               run: |
@@ -336,11 +323,9 @@ jobs:
                   cat /tmp/release-notes.md
 
             - name: Apply version bump + push release branch
-              if: steps.changes.outputs.changed == 'true'
               env:
                   NEW_VERSION: ${{ steps.decision.outputs.new_version }}
               run: |
-                  git checkout -B release-mobile
                   node -e "
                     const fs = require('fs');
                     const p = 'apps/mobile/package.json';
@@ -357,9 +342,8 @@ jobs:
                   git push origin +release-mobile
 
             - name: Create or update release PR
-              if: steps.changes.outputs.changed == 'true'
               env:
-                  GH_TOKEN: ${{ secrets.RELEASE_BOT_PAT || secrets.GITHUB_TOKEN }}
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   NEW_VERSION: ${{ steps.decision.outputs.new_version }}
               run: |
                   TITLE="chore: release mobile v${NEW_VERSION}"
@@ -373,13 +357,4 @@ jobs:
                       --head release-mobile \
                       --title "$TITLE" \
                       --body-file /tmp/release-notes.md
-                  fi
-
-            - name: Close stale release PR when nothing to ship
-              if: steps.changes.outputs.changed == 'false'
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  if gh pr view release-mobile --json number -q .number > /dev/null 2>&1; then
-                    gh pr close release-mobile --comment "Nothing to release — last tag is still current."
                   fi
