@@ -79,10 +79,32 @@ const nodeStubs = {
     winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
 };
 
+// Kysely's FileMigrationProvider uses `yield import(runtime-path)` in
+// BOTH its ESM and CJS builds — Node 14+ supports dynamic import() in
+// CJS so the compiler preserves the syntax. conditionNames can't help;
+// stubbing the specific file is the only way to keep it out of the
+// Hermes bytecode compilation path. Mobile never instantiates
+// FileMigrationProvider (it's dead code from Kysely's main index
+// re-exporting everything). The stub file throws if anyone tries.
+const pathStubs = [
+    {
+        match: /file-migration-provider(\.js|\.ts|\.cjs|\.mjs)?$/,
+        stub: path.resolve(
+            projectRoot,
+            "src/lib/stubs/kysely-file-migration-provider.js",
+        ),
+    },
+];
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
     const stub = nodeStubs[moduleName];
     if (stub !== undefined) {
         return context.resolveRequest(context, stub, platform);
+    }
+    for (const entry of pathStubs) {
+        if (entry.match.test(moduleName)) {
+            return context.resolveRequest(context, entry.stub, platform);
+        }
     }
     return context.resolveRequest(context, moduleName, platform);
 };
