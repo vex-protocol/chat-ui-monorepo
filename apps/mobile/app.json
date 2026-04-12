@@ -17,6 +17,11 @@
             "package": "chat.vex.mobile",
             "permissions": ["INTERNET", "POST_NOTIFICATIONS"]
         },
-        "plugins": ["expo-secure-store", "expo-sqlite", "expo-notifications"]
+        "plugins": [
+            "expo-secure-store",
+            "expo-sqlite",
+            "expo-notifications",
+            "./plugins/gradle-memory"
+        ]
     }
 }
