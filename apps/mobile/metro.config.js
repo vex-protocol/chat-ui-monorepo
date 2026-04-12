@@ -12,7 +12,42 @@ config.resolver.nodeModulesPaths = [
     path.resolve(monorepoRoot, "node_modules"),
 ];
 config.resolver.unstable_enableSymlinks = true;
+
+// Two flags working together to solve the libvex/Kysely/Hermes tangle:
+//
+//   1. unstable_enablePackageExports: true (Expo SDK 55 default)
+//      — needed so Metro can resolve subpath exports like
+//        "@vex-chat/libvex/storage/sqlite" (used in platform.ts),
+//        and workspace packages like "@vex-chat/store" that only
+//        declare their entry via "exports".
+//
+//   2. unstable_conditionNames: ['react-native', 'require']
+//      — forces Metro to prefer the CJS ("require") condition over
+//        the ESM ("import") condition when a package's exports map
+//        offers both. Kysely's ESM build of FileMigrationProvider
+//        contains `yield import(runtime-path)` which Hermes's bytecode
+//        compiler rejects with "Invalid expression encountered" during
+//        the release `createBundleReleaseJsAndAssets` Gradle task.
+//        Kysely's CJS build uses plain `require()` and compiles fine.
+//
+// Why not just disable package exports globally (the Bluesky approach):
+// Bluesky ships a single app with no workspace packages and no libvex-
+// style subpath imports. vex-chat has both — disabling exports globally
+// breaks "@vex-chat/store" resolution (exports-only package.json) and
+// "@vex-chat/libvex/storage/sqlite" subpath lookup. conditionNames
+// lets us keep exports on while avoiding the ESM paths that hit
+// Hermes.
+//
+// Condition resolution order:
+//   1. 'react-native' — preferred when a package has RN-specific code
+//   2. 'require' — CJS, skips ESM variants (avoids yield import() etc.)
+//   3. implicit 'default' fallback for packages with neither
+//
+// 'import' is intentionally ABSENT so Metro never picks ESM variants.
+// If a package is ESM-only (no require + no default), we'll see a
+// resolution failure and handle it case-by-case.
 config.resolver.unstable_enablePackageExports = true;
+config.resolver.unstable_conditionNames = ["react-native", "require"];
 
 // Stub Node-only modules that libvex@2.0.0 drags into the import graph.
 //
@@ -20,17 +55,15 @@ config.resolver.unstable_enablePackageExports = true;
 //   - storage/node.js  → better-sqlite3  → "fs"
 //   - utils/createLogger.js → winston → "os", "fs", "net", "tls", ...
 //
-// React Native has none of those Node builtins, so Metro dies at
-// bundle time ("Unable to resolve module fs / os / ..."). Each entry
-// below redirects a single top-level Node package to a local stub,
-// short-circuiting the chain before Metro walks into Node-only code.
+// React Native has none of those Node builtins. Even with package
+// exports off, these are genuine Node-only top-level deps that fail
+// to bundle — CJS doesn't save them. Stubbing is the right answer here.
 //
 // Design choices:
 //   - Stubs are real constructors / functions, not { type: "empty" },
 //     so a surprise `new X()` at module load gives a clear error
 //     instead of a cryptic "object is not a constructor" crash.
-//   - Stubs are in src/lib/stubs/<name>.js so they're tree-shakeable
-//     into the bundle with sensible file paths in stack traces.
+//   - Stubs live in src/lib/stubs/<name>.js so stack traces are readable.
 //
 // Adding another stub: create apps/mobile/src/lib/stubs/<name>.js,
 // add the entry to nodeStubs below. Done.
@@ -45,6 +78,7 @@ const nodeStubs = {
     ),
     winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
 };
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
     const stub = nodeStubs[moduleName];
     if (stub !== undefined) {
