@@ -1,7 +1,7 @@
 {
     "expo": {
         "name": "Vex",
-        "slug": "vex-chat",
+        "slug": "vex",
         "version": "0.1.0",
         "scheme": "vex",
         "newArchEnabled": true,
