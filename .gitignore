@@ -20,6 +20,9 @@ apps/mobile/android/
 .dolt/
 *.db
 
+# Beads auto-generated backup dumps — noisy, regenerated per run
+.beads/backup/
+
 .expo
 
 # Verdaccio local registry
