@@ -8,7 +8,7 @@
 import type { Storage } from "@vex-chat/libvex";
 import type { BootstrapConfig } from "@vex-chat/store";
 
-import { getServerUrl } from "./config.js";
+import { getServerIdentity } from "./config.js";
 
 export function desktopConfig(): BootstrapConfig {
     return {
@@ -50,7 +50,7 @@ export function desktopConfig(): BootstrapConfig {
 }
 
 function scopedDbName(): string {
-    const host = getServerUrl()
+    const host = getServerIdentity()
         .replace(/^https?:\/\//, "")
         .replace(/\/+$/, "")
         .toLowerCase()

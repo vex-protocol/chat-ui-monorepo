@@ -1,6 +1,6 @@
 import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
-import { getServerUrl } from "./config.js";
+import { getServerIdentity } from "./config.js";
 
 const SERVICE_PREFIX = "com.vex-chat.desktop";
 const ACTIVE_USER_LS_PREFIX = "vex-active-user";
@@ -96,7 +96,7 @@ class KeyringKeyStore implements KeyStore {
 }
 
 function activeUserKey(): string {
-    return `${ACTIVE_USER_LS_PREFIX}.${scopeFromHost(getServerUrl())}`;
+    return `${ACTIVE_USER_LS_PREFIX}.${scopeFromHost(getServerIdentity())}`;
 }
 
 /**
@@ -115,7 +115,7 @@ function scopeFromHost(host: string): string {
 }
 
 function serviceName(): string {
-    return `${SERVICE_PREFIX}.${scopeFromHost(getServerUrl())}`;
+    return `${SERVICE_PREFIX}.${scopeFromHost(getServerIdentity())}`;
 }
 
 // ── localStorage fallback (dev mode without Tauri runtime) ──────────────────
@@ -124,7 +124,7 @@ const LS_PREFIX = "vex-ks";
 
 class LocalStorageKeyStore implements KeyStore {
     clear(username: string): Promise<void> {
-        const scope = scopeFromHost(getServerUrl());
+        const scope = scopeFromHost(getServerIdentity());
         localStorage.removeItem(`${LS_PREFIX}.${scope}.${username}`);
         if (localStorage.getItem(activeUserKey()) === username) {
             localStorage.removeItem(activeUserKey());
@@ -133,7 +133,7 @@ class LocalStorageKeyStore implements KeyStore {
     }
 
     load(username?: string): Promise<null | StoredCredentials> {
-        const scope = scopeFromHost(getServerUrl());
+        const scope = scopeFromHost(getServerIdentity());
         const user = username ?? localStorage.getItem(activeUserKey());
         if (!user) return Promise.resolve(null);
         const raw = localStorage.getItem(`${LS_PREFIX}.${scope}.${user}`);
@@ -150,7 +150,7 @@ class LocalStorageKeyStore implements KeyStore {
     }
 
     save(creds: StoredCredentials): Promise<void> {
-        const scope = scopeFromHost(getServerUrl());
+        const scope = scopeFromHost(getServerIdentity());
         localStorage.setItem(
             `${LS_PREFIX}.${scope}.${creds.username}`,
             JSON.stringify(creds),
