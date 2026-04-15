@@ -81,7 +81,9 @@ export function OnboardingEmptyScreen() {
                     accentColor="#4CAF50"
                     badge="CREATE"
                     icon={<GroupIcon color="#4CAF50" />}
-                    onPress={() => {}}
+                    onPress={() => {
+                        navigation.navigate("AddServer");
+                    }}
                     subtitle="Start a new conversation space"
                     title="Create group"
                 />
