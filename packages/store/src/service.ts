@@ -6,11 +6,14 @@
  * Components subscribe to readonly atom exports from domains/.
  */
 import type {
+    Channel,
+    ClientEvents,
     ClientOptions,
     Invite,
     KeyStore,
-    Logger,
     Message,
+    Permission,
+    Server,
     Storage,
     User,
 } from "@vex-chat/libvex";
@@ -48,13 +51,8 @@ export interface AuthResult {
 
 /** App-provided platform configuration for client bootstrap. */
 export interface BootstrapConfig {
-    createStorage(
-        dbName: string,
-        privateKey: string,
-        logger: Logger,
-    ): Promise<Storage>;
+    createStorage(dbName: string, privateKey: string): Promise<Storage>;
     deviceName: string;
-    logger: Logger;
 }
 
 /** Result from any mutation operation. */
@@ -80,8 +78,33 @@ export interface ServerOptions {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+interface HttpErrorLike {
+    response: { status: number };
+}
+
+class Disposable {
+    private fns: Array<() => void> = [];
+
+    add(fn: () => void): void {
+        this.fns.push(fn);
+    }
+
+    dispose(): void {
+        const fns = this.fns;
+        this.fns = [];
+        for (const fn of fns) {
+            try {
+                fn();
+            } catch (e: unknown) {
+                console.error("[vex-store] disposer threw", e);
+            }
+        }
+    }
+}
+
 class VexService {
     private client: Client | null = null;
+    private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
 
     // ── Auth flows ──────────────────────────────────────────────────────
@@ -95,61 +118,29 @@ class VexService {
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<AuthResult> {
-        console.log("[vex-store] autoLogin: loading keyStore...");
         let creds;
         try {
             creds = await keyStore.load();
         } catch (loadErr: unknown) {
-            console.error(
-                "[vex-store] autoLogin: keyStore.load() threw:",
-                loadErr,
-            );
             return { error: errorMessage(loadErr), ok: false };
         }
-        if (!creds) {
-            console.log(
-                "[vex-store] autoLogin: no creds found, returning ok:false",
-            );
-            return { ok: false };
-        }
-        console.log("[vex-store] autoLogin: creds found for", creds.username);
+        if (!creds) return { ok: false };
 
         try {
-            console.log("[vex-store] autoLogin: initClient...");
             await this.initClient(creds.deviceKey, config, options);
             const client = this.requireClient();
-            console.log(
-                "[vex-store] autoLogin: client created, calling loginWithDeviceKey...",
-            );
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
-            console.log(
-                "[vex-store] autoLogin: loginWithDeviceKey result:",
-                authErr?.message ?? "success",
-            );
             if (authErr) {
-                console.log(
-                    "[vex-store] autoLogin: auth failed, closing client...",
-                );
                 await this.close();
-                console.log(
-                    "[vex-store] autoLogin: client closed, returning ok:false",
-                );
                 return { error: authErr.message, ok: false };
             }
 
-            console.log("[vex-store] autoLogin: connecting...");
             await client.connect();
             $userWritable.set(client.me.user());
-            console.log("[vex-store] autoLogin: populating state...");
             await this.populateState();
-            console.log("[vex-store] autoLogin: done, ok:true");
             return { ok: true };
         } catch (err: unknown) {
-            console.error(
-                "[vex-store] autoLogin: caught error:",
-                errorMessage(err),
-            );
             try {
                 await this.close();
             } catch {
@@ -165,6 +156,7 @@ class VexService {
     async close(): Promise<void> {
         if (this.client) {
             const c = this.client;
+            this.unwireEvents();
             this.client = null;
             try {
                 await c.close(true);
@@ -301,23 +293,14 @@ class VexService {
             $userWritable.set(client.me.user());
 
             if (!creds) {
-                this.log(
-                    "No saved creds for " +
-                        username +
-                        " — registering new device",
-                );
                 try {
                     await client.devices.register();
-                    this.log(
-                        "Device registered: " + client.me.device().deviceID,
-                    );
                 } catch (regErr: unknown) {
                     // 470 = device with this signing key already exists — reuse it
                     if (!this.isDeviceExistsError(regErr)) {
-                        this.log(
-                            "Device registration failed: " +
-                                errorMessage(regErr),
-                        );
+                        await this.close();
+                        this.resetAll();
+                        return { error: errorMessage(regErr), ok: false };
                     }
                 }
                 await this.saveCredentials(keyStore, {
@@ -461,23 +444,76 @@ class VexService {
 
     // ── Private ─────────────────────────────────────────────────────────
 
+    private ensureFamiliarCached(userID: string): void {
+        if ($familiarsWritable.get()[userID]) return;
+        if (this.failedUserLookups.has(userID)) return;
+
+        $familiarsWritable.setKey(userID, {
+            lastSeen: new Date().toISOString(),
+            userID,
+            username: userID.slice(0, 8),
+        });
+
+        const client = this.client;
+        if (!client) return;
+        client.users
+            .retrieve(userID)
+            .then(([u]) => {
+                if (u) {
+                    $familiarsWritable.setKey(userID, u);
+                } else {
+                    this.failedUserLookups.add(userID);
+                }
+            })
+            .catch(() => {
+                this.failedUserLookups.add(userID);
+            });
+    }
+
+    private handleDirectMessage(msg: Message): void {
+        const me = $userWritable.get();
+        const isOwnMessage = Boolean(me && msg.authorID === me.userID);
+        const threadKey = isOwnMessage ? msg.readerID : msg.authorID;
+        const prev = $messagesWritable.get()[threadKey] ?? [];
+        if (prev.some((m) => m.mailID === msg.mailID)) return;
+
+        $messagesWritable.setKey(threadKey, [...prev, msg]);
+
+        if (!isOwnMessage) {
+            const count = ($dmUnreadCountsWritable.get()[threadKey] ?? 0) + 1;
+            $dmUnreadCountsWritable.setKey(threadKey, count);
+        }
+
+        this.ensureFamiliarCached(threadKey);
+    }
+
+    private handleGroupMessage(msg: Message, channelID: string): void {
+        const prev = $groupMessagesWritable.get()[channelID] ?? [];
+        if (prev.some((m) => m.mailID === msg.mailID)) return;
+
+        $groupMessagesWritable.setKey(channelID, [...prev, msg]);
+
+        const me = $userWritable.get();
+        if (me && msg.authorID !== me.userID) {
+            const count =
+                ($channelUnreadCountsWritable.get()[channelID] ?? 0) + 1;
+            $channelUnreadCountsWritable.setKey(channelID, count);
+        }
+    }
+
     private async initClient(
         privateKey: string,
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<void> {
+        await this.close();
         this.resetAll();
 
-        const storage = await config.createStorage(
-            "vex-client.db",
-            privateKey,
-            config.logger,
-        );
+        const storage = await config.createStorage("vex-client.db", privateKey);
 
         const clientOptions: ClientOptions = {
             ...options,
             deviceName: config.deviceName,
-            logger: config.logger,
         };
 
         this.client = await Client.create(privateKey, clientOptions, storage);
@@ -485,114 +521,75 @@ class VexService {
     }
 
     private isDeviceExistsError(err: unknown): boolean {
-        if (
-            err instanceof Error &&
-            "response" in err &&
-            typeof (err as Record<string, unknown>)["response"] === "object"
-        ) {
-            const response = (err as Record<string, unknown>)["response"] as
-                | undefined
-                | { status?: number };
-            return response?.status === 470;
-        }
-        return false;
-    }
-
-    private log(message: string): void {
-        const logger = this.client
-            ? // @ts-expect-error -- accessing internal logger for debug output
-              (this.client as { log?: Logger }).log
-            : undefined;
-        if (logger) {
-            logger.warn("[vex-store] " + message);
-        } else {
-            console.warn("[vex-store] " + message);
-        }
+        return hasHttpStatus(err) && err.response.status === 470;
     }
 
     private async populateState(): Promise<void> {
         const client = this.requireClient();
-        try {
-            const servers = await client.servers.retrieve();
-            console.log(
-                "[vex-store] populateState: found",
-                servers.length,
-                "servers",
-            );
-            for (const server of servers) {
-                $serversWritable.setKey(server.serverID, server);
-                const channels = await client.channels.retrieve(
-                    server.serverID,
-                );
-                console.log(
-                    "[vex-store] server",
-                    server.name,
-                    "has",
-                    channels.length,
-                    "channels",
-                );
-                $channelsWritable.setKey(server.serverID, channels);
 
-                for (const channel of channels) {
+        const serversAcc: Record<string, Server> = {};
+        const channelsAcc: Record<string, Channel[]> = {};
+        const groupMessagesAcc: Record<string, Message[]> = {};
+        const permsAcc: Record<string, Permission> = {};
+        const familiarsAcc: Record<string, User> = {};
+        const messagesAcc: Record<string, Message[]> = {};
+
+        const loadServer = async (server: Server): Promise<void> => {
+            serversAcc[server.serverID] = server;
+            const channels = await client.channels.retrieve(server.serverID);
+            channelsAcc[server.serverID] = channels;
+
+            await Promise.all(
+                channels.map(async (channel) => {
                     try {
                         const msgs = await client.messages.retrieveGroup(
                             channel.channelID,
                         );
-                        console.log(
-                            "[vex-store] channel",
-                            channel.name,
-                            "(",
-                            channel.channelID,
-                            ") has",
-                            msgs.length,
-                            "local messages",
-                        );
                         if (msgs.length > 0) {
-                            console.log(
-                                "[vex-store] first msg:",
-                                JSON.stringify(msgs[0], null, 2),
-                            );
-                            $groupMessagesWritable.setKey(
-                                channel.channelID,
-                                deduplicateMessages(msgs),
-                            );
-                        }
-                    } catch (e: unknown) {
-                        console.error(
-                            "[vex-store] retrieveGroup failed for",
-                            channel.channelID,
-                            e,
-                        );
-                    }
-                }
-            }
-
-            const perms = await client.permissions.retrieve();
-            for (const perm of perms) {
-                $permissionsWritable.setKey(perm.permissionID, perm);
-            }
-
-            try {
-                const familiars = await client.users.familiars();
-                for (const user of familiars) {
-                    $familiarsWritable.setKey(user.userID, user);
-                    try {
-                        const msgs = await client.messages.retrieve(
-                            user.userID,
-                        );
-                        if (msgs.length > 0) {
-                            $messagesWritable.setKey(
-                                user.userID,
-                                deduplicateMessages(msgs),
-                            );
+                            groupMessagesAcc[channel.channelID] =
+                                deduplicateMessages(msgs);
                         }
                     } catch {
                         /* non-fatal */
                     }
+                }),
+            );
+        };
+
+        const loadFamiliar = async (user: User): Promise<void> => {
+            familiarsAcc[user.userID] = user;
+            try {
+                const msgs = await client.messages.retrieve(user.userID);
+                if (msgs.length > 0) {
+                    messagesAcc[user.userID] = deduplicateMessages(msgs);
                 }
             } catch {
                 /* non-fatal */
             }
+        };
+
+        try {
+            const [servers, perms, familiars] = await Promise.all([
+                client.servers.retrieve(),
+                client.permissions.retrieve().catch(() => [] as Permission[]),
+                client.users.familiars().catch(() => [] as User[]),
+            ]);
+
+            for (const perm of perms) {
+                permsAcc[perm.permissionID] = perm;
+            }
+
+            await Promise.all([
+                ...servers.map((s) => loadServer(s)),
+                ...familiars.map((u) => loadFamiliar(u)),
+            ]);
+
+            $serversWritable.set(serversAcc);
+            $channelsWritable.set(channelsAcc);
+            $groupMessagesWritable.set(groupMessagesAcc);
+            $permissionsWritable.set(permsAcc);
+            $familiarsWritable.set(familiarsAcc);
+            $messagesWritable.set(messagesAcc);
         } catch {
             /* non-fatal — UI will show empty state */
         }
@@ -631,94 +628,33 @@ class VexService {
         },
     ): Promise<void> {
         try {
-            this.log(
-                "Saving creds: " +
-                    JSON.stringify({
-                        deviceID: creds.deviceID,
-                        username: creds.username,
-                    }),
-            );
             await keyStore.save(creds);
-            this.log("Creds saved successfully");
-        } catch (err: unknown) {
-            this.log("keyStore.save failed: " + errorMessage(err));
+        } catch {
+            /* ignore — keystore failures are non-fatal here */
         }
     }
 
-    private wireEvents(): void {
+    private subscribe<E extends keyof ClientEvents>(
+        evt: E,
+        fn: ClientEvents[E],
+    ): void {
         const client = this.requireClient();
+        client.on(evt, fn);
+        this.disposable.add(() => {
+            this.client?.off(evt, fn);
+        });
+    }
 
-        client.on("message", (msg: Message) => {
-            console.log("[vex-store] message event:", {
-                authorID: msg.authorID,
-                direction: msg.direction,
-                group: msg.group,
-                mailID: msg.mailID.slice(0, 8),
-                message: msg.message.slice(0, 50),
-                timestamp: msg.timestamp,
-            });
-            const me = $userWritable.get();
+    private unwireEvents(): void {
+        this.disposable.dispose();
+    }
 
+    private wireEvents(): void {
+        this.subscribe("message", (msg) => {
             if (msg.group) {
-                const prev = $groupMessagesWritable.get()[msg.group] ?? [];
-                console.log(
-                    "[vex-store] group msg for channel",
-                    msg.group,
-                    "prev count:",
-                    prev.length,
-                    "dupe:",
-                    prev.some((m) => m.mailID === msg.mailID),
-                );
-                if (!prev.some((m) => m.mailID === msg.mailID)) {
-                    $groupMessagesWritable.setKey(msg.group, [...prev, msg]);
-                    console.log(
-                        "[vex-store] stored. new count:",
-                        $groupMessagesWritable.get()[msg.group]?.length,
-                    );
-                    if (me && msg.authorID !== me.userID) {
-                        const count =
-                            ($channelUnreadCountsWritable.get()[msg.group] ??
-                                0) + 1;
-                        $channelUnreadCountsWritable.setKey(msg.group, count);
-                    }
-                }
+                this.handleGroupMessage(msg, msg.group);
             } else {
-                const isOwnMessage = me && msg.authorID === me.userID;
-                const threadKey = isOwnMessage ? msg.readerID : msg.authorID;
-                const prev = $messagesWritable.get()[threadKey] ?? [];
-
-                if (!prev.some((m) => m.mailID === msg.mailID)) {
-                    $messagesWritable.setKey(threadKey, [...prev, msg]);
-                    if (!isOwnMessage) {
-                        const count =
-                            ($dmUnreadCountsWritable.get()[threadKey] ?? 0) + 1;
-                        $dmUnreadCountsWritable.setKey(threadKey, count);
-                    }
-
-                    const otherUserID = threadKey;
-                    if (
-                        !$familiarsWritable.get()[otherUserID] &&
-                        !this.failedUserLookups.has(otherUserID)
-                    ) {
-                        $familiarsWritable.setKey(otherUserID, {
-                            lastSeen: new Date().toISOString(),
-                            userID: otherUserID,
-                            username: otherUserID.slice(0, 8),
-                        });
-                        client.users
-                            .retrieve(otherUserID)
-                            .then(([u]) => {
-                                if (u) {
-                                    $familiarsWritable.setKey(otherUserID, u);
-                                } else {
-                                    this.failedUserLookups.add(otherUserID);
-                                }
-                            })
-                            .catch(() => {
-                                this.failedUserLookups.add(otherUserID);
-                            });
-                    }
-                }
+                this.handleDirectMessage(msg);
             }
         });
     }
@@ -733,10 +669,21 @@ function deduplicateMessages(messages: Message[]): Message[] {
     });
 }
 
-// ── VexService ──────────────────────────────────────────────────────────────
-
 function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
+}
+
+// ── VexService ──────────────────────────────────────────────────────────────
+
+function hasHttpStatus(err: unknown): err is HttpErrorLike {
+    if (!(err instanceof Error) || !("response" in err)) return false;
+    const res = (err as { response: unknown }).response;
+    return (
+        typeof res === "object" &&
+        res !== null &&
+        "status" in res &&
+        typeof (res as { status: unknown }).status === "number"
+    );
 }
 
 export const vexService = new VexService();
