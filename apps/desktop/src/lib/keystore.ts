@@ -1,7 +1,7 @@
 import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
 const SERVICE = "com.vex-chat.desktop";
-const ACTIVE_USER_KEY = "__vex_active_user__";
+const ACTIVE_USER_LS_KEY = "vex-active-user";
 
 /**
  * KeyStore backed by OS native credential stores via tauri-plugin-keyring.
@@ -10,37 +10,41 @@ const ACTIVE_USER_KEY = "__vex_active_user__";
  * Windows: Credential Manager
  * Linux: Secret Service (GNOME Keyring / KWallet)
  *
- * Credentials are stored as JSON strings in the OS keychain, keyed by
- * service name + username. The active user is tracked separately.
+ * Only the actual credentials blob (private key, tokens) hits the keychain.
+ * The active-user pointer (just a username string, non-sensitive) lives in
+ * localStorage to avoid an extra keychain prompt per session.
  */
 class KeyringKeyStore implements KeyStore {
+    private credsCache = new Map<string, StoredCredentials>();
     private keyring: null | typeof import("tauri-plugin-keyring-api") = null;
 
     async clear(username: string): Promise<void> {
         const kr = await this.getKeyring();
+        this.credsCache.delete(username);
         try {
             await kr.deletePassword(SERVICE, username);
         } catch {
             /* may not exist */
         }
-        const active = await this.getActiveUser(kr);
-        if (active === username) {
-            try {
-                await kr.deletePassword(SERVICE, ACTIVE_USER_KEY);
-            } catch {
-                /* ok */
-            }
+        if (this.getActiveUser() === username) {
+            localStorage.removeItem(ACTIVE_USER_LS_KEY);
         }
     }
 
     async load(username?: string): Promise<null | StoredCredentials> {
-        const kr = await this.getKeyring();
-        const user = username ?? (await this.getActiveUser(kr));
+        const user = username ?? this.getActiveUser();
         if (!user) return null;
+
+        const cached = this.credsCache.get(user);
+        if (cached) return cached;
+
+        const kr = await this.getKeyring();
         const raw = await kr.getPassword(SERVICE, user);
         if (!raw) return null;
         try {
-            return JSON.parse(raw) as StoredCredentials;
+            const parsed = JSON.parse(raw) as StoredCredentials;
+            this.credsCache.set(user, parsed);
+            return parsed;
         } catch {
             return null;
         }
@@ -51,19 +55,25 @@ class KeyringKeyStore implements KeyStore {
     }
 
     async save(creds: StoredCredentials): Promise<void> {
+        const existing = this.credsCache.get(creds.username);
+        const serialized = JSON.stringify(creds);
+
+        if (existing && JSON.stringify(existing) === serialized) {
+            if (this.getActiveUser() !== creds.username) {
+                localStorage.setItem(ACTIVE_USER_LS_KEY, creds.username);
+            }
+            return;
+        }
+
+        this.credsCache.set(creds.username, creds);
+        localStorage.setItem(ACTIVE_USER_LS_KEY, creds.username);
+
         const kr = await this.getKeyring();
-        await kr.setPassword(SERVICE, creds.username, JSON.stringify(creds));
-        await kr.setPassword(SERVICE, ACTIVE_USER_KEY, creds.username);
+        await kr.setPassword(SERVICE, creds.username, serialized);
     }
 
-    private async getActiveUser(
-        kr: typeof import("tauri-plugin-keyring-api"),
-    ): Promise<null | string> {
-        try {
-            return await kr.getPassword(SERVICE, ACTIVE_USER_KEY);
-        } catch {
-            return null;
-        }
+    private getActiveUser(): null | string {
+        return localStorage.getItem(ACTIVE_USER_LS_KEY);
     }
 
     private async getKeyring() {
