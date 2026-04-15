@@ -10,10 +10,12 @@ import type { BootstrapConfig } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
+import { getServerUrl } from "./config.js";
+
 export function mobileConfig(): BootstrapConfig {
     return {
         async createStorage(
-            dbName: string,
+            _dbName: string,
             privateKey: string,
         ): Promise<Storage> {
             const { Kysely } = await import("kysely");
@@ -21,6 +23,7 @@ export function mobileConfig(): BootstrapConfig {
             const { SqliteStorage } =
                 await import("@vex-chat/libvex/storage/sqlite");
 
+            const dbName = scopedDbName();
             const db = new Kysely({
                 dialect: new ExpoDialect({ database: dbName }),
             });
@@ -30,4 +33,13 @@ export function mobileConfig(): BootstrapConfig {
         },
         deviceName: Platform.OS,
     };
+}
+
+function scopedDbName(): string {
+    const host = getServerUrl()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-");
+    return `vex-client.${host}.db`;
 }
