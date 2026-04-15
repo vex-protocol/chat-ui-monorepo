@@ -13,8 +13,8 @@ import { getServerIdentity } from "./config.js";
 export function desktopConfig(): BootstrapConfig {
     return {
         async createStorage(
-            _dbName: string,
             privateKey: string,
+            username: string,
         ): Promise<Storage> {
             const { Kysely } = await import("kysely");
             const { TauriSqliteDialect } = await import("kysely-dialect-tauri");
@@ -23,7 +23,7 @@ export function desktopConfig(): BootstrapConfig {
             const { SqliteStorage } =
                 await import("@vex-chat/libvex/storage/sqlite");
 
-            const dbName = scopedDbName();
+            const dbName = scopedDbName(username);
             const db = new Kysely({
                 dialect: new TauriSqliteDialect({
                     database: () => Database.load(`sqlite:${dbName}`),
@@ -49,11 +49,14 @@ export function desktopConfig(): BootstrapConfig {
     };
 }
 
-function scopedDbName(): string {
-    const host = getServerIdentity()
+function sanitize(s: string): string {
+    return s
         .replace(/^https?:\/\//, "")
         .replace(/\/+$/, "")
         .toLowerCase()
         .replace(/[^a-z0-9._-]+/g, "-");
-    return `vex-client.${host}.db`;
+}
+
+function scopedDbName(username: string): string {
+    return `vex-client.${sanitize(getServerIdentity())}.${sanitize(username)}.db`;
 }

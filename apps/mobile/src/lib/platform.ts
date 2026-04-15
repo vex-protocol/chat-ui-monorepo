@@ -15,15 +15,15 @@ import { getServerUrl } from "./config";
 export function mobileConfig(): BootstrapConfig {
     return {
         async createStorage(
-            _dbName: string,
             privateKey: string,
+            username: string,
         ): Promise<Storage> {
             const { Kysely } = await import("kysely");
             const { ExpoDialect } = await import("kysely-expo");
             const { SqliteStorage } =
                 await import("@vex-chat/libvex/storage/sqlite");
 
-            const dbName = scopedDbName();
+            const dbName = scopedDbName(username);
             const db = new Kysely({
                 dialect: new ExpoDialect({ database: dbName }),
             });
@@ -35,11 +35,14 @@ export function mobileConfig(): BootstrapConfig {
     };
 }
 
-function scopedDbName(): string {
-    const host = getServerUrl()
+function sanitize(s: string): string {
+    return s
         .replace(/^https?:\/\//, "")
         .replace(/\/+$/, "")
         .toLowerCase()
         .replace(/[^a-z0-9._-]+/g, "-");
-    return `vex-client.${host}.db`;
+}
+
+function scopedDbName(username: string): string {
+    return `vex-client.${sanitize(getServerUrl())}.${sanitize(username)}.db`;
 }

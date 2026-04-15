@@ -51,7 +51,14 @@ export interface AuthResult {
 
 /** App-provided platform configuration for client bootstrap. */
 export interface BootstrapConfig {
-    createStorage(dbName: string, privateKey: string): Promise<Storage>;
+    /**
+     * Open (or create) per-identity local storage. Platforms compose the
+     * final file path from `username` + the configured server host so each
+     * identity on each server owns an isolated encrypted DB. Switching
+     * between identities is non-destructive; sealed columns stay paired
+     * with the deviceKey that encrypted them.
+     */
+    createStorage(privateKey: string, username: string): Promise<Storage>;
     deviceName: string;
 }
 
@@ -127,7 +134,12 @@ class VexService {
         if (!creds) return { ok: false };
 
         try {
-            await this.initClient(creds.deviceKey, config, options);
+            await this.initClient(
+                creds.deviceKey,
+                creds.username,
+                config,
+                options,
+            );
             const client = this.requireClient();
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
@@ -278,7 +290,7 @@ class VexService {
             const creds = await keyStore.load(username);
             const privateKey = creds?.deviceKey ?? Client.generateSecretKey();
 
-            await this.initClient(privateKey, config, options);
+            await this.initClient(privateKey, username, config, options);
             const client = this.requireClient();
 
             const loginResult = await client.login(username, password);
@@ -358,7 +370,7 @@ class VexService {
     ): Promise<AuthResult> {
         try {
             const privateKey = Client.generateSecretKey();
-            await this.initClient(privateKey, config, options);
+            await this.initClient(privateKey, username, config, options);
             const client = this.requireClient();
 
             const [user, regErr] = await client.register(username, password);
@@ -503,13 +515,14 @@ class VexService {
 
     private async initClient(
         privateKey: string,
+        username: string,
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<void> {
         await this.close();
         this.resetAll();
 
-        const storage = await config.createStorage("vex-client.db", privateKey);
+        const storage = await config.createStorage(privateKey, username);
 
         const clientOptions: ClientOptions = {
             ...options,
