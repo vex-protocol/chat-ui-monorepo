@@ -10,7 +10,7 @@ import type { BootstrapConfig } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
-import { getServerUrl } from "./config.js";
+import { getServerUrl } from "./config";
 
 export function mobileConfig(): BootstrapConfig {
     return {

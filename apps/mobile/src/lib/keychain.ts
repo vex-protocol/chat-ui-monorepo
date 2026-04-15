@@ -2,7 +2,7 @@ import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
 import * as SecureStore from "expo-secure-store";
 
-import { getServerUrl } from "./config.js";
+import { getServerUrl } from "./config";
 
 const CREDS_KEY_PREFIX = "vex-device-credentials";
 
