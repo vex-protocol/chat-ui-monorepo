@@ -2,7 +2,9 @@
 // detect a dev build. Vite substitutes `import.meta.env.DEV` at build time
 // but libvex inspects the runtime `process` global directly.
 if (typeof (globalThis as { process?: unknown }).process === "undefined") {
-    (globalThis as { process: { env: { NODE_ENV: string } } }).process = {
+    (
+        globalThis as unknown as { process: { env: { NODE_ENV: string } } }
+    ).process = {
         env: {
             NODE_ENV: import.meta.env.DEV ? "development" : "production",
         },

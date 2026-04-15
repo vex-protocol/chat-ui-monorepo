@@ -1,7 +1,9 @@
 import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
-const SERVICE = "com.vex-chat.desktop";
-const ACTIVE_USER_LS_KEY = "vex-active-user";
+import { getServerUrl } from "./config.js";
+
+const SERVICE_PREFIX = "com.vex-chat.desktop";
+const ACTIVE_USER_LS_PREFIX = "vex-active-user";
 
 /**
  * KeyStore backed by OS native credential stores via tauri-plugin-keyring.
@@ -10,9 +12,9 @@ const ACTIVE_USER_LS_KEY = "vex-active-user";
  * Windows: Credential Manager
  * Linux: Secret Service (GNOME Keyring / KWallet)
  *
- * Only the actual credentials blob (private key, tokens) hits the keychain.
- * The active-user pointer (just a username string, non-sensitive) lives in
- * localStorage to avoid an extra keychain prompt per session.
+ * Credentials are scoped by server host — switching between prod/local/etc
+ * uses isolated keychain slots, so a deviceKey registered against one
+ * server never clobbers another's.
  */
 class KeyringKeyStore implements KeyStore {
     private credsCache = new Map<string, StoredCredentials>();
@@ -20,30 +22,33 @@ class KeyringKeyStore implements KeyStore {
 
     async clear(username: string): Promise<void> {
         const kr = await this.getKeyring();
-        this.credsCache.delete(username);
+        const service = serviceName();
+        this.credsCache.delete(this.cacheKey(service, username));
         try {
-            await kr.deletePassword(SERVICE, username);
+            await kr.deletePassword(service, username);
         } catch {
             /* may not exist */
         }
         if (this.getActiveUser() === username) {
-            localStorage.removeItem(ACTIVE_USER_LS_KEY);
+            localStorage.removeItem(activeUserKey());
         }
     }
 
     async load(username?: string): Promise<null | StoredCredentials> {
+        const service = serviceName();
         const user = username ?? this.getActiveUser();
         if (!user) return null;
 
-        const cached = this.credsCache.get(user);
+        const key = this.cacheKey(service, user);
+        const cached = this.credsCache.get(key);
         if (cached) return cached;
 
         const kr = await this.getKeyring();
-        const raw = await kr.getPassword(SERVICE, user);
+        const raw = await kr.getPassword(service, user);
         if (!raw) return null;
         try {
             const parsed = JSON.parse(raw) as StoredCredentials;
-            this.credsCache.set(user, parsed);
+            this.credsCache.set(key, parsed);
             return parsed;
         } catch {
             return null;
@@ -55,25 +60,31 @@ class KeyringKeyStore implements KeyStore {
     }
 
     async save(creds: StoredCredentials): Promise<void> {
-        const existing = this.credsCache.get(creds.username);
+        const service = serviceName();
+        const key = this.cacheKey(service, creds.username);
+        const existing = this.credsCache.get(key);
         const serialized = JSON.stringify(creds);
 
         if (existing && JSON.stringify(existing) === serialized) {
             if (this.getActiveUser() !== creds.username) {
-                localStorage.setItem(ACTIVE_USER_LS_KEY, creds.username);
+                localStorage.setItem(activeUserKey(), creds.username);
             }
             return;
         }
 
-        this.credsCache.set(creds.username, creds);
-        localStorage.setItem(ACTIVE_USER_LS_KEY, creds.username);
+        this.credsCache.set(key, creds);
+        localStorage.setItem(activeUserKey(), creds.username);
 
         const kr = await this.getKeyring();
-        await kr.setPassword(SERVICE, creds.username, serialized);
+        await kr.setPassword(service, creds.username, serialized);
+    }
+
+    private cacheKey(service: string, username: string): string {
+        return `${service}\u0000${username}`;
     }
 
     private getActiveUser(): null | string {
-        return localStorage.getItem(ACTIVE_USER_LS_KEY);
+        return localStorage.getItem(activeUserKey());
     }
 
     private async getKeyring() {
@@ -84,24 +95,48 @@ class KeyringKeyStore implements KeyStore {
     }
 }
 
+function activeUserKey(): string {
+    return `${ACTIVE_USER_LS_PREFIX}.${scopeFromHost(getServerUrl())}`;
+}
+
+/**
+ * Sanitize a host string into a stable identifier for scoping keychain and
+ * localStorage keys. Strips protocol + trailing slashes, lowercases, and
+ * replaces everything outside [a-z0-9._-] with a single dash so the result
+ * is safe for use as part of a macOS Keychain service name and a
+ * localStorage key.
+ */
+function scopeFromHost(host: string): string {
+    return host
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, "-");
+}
+
+function serviceName(): string {
+    return `${SERVICE_PREFIX}.${scopeFromHost(getServerUrl())}`;
+}
+
 // ── localStorage fallback (dev mode without Tauri runtime) ──────────────────
 
-const LS_PREFIX = "vex-ks-";
-const LS_ACTIVE = "vex-active-user";
+const LS_PREFIX = "vex-ks";
 
 class LocalStorageKeyStore implements KeyStore {
     clear(username: string): Promise<void> {
-        localStorage.removeItem(LS_PREFIX + username);
-        if (localStorage.getItem(LS_ACTIVE) === username) {
-            localStorage.removeItem(LS_ACTIVE);
+        const scope = scopeFromHost(getServerUrl());
+        localStorage.removeItem(`${LS_PREFIX}.${scope}.${username}`);
+        if (localStorage.getItem(activeUserKey()) === username) {
+            localStorage.removeItem(activeUserKey());
         }
         return Promise.resolve();
     }
 
     load(username?: string): Promise<null | StoredCredentials> {
-        const user = username ?? localStorage.getItem(LS_ACTIVE);
+        const scope = scopeFromHost(getServerUrl());
+        const user = username ?? localStorage.getItem(activeUserKey());
         if (!user) return Promise.resolve(null);
-        const raw = localStorage.getItem(LS_PREFIX + user);
+        const raw = localStorage.getItem(`${LS_PREFIX}.${scope}.${user}`);
         if (!raw) return Promise.resolve(null);
         try {
             return Promise.resolve(JSON.parse(raw) as StoredCredentials);
@@ -115,8 +150,12 @@ class LocalStorageKeyStore implements KeyStore {
     }
 
     save(creds: StoredCredentials): Promise<void> {
-        localStorage.setItem(LS_PREFIX + creds.username, JSON.stringify(creds));
-        localStorage.setItem(LS_ACTIVE, creds.username);
+        const scope = scopeFromHost(getServerUrl());
+        localStorage.setItem(
+            `${LS_PREFIX}.${scope}.${creds.username}`,
+            JSON.stringify(creds),
+        );
+        localStorage.setItem(activeUserKey(), creds.username);
         return Promise.resolve();
     }
 }
