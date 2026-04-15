@@ -23,21 +23,16 @@
     import ServerChannel from "./routes/ServerChannel.svelte";
     import Settings from "./routes/Settings.svelte";
 
-    // Svelte 5 component types aren't homogeneous across the union, so
-    // TypeScript can't infer a single tuple shape for the Map constructor.
-    // Widening the value type to `unknown` (what svelte-spa-router accepts
-    // internally anyway) sidesteps the overload mismatch.
-    const routes = new Map<string, unknown>([
-        ["*", Launch],
-        ["/", Launch],
-        ["/home", Home],
-        ["/launch", Launch],
-        ["/login", Login],
-        ["/messaging/:userID", Messaging],
-        ["/register", Register],
-        ["/server/:serverID/:channelID", ServerChannel],
-        ["/settings", Settings],
-    ]);
+    const routes = {
+        "/": Launch,
+        "/home": Home,
+        "/launch": Launch,
+        "/login": Login,
+        "/messaging/:userID": Messaging,
+        "/register": Register,
+        "/server/:serverID/:channelID": ServerChannel,
+        "/settings": Settings,
+    };
 
     // Auth routes show no sidebars
     const AUTH_ROUTES = ["/", "/login", "/register", "/launch"];
@@ -63,6 +58,13 @@
     // Handle key replaced — server rotated our key; force re-login
     $effect(() => {
         if ($keyReplaced) {
+            void push("/login");
+        }
+    });
+
+    // Auth guard — unauthenticated access to protected routes → /login
+    $effect(() => {
+        if (!$user && !isAuthRoute) {
             void push("/login");
         }
     });
