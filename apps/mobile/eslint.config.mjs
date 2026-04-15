@@ -4,7 +4,17 @@ import { appImportRestrictions, base } from "@vex-chat/eslint-config/base";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-    { ignores: ["dist/**", ".expo/**", "ios/**", "android/**"] },
+    {
+        ignores: [
+            "dist/**",
+            ".expo/**",
+            "ios/**",
+            "android/**",
+            // Metro resolver shims for node-only deps; handwritten `.js`,
+            // not type-checked, intentionally loose.
+            "src/lib/stubs/**",
+        ],
+    },
     ...base,
     reactHooks.configs.flat.recommended,
     {
