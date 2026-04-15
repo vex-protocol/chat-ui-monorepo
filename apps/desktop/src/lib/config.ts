@@ -34,6 +34,22 @@ export function clearSession(): void {
     localStorage.removeItem(SERVER_URL_KEY);
 }
 
+/**
+ * Stable server identity for scoping credentials and local db. When a Vite
+ * proxy is in use, the client's `host` is the proxy address (localhost:5180),
+ * which is the same regardless of upstream — collisions happen when
+ * switching between prod/local via the same proxy. Prefer `VITE_PROXY_TARGET`
+ * when set so each upstream gets its own keychain slot and db file.
+ */
+export function getServerIdentity(): string {
+    const proxyTarget =
+        typeof import.meta.env.VITE_PROXY_TARGET === "string"
+            ? import.meta.env.VITE_PROXY_TARGET.trim()
+            : "";
+    if (proxyTarget.length > 0) return proxyTarget;
+    return getServerUrl();
+}
+
 /** Server options derived from the current URL — use everywhere. */
 export function getServerOptions(): ServerOptions {
     const host = getServerUrl();

@@ -1,7 +1,10 @@
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 
-const SPIRE_URL = process.env.VITE_SERVER_URL || "https://api.vex.wtf";
+const SPIRE_URL =
+    process.env.VITE_PROXY_TARGET ||
+    process.env.VITE_SERVER_URL ||
+    "https://api.vex.wtf";
 const spire = { changeOrigin: true, target: SPIRE_URL } as const;
 
 // https://vite.dev/config/

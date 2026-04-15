@@ -9,7 +9,7 @@ import {
     StyleSheet,
 } from "react-native";
 
-import { $groupMessages, $user, vexService } from "@vex-chat/store";
+import { $groupMessages, $servers, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,7 +26,10 @@ export function ChannelScreen({
 }: AppScreenProps<"Channel">) {
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
+    // Scoped to just this server's slot so other server churn doesn't re-render us.
+    const servers = useStore($servers, { keys: [serverID] });
     const user = useStore($user);
+    const serverName = servers[serverID]?.name ?? "";
 
     // Store keeps messages oldest-first; inverted FlatList needs newest-first
     const messages = useMemo(() => {
@@ -111,7 +114,11 @@ export function ChannelScreen({
                 onBack={() => {
                     navigation.navigate("ChannelList", { serverID });
                 }}
-                title={`# ${channelName}`}
+                onOverflow={() => {
+                    navigation.navigate("Invite", { serverID, serverName });
+                }}
+                subtitle={`# ${channelName}`}
+                title={serverName || "Server"}
             />
 
             <FlatList

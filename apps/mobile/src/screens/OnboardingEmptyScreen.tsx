@@ -31,14 +31,24 @@ export function OnboardingEmptyScreen() {
         <ScreenLayout>
             {/* Header */}
             <View style={styles.header}>
-                <Text style={styles.hamburger}>☰</Text>
+                <View style={styles.headerSide} />
                 <VexLogo size={28} />
-                <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
-                    <Path
-                        d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
-                        fill={colors.muted}
-                    />
-                </Svg>
+                <TouchableOpacity
+                    accessibilityLabel="Account settings"
+                    activeOpacity={0.7}
+                    hitSlop={8}
+                    onPress={() => {
+                        navigation.navigate("Settings");
+                    }}
+                    style={styles.headerSide}
+                >
+                    <Svg fill="none" height={24} viewBox="0 0 24 24" width={24}>
+                        <Path
+                            d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
+                            fill={colors.muted}
+                        />
+                    </Svg>
+                </TouchableOpacity>
             </View>
 
             {/* Empty state */}
@@ -71,7 +81,9 @@ export function OnboardingEmptyScreen() {
                     accentColor="#4CAF50"
                     badge="CREATE"
                     icon={<GroupIcon color="#4CAF50" />}
-                    onPress={() => {}}
+                    onPress={() => {
+                        navigation.navigate("AddServer");
+                    }}
                     subtitle="Start a new conversation space"
                     title="Create group"
                 />
@@ -235,15 +247,16 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.5,
         shadowRadius: 24,
     },
-    hamburger: {
-        color: colors.text,
-        fontSize: 24,
-    },
     header: {
         alignItems: "center",
         flexDirection: "row",
         justifyContent: "space-between",
         paddingVertical: 8,
+    },
+    headerSide: {
+        alignItems: "center",
+        justifyContent: "center",
+        width: 24,
     },
     heading: {
         ...typography.headingSmall,

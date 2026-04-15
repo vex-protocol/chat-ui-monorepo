@@ -10,17 +10,22 @@ import {
     View,
 } from "react-native";
 
-import { $channels } from "@vex-chat/store";
+import { $channels, $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+
+import { ChatHeader } from "../components/ChatHeader";
 
 export function ChannelListScreen({
     navigation,
     route,
 }: AppScreenProps<"ChannelList">) {
     const { serverID } = route.params;
-    const allChannels = useStore($channels);
+    const allChannels = useStore($channels, { keys: [serverID] });
+    const servers = useStore($servers, { keys: [serverID] });
     const channels: Channel[] = allChannels[serverID] ?? [];
+    const serverName =
+        servers[serverID]?.name ?? route.params.serverName ?? "Server";
 
     function renderChannel({ item }: { item: Channel }) {
         return (
@@ -42,6 +47,13 @@ export function ChannelListScreen({
 
     return (
         <View style={styles.container}>
+            <ChatHeader
+                onOverflow={() => {
+                    navigation.navigate("Invite", { serverID, serverName });
+                }}
+                title={serverName}
+            />
+
             {channels.length === 0 ? (
                 <View style={styles.empty}>
                     <Text style={styles.emptyText}>No channels</Text>

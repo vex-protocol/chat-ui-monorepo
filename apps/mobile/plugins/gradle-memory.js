@@ -24,9 +24,7 @@ const { withGradleProperties } = require("expo/config-plugins");
 //   automatically so a fat APK is never needed.
 
 function setProperty(props, key, value) {
-    const idx = props.findIndex(
-        (p) => p.type === "property" && p.key === key,
-    );
+    const idx = props.findIndex((p) => p.type === "property" && p.key === key);
     if (idx !== -1) {
         props[idx].value = value;
     } else {

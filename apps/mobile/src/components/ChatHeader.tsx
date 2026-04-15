@@ -5,11 +5,17 @@ import { colors, typography } from "../theme";
 
 interface ChatHeaderProps {
     onBack?: () => void;
+    onOverflow?: () => void;
     subtitle?: string;
     title: string;
 }
 
-export function ChatHeader({ onBack, subtitle, title }: ChatHeaderProps) {
+export function ChatHeader({
+    onBack,
+    onOverflow,
+    subtitle,
+    title,
+}: ChatHeaderProps) {
     return (
         <View style={styles.container}>
             <View style={styles.breadcrumb}>
@@ -31,12 +37,16 @@ export function ChatHeader({ onBack, subtitle, title }: ChatHeaderProps) {
                 )}
             </View>
             <View style={styles.actions}>
-                <TouchableOpacity style={styles.actionBtn}>
-                    <Text style={styles.actionIcon}>🔍</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
-                    <Text style={styles.actionIcon}>⋮</Text>
-                </TouchableOpacity>
+                {onOverflow && (
+                    <TouchableOpacity
+                        accessibilityLabel="Channel menu"
+                        hitSlop={8}
+                        onPress={onOverflow}
+                        style={styles.actionBtn}
+                    >
+                        <Text style={styles.actionIcon}>⋮</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -50,10 +60,13 @@ const styles = StyleSheet.create({
         width: 36,
     },
     actionIcon: {
-        fontSize: 18,
+        color: colors.text,
+        fontSize: 22,
+        fontWeight: "700",
     },
     actions: {
         flexDirection: "row",
+        flexShrink: 0,
         gap: 4,
     },
     backArrow: {
@@ -68,6 +81,7 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: "row",
         gap: 8,
+        minWidth: 0,
     },
     container: {
         alignItems: "center",
@@ -91,6 +105,7 @@ const styles = StyleSheet.create({
     title: {
         ...typography.button,
         color: colors.text,
+        flexShrink: 1,
         fontSize: 16,
     },
 });
