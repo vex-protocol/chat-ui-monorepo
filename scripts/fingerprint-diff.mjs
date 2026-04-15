@@ -24,10 +24,23 @@
 
 import { readFileSync } from "node:fs";
 
+// Any reason in this set forces a rebuild because it can land native code
+// or native config that OTA can't ship. Anything NOT here (formatting,
+// pod reshuffles, metadata tweaks) is treated as OTA-safe.
+//
+// Earlier revisions of this list only contained the `*Autolinking` keys,
+// copied from Bluesky's social-app. That under-counted — `expoConfigPlugins`
+// and `rncoreAutolinking*` also legitimately bump the EAS fingerprint
+// (and therefore the runtime version), so an OTA published under those
+// conditions would land a new runtimeVersion that no installed APK
+// matches → silent "update missing" bug.
 const REBUILD_REASONS = new Set([
     "bareRncliAutolinking",
     "expoAutolinkingAndroid",
     "expoAutolinkingIos",
+    "expoConfigPlugins",
+    "rncoreAutolinkingAndroid",
+    "rncoreAutolinkingIos",
 ]);
 
 const [, , currentPath, prevPath] = process.argv;
