@@ -64,6 +64,7 @@ const styles = StyleSheet.create({
     },
     actions: {
         flexDirection: "row",
+        flexShrink: 0,
         gap: 4,
     },
     backArrow: {
@@ -78,6 +79,7 @@ const styles = StyleSheet.create({
         flex: 1,
         flexDirection: "row",
         gap: 8,
+        minWidth: 0,
     },
     container: {
         alignItems: "center",
@@ -101,6 +103,7 @@ const styles = StyleSheet.create({
     title: {
         ...typography.button,
         color: colors.text,
+        flexShrink: 1,
         fontSize: 16,
     },
 });

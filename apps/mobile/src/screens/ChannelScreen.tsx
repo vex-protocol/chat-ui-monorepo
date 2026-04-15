@@ -26,9 +26,10 @@ export function ChannelScreen({
 }: AppScreenProps<"Channel">) {
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
-    const allServers = useStore($servers);
+    // Scoped to just this server's slot so other server churn doesn't re-render us.
+    const servers = useStore($servers, { keys: [serverID] });
     const user = useStore($user);
-    const serverName = allServers[serverID]?.name ?? "";
+    const serverName = servers[serverID]?.name ?? "";
 
     // Store keeps messages oldest-first; inverted FlatList needs newest-first
     const messages = useMemo(() => {
