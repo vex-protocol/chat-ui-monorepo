@@ -11,6 +11,7 @@ export type AppStackParamList = {
     ChannelList: { serverID: string; serverName?: string };
     Conversation: { userID: string; username: string };
     DMList: undefined;
+    Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
     Settings: undefined;

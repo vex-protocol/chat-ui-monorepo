@@ -15,6 +15,7 @@ import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
 import { ConversationScreen } from "../screens/ConversationScreen";
 import { DMListScreen } from "../screens/DMListScreen";
+import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
@@ -120,6 +121,7 @@ function ContentStack({
             <Stack.Screen component={ConversationScreen} name="Conversation" />
             <Stack.Screen component={ChannelListScreen} name="ChannelList" />
             <Stack.Screen component={ChannelScreen} name="Channel" />
+            <Stack.Screen component={InviteScreen} name="Invite" />
             <Stack.Screen component={SettingsScreen} name="Settings" />
         </Stack.Navigator>
     );

@@ -5,11 +5,17 @@ import { colors, typography } from "../theme";
 
 interface ChatHeaderProps {
     onBack?: () => void;
+    onOverflow?: () => void;
     subtitle?: string;
     title: string;
 }
 
-export function ChatHeader({ onBack, subtitle, title }: ChatHeaderProps) {
+export function ChatHeader({
+    onBack,
+    onOverflow,
+    subtitle,
+    title,
+}: ChatHeaderProps) {
     return (
         <View style={styles.container}>
             <View style={styles.breadcrumb}>
@@ -31,12 +37,16 @@ export function ChatHeader({ onBack, subtitle, title }: ChatHeaderProps) {
                 )}
             </View>
             <View style={styles.actions}>
-                <TouchableOpacity style={styles.actionBtn}>
-                    <Text style={styles.actionIcon}>🔍</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
-                    <Text style={styles.actionIcon}>⋮</Text>
-                </TouchableOpacity>
+                {onOverflow && (
+                    <TouchableOpacity
+                        accessibilityLabel="Channel menu"
+                        hitSlop={8}
+                        onPress={onOverflow}
+                        style={styles.actionBtn}
+                    >
+                        <Text style={styles.actionIcon}>⋮</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );

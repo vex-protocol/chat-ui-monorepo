@@ -111,6 +111,9 @@ export function ChannelScreen({
                 onBack={() => {
                     navigation.navigate("ChannelList", { serverID });
                 }}
+                onOverflow={() => {
+                    navigation.navigate("Invite", { serverID });
+                }}
                 title={`# ${channelName}`}
             />
 
