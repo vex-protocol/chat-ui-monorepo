@@ -25,12 +25,25 @@ export function SettingsScreen({
     const [loggingOut, setLoggingOut] = useState(false);
 
     function handleLogout() {
-        setLoggingOut(true);
-        // Close connection + reset atoms so navigation redirects to auth.
-        // This does NOT invalidate the server session — autoLogin can reuse saved credentials.
-        void vexService.logout().catch(() => {
-            /* ignore */
-        });
+        Alert.alert(
+            "Sign out?",
+            "Your messages stay encrypted on this device. You can sign back in anytime.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        setLoggingOut(true);
+                        // Close connection + reset atoms so navigation redirects to auth.
+                        // Credentials remain in the keychain so autoLogin can reuse them.
+                        void vexService.logout().catch(() => {
+                            /* ignore */
+                        });
+                    },
+                    style: "destructive",
+                    text: "Sign out",
+                },
+            ],
+        );
     }
 
     function handleClearKeys() {
