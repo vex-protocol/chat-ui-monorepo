@@ -18,9 +18,7 @@ import { AndroidImportance } from "expo-notifications";
 
 import { clearCredentials } from "../lib/keychain";
 
-export function SettingsScreen({
-    navigation: _navigation,
-}: AppScreenProps<"Settings">) {
+export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [loggingOut, setLoggingOut] = useState(false);
 
@@ -97,6 +95,23 @@ export function SettingsScreen({
             contentContainerStyle={styles.content}
             style={styles.container}
         >
+            {/* Header with back */}
+            <View style={styles.header}>
+                <TouchableOpacity
+                    accessibilityLabel="Back"
+                    activeOpacity={0.7}
+                    hitSlop={12}
+                    onPress={() => {
+                        if (navigation.canGoBack()) navigation.goBack();
+                    }}
+                    style={styles.backBtn}
+                >
+                    <Text style={styles.backArrow}>←</Text>
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Settings</Text>
+                <View style={styles.backBtn} />
+            </View>
+
             {/* Account section */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Account</Text>
@@ -181,6 +196,12 @@ export function SettingsScreen({
 }
 
 const styles = StyleSheet.create({
+    backArrow: { color: "#FFFFFF", fontSize: 24, lineHeight: 24 },
+    backBtn: {
+        alignItems: "center",
+        justifyContent: "center",
+        width: 32,
+    },
     container: { backgroundColor: "#1a1a1a", flex: 1 },
     content: { gap: 16, padding: 16 },
     dangerBtn: {
@@ -201,6 +222,17 @@ const styles = StyleSheet.create({
     desc: {
         color: "#666666",
         fontSize: 12,
+    },
+    header: {
+        alignItems: "center",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingBottom: 8,
+    },
+    headerTitle: {
+        color: "#FFFFFF",
+        fontSize: 18,
+        fontWeight: "600",
     },
     label: {
         color: "#e8e8e8",
