@@ -60,7 +60,9 @@ const styles = StyleSheet.create({
         width: 36,
     },
     actionIcon: {
-        fontSize: 18,
+        color: colors.text,
+        fontSize: 22,
+        fontWeight: "700",
     },
     actions: {
         flexDirection: "row",
