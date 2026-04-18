@@ -9,13 +9,13 @@ catalog:
     "@types/node": ^24.10.1
     "@vex-chat/libvex": 5.0.0
     dompurify: ^3.2.6
-    kysely: ^0.28.15
+    kysely: ^0.28.16
     marked: ^15.0.12
     nanostores: ^1.2.0
-    react: 19.2.0
-    react-dom: 19.2.0
+    react: 19.2.5
+    react-dom: 19.2.5
     svelte: ^5.45.2
-    typescript: ~5.9.3
+    typescript: ~6.0.3
     uuid: ^11.0.0
     vitest: 3.2.4
 
