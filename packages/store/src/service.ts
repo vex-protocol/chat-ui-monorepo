@@ -169,8 +169,10 @@ class Disposable {
 
 class VexService {
     private client: Client | null = null;
+    private connectionRecoveryInFlight = false;
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
+    private lastConnectionRecoveryAt = 0;
     private wsDebugEnabled = false;
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
     private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
@@ -664,11 +666,33 @@ class VexService {
         recipientID: string,
         content: string,
     ): Promise<OperationResult> {
-        try {
+        const send = async (): Promise<void> => {
             const client = this.requireClient();
             await client.messages.send(recipientID, content);
+        };
+        try {
+            await send();
             return { ok: true };
         } catch (err: unknown) {
+            if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                const recovered = await this.recoverConnection("send-dm");
+                if (recovered === "authenticated") {
+                    try {
+                        await send();
+                        return { ok: true };
+                    } catch (retryErr: unknown) {
+                        if (
+                            isUnauthorizedError(retryErr) ||
+                            isNotAuthenticatedError(retryErr)
+                        ) {
+                            this.setAuthStatus("unauthorized");
+                        } else if (isNetworkError(retryErr)) {
+                            this.setAuthStatus("offline");
+                        }
+                        return { error: errorMessage(retryErr), ok: false };
+                    }
+                }
+            }
             return { error: errorMessage(err), ok: false };
         }
     }
@@ -677,11 +701,33 @@ class VexService {
         channelID: string,
         content: string,
     ): Promise<OperationResult> {
-        try {
+        const send = async (): Promise<void> => {
             const client = this.requireClient();
             await client.messages.group(channelID, content);
+        };
+        try {
+            await send();
             return { ok: true };
         } catch (err: unknown) {
+            if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                const recovered = await this.recoverConnection("send-group");
+                if (recovered === "authenticated") {
+                    try {
+                        await send();
+                        return { ok: true };
+                    } catch (retryErr: unknown) {
+                        if (
+                            isUnauthorizedError(retryErr) ||
+                            isNotAuthenticatedError(retryErr)
+                        ) {
+                            this.setAuthStatus("unauthorized");
+                        } else if (isNetworkError(retryErr)) {
+                            this.setAuthStatus("offline");
+                        }
+                        return { error: errorMessage(retryErr), ok: false };
+                    }
+                }
+            }
             return { error: errorMessage(err), ok: false };
         }
     }
@@ -977,6 +1023,40 @@ class VexService {
         }
     }
 
+    private async recoverConnection(
+        reason: string,
+    ): Promise<null | ResumeNetworkStatus> {
+        if (!this.client) {
+            return null;
+        }
+        if (this.connectionRecoveryInFlight) {
+            return null;
+        }
+        const now = Date.now();
+        if (now - this.lastConnectionRecoveryAt < 5000) {
+            return null;
+        }
+        this.connectionRecoveryInFlight = true;
+        this.lastConnectionRecoveryAt = now;
+        debugAuth("connection:recover:start", { reason });
+        try {
+            const status = await this.refreshSessionAfterForeground();
+            debugAuth("connection:recover:done", { reason, status });
+            if (status === "unauthorized") {
+                $userWritable.set(null);
+            }
+            return status;
+        } catch (err: unknown) {
+            debugAuth("connection:recover:error", {
+                error: err instanceof Error ? err.message : String(err),
+                reason,
+            });
+            return null;
+        } finally {
+            this.connectionRecoveryInFlight = false;
+        }
+    }
+
     private requireClient(): Client {
         if (!this.client) throw new Error("Not authenticated");
         return this.client;
@@ -1047,6 +1127,14 @@ class VexService {
     }
 
     private wireEvents(): void {
+        this.subscribe("connected", () => {
+            this.setAuthStatus("authenticated");
+            this.attachWebsocketDebug();
+        });
+        this.subscribe("disconnect", () => {
+            this.setAuthStatus("offline");
+            void this.recoverConnection("disconnect");
+        });
         this.subscribe("message", (msg) => {
             if (msg.group) {
                 this.handleGroupMessage(msg, msg.group);
@@ -1176,6 +1264,13 @@ function isNetworkError(err: unknown): boolean {
         return false;
     }
     return /network error/i.test(err.message);
+}
+
+function isNotAuthenticatedError(err: unknown): boolean {
+    if (!(err instanceof Error)) {
+        return false;
+    }
+    return /not authenticated|no token|login first/i.test(err.message);
 }
 
 function isReactNativeRuntime(): boolean {

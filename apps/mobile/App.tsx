@@ -31,6 +31,7 @@ function App() {
     const appStateRef = useRef(AppState.currentState);
     const bootstrappedRef = useRef(false);
     const authProbeInFlightRef = useRef(false);
+    const networkRefreshInFlightRef = useRef(false);
     const resumeProbeInFlightRef = useRef(false);
     const [authNotice, setAuthNotice] = useState<null | string>(null);
 
@@ -98,7 +99,29 @@ function App() {
             authProbeInFlightRef.current = true;
             try {
                 const status = await vexService.probeAuthSession();
-                if (!active || status !== "unauthorized") {
+                if (!active) {
+                    return;
+                }
+                if (status === "offline") {
+                    if (networkRefreshInFlightRef.current) {
+                        return;
+                    }
+                    networkRefreshInFlightRef.current = true;
+                    try {
+                        const refreshed =
+                            await vexService.refreshSessionAfterForeground();
+                        if (refreshed !== "unauthorized") {
+                            return;
+                        }
+                        await clearCredentials();
+                        await vexService.logout();
+                        setAuthNotice("Session expired. Please sign in again.");
+                        return;
+                    } finally {
+                        networkRefreshInFlightRef.current = false;
+                    }
+                }
+                if (status !== "unauthorized") {
                     return;
                 }
                 await clearCredentials();
@@ -129,10 +152,14 @@ function App() {
         }
         let active = true;
         const onResume = async () => {
-            if (resumeProbeInFlightRef.current) {
+            if (
+                resumeProbeInFlightRef.current ||
+                networkRefreshInFlightRef.current
+            ) {
                 return;
             }
             resumeProbeInFlightRef.current = true;
+            networkRefreshInFlightRef.current = true;
             try {
                 const status = await vexService.refreshSessionAfterForeground();
                 if (!active || status !== "unauthorized") {
@@ -148,6 +175,7 @@ function App() {
                 );
             } finally {
                 resumeProbeInFlightRef.current = false;
+                networkRefreshInFlightRef.current = false;
             }
         };
         const subscription = AppState.addEventListener(
