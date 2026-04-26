@@ -14,6 +14,8 @@ import { useStore } from "@nanostores/react";
 
 import { colors } from "../theme";
 
+import { VexLogo } from "./VexLogo";
+
 interface ServerSidebarProps {
     activeServerId: null | string;
     authStatus:
@@ -63,10 +65,7 @@ export function ServerSidebar({
                     ]}
                 />
                 <TouchableOpacity onPress={onSelectHome} style={styles.homeBtn}>
-                    <View style={styles.envelopeIcon}>
-                        <View style={styles.envelopeFlapLeft} />
-                        <View style={styles.envelopeFlapRight} />
-                    </View>
+                    <VexLogo showWordmark={false} size={22} />
                     {totalUnread > 0 && (
                         <View style={styles.homeBadge}>
                             <Text style={styles.homeBadgeText}>
@@ -213,34 +212,6 @@ const styles = StyleSheet.create({
         height: 1,
         marginVertical: 8,
         width: 40,
-    },
-    envelopeFlapLeft: {
-        backgroundColor: "rgba(255,255,255,0.9)",
-        borderRadius: 999,
-        height: 2,
-        left: 4,
-        position: "absolute",
-        top: 7,
-        transform: [{ rotate: "34deg" }],
-        width: 12,
-    },
-    envelopeFlapRight: {
-        backgroundColor: "rgba(255,255,255,0.9)",
-        borderRadius: 999,
-        height: 2,
-        position: "absolute",
-        right: 4,
-        top: 7,
-        transform: [{ rotate: "-34deg" }],
-        width: 12,
-    },
-    envelopeIcon: {
-        borderColor: "rgba(255,255,255,0.88)",
-        borderRadius: 6,
-        borderWidth: 1.6,
-        height: 18,
-        position: "relative",
-        width: 24,
     },
     homeBadge: {
         alignItems: "center",

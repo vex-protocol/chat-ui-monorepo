@@ -9,6 +9,7 @@ const TOPBAR_HEIGHT = 56;
 interface ChatHeaderProps {
     onBack?: () => void;
     onOverflow?: () => void;
+    onTitlePress?: () => void;
     overflowIcon?: "dots" | "users";
     subtitle?: string;
     title: string;
@@ -17,6 +18,7 @@ interface ChatHeaderProps {
 export function ChatHeader({
     onBack,
     onOverflow,
+    onTitlePress,
     overflowIcon = "dots",
     subtitle,
     title,
@@ -29,9 +31,22 @@ export function ChatHeader({
                         <Text style={styles.backArrow}>←</Text>
                     </TouchableOpacity>
                 )}
-                <Text numberOfLines={1} style={styles.title}>
-                    {title}
-                </Text>
+                {onTitlePress ? (
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        hitSlop={6}
+                        onPress={onTitlePress}
+                        style={styles.titlePressable}
+                    >
+                        <Text numberOfLines={1} style={styles.title}>
+                            {title}
+                        </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <Text numberOfLines={1} style={styles.title}>
+                        {title}
+                    </Text>
+                )}
                 {subtitle && (
                     <>
                         <Text style={styles.separator}>|</Text>
@@ -123,6 +138,9 @@ const styles = StyleSheet.create({
         color: colors.text,
         flexShrink: 1,
         fontSize: 16,
+    },
+    titlePressable: {
+        flexShrink: 1,
     },
     usersBackHead: {
         backgroundColor: "rgba(255,255,255,0.52)",

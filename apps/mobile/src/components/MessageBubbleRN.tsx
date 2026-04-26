@@ -11,12 +11,14 @@ interface MessageBubbleRNProps {
     authorName: string;
     isOwn: boolean;
     message: Message;
+    showIdentity?: boolean;
 }
 
 export function MessageBubbleRN({
     authorName,
     isOwn,
     message,
+    showIdentity = true,
 }: MessageBubbleRNProps) {
     if (message.group === "__system__") {
         return (
@@ -27,32 +29,44 @@ export function MessageBubbleRN({
     }
 
     return (
-        <View style={styles.container}>
-            {/* Avatar */}
-            <View
-                style={[
-                    styles.avatar,
-                    {
-                        backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
-                    },
-                ]}
-            >
-                <Text style={styles.avatarText}>
-                    {authorName.charAt(0).toUpperCase()}
-                </Text>
-            </View>
-
-            {/* Content */}
-            <View style={styles.content}>
-                <View style={styles.meta}>
-                    <Text style={[styles.author, isOwn && styles.authorSelf]}>
-                        {authorName}
-                    </Text>
-                    <Text style={styles.timestamp}>
-                        {formatTime(message.timestamp)}
+        <View
+            style={[styles.container, !showIdentity && styles.containerGrouped]}
+        >
+            {showIdentity ? (
+                <View
+                    style={[
+                        styles.avatar,
+                        {
+                            backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
+                        },
+                    ]}
+                >
+                    <Text style={styles.avatarText}>
+                        {authorName.charAt(0).toUpperCase()}
                     </Text>
                 </View>
-                <Text style={styles.text}>{message.message}</Text>
+            ) : (
+                <View style={styles.avatarSpacer} />
+            )}
+
+            <View style={styles.content}>
+                {showIdentity && (
+                    <View style={styles.meta}>
+                        <Text
+                            style={[styles.author, isOwn && styles.authorSelf]}
+                        >
+                            {authorName}
+                        </Text>
+                        <Text style={styles.timestamp}>
+                            {formatTime(message.timestamp)}
+                        </Text>
+                    </View>
+                )}
+                <Text
+                    style={[styles.text, !showIdentity && styles.textGrouped]}
+                >
+                    {message.message}
+                </Text>
             </View>
         </View>
     );
@@ -76,6 +90,9 @@ const styles = StyleSheet.create({
         marginTop: 2,
         width: 32,
     },
+    avatarSpacer: {
+        width: 32,
+    },
     avatarText: {
         color: "#fff",
         fontSize: 13,
@@ -86,6 +103,9 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingHorizontal: 12,
         paddingVertical: 6,
+    },
+    containerGrouped: {
+        paddingVertical: 2,
     },
     content: {
         flex: 1,
@@ -110,6 +130,9 @@ const styles = StyleSheet.create({
     text: {
         ...typography.bodyLarge,
         color: colors.textSecondary,
+    },
+    textGrouped: {
+        marginTop: 1,
     },
     timestamp: {
         ...typography.body,

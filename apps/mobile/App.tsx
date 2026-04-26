@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StatusBar, StyleSheet, Text, View } from "react-native";
+import { AppState, StatusBar, StyleSheet, Text, View } from "react-native";
 
 import {
     $groupMessages,
@@ -28,8 +28,10 @@ import { colors, fontFamilies } from "./src/theme";
 function App() {
     const keyReplaced = useStore($keyReplaced);
     const user = useStore($user);
+    const appStateRef = useRef(AppState.currentState);
     const bootstrappedRef = useRef(false);
     const authProbeInFlightRef = useRef(false);
+    const resumeProbeInFlightRef = useRef(false);
     const [authNotice, setAuthNotice] = useState<null | string>(null);
 
     useEffect(() => {
@@ -118,6 +120,52 @@ function App() {
         return () => {
             active = false;
             clearInterval(interval);
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        let active = true;
+        const onResume = async () => {
+            if (resumeProbeInFlightRef.current) {
+                return;
+            }
+            resumeProbeInFlightRef.current = true;
+            try {
+                const status = await vexService.refreshSessionAfterForeground();
+                if (!active || status !== "unauthorized") {
+                    return;
+                }
+                await clearCredentials();
+                await vexService.logout();
+                setAuthNotice("Session expired. Please sign in again.");
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-auth] app resume refresh failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            } finally {
+                resumeProbeInFlightRef.current = false;
+            }
+        };
+        const subscription = AppState.addEventListener(
+            "change",
+            (nextState) => {
+                const previous = appStateRef.current;
+                appStateRef.current = nextState;
+                const resumed =
+                    (previous === "background" || previous === "inactive") &&
+                    nextState === "active";
+                if (resumed) {
+                    void onResume();
+                }
+            },
+        );
+        return () => {
+            active = false;
+            subscription.remove();
         };
     }, [user]);
 

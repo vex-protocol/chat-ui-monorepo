@@ -297,8 +297,7 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                     toggleFriendsBar();
                 }}
                 overflowIcon="users"
-                subtitle="Direct Messages"
-                title="Home"
+                title="Direct Messages"
             />
 
             <View style={styles.searchWrap}>

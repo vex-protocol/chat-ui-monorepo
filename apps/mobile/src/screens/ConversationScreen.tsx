@@ -28,7 +28,12 @@ import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
-export function ConversationScreen({ route }: AppScreenProps<"Conversation">) {
+const GROUP_WINDOW_MS = 10 * 60 * 1000;
+
+export function ConversationScreen({
+    navigation,
+    route,
+}: AppScreenProps<"Conversation">) {
     const { userID, username } = route.params;
     const allMessages = useStore($messages);
     const user = useStore($user);
@@ -38,6 +43,10 @@ export function ConversationScreen({ route }: AppScreenProps<"Conversation">) {
         const thread = allMessages[userID] ?? [];
         return [...thread].reverse();
     }, [allMessages, userID]);
+    const identityVisibility = useMemo(
+        () => buildIdentityVisibility(messages),
+        [messages],
+    );
 
     // Track active conversation for notification suppression + mark read
     useEffect(() => {
@@ -79,13 +88,16 @@ export function ConversationScreen({ route }: AppScreenProps<"Conversation">) {
         }
     }, [text, user, userID, sendInFlightRef]);
 
-    function renderMessage({ item }: { item: Message }) {
+    function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
+        const ownName = user?.username ?? "Unknown";
+        const showIdentity = identityVisibility[index] ?? true;
         return (
             <MessageBubbleRN
-                authorName={isOwn ? "You" : username}
+                authorName={isOwn ? ownName : username}
                 isOwn={isOwn}
                 message={item}
+                showIdentity={showIdentity}
             />
         );
     }
@@ -96,7 +108,13 @@ export function ConversationScreen({ route }: AppScreenProps<"Conversation">) {
             keyboardVerticalOffset={insets.top}
             style={styles.container}
         >
-            <ChatHeader subtitle={`@${username}`} title="Home" />
+            <ChatHeader
+                onTitlePress={() => {
+                    navigation.navigate("DMList");
+                }}
+                subtitle={`@${username}`}
+                title="Direct Messages"
+            />
 
             {messages.length === 0 ? (
                 <View style={styles.empty}>
@@ -166,3 +184,46 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
 });
+
+function buildIdentityVisibility(messages: Message[]): boolean[] {
+    const visibility = Array<boolean>(messages.length).fill(true);
+    let chunkAuthorID: null | string = null;
+    let chunkStartTs = 0;
+
+    // Process oldest -> newest so chunk windows are stable.
+    for (let index = messages.length - 1; index >= 0; index--) {
+        const current = messages[index];
+        if (!current || current.group === "__system__") {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        const currentTs = Date.parse(current.timestamp);
+        if (Number.isNaN(currentTs)) {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        if (chunkAuthorID !== current.authorID) {
+            visibility[index] = true;
+            chunkAuthorID = current.authorID;
+            chunkStartTs = currentTs;
+            continue;
+        }
+
+        const elapsed = currentTs - chunkStartTs;
+        if (elapsed >= 0 && elapsed <= GROUP_WINDOW_MS) {
+            visibility[index] = false;
+            continue;
+        }
+
+        visibility[index] = true;
+        chunkStartTs = currentTs;
+    }
+
+    return visibility;
+}

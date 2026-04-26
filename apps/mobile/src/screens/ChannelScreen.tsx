@@ -26,6 +26,8 @@ import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
 import { colors } from "../theme";
 
+const GROUP_WINDOW_MS = 10 * 60 * 1000;
+
 export function ChannelScreen({
     navigation,
     route,
@@ -42,6 +44,10 @@ export function ChannelScreen({
         const thread = allGroupMessages[channelID] ?? [];
         return [...thread].reverse();
     }, [allGroupMessages, channelID]);
+    const identityVisibility = useMemo(
+        () => buildIdentityVisibility(messages),
+        [messages],
+    );
 
     // Track active channel for notification suppression + mark read
     useEffect(() => {
@@ -98,18 +104,21 @@ export function ChannelScreen({
         }
     }, [text, user, channelID, sendInFlightRef]);
 
-    function renderMessage({ item }: { item: Message }) {
+    function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
+        const ownName = user?.username ?? "Unknown";
+        const showIdentity = identityVisibility[index] ?? true;
         return (
             <MessageBubbleRN
                 authorName={
                     isOwn
-                        ? "You"
+                        ? ownName
                         : (usernames[item.authorID] ??
                           item.authorID.slice(0, 8))
                 }
                 isOwn={isOwn}
                 message={item}
+                showIdentity={showIdentity}
             />
         );
     }
@@ -156,3 +165,46 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
 });
+
+function buildIdentityVisibility(messages: Message[]): boolean[] {
+    const visibility = Array<boolean>(messages.length).fill(true);
+    let chunkAuthorID: null | string = null;
+    let chunkStartTs = 0;
+
+    // Process oldest -> newest so chunk windows are stable.
+    for (let index = messages.length - 1; index >= 0; index--) {
+        const current = messages[index];
+        if (!current || current.group === "__system__") {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        const currentTs = Date.parse(current.timestamp);
+        if (Number.isNaN(currentTs)) {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        if (chunkAuthorID !== current.authorID) {
+            visibility[index] = true;
+            chunkAuthorID = current.authorID;
+            chunkStartTs = currentTs;
+            continue;
+        }
+
+        const elapsed = currentTs - chunkStartTs;
+        if (elapsed >= 0 && elapsed <= GROUP_WINDOW_MS) {
+            visibility[index] = false;
+            continue;
+        }
+
+        visibility[index] = true;
+        chunkStartTs = currentTs;
+    }
+
+    return visibility;
+}

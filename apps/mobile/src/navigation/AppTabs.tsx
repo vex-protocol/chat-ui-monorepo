@@ -3,7 +3,7 @@ import type { AppStackParamList } from "./types";
 import React, { useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
-import { $authStatus, $channels, $familiars, $servers } from "@vex-chat/store";
+import { $authStatus, $channels } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -39,15 +39,9 @@ export function AppTabs() {
     const insets = useSafeAreaInsets();
     const [activeServerId, setActiveServerId] = useState<null | string>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const familiars = useStore($familiars);
-    const servers = useStore($servers);
     const channels = useStore($channels);
     const authStatus = useStore($authStatus);
-    const hasContent =
-        Object.keys(familiars).length > 0 || Object.keys(servers).length > 0;
-    const initialRoute: keyof AppStackParamList = hasContent
-        ? "DMList"
-        : "OnboardingEmpty";
+    const initialRoute: keyof AppStackParamList = "DMList";
     const [currentRoute, setCurrentRoute] =
         useState<keyof AppStackParamList>(initialRoute);
     const topLeftShowsBack = TOP_LEFT_BACK_ROUTES.includes(currentRoute);
@@ -101,7 +95,7 @@ export function AppTabs() {
                 return;
             }
             navigationRef.navigate("App", {
-                screen: hasContent ? "DMList" : "OnboardingEmpty",
+                screen: "DMList",
             });
             return;
         }
@@ -235,7 +229,7 @@ export function AppTabs() {
                         closeSidebar();
                         setActiveServerId(null);
                         navigationRef.navigate("App", {
-                            screen: hasContent ? "DMList" : "OnboardingEmpty",
+                            screen: "DMList",
                         });
                     }}
                     onSelectServer={(id) => {

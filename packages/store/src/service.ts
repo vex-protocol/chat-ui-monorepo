@@ -44,7 +44,6 @@ import {
 // ── Public types ────────────────────────────────────────────────────────────
 
 export type AuthProbeStatus = "authenticated" | "offline" | "unauthorized";
-
 /** Result from any auth flow. */
 export interface AuthResult {
     error?: string;
@@ -70,6 +69,8 @@ export interface OperationResult {
     error?: string;
     ok: boolean;
 }
+
+export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 
 /** Server connection options — identical across all auth flows. */
 export interface ServerOptions {
@@ -121,6 +122,10 @@ interface ClientWithInternalHttp {
 
 interface ClientWithSocketLike {
     socket?: unknown;
+}
+
+interface ClientWithSyncInboxLike {
+    syncInboxNow?: unknown;
 }
 
 interface HttpErrorLike {
@@ -479,6 +484,51 @@ class VexService {
         }
     }
 
+    async refreshSessionAfterForeground(): Promise<ResumeNetworkStatus> {
+        if (!this.client) {
+            this.setAuthStatus("signed_out");
+            return "signed_out";
+        }
+        this.setAuthStatus("checking");
+        const probe = await this.probeAuthSession();
+        if (probe !== "authenticated") {
+            return probe;
+        }
+
+        try {
+            await withTimeout(
+                this.client.reconnectWebsocket(),
+                10_000,
+                "WebSocket reconnect timed out after app resume.",
+            );
+            // reconnectWebsocket() swaps the underlying socket object; re-bind
+            // debug hooks so inbound/outbound frame logging continues.
+            this.attachWebsocketDebug();
+            if (hasSyncInboxNow(this.client)) {
+                await withTimeout(
+                    this.client.syncInboxNow(),
+                    10_000,
+                    "Inbox sync timed out after app resume.",
+                );
+            } else {
+                await withTimeout(
+                    this.populateState(),
+                    10_000,
+                    "State refresh timed out after app resume.",
+                );
+            }
+            this.setAuthStatus("authenticated");
+            return "authenticated";
+        } catch (err: unknown) {
+            if (isUnauthorizedError(err)) {
+                this.setAuthStatus("unauthorized");
+                return "unauthorized";
+            }
+            this.setAuthStatus("offline");
+            return "offline";
+        }
+    }
+
     /**
      * Register a new account → save credentials → connect.
      */
@@ -666,6 +716,7 @@ class VexService {
         this.wsDebugSocket = socket;
         this.wsDebugInboundListener = inbound;
         this.wsDebugOriginalSend = originalSend;
+        console.log("[vex-ws] debug attached");
     }
 
     private async clearStoredCredentials(
@@ -1082,6 +1133,13 @@ function hasHttpStatus(err: unknown): err is HttpErrorLike {
         "status" in res &&
         typeof (res as { status: unknown }).status === "number"
     );
+}
+
+function hasSyncInboxNow(client: Client): client is Client & {
+    syncInboxNow: () => Promise<void>;
+} {
+    const maybeClient = client as unknown as ClientWithSyncInboxLike;
+    return typeof maybeClient.syncInboxNow === "function";
 }
 
 function isDecryptMismatchError(err: unknown): boolean {
