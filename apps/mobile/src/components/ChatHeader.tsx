@@ -3,9 +3,14 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { colors, typography } from "../theme";
 
+const TOPBAR_LEFT_GUTTER = 52;
+const TOPBAR_HEIGHT = 56;
+
 interface ChatHeaderProps {
     onBack?: () => void;
     onOverflow?: () => void;
+    onTitlePress?: () => void;
+    overflowIcon?: "dots" | "users";
     subtitle?: string;
     title: string;
 }
@@ -13,6 +18,8 @@ interface ChatHeaderProps {
 export function ChatHeader({
     onBack,
     onOverflow,
+    onTitlePress,
+    overflowIcon = "dots",
     subtitle,
     title,
 }: ChatHeaderProps) {
@@ -24,9 +31,22 @@ export function ChatHeader({
                         <Text style={styles.backArrow}>←</Text>
                     </TouchableOpacity>
                 )}
-                <Text numberOfLines={1} style={styles.title}>
-                    {title}
-                </Text>
+                {onTitlePress ? (
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        hitSlop={6}
+                        onPress={onTitlePress}
+                        style={styles.titlePressable}
+                    >
+                        <Text numberOfLines={1} style={styles.title}>
+                            {title}
+                        </Text>
+                    </TouchableOpacity>
+                ) : (
+                    <Text numberOfLines={1} style={styles.title}>
+                        {title}
+                    </Text>
+                )}
                 {subtitle && (
                     <>
                         <Text style={styles.separator}>|</Text>
@@ -44,7 +64,15 @@ export function ChatHeader({
                         onPress={onOverflow}
                         style={styles.actionBtn}
                     >
-                        <Text style={styles.actionIcon}>⋮</Text>
+                        {overflowIcon === "users" ? (
+                            <View style={styles.usersIcon}>
+                                <View style={styles.usersBackHead} />
+                                <View style={styles.usersFrontHead} />
+                                <View style={styles.usersBody} />
+                            </View>
+                        ) : (
+                            <Text style={styles.actionIcon}>⋮</Text>
+                        )}
                     </TouchableOpacity>
                 )}
             </View>
@@ -65,9 +93,11 @@ const styles = StyleSheet.create({
         fontWeight: "700",
     },
     actions: {
+        alignItems: "flex-end",
         flexDirection: "row",
         flexShrink: 0,
         gap: 4,
+        width: 36,
     },
     backArrow: {
         color: colors.text,
@@ -89,9 +119,10 @@ const styles = StyleSheet.create({
         borderBottomColor: colors.borderSubtle,
         borderBottomWidth: 1,
         flexDirection: "row",
+        height: TOPBAR_HEIGHT,
         justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingLeft: TOPBAR_LEFT_GUTTER,
+        paddingRight: 12,
     },
     separator: {
         color: colors.muted,
@@ -107,5 +138,41 @@ const styles = StyleSheet.create({
         color: colors.text,
         flexShrink: 1,
         fontSize: 16,
+    },
+    titlePressable: {
+        flexShrink: 1,
+    },
+    usersBackHead: {
+        backgroundColor: "rgba(255,255,255,0.52)",
+        borderRadius: 4,
+        height: 8,
+        left: 4,
+        position: "absolute",
+        top: 5,
+        width: 8,
+    },
+    usersBody: {
+        backgroundColor: "rgba(255,255,255,0.88)",
+        borderRadius: 5,
+        bottom: 3,
+        height: 6,
+        position: "absolute",
+        width: 16,
+    },
+    usersFrontHead: {
+        backgroundColor: colors.text,
+        borderRadius: 5,
+        height: 10,
+        position: "absolute",
+        right: 5,
+        top: 3,
+        width: 10,
+    },
+    usersIcon: {
+        alignItems: "center",
+        height: 20,
+        justifyContent: "center",
+        position: "relative",
+        width: 20,
     },
 });

@@ -112,4 +112,12 @@ export default [
             "@typescript-eslint/only-throw-error": "off",
         },
     },
+    {
+        files: ["src/navigation/AppTabs.tsx"],
+        rules: {
+            // Drawer animation logic uses refs/gesture closures intentionally.
+            "react-hooks/exhaustive-deps": "off",
+            "react-hooks/refs": "off",
+        },
+    },
 ];

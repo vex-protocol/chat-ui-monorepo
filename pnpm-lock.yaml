@@ -13,8 +13,8 @@ catalogs:
       specifier: ^24.10.1
       version: 24.12.2
     '@vex-chat/libvex':
-      specifier: 5.0.0
-      version: 5.0.0
+      specifier: 5.3.1
+      version: 5.3.1
     dompurify:
       specifier: ^3.2.6
       version: 3.3.3
@@ -137,7 +137,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 5.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 5.3.1(better-sqlite3@11.10.0)(typescript@5.9.3)
       eslint-plugin-svelte:
         specifier: ^3.17.0
         version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
@@ -180,6 +180,9 @@ importers:
       expo:
         specifier: ^55.0.13
         version: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      expo-image-picker:
+        specifier: ^55.0.18
+        version: 55.0.18(expo@55.0.13)
       expo-notifications:
         specifier: ~55.0.18
         version: 55.0.18(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
@@ -234,7 +237,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 5.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 5.3.1(better-sqlite3@11.10.0)(typescript@5.9.3)
       babel-preset-expo:
         specifier: ^55.0.15
         version: 55.0.15(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@55.0.13)(react-refresh@0.14.2)
@@ -270,7 +273,7 @@ importers:
         version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 5.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 5.3.1(better-sqlite3@11.10.0)(typescript@5.9.3)
       nanostores:
         specifier: 'catalog:'
         version: 1.2.0
@@ -1518,12 +1521,19 @@ packages:
       nanostores: ^1.2.0
       react: 19.2.0
 
+  '@noble/curves@1.4.0':
+    resolution: {integrity: sha512-p+4cb332SFCrReJkCYe8Xzm0OWi4Jji5jVdIZRL/PmacmDkFNw6MrrV+gGpiPxLHbV+zKFRywUWbaseT+tZRXg==}
+
+  '@noble/hashes@1.4.0':
+    resolution: {integrity: sha512-V1JJ1WTRUqHHrOSh597hURcMqVKVGL/ea3kv0gSnEdsEZ0/+VyPghM1lMNGc00z7CIQorSvbKpuJkxvuHbvdbg==}
+    engines: {node: '>= 16'}
+
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
-  '@noble/hashes@2.0.1':
-    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+  '@noble/hashes@2.2.0':
+    resolution: {integrity: sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==}
     engines: {node: '>= 20.19.0'}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -2338,18 +2348,18 @@ packages:
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
 
-  '@vex-chat/crypto@2.0.0':
-    resolution: {integrity: sha512-bEOH8a+nFvkUbHvmD1N4laQV9NwSKOJVE5EnoJoAEJIc+n0Wk+JjvA+vtvafBogRoPjZyEa/LvR1umE7U4dd8g==}
+  '@vex-chat/crypto@2.1.2':
+    resolution: {integrity: sha512-MeoWu/79meMHFxeArRvuA4IWAS8emxaU/yXI4RbeE8XZGOLgacriIJ246xwBYfTVRuNc26OrQNjca6UnSZV1ow==}
     engines: {node: '>=24.0.0', npm: '>=10.0.0'}
     peerDependencies:
-      '@vex-chat/types': ^2.0.0
+      '@vex-chat/types': 2.0.0
       typescript: ~5.9.3
     peerDependenciesMeta:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@5.0.0':
-    resolution: {integrity: sha512-VuKqOijQUlg4wKJLVpI8C0kvrM+uiR7u+N1xfYFXeTiDRxFXD2Kh/JY76VBIF6YgkyjRo82NdVTpXyks843+jw==}
+  '@vex-chat/libvex@5.3.1':
+    resolution: {integrity: sha512-jeyswwmXFibQAP1PKtxZbfgC86VNiFCBX9GMQvqSXx/1w7CY7BhCNy3l9KGcBfDQZba94AJtFJpyO5tPhmaw2g==}
     engines: {node: '>=24.0.0', npm: '>=10.0.0'}
     peerDependencies:
       better-sqlite3: '>=11.0.0'
@@ -3504,6 +3514,16 @@ packages:
       expo: '*'
       react: 19.2.0
       react-native: '*'
+
+  expo-image-loader@55.0.0:
+    resolution: {integrity: sha512-NOjp56wDrfuA5aiNAybBIjqIn1IxKeGJ8CECWZncQ/GzjZfyTYAHTCyeApYkdKkMBLHINzI4BbTGSlbCa0fXXQ==}
+    peerDependencies:
+      expo: '*'
+
+  expo-image-picker@55.0.18:
+    resolution: {integrity: sha512-lGpPGRu+7mE8qN0ma2boRsCmfOGbdHZ2bXTpWVeWly0JCZdogGlTrYFnhTqgS8+lmiRb/UCOs7iTm2P5Rra6kw==}
+    peerDependencies:
+      expo: '*'
 
   expo-json-utils@55.0.2:
     resolution: {integrity: sha512-QJMOZOPOG7CTnKcrdVaiummn2va1MCO56z++eyWkDv3GBRODldM6MFMDf/jTREWthFc2Nxo6TuyWRrEV9S6n/Q==}
@@ -5961,8 +5981,8 @@ packages:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
     hasBin: true
 
-  uuid@13.0.0:
-    resolution: {integrity: sha512-XQegIaBTVUjSHliKqcnFqYypAd4S+WCYt5NIeRs6w/UAry7z8Y9j5ZwRRL4kzq9U3sD6v+85er9FvkEaBpji2w==}
+  uuid@14.0.0:
+    resolution: {integrity: sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg==}
     hasBin: true
 
   uuid@7.0.3:
@@ -7913,9 +7933,15 @@ snapshots:
       nanostores: 1.2.0
       react: 19.2.0
 
+  '@noble/curves@1.4.0':
+    dependencies:
+      '@noble/hashes': 1.4.0
+
+  '@noble/hashes@1.4.0': {}
+
   '@noble/hashes@1.8.0': {}
 
-  '@noble/hashes@2.0.1': {}
+  '@noble/hashes@2.2.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -8995,9 +9021,10 @@ snapshots:
 
   '@ungap/structured-clone@1.3.0': {}
 
-  '@vex-chat/crypto@2.0.0(@vex-chat/types@2.0.0)(typescript@5.9.3)':
+  '@vex-chat/crypto@2.1.2(@vex-chat/types@2.0.0)(typescript@5.9.3)':
     dependencies:
-      '@noble/hashes': 2.0.1
+      '@noble/curves': 1.4.0
+      '@noble/hashes': 2.2.0
       '@stablelib/base64': 2.0.1
       '@stablelib/utf8': 2.1.0
       '@vex-chat/types': 2.0.0
@@ -9005,18 +9032,19 @@ snapshots:
       ed2curve: 0.3.0
       msgpackr: 1.11.9
       tweetnacl: 1.0.3
+      zod: 4.3.6
     optionalDependencies:
       typescript: 5.9.3
 
-  '@vex-chat/libvex@5.0.0(better-sqlite3@11.10.0)(typescript@5.9.3)':
+  '@vex-chat/libvex@5.3.1(better-sqlite3@11.10.0)(typescript@5.9.3)':
     dependencies:
-      '@vex-chat/crypto': 2.0.0(@vex-chat/types@2.0.0)(typescript@5.9.3)
+      '@vex-chat/crypto': 2.1.2(@vex-chat/types@2.0.0)(typescript@5.9.3)
       '@vex-chat/types': 2.0.0
       axios: 1.15.0(debug@4.4.3)
       eventemitter3: 5.0.4
       kysely: 0.28.15
       msgpackr: 1.11.8
-      uuid: 13.0.0
+      uuid: 14.0.0
       zod: 4.3.6
     optionalDependencies:
       better-sqlite3: 11.10.0
@@ -10496,6 +10524,15 @@ snapshots:
       fontfaceobserver: 2.3.0
       react: 19.2.0
       react-native: 0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0)
+
+  expo-image-loader@55.0.0(expo@55.0.13):
+    dependencies:
+      expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
+  expo-image-picker@55.0.18(expo@55.0.13):
+    dependencies:
+      expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+      expo-image-loader: 55.0.0(expo@55.0.13)
 
   expo-json-utils@55.0.2: {}
 
@@ -13264,7 +13301,7 @@ snapshots:
 
   uuid@11.1.0: {}
 
-  uuid@13.0.0: {}
+  uuid@14.0.0: {}
 
   uuid@7.0.3: {}
 

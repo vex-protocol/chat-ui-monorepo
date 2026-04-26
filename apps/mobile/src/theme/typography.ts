@@ -1,62 +1,54 @@
 import { Platform, type TextStyle } from "react-native";
 
 export const fontFamilies = {
-    body:
-        Platform.select({ android: "Inter-Medium", ios: "Inter-Medium" }) ??
-        "Inter-Medium",
+    body: Platform.select({ android: "sans-serif", ios: "System" }) ?? "System",
     heading:
-        Platform.select({
-            android: "SpaceGrotesk-Medium",
-            ios: "SpaceGrotesk-Medium",
-        }) ?? "SpaceGrotesk-Medium",
+        Platform.select({ android: "sans-serif", ios: "System" }) ?? "System",
     mono:
-        Platform.select({
-            android: "ChivoMono-Light",
-            ios: "ChivoMono-Light",
-        }) ?? "ChivoMono-Light",
+        Platform.select({ android: "monospace", ios: "Menlo" }) ?? "monospace",
 } as const;
 
 export const typography = {
     body: {
-        fontFamily: fontFamilies.mono,
+        fontFamily: fontFamilies.body,
         fontSize: 12,
-        fontWeight: "300",
+        fontWeight: "400",
         lineHeight: 18,
     } satisfies TextStyle,
 
     bodyLarge: {
-        fontFamily: fontFamilies.mono,
+        fontFamily: fontFamilies.body,
         fontSize: 14,
-        fontWeight: "300",
+        fontWeight: "400",
         lineHeight: 20,
     } satisfies TextStyle,
 
     button: {
         fontFamily: fontFamilies.body,
         fontSize: 14,
-        fontWeight: "500",
+        fontWeight: "600",
         lineHeight: 20,
     } satisfies TextStyle,
 
     heading: {
         fontFamily: fontFamilies.heading,
         fontSize: 40,
-        fontWeight: "500",
+        fontWeight: "700",
         lineHeight: 48,
     } satisfies TextStyle,
 
     headingSmall: {
         fontFamily: fontFamilies.heading,
         fontSize: 28,
-        fontWeight: "500",
+        fontWeight: "700",
         lineHeight: 34,
     } satisfies TextStyle,
 
     label: {
-        fontFamily: fontFamilies.mono,
+        fontFamily: fontFamilies.body,
         fontSize: 12,
-        fontWeight: "300",
-        letterSpacing: 1.5,
+        fontWeight: "600",
+        letterSpacing: 1.2,
         lineHeight: 16,
         textTransform: "uppercase",
     } satisfies TextStyle,

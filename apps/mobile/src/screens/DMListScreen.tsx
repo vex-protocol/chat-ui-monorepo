@@ -2,9 +2,17 @@ import type { AppScreenProps } from "../navigation/types";
 import type { User } from "@vex-chat/libvex";
 import type { Message } from "@vex-chat/libvex";
 
-import React, { useCallback, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
+    Animated,
     FlatList,
+    Pressable,
     StyleSheet,
     Text,
     TextInput,
@@ -20,6 +28,9 @@ import { useStore } from "@nanostores/react";
 import { ChatHeader } from "../components/ChatHeader";
 import { colors, typography } from "../theme";
 
+const FRIENDS_DRAWER_WIDTH = 232;
+const ONLINE_WINDOW_MS = 15 * 60 * 1000;
+
 export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
     const familiars = useStore($familiars);
     const allMessages = useStore($messages);
@@ -28,9 +39,73 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<User[]>([]);
     const [searching, setSearching] = useState(false);
+    const [nowMs, setNowMs] = useState(0);
+    const [friendsBarOpen, setFriendsBarOpen] = useState(false);
+    const [friendsBarVisible, setFriendsBarVisible] = useState(false);
+    const [friendsBarAnim] = useState(() => new Animated.Value(0));
     const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
 
-    const familiarList = Object.values(familiars);
+    const familiarList = useMemo(() => Object.values(familiars), [familiars]);
+    const friendsBackdropOpacity = useMemo(
+        () =>
+            friendsBarAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 0.34],
+            }),
+        [friendsBarAnim],
+    );
+    const friendsDrawerX = useMemo(
+        () =>
+            friendsBarAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [FRIENDS_DRAWER_WIDTH, 0],
+            }),
+        [friendsBarAnim],
+    );
+
+    useEffect(() => {
+        const tick = () => {
+            setNowMs(Date.now());
+        };
+        tick();
+        const interval = setInterval(tick, 60_000);
+        return () => {
+            clearInterval(interval);
+        };
+    }, []);
+
+    function openFriendsBar(): void {
+        setFriendsBarVisible(true);
+        setFriendsBarOpen(true);
+        Animated.spring(friendsBarAnim, {
+            damping: 20,
+            mass: 0.8,
+            stiffness: 280,
+            toValue: 1,
+            useNativeDriver: true,
+        }).start();
+    }
+
+    function closeFriendsBar(): void {
+        setFriendsBarOpen(false);
+        Animated.timing(friendsBarAnim, {
+            duration: 180,
+            toValue: 0,
+            useNativeDriver: true,
+        }).start(({ finished }) => {
+            if (finished) {
+                setFriendsBarVisible(false);
+            }
+        });
+    }
+
+    function toggleFriendsBar(): void {
+        if (friendsBarOpen) {
+            closeFriendsBar();
+            return;
+        }
+        openFriendsBar();
+    }
 
     const onSearch = useCallback((text: string) => {
         setQuery(text);
@@ -56,6 +131,9 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
         // automatically once a message is exchanged.
         setQuery("");
         setResults([]);
+        if (friendsBarOpen) {
+            closeFriendsBar();
+        }
         navigation.navigate("Conversation", {
             userID: user.userID,
             username: user.username,
@@ -67,6 +145,77 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
         return thread?.[thread.length - 1];
     }
 
+    function friendActivityText(user: User): string {
+        const unread = unreadCounts[user.userID] ?? 0;
+        if (unread > 0) {
+            return `${unread} new`;
+        }
+        return lastMessage(user.userID) ? "Recently active" : "No messages yet";
+    }
+
+    function isOnline(user: User): boolean {
+        if (!user.lastSeen) return false;
+        const lastSeenMs = new Date(user.lastSeen).getTime();
+        if (Number.isNaN(lastSeenMs)) return false;
+        return nowMs - lastSeenMs < ONLINE_WINDOW_MS;
+    }
+
+    function renderFriendChip(user: User) {
+        const unread = unreadCounts[user.userID] ?? 0;
+        const online = isOnline(user);
+        return (
+            <TouchableOpacity
+                key={user.userID}
+                onPress={() => {
+                    openConversation(user);
+                }}
+                style={styles.friendChip}
+            >
+                <View style={styles.friendAvatarWrap}>
+                    <View
+                        style={[
+                            styles.avatarSm,
+                            {
+                                backgroundColor: `hsl(${avatarHue(user.userID)}, 45%, 40%)`,
+                            },
+                        ]}
+                    >
+                        <Text style={styles.avatarSmText}>
+                            {user.username.slice(0, 1).toUpperCase()}
+                        </Text>
+                    </View>
+                    <View
+                        style={[
+                            styles.friendPresenceDot,
+                            online
+                                ? styles.friendPresenceDotOnline
+                                : styles.friendPresenceDotOffline,
+                        ]}
+                    />
+                </View>
+                <View style={styles.friendMeta}>
+                    <Text numberOfLines={1} style={styles.friendName}>
+                        {user.username}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.friendSubtext}>
+                        {friendActivityText(user)}
+                    </Text>
+                </View>
+                {unread > 0 && (
+                    <View style={styles.friendUnreadDot}>
+                        <Text style={styles.friendUnreadText}>
+                            {unread > 99 ? "99+" : unread}
+                        </Text>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    }
+
+    function renderFriendBarItem({ item }: { item: User }) {
+        return renderFriendChip(item);
+    }
+
     function renderFamiliar({ item }: { item: User }) {
         const last = lastMessage(item.userID);
         const unread = unreadCounts[item.userID] ?? 0;
@@ -75,7 +224,7 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 onPress={() => {
                     openConversation(item);
                 }}
-                style={styles.row}
+                style={[styles.row, unread > 0 && styles.rowUnread]}
             >
                 <View
                     style={[
@@ -91,9 +240,13 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 </View>
                 <View style={styles.rowContent}>
                     <Text style={styles.username}>{item.username}</Text>
-                    {last && (
+                    {last ? (
                         <Text numberOfLines={1} style={styles.preview}>
                             {last.message}
+                        </Text>
+                    ) : (
+                        <Text numberOfLines={1} style={styles.previewEmpty}>
+                            No messages yet
                         </Text>
                     )}
                 </View>
@@ -135,12 +288,22 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 
     return (
         <View style={styles.container}>
-            <ChatHeader title="Home" />
+            <View pointerEvents="none" style={styles.blackoutLayer} />
+            <View pointerEvents="none" style={styles.glowTop} />
+            <View pointerEvents="none" style={styles.glowBottom} />
+
+            <ChatHeader
+                onOverflow={() => {
+                    toggleFriendsBar();
+                }}
+                overflowIcon="users"
+                title="Direct Messages"
+            />
 
             <View style={styles.searchWrap}>
                 <TextInput
                     onChangeText={onSearch}
-                    placeholder="Search by exact username..."
+                    placeholder="Find users by exact username"
                     placeholderTextColor={colors.mutedDark}
                     style={styles.searchInput}
                     value={query}
@@ -163,6 +326,11 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 
             {searching && <Text style={styles.noResults}>Searching...</Text>}
 
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>DIRECT MESSAGES</Text>
+                <Text style={styles.sectionMeta}>{familiarList.length}</Text>
+            </View>
+
             {familiarList.length === 0 && !query.trim() ? (
                 <View style={styles.empty}>
                     <Text style={styles.emptyText}>No conversations yet</Text>
@@ -178,6 +346,50 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                     renderItem={renderFamiliar}
                 />
             )}
+
+            {friendsBarVisible && (
+                <>
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[
+                            styles.friendsBackdrop,
+                            { opacity: friendsBackdropOpacity },
+                        ]}
+                    />
+                    <Pressable
+                        onPress={() => {
+                            closeFriendsBar();
+                        }}
+                        style={styles.friendsBackdropPressable}
+                    />
+                    <Animated.View
+                        pointerEvents="auto"
+                        style={[
+                            styles.friendsDrawer,
+                            { transform: [{ translateX: friendsDrawerX }] },
+                        ]}
+                    >
+                        <View style={styles.friendsDrawerHeader}>
+                            <Text style={styles.sectionTitle}>FRIENDS</Text>
+                            <Text style={styles.sectionMeta}>
+                                {familiarList.length}
+                            </Text>
+                        </View>
+                        {familiarList.length === 0 ? (
+                            <Text style={styles.noFriendsText}>
+                                No friends yet. Search for someone to start
+                                chatting.
+                            </Text>
+                        ) : (
+                            <FlatList
+                                data={familiarList}
+                                keyExtractor={(u) => u.userID}
+                                renderItem={renderFriendBarItem}
+                            />
+                        )}
+                    </Animated.View>
+                </>
+            )}
         </View>
     );
 }
@@ -185,17 +397,17 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 const styles = StyleSheet.create({
     avatar: {
         alignItems: "center",
-        borderRadius: 20,
-        height: 40,
+        borderRadius: 24,
+        height: 48,
         justifyContent: "center",
-        width: 40,
+        width: 48,
     },
     avatarSm: {
         alignItems: "center",
-        borderRadius: 14,
-        height: 28,
+        borderRadius: 16,
+        height: 32,
         justifyContent: "center",
-        width: 28,
+        width: 32,
     },
     avatarSmText: {
         color: "#fff",
@@ -207,36 +419,159 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "700",
     },
+    blackoutLayer: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: "#000000",
+        opacity: 0.72,
+    },
     container: {
-        backgroundColor: colors.bg,
+        backgroundColor: "#11131a",
         flex: 1,
     },
     empty: {
         alignItems: "center",
-        flex: 1,
-        justifyContent: "center",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
+        marginTop: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 18,
     },
     emptyHint: {
         ...typography.body,
-        color: colors.muted,
-        fontSize: 11,
+        color: "rgba(255,255,255,0.62)",
         marginTop: 4,
+        textAlign: "center",
     },
     emptyText: {
+        ...typography.button,
+        color: colors.textSecondary,
+        letterSpacing: 0.4,
+        textTransform: "uppercase",
+    },
+    friendAvatarWrap: {
+        position: "relative",
+    },
+    friendChip: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 8,
+        marginRight: 8,
+        minWidth: 150,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    friendMeta: {
+        flex: 1,
+        gap: 1,
+    },
+    friendName: {
+        ...typography.button,
+        color: colors.textSecondary,
+        fontSize: 12,
+    },
+    friendPresenceDot: {
+        borderColor: "rgba(12,14,20,0.98)",
+        borderRadius: 999,
+        borderWidth: 2,
+        bottom: -1,
+        height: 10,
+        position: "absolute",
+        right: -1,
+        width: 10,
+    },
+    friendPresenceDotOffline: {
+        backgroundColor: "rgba(132,138,152,0.85)",
+    },
+    friendPresenceDotOnline: {
+        backgroundColor: "#30D158",
+    },
+    friendsBackdrop: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: "rgba(0,0,0,0.36)",
+    },
+    friendsBackdropPressable: {
+        ...StyleSheet.absoluteFill,
+    },
+    friendsDrawer: {
+        backgroundColor: "rgba(12,14,20,0.98)",
+        borderLeftColor: "rgba(255,255,255,0.1)",
+        borderLeftWidth: 1,
+        bottom: 0,
+        paddingTop: 56,
+        position: "absolute",
+        right: 0,
+        top: 0,
+        width: FRIENDS_DRAWER_WIDTH,
+    },
+    friendsDrawerHeader: {
+        alignItems: "center",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    friendSubtext: {
         ...typography.body,
-        color: colors.mutedDark,
-        fontStyle: "italic",
+        color: "rgba(255,255,255,0.52)",
+        fontSize: 10,
+    },
+    friendUnreadDot: {
+        alignItems: "center",
+        backgroundColor: colors.error,
+        borderRadius: 10,
+        justifyContent: "center",
+        minWidth: 20,
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+    },
+    friendUnreadText: {
+        color: "#fff",
+        fontSize: 10,
+        fontWeight: "700",
+    },
+    glowBottom: {
+        backgroundColor: colors.accent,
+        borderRadius: 120,
+        bottom: -36,
+        height: 130,
+        left: "36%",
+        opacity: 0.07,
+        position: "absolute",
+        width: 130,
+    },
+    glowTop: {
+        backgroundColor: colors.accent,
+        borderRadius: 120,
+        height: 130,
+        opacity: 0.08,
+        position: "absolute",
+        right: -36,
+        top: -24,
+        width: 130,
+    },
+    noFriendsText: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.52)",
+        marginTop: 6,
+        paddingHorizontal: 14,
     },
     noResults: {
         ...typography.body,
-        color: colors.mutedDark,
-        fontStyle: "italic",
+        color: "rgba(255,255,255,0.62)",
         paddingHorizontal: 12,
         paddingVertical: 8,
     },
     preview: {
         ...typography.body,
-        color: colors.mutedDark,
+        color: "rgba(255,255,255,0.58)",
+        marginTop: 2,
+    },
+    previewEmpty: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.42)",
         marginTop: 2,
     },
     resultName: {
@@ -245,51 +580,74 @@ const styles = StyleSheet.create({
     },
     resultRow: {
         alignItems: "center",
-        backgroundColor: colors.surface,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
         flexDirection: "row",
         gap: 10,
+        marginBottom: 6,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,
     },
     resultsList: {
-        borderBottomColor: colors.borderSubtle,
-        borderBottomWidth: 1,
-        maxHeight: 200,
+        marginHorizontal: 14,
+        maxHeight: 220,
     },
     row: {
         alignItems: "center",
-        borderBottomColor: colors.borderSubtle,
-        borderBottomWidth: 1,
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
         flexDirection: "row",
         gap: 12,
-        padding: 12,
+        marginBottom: 8,
+        marginHorizontal: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
     },
     rowContent: {
         flex: 1,
     },
+    rowUnread: {
+        backgroundColor: "rgba(231,0,0,0.08)",
+        borderColor: "rgba(231,0,0,0.35)",
+    },
     searchInput: {
-        backgroundColor: colors.input,
-        borderColor: colors.borderSubtle,
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderColor: "rgba(255,255,255,0.1)",
         borderWidth: 1,
         color: colors.textSecondary,
         fontSize: 14,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10,
     },
     searchWrap: {
-        borderBottomColor: colors.borderSubtle,
-        borderBottomWidth: 1,
-        padding: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    sectionHeader: {
+        alignItems: "center",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        paddingHorizontal: 14,
+    },
+    sectionMeta: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.52)",
+        fontSize: 11,
+    },
+    sectionTitle: {
+        ...typography.label,
+        color: "rgba(255,255,255,0.52)",
     },
     unreadBadge: {
         alignItems: "center",
         backgroundColor: colors.error,
-        borderRadius: 10,
-        height: 20,
+        borderRadius: 12,
         justifyContent: "center",
-        marginLeft: "auto",
-        minWidth: 20,
-        paddingHorizontal: 5,
+        minWidth: 24,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
     },
     unreadText: {
         color: "#fff",

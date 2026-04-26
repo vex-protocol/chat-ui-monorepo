@@ -33,7 +33,8 @@ export function desktopConfig(): BootstrapConfig {
             // module and isn't re-exported from the sqlite subpath; cast
             // via `never` to satisfy the Kysely<ClientDatabase> parameter
             // without pulling in an internal import.
-            const storage = new SqliteStorage(db as never, privateKey);
+            const atRestAes = deriveAtRestAesKey(privateKey);
+            const storage = new SqliteStorage(db as never, atRestAes);
             await storage.init();
             return storage;
         },
@@ -47,6 +48,30 @@ export function desktopConfig(): BootstrapConfig {
         // eslint-disable-next-line @typescript-eslint/no-deprecated
         deviceName: navigator.platform,
     };
+}
+
+function decodeHex(hex: string): Uint8Array {
+    const normalized = hex.trim().toLowerCase();
+    const evenHex = normalized.length % 2 === 0 ? normalized : `0${normalized}`;
+    const out = new Uint8Array(evenHex.length / 2);
+    for (let i = 0; i < out.length; i += 1) {
+        const start = i * 2;
+        out[i] = Number.parseInt(evenHex.slice(start, start + 2), 16);
+    }
+    return out;
+}
+
+function deriveAtRestAesKey(privateKeyHex: string): Uint8Array {
+    const raw = decodeHex(privateKeyHex);
+    if (raw.length === 32) {
+        return raw;
+    }
+    if (raw.length > 32) {
+        return raw.subarray(0, 32);
+    }
+    const out = new Uint8Array(32);
+    out.set(raw);
+    return out;
 }
 
 function sanitize(s: string): string {

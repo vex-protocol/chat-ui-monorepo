@@ -3,7 +3,6 @@ import type { AuthScreenProps } from "../navigation/types";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { HourglassIcon } from "../components/HourglassIcon";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
@@ -13,52 +12,37 @@ type Props = AuthScreenProps<"Welcome">;
 
 export function WelcomeScreen({ navigation }: Props) {
     return (
-        <ScreenLayout>
+        <ScreenLayout style={styles.layout}>
             <View style={styles.container}>
-                {/* Logo */}
-                <VexLogo size={36} />
+                <View pointerEvents="none" style={styles.blackoutLayer} />
+                <View pointerEvents="none" style={styles.glowTop} />
+                <View pointerEvents="none" style={styles.glowBottom} />
 
-                {/* Center content */}
-                <View style={styles.center}>
-                    {/* Hourglass icon with dashed connection lines */}
-                    <View style={styles.iconRow}>
-                        <View style={styles.node} />
-                        <View style={styles.dashedLine} />
-                        <View style={styles.hourglassBox}>
-                            <HourglassIcon size={36} />
-                        </View>
-                        <View style={styles.dashedLine} />
-                        <View style={styles.node} />
-                    </View>
-
-                    <Text style={styles.heading}>Welcome</Text>
-                    <Text style={styles.subtitle}>Secure. Private. Yours.</Text>
+                <View style={styles.logoWrap}>
+                    <VexLogo size={42} />
                 </View>
 
-                {/* Actions */}
                 <View style={styles.actions}>
                     <VexButton
                         glow
                         onPress={() => {
                             navigation.navigate("Initialize");
                         }}
+                        style={styles.actionButton}
                         title="Get Started"
-                        variant="outline"
+                        variant="primary"
                     />
-                    <Text
+                    <VexButton
                         onPress={() => {
                             navigation.navigate("Login");
                         }}
-                        style={styles.signInLink}
-                    >
-                        Sign in
-                    </Text>
+                        style={styles.actionButton}
+                        title="Sign In"
+                        variant="outline"
+                    />
                 </View>
 
-                {/* Footer */}
                 <Text style={styles.footer}>
-                    By continuing, you agree to our{"\n"}
-                    <Text style={styles.footerLink}>Terms</Text> &{" "}
                     <Text style={styles.footerLink}>Privacy Policy</Text>
                 </Text>
             </View>
@@ -67,74 +51,64 @@ export function WelcomeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-    actions: {
-        alignItems: "center",
-        gap: 16,
+    actionButton: {
         width: "100%",
     },
-    center: {
+    actions: {
         alignItems: "center",
         gap: 12,
+        paddingTop: 6,
+        width: "100%",
+    },
+    blackoutLayer: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: "#000000",
+        opacity: 0.72,
     },
     container: {
         alignItems: "center",
         flex: 1,
-        justifyContent: "space-between",
-    },
-    dashedLine: {
-        borderColor: colors.accent,
-        borderStyle: "dashed",
-        borderTopWidth: 1,
-        height: 0,
-        width: 48,
+        justifyContent: "center",
+        paddingBottom: 22,
     },
     footer: {
         ...typography.body,
-        color: colors.accent,
-        fontSize: 10,
+        color: "rgba(255,255,255,0.48)",
+        fontSize: 11,
+        letterSpacing: 0.9,
         lineHeight: 16,
+        marginTop: 26,
         textAlign: "center",
+        textTransform: "uppercase",
     },
     footerLink: {
         color: colors.accent,
         textDecorationLine: "underline",
     },
-    heading: {
-        ...typography.heading,
-        color: colors.text,
+    glowBottom: {
+        backgroundColor: colors.accent,
+        borderRadius: 120,
+        bottom: -40,
+        height: 140,
+        left: "30%",
+        opacity: 0.08,
+        position: "absolute",
+        width: 140,
     },
-    hourglassBox: {
-        alignItems: "center",
-        backgroundColor: colors.bg,
-        borderColor: colors.accent,
-        borderWidth: 1,
-        height: 64,
-        justifyContent: "center",
-        width: 64,
+    glowTop: {
+        backgroundColor: colors.accent,
+        borderRadius: 140,
+        height: 160,
+        opacity: 0.1,
+        position: "absolute",
+        right: -44,
+        top: -48,
+        width: 160,
     },
-    iconRow: {
-        alignItems: "center",
-        flexDirection: "row",
-        gap: 0,
-        marginBottom: 24,
+    layout: {
+        backgroundColor: "#000000",
     },
-    logo: {
-        marginTop: 16,
-    },
-    node: {
-        borderColor: colors.accent,
-        borderRadius: 5,
-        borderWidth: 1,
-        height: 10,
-        width: 10,
-    },
-    signInLink: {
-        ...typography.button,
-        color: colors.muted,
-    },
-    subtitle: {
-        ...typography.body,
-        color: colors.muted,
-        letterSpacing: 2,
+    logoWrap: {
+        marginBottom: 22,
     },
 });

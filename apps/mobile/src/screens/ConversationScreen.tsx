@@ -1,7 +1,13 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -14,12 +20,15 @@ import {
 import { $messages, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
 import { colors, typography } from "../theme";
+
+const GROUP_WINDOW_MS = 10 * 60 * 1000;
 
 export function ConversationScreen({
     navigation,
@@ -34,6 +43,10 @@ export function ConversationScreen({
         const thread = allMessages[userID] ?? [];
         return [...thread].reverse();
     }, [allMessages, userID]);
+    const identityVisibility = useMemo(
+        () => buildIdentityVisibility(messages),
+        [messages],
+    );
 
     // Track active conversation for notification suppression + mark read
     useEffect(() => {
@@ -52,10 +65,13 @@ export function ConversationScreen({
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
+    const sendInFlightRef = useRef(false);
+    const insets = useSafeAreaInsets();
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
-        if (!content || !user) return;
+        if (!content || !user || sendInFlightRef.current) return;
+        sendInFlightRef.current = true;
         setSending(true);
         setText("");
         setError("");
@@ -66,33 +82,38 @@ export function ConversationScreen({
             }
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to send");
+        } finally {
+            sendInFlightRef.current = false;
+            setSending(false);
         }
-        setSending(false);
-    }, [text, user, userID]);
+    }, [text, user, userID, sendInFlightRef]);
 
-    function renderMessage({ item }: { item: Message }) {
+    function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
+        const ownName = user?.username ?? "Unknown";
+        const showIdentity = identityVisibility[index] ?? true;
         return (
             <MessageBubbleRN
-                authorName={isOwn ? "You" : username}
+                authorName={isOwn ? ownName : username}
                 isOwn={isOwn}
                 message={item}
+                showIdentity={showIdentity}
             />
         );
     }
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={0}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={insets.top}
             style={styles.container}
         >
             <ChatHeader
-                onBack={() => {
-                    navigation.goBack();
+                onTitlePress={() => {
+                    navigation.navigate("DMList");
                 }}
                 subtitle={`@${username}`}
-                title="Home"
+                title="Direct Messages"
             />
 
             {messages.length === 0 ? (
@@ -163,3 +184,46 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
 });
+
+function buildIdentityVisibility(messages: Message[]): boolean[] {
+    const visibility = Array<boolean>(messages.length).fill(true);
+    let chunkAuthorID: null | string = null;
+    let chunkStartTs = 0;
+
+    // Process oldest -> newest so chunk windows are stable.
+    for (let index = messages.length - 1; index >= 0; index--) {
+        const current = messages[index];
+        if (!current || current.group === "__system__") {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        const currentTs = Date.parse(current.timestamp);
+        if (Number.isNaN(currentTs)) {
+            visibility[index] = true;
+            chunkAuthorID = null;
+            chunkStartTs = 0;
+            continue;
+        }
+
+        if (chunkAuthorID !== current.authorID) {
+            visibility[index] = true;
+            chunkAuthorID = current.authorID;
+            chunkStartTs = currentTs;
+            continue;
+        }
+
+        const elapsed = currentTs - chunkStartTs;
+        if (elapsed >= 0 && elapsed <= GROUP_WINDOW_MS) {
+            visibility[index] = false;
+            continue;
+        }
+
+        visibility[index] = true;
+        chunkStartTs = currentTs;
+    }
+
+    return visibility;
+}

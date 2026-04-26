@@ -9,7 +9,6 @@ import { vexService } from "@vex-chat/store";
 
 import { useNavigation } from "@react-navigation/native";
 
-import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
@@ -34,14 +33,29 @@ export function AddServerScreen() {
             const result = await vexService.createServer(name.trim());
             if (!result.ok) {
                 setError(result.error || "Failed to create server");
-                setLoading(false);
                 return;
             }
-            if (navigation.canGoBack()) navigation.goBack();
+            if (!result.serverID) {
+                if (navigation.canGoBack()) navigation.goBack();
+                return;
+            }
+            if (result.channelID && result.channelName) {
+                navigation.navigate("Channel", {
+                    channelID: result.channelID,
+                    channelName: result.channelName,
+                    serverID: result.serverID,
+                });
+                return;
+            }
+            navigation.navigate("ChannelList", {
+                serverID: result.serverID,
+                serverName: result.serverName,
+            });
         } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to create server",
             );
+        } finally {
             setLoading(false);
         }
     }
@@ -73,7 +87,6 @@ export function AddServerScreen() {
     if (mode === "pick") {
         return (
             <ScreenLayout>
-                <BackButton />
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <Text style={styles.heading}>Add a server.</Text>
@@ -105,12 +118,6 @@ export function AddServerScreen() {
     if (mode === "create") {
         return (
             <ScreenLayout>
-                <BackButton
-                    onPress={() => {
-                        setMode("pick");
-                        setError("");
-                    }}
-                />
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <Text style={styles.heading}>Create a server.</Text>
@@ -161,12 +168,6 @@ export function AddServerScreen() {
     // mode === 'join'
     return (
         <ScreenLayout>
-            <BackButton
-                onPress={() => {
-                    setMode("pick");
-                    setError("");
-                }}
-            />
             <View style={styles.content}>
                 <View style={styles.header}>
                     <Text style={styles.heading}>Join a server.</Text>

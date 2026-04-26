@@ -6,11 +6,12 @@ import Svg, { Path } from "react-native-svg";
 import { colors, fontFamilies } from "../theme";
 
 interface VexLogoProps {
+    showWordmark?: boolean;
     size?: number;
 }
 
 /** Red vex icon (from SVG) + "vex" text in Space Grotesk */
-export function VexLogo({ size = 36 }: VexLogoProps) {
+export function VexLogo({ showWordmark = true, size = 36 }: VexLogoProps) {
     return (
         <View style={styles.row}>
             <Svg
@@ -26,14 +27,16 @@ export function VexLogo({ size = 36 }: VexLogoProps) {
                     fillRule="evenodd"
                 />
             </Svg>
-            <Text
-                style={[
-                    styles.text,
-                    { fontSize: size * 0.85, lineHeight: size },
-                ]}
-            >
-                vex
-            </Text>
+            {showWordmark && (
+                <Text
+                    style={[
+                        styles.text,
+                        { fontSize: size * 0.85, lineHeight: size },
+                    ]}
+                >
+                    vex
+                </Text>
+            )}
         </View>
     );
 }

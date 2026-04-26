@@ -6,7 +6,6 @@ import { vexService } from "@vex-chat/store";
 
 import { useNavigation } from "@react-navigation/native";
 
-import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
@@ -47,8 +46,6 @@ export function JoinGroupScreen() {
 
     return (
         <ScreenLayout>
-            <BackButton />
-
             <View style={styles.content}>
                 <View style={styles.header}>
                     <Text style={styles.heading}>Join a group.</Text>

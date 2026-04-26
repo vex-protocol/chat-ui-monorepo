@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from "react";
-import { StatusBar } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { AppState, StatusBar, StyleSheet, Text, View } from "react-native";
 
 import {
     $groupMessages,
     $keyReplaced,
     $messages,
+    $user,
     vexService,
 } from "@vex-chat/store";
 
@@ -26,6 +27,13 @@ import { colors, fontFamilies } from "./src/theme";
 
 function App() {
     const keyReplaced = useStore($keyReplaced);
+    const user = useStore($user);
+    const appStateRef = useRef(AppState.currentState);
+    const bootstrappedRef = useRef(false);
+    const authProbeInFlightRef = useRef(false);
+    const networkRefreshInFlightRef = useRef(false);
+    const resumeProbeInFlightRef = useRef(false);
+    const [authNotice, setAuthNotice] = useState<null | string>(null);
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -35,16 +43,159 @@ function App() {
     }, []);
 
     useEffect(() => {
+        if (bootstrappedRef.current) {
+            return;
+        }
+        bootstrappedRef.current = true;
         void (async () => {
-            await requestNotificationPermission();
-            await vexService.autoLogin(
-                keychainKeyStore,
-                mobileConfig(),
-                getServerOptions(),
-            );
-            // Familiars are populated by vexService.populateState() during bootstrap
+            try {
+                await requestNotificationPermission();
+                const result = await vexService.autoLogin(
+                    keychainKeyStore,
+                    mobileConfig(),
+                    getServerOptions(),
+                );
+                if (
+                    !result.ok &&
+                    result.error === "Session expired. Please sign in again."
+                ) {
+                    setAuthNotice(result.error);
+                }
+                if (!result.ok && result.error) {
+                    // Avoid noisy unhandled rejections and keep bootstrap debuggable.
+                    console.warn("[vex-auth] autoLogin failed", result.error);
+                }
+                // Familiars are populated by vexService.populateState() during bootstrap
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-auth] bootstrap failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            }
         })();
     }, []);
+
+    useEffect(() => {
+        if (!authNotice) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            setAuthNotice(null);
+        }, 6000);
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [authNotice]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        let active = true;
+        const pollWhoAmI = async () => {
+            if (authProbeInFlightRef.current) {
+                return;
+            }
+            authProbeInFlightRef.current = true;
+            try {
+                const status = await vexService.probeAuthSession();
+                if (!active) {
+                    return;
+                }
+                if (status === "offline") {
+                    if (networkRefreshInFlightRef.current) {
+                        return;
+                    }
+                    networkRefreshInFlightRef.current = true;
+                    try {
+                        const refreshed =
+                            await vexService.refreshSessionAfterForeground();
+                        if (refreshed !== "unauthorized") {
+                            return;
+                        }
+                        await clearCredentials();
+                        await vexService.logout();
+                        setAuthNotice("Session expired. Please sign in again.");
+                        return;
+                    } finally {
+                        networkRefreshInFlightRef.current = false;
+                    }
+                }
+                if (status !== "unauthorized") {
+                    return;
+                }
+                await clearCredentials();
+                await vexService.logout();
+                setAuthNotice("Session expired. Please sign in again.");
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-auth] whoami poll failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            } finally {
+                authProbeInFlightRef.current = false;
+            }
+        };
+        void pollWhoAmI();
+        const interval = setInterval(() => {
+            void pollWhoAmI();
+        }, 10_000);
+        return () => {
+            active = false;
+            clearInterval(interval);
+        };
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        let active = true;
+        const onResume = async () => {
+            if (
+                resumeProbeInFlightRef.current ||
+                networkRefreshInFlightRef.current
+            ) {
+                return;
+            }
+            resumeProbeInFlightRef.current = true;
+            networkRefreshInFlightRef.current = true;
+            try {
+                const status = await vexService.refreshSessionAfterForeground();
+                if (!active || status !== "unauthorized") {
+                    return;
+                }
+                await clearCredentials();
+                await vexService.logout();
+                setAuthNotice("Session expired. Please sign in again.");
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-auth] app resume refresh failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            } finally {
+                resumeProbeInFlightRef.current = false;
+                networkRefreshInFlightRef.current = false;
+            }
+        };
+        const subscription = AppState.addEventListener(
+            "change",
+            (nextState) => {
+                const previous = appStateRef.current;
+                appStateRef.current = nextState;
+                const resumed =
+                    (previous === "background" || previous === "inactive") &&
+                    nextState === "active";
+                if (resumed) {
+                    void onResume();
+                }
+            },
+        );
+        return () => {
+            active = false;
+            subscription.remove();
+        };
+    }, [user]);
 
     // Show local notifications for incoming messages by watching atom changes
     const allDms = useStore($messages);
@@ -87,6 +238,13 @@ function App() {
     return (
         <SafeAreaProvider>
             <StatusBar barStyle="light-content" />
+            {authNotice && (
+                <View pointerEvents="none" style={styles.noticeWrap}>
+                    <View style={styles.noticeCard}>
+                        <Text style={styles.noticeText}>{authNotice}</Text>
+                    </View>
+                </View>
+            )}
             <NavigationContainer
                 ref={navigationRef}
                 theme={{
@@ -124,5 +282,30 @@ function App() {
         </SafeAreaProvider>
     );
 }
+
+const styles = StyleSheet.create({
+    noticeCard: {
+        backgroundColor: "rgba(36, 40, 50, 0.96)",
+        borderColor: "rgba(255,255,255,0.16)",
+        borderRadius: 10,
+        borderWidth: 1,
+        maxWidth: 420,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    noticeText: {
+        color: "#E7EAF1",
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    noticeWrap: {
+        alignItems: "center",
+        left: 0,
+        position: "absolute",
+        right: 0,
+        top: 54,
+        zIndex: 999,
+    },
+});
 
 export default App;
