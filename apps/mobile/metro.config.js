@@ -76,6 +76,10 @@ const nodeStubs = {
         projectRoot,
         "src/lib/stubs/better-sqlite3.js",
     ),
+    "node:http": path.resolve(projectRoot, "src/lib/stubs/node-http.js"),
+    "node:https": path.resolve(projectRoot, "src/lib/stubs/node-https.js"),
+    http: path.resolve(projectRoot, "src/lib/stubs/node-http.js"),
+    https: path.resolve(projectRoot, "src/lib/stubs/node-https.js"),
     winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
 };
 
