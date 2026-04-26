@@ -33,14 +33,29 @@ export function AddServerScreen() {
             const result = await vexService.createServer(name.trim());
             if (!result.ok) {
                 setError(result.error || "Failed to create server");
-                setLoading(false);
                 return;
             }
-            if (navigation.canGoBack()) navigation.goBack();
+            if (!result.serverID) {
+                if (navigation.canGoBack()) navigation.goBack();
+                return;
+            }
+            if (result.channelID && result.channelName) {
+                navigation.navigate("Channel", {
+                    channelID: result.channelID,
+                    channelName: result.channelName,
+                    serverID: result.serverID,
+                });
+                return;
+            }
+            navigation.navigate("ChannelList", {
+                serverID: result.serverID,
+                serverName: result.serverName,
+            });
         } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to create server",
             );
+        } finally {
             setLoading(false);
         }
     }

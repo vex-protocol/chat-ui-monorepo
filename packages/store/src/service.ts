@@ -64,6 +64,13 @@ export interface BootstrapConfig {
     deviceName: string;
 }
 
+export interface CreateServerResult extends OperationResult {
+    channelID?: string;
+    channelName?: string;
+    serverID?: string;
+    serverName?: string;
+}
+
 /** Result from any mutation operation. */
 export interface OperationResult {
     error?: string;
@@ -292,14 +299,25 @@ class VexService {
         return client.invites.create(serverID, duration);
     }
 
-    async createServer(name: string): Promise<OperationResult> {
+    async createServer(name: string): Promise<CreateServerResult> {
         try {
             const client = this.requireClient();
             const server = await client.servers.create(name);
             $serversWritable.setKey(server.serverID, server);
             const channels = await client.channels.retrieve(server.serverID);
             $channelsWritable.setKey(server.serverID, channels);
-            return { ok: true };
+            const firstChannel = channels[0];
+            return {
+                ok: true,
+                serverID: server.serverID,
+                serverName: server.name,
+                ...(firstChannel
+                    ? {
+                          channelID: firstChannel.channelID,
+                          channelName: firstChannel.name,
+                      }
+                    : {}),
+            };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }

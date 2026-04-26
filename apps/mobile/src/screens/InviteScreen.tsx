@@ -16,7 +16,7 @@ import {
 import { vexService } from "@vex-chat/store";
 
 import { ChatHeader } from "../components/ChatHeader";
-import { colors, typography } from "../theme";
+import { colors, fontFamilies, typography } from "../theme";
 
 const DURATIONS: { label: string; value: string }[] = [
     { label: "1 hour", value: "1h" },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     },
     fieldValue: { ...typography.body, color: colors.text },
     label: { ...typography.label, color: colors.muted, fontSize: 12 },
-    mono: { fontFamily: "Menlo" },
+    mono: { fontFamily: fontFamilies.mono },
     resetBtn: { alignItems: "center", marginTop: 24, padding: 8 },
     resetText: { color: colors.muted },
     submit: { alignSelf: "stretch", marginTop: 8 },

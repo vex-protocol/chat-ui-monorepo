@@ -19,6 +19,7 @@ import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";
 
@@ -361,7 +362,7 @@ const styles = StyleSheet.create({
         right: 0,
     },
     chevronBar: {
-        backgroundColor: "#f2f4fa",
+        backgroundColor: colors.text,
         borderRadius: 999,
         height: 2,
         position: "absolute",
@@ -382,11 +383,11 @@ const styles = StyleSheet.create({
         ],
     },
     container: {
-        backgroundColor: "#0a0c10",
+        backgroundColor: colors.bg,
         flex: 1,
     },
     content: {
-        backgroundColor: "#11131a",
+        backgroundColor: colors.surfaceLight,
         flex: 1,
     },
     hamburgerButton: {
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
         width: 36,
     },
     hamburgerLine: {
-        backgroundColor: "#f2f4fa",
+        backgroundColor: colors.text,
         borderRadius: 999,
         height: 2,
         marginVertical: 1.5,
@@ -416,12 +417,12 @@ const styles = StyleSheet.create({
         width: 36,
     },
     toggleButtonFrameClosed: {
-        backgroundColor: "rgba(17,19,26,0.92)",
+        backgroundColor: "rgba(17,17,19,0.92)",
         borderColor: "rgba(255,255,255,0.14)",
         borderWidth: 1,
     },
     toggleButtonFrameOpen: {
-        backgroundColor: "rgba(10,12,16,0.98)",
+        backgroundColor: "rgba(9,9,11,0.98)",
         borderColor: "rgba(255,255,255,0.22)",
         borderWidth: 1,
     },
