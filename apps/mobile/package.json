@@ -45,7 +45,7 @@
         "@vex-chat/libvex": "catalog:",
         "babel-preset-expo": "^55.0.15",
         "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.0.1",
+        "eslint-plugin-react-hooks": "^7.1.1",
         "typescript": "catalog:"
     },
     "engines": {
