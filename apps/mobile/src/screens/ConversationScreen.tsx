@@ -1,7 +1,13 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -14,6 +20,7 @@ import {
 import { $messages, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
@@ -21,10 +28,7 @@ import { MessageInputBar } from "../components/MessageInputBar";
 import { setActiveConversation } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
-export function ConversationScreen({
-    navigation,
-    route,
-}: AppScreenProps<"Conversation">) {
+export function ConversationScreen({ route }: AppScreenProps<"Conversation">) {
     const { userID, username } = route.params;
     const allMessages = useStore($messages);
     const user = useStore($user);
@@ -52,10 +56,13 @@ export function ConversationScreen({
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
+    const sendInFlightRef = useRef(false);
+    const insets = useSafeAreaInsets();
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
-        if (!content || !user) return;
+        if (!content || !user || sendInFlightRef.current) return;
+        sendInFlightRef.current = true;
         setSending(true);
         setText("");
         setError("");
@@ -66,9 +73,11 @@ export function ConversationScreen({
             }
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to send");
+        } finally {
+            sendInFlightRef.current = false;
+            setSending(false);
         }
-        setSending(false);
-    }, [text, user, userID]);
+    }, [text, user, userID, sendInFlightRef]);
 
     function renderMessage({ item }: { item: Message }) {
         const isOwn = item.authorID === user?.userID;
@@ -83,17 +92,11 @@ export function ConversationScreen({
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={0}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={insets.top}
             style={styles.container}
         >
-            <ChatHeader
-                onBack={() => {
-                    navigation.goBack();
-                }}
-                subtitle={`@${username}`}
-                title="Home"
-            />
+            <ChatHeader subtitle={`@${username}`} title="Home" />
 
             {messages.length === 0 ? (
                 <View style={styles.empty}>

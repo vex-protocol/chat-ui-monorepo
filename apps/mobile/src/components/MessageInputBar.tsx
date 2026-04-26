@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
     StyleSheet,
     Text,
@@ -25,6 +25,19 @@ export function MessageInputBar({
     value,
 }: MessageInputBarProps) {
     const canSend = value.trim().length > 0 && !sending;
+    const inputRef = useRef<TextInput>(null);
+    const keepFocusAfterSubmitRef = useRef(false);
+    const handleSubmitEditing = () => {
+        if (canSend) {
+            keepFocusAfterSubmitRef.current = true;
+            onSend();
+        }
+        // Keep chat composer focused after pressing Enter/Send.
+        setTimeout(() => {
+            inputRef.current?.focus();
+            keepFocusAfterSubmitRef.current = false;
+        }, 0);
+    };
 
     return (
         <View style={styles.container}>
@@ -33,12 +46,21 @@ export function MessageInputBar({
             </TouchableOpacity>
 
             <TextInput
-                editable={!sending}
                 multiline
+                onBlur={() => {
+                    if (!keepFocusAfterSubmitRef.current) return;
+                    requestAnimationFrame(() => {
+                        inputRef.current?.focus();
+                    });
+                }}
                 onChangeText={onChangeText}
+                onSubmitEditing={handleSubmitEditing}
                 placeholder={placeholder}
                 placeholderTextColor={colors.mutedDark}
+                ref={inputRef}
+                returnKeyType="send"
                 style={styles.input}
+                submitBehavior="submit"
                 value={value}
             />
 

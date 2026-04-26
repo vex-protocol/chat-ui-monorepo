@@ -1,7 +1,13 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -54,6 +60,7 @@ export function ChannelScreen({
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const [_sendError, setSendError] = useState("");
+    const sendInFlightRef = useRef(false);
     const [usernames, setUsernames] = useState<Record<string, string>>({});
 
     // Load channel members to resolve userIDs → usernames
@@ -70,7 +77,8 @@ export function ChannelScreen({
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
-        if (!content || !user) return;
+        if (!content || !user || sendInFlightRef.current) return;
+        sendInFlightRef.current = true;
         setSending(true);
         setSendError("");
         setText("");
@@ -84,9 +92,11 @@ export function ChannelScreen({
             }
         } catch (err: unknown) {
             setSendError(err instanceof Error ? err.message : "Failed to send");
+        } finally {
+            sendInFlightRef.current = false;
+            setSending(false);
         }
-        setSending(false);
-    }, [text, user, channelID]);
+    }, [text, user, channelID, sendInFlightRef]);
 
     function renderMessage({ item }: { item: Message }) {
         const isOwn = item.authorID === user?.userID;
@@ -106,14 +116,11 @@ export function ChannelScreen({
 
     return (
         <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
             keyboardVerticalOffset={insets.top}
             style={styles.container}
         >
             <ChatHeader
-                onBack={() => {
-                    navigation.navigate("ChannelList", { serverID });
-                }}
                 onOverflow={() => {
                     navigation.navigate("Invite", { serverID, serverName });
                 }}

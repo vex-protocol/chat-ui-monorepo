@@ -15,6 +15,7 @@ import {
 
 import { vexService } from "@vex-chat/store";
 
+import { ChatHeader } from "../components/ChatHeader";
 import { colors, typography } from "../theme";
 
 const DURATIONS: { label: string; value: string }[] = [
@@ -26,7 +27,7 @@ const DURATIONS: { label: string; value: string }[] = [
 
 const INVITE_URL_BASE = "https://vex.chat/invite";
 
-export function InviteScreen({ navigation, route }: AppScreenProps<"Invite">) {
+export function InviteScreen({ route }: AppScreenProps<"Invite">) {
     const { serverID, serverName } = route.params;
     const [duration, setDuration] = useState("7d");
     const [invite, setInvite] = useState<Invite | null>(null);
@@ -63,23 +64,7 @@ export function InviteScreen({ navigation, route }: AppScreenProps<"Invite">) {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    accessibilityLabel="Back"
-                    hitSlop={12}
-                    onPress={() => {
-                        if (navigation.canGoBack()) navigation.goBack();
-                    }}
-                    style={styles.backBtn}
-                >
-                    <Text style={styles.backArrow}>←</Text>
-                </TouchableOpacity>
-                <Text numberOfLines={1} style={styles.headerTitle}>
-                    Invite to {serverName ?? "server"}
-                </Text>
-                <View style={styles.backBtn} />
-            </View>
+            <ChatHeader title={`Invite to ${serverName ?? "server"}`} />
 
             {invite ? (
                 <View style={styles.body}>
@@ -213,12 +198,6 @@ const styles = StyleSheet.create({
         gap: 8,
         marginTop: 16,
     },
-    backArrow: { color: colors.text, fontSize: 24, lineHeight: 24 },
-    backBtn: {
-        alignItems: "center",
-        justifyContent: "center",
-        width: 32,
-    },
     body: { flex: 1, padding: 16 },
     btn: {
         alignItems: "center",
@@ -274,22 +253,6 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     fieldValue: { ...typography.body, color: colors.text },
-    header: {
-        alignItems: "center",
-        borderBottomColor: colors.borderSubtle,
-        borderBottomWidth: 1,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-    },
-    headerTitle: {
-        ...typography.button,
-        color: colors.text,
-        flex: 1,
-        fontSize: 16,
-        textAlign: "center",
-    },
     label: { ...typography.label, color: colors.muted, fontSize: 12 },
     mono: { fontFamily: "Menlo" },
     resetBtn: { alignItems: "center", marginTop: 24, padding: 8 },

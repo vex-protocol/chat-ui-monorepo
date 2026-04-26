@@ -106,7 +106,6 @@ export async function showMessageNotification(mail: Message): Promise<void> {
                 authorID: payload.authorID,
                 username: payload.title,
             },
-            sound: "default",
             title: payload.title,
         },
         trigger: { channelId: CHANNEL_ID },
@@ -118,7 +117,6 @@ async function ensureChannel(): Promise<void> {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
         importance: AndroidImportance.HIGH,
         name: "Messages",
-        sound: "default",
     });
     channelReady = true;
 }

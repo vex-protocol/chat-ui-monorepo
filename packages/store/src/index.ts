@@ -6,12 +6,14 @@ export type { VexLink } from "./deeplink.ts";
 // ── Domain atoms (readonly — apps can subscribe, not write) ─────────────────
 
 export {
+    $authStatus,
     $avatarHash,
     $devices,
     $familiars,
     $keyReplaced,
     $user,
 } from "./domains/identity.ts";
+export type { AuthStatus } from "./domains/identity.ts";
 
 export {
     $channelUnreadCounts,

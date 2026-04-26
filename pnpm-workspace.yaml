@@ -7,8 +7,9 @@ blockExoticSubdeps: true
 catalog:
     "@nanostores/react": ^1.1.0
     "@types/node": ^24.10.1
-    "@vex-chat/libvex": 5.0.0
+    "@vex-chat/libvex": 5.3.1
     dompurify: ^3.2.6
+    expo-image-picker: ^55.0.18
     kysely: ^0.28.15
     marked: ^15.0.12
     nanostores: ^1.2.0
@@ -28,3 +29,4 @@ minimumReleaseAgeExclude:
     - "@vex-chat/types"
     - "@vex-chat/crypto"
     - axios
+    - uuid

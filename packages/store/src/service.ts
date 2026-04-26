@@ -21,6 +21,7 @@ import type {
 import { Client } from "@vex-chat/libvex";
 
 import {
+    $authStatusWritable,
     $avatarHashWritable,
     $devicesWritable,
     $familiarsWritable,
@@ -41,6 +42,8 @@ import {
 } from "./domains/servers.ts";
 
 // ── Public types ────────────────────────────────────────────────────────────
+
+export type AuthProbeStatus = "authenticated" | "offline" | "unauthorized";
 
 /** Result from any auth flow. */
 export interface AuthResult {
@@ -85,9 +88,52 @@ export interface ServerOptions {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
+interface ClientHttpDefaultsLike {
+    signal?: unknown;
+    timeout?: number;
+}
+
+interface ClientHttpInterceptorsLike {
+    request?: {
+        use?: (
+            onFulfilled: (
+                config: ClientHttpRequestConfigLike,
+            ) => ClientHttpRequestConfigLike,
+        ) => unknown;
+    };
+}
+
+interface ClientHttpLike {
+    defaults?: ClientHttpDefaultsLike;
+    get?: (...args: unknown[]) => Promise<unknown>;
+    interceptors?: ClientHttpInterceptorsLike;
+    post?: (...args: unknown[]) => Promise<unknown>;
+}
+
+interface ClientHttpRequestConfigLike {
+    signal?: unknown;
+    timeout?: number;
+}
+
+interface ClientWithInternalHttp {
+    http?: ClientHttpLike;
+}
+
+interface ClientWithSocketLike {
+    socket?: unknown;
+}
+
 interface HttpErrorLike {
     response: { status: number };
 }
+
+interface WebSocketDebugLike {
+    off(event: "message", listener: (data: Uint8Array) => void): void;
+    on(event: "message", listener: (data: Uint8Array) => void): void;
+    send(data: Uint8Array): void;
+}
+
+const REGISTER_STEP_TIMEOUT_MS = 12000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -113,6 +159,10 @@ class VexService {
     private client: Client | null = null;
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
+    private wsDebugEnabled = false;
+    private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
+    private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
+    private wsDebugSocket: null | WebSocketDebugLike = null;
 
     // ── Auth flows ──────────────────────────────────────────────────────
 
@@ -125,13 +175,18 @@ class VexService {
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<AuthResult> {
+        this.setAuthStatus("checking");
+        debugAuth("autoLogin:start", { host: options.host });
         let creds;
         try {
             creds = await keyStore.load();
         } catch (loadErr: unknown) {
             return { error: errorMessage(loadErr), ok: false };
         }
-        if (!creds) return { ok: false };
+        if (!creds) {
+            this.setAuthStatus("signed_out");
+            return { ok: false };
+        }
 
         try {
             await this.initClient(
@@ -140,16 +195,32 @@ class VexService {
                 config,
                 options,
             );
+            debugAuth("autoLogin:initClient:ok", {
+                host: options.host,
+                username: creds.username,
+            });
             const client = this.requireClient();
 
             const authErr = await client.loginWithDeviceKey(creds.deviceID);
             if (authErr) {
                 await this.close();
+                if (isUnauthorizedError(authErr)) {
+                    debugAuth("autoLogin:unauthorized:clearingCredentials", {
+                        username: creds.username,
+                    });
+                    await this.clearStoredCredentials(keyStore, creds.username);
+                    this.setAuthStatus("unauthorized");
+                    return {
+                        error: "Session expired. Please sign in again.",
+                        ok: false,
+                    };
+                }
                 return { error: authErr.message, ok: false };
             }
 
             await client.connect();
             $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
@@ -157,6 +228,20 @@ class VexService {
                 await this.close();
             } catch {
                 /* ignore close errors */
+            }
+            if (isUnauthorizedError(err)) {
+                debugAuth("autoLogin:catch:unauthorized:clearingCredentials", {
+                    username: creds.username,
+                });
+                await this.clearStoredCredentials(keyStore, creds.username);
+                this.setAuthStatus("unauthorized");
+                return {
+                    error: "Session expired. Please sign in again.",
+                    ok: false,
+                };
+            }
+            if (isNetworkError(err)) {
+                this.setAuthStatus("offline");
             }
             if ($keyReplacedWritable.get()) {
                 return { keyReplaced: true, ok: false };
@@ -167,6 +252,7 @@ class VexService {
 
     async close(): Promise<void> {
         if (this.client) {
+            this.detachWebsocketDebug();
             const c = this.client;
             this.unwireEvents();
             this.client = null;
@@ -255,6 +341,12 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
+    getWebsocketDebugEnabled(): boolean {
+        return this.wsDebugEnabled;
+    }
+
+    // ── Messaging ───────────────────────────────────────────────────────
+
     async joinInvite(inviteID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -274,8 +366,6 @@ class VexService {
         }
     }
 
-    // ── Messaging ───────────────────────────────────────────────────────
-
     /**
      * Login with username/password → register device if needed → connect.
      */
@@ -286,14 +376,21 @@ class VexService {
         options: ServerOptions,
         keyStore: KeyStore,
     ): Promise<AuthResult> {
+        this.setAuthStatus("checking");
+        debugAuth("login:start", { host: options.host, username });
         try {
             const creds = await keyStore.load(username);
             const privateKey = creds?.deviceKey ?? Client.generateSecretKey();
 
             await this.initClient(privateKey, username, config, options);
+            debugAuth("login:initClient:ok", { host: options.host, username });
             const client = this.requireClient();
 
             const loginResult = await client.login(username, password);
+            debugAuth("login:http:done", {
+                error: loginResult.error ?? null,
+                ok: loginResult.ok,
+            });
             if (!loginResult.ok) {
                 return {
                     error: loginResult.error ?? "Invalid username or password",
@@ -303,6 +400,7 @@ class VexService {
 
             await client.connect();
             $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
 
             if (!creds) {
                 try {
@@ -332,6 +430,11 @@ class VexService {
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
+            if (isUnauthorizedError(err)) {
+                this.setAuthStatus("unauthorized");
+            } else if (isNetworkError(err)) {
+                this.setAuthStatus("offline");
+            }
             return { error: errorMessage(err), ok: false };
         }
     }
@@ -339,6 +442,7 @@ class VexService {
     async logout(): Promise<void> {
         await this.close();
         this.resetAll();
+        this.setAuthStatus("signed_out");
     }
 
     async lookupUser(query: string): Promise<null | User> {
@@ -358,6 +462,23 @@ class VexService {
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
 
+    async probeAuthSession(): Promise<AuthProbeStatus> {
+        try {
+            const client = this.requireClient();
+            const auth = await client.whoami();
+            $userWritable.set(auth.user);
+            this.setAuthStatus("authenticated");
+            return "authenticated";
+        } catch (err: unknown) {
+            if (isUnauthorizedError(err)) {
+                this.setAuthStatus("unauthorized");
+                return "unauthorized";
+            }
+            this.setAuthStatus("offline");
+            return "offline";
+        }
+    }
+
     /**
      * Register a new account → save credentials → connect.
      */
@@ -368,12 +489,41 @@ class VexService {
         options: ServerOptions,
         keyStore: KeyStore,
     ): Promise<AuthResult> {
+        this.setAuthStatus("checking");
+        debugAuth("register:start", { host: options.host, username });
         try {
             const privateKey = Client.generateSecretKey();
-            await this.initClient(privateKey, username, config, options);
+            debugAuth("register:initClient:begin", { host: options.host });
+            await withTimeout(
+                this.initClient(privateKey, username, config, options, true),
+                REGISTER_STEP_TIMEOUT_MS,
+                "Signup stalled while preparing local encrypted storage.",
+            );
+            debugAuth("register:initClient:ok", { host: options.host });
             const client = this.requireClient();
+            const hasXKeyRing = Boolean(
+                (client as unknown as { xKeyRing?: unknown }).xKeyRing,
+            );
+            debugAuth("register:precheck", { hasXKeyRing });
+            if (!hasXKeyRing) {
+                return {
+                    error: "Local crypto keyring did not initialize. Please retry.",
+                    ok: false,
+                };
+            }
 
-            const [user, regErr] = await client.register(username, password);
+            debugAuth("register:http:begin", {
+                endpoint: `${options.host}/register`,
+            });
+            const [user, regErr] = await withTimeout(
+                client.register(username, password),
+                REGISTER_STEP_TIMEOUT_MS,
+                `Signup stalled before reaching server registration at ${options.host}.`,
+            );
+            debugAuth("register:http:done", {
+                hasUser: Boolean(user),
+                regErr: regErr?.message ?? null,
+            });
             if (regErr || !user) {
                 return {
                     error: regErr?.message ?? "Registration failed",
@@ -381,7 +531,15 @@ class VexService {
                 };
             }
 
-            const loginResult = await client.login(username, password);
+            const loginResult = await withTimeout(
+                client.login(username, password),
+                REGISTER_STEP_TIMEOUT_MS,
+                "Signup stalled while logging in the new account.",
+            );
+            debugAuth("register:login:done", {
+                error: loginResult.error ?? null,
+                ok: loginResult.ok,
+            });
             if (!loginResult.ok) {
                 return {
                     error:
@@ -391,8 +549,14 @@ class VexService {
                 };
             }
 
-            await client.connect();
+            await withTimeout(
+                client.connect(),
+                REGISTER_STEP_TIMEOUT_MS,
+                "Signup stalled while opening realtime connection.",
+            );
+            debugAuth("register:connect:ok", undefined);
             $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
 
             await this.saveCredentials(keyStore, {
                 deviceID: client.me.device().deviceID,
@@ -401,19 +565,32 @@ class VexService {
                 username,
             });
 
-            await this.populateState();
+            await withTimeout(
+                this.populateState(),
+                REGISTER_STEP_TIMEOUT_MS,
+                "Signup stalled while loading initial account data.",
+            );
+            debugAuth("register:populateState:ok", undefined);
             return { ok: true };
         } catch (err: unknown) {
+            debugAuth("register:catch", {
+                error: err instanceof Error ? err.message : String(err),
+            });
+            if (isUnauthorizedError(err)) {
+                this.setAuthStatus("unauthorized");
+            } else if (isNetworkError(err)) {
+                this.setAuthStatus("offline");
+            }
             return { error: errorMessage(err), ok: false };
         }
     }
-
-    // ── Unread management ───────────────────────────────────────────────
 
     resetAllUnread(): void {
         $dmUnreadCountsWritable.set({});
         $channelUnreadCountsWritable.set({});
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     async sendDM(
         recipientID: string,
@@ -428,8 +605,6 @@ class VexService {
         }
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
-
     async sendGroupMessage(
         channelID: string,
         content: string,
@@ -443,6 +618,8 @@ class VexService {
         }
     }
 
+    // ── Lifecycle ───────────────────────────────────────────────────────
+
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -454,7 +631,118 @@ class VexService {
         }
     }
 
+    setWebsocketDebug(enabled: boolean): void {
+        this.wsDebugEnabled = enabled;
+        if (enabled) {
+            this.attachWebsocketDebug();
+            return;
+        }
+        this.detachWebsocketDebug();
+    }
+
     // ── Private ─────────────────────────────────────────────────────────
+
+    private attachWebsocketDebug(): void {
+        if (!this.wsDebugEnabled || !this.client) {
+            return;
+        }
+        const socket = getClientSocket(this.client);
+        if (!socket) {
+            return;
+        }
+        if (this.wsDebugSocket === socket && this.wsDebugInboundListener) {
+            return;
+        }
+        this.detachWebsocketDebug();
+        const inbound = (data: Uint8Array) => {
+            console.log("[vex-ws][in]", describeWsFrame(data));
+        };
+        const originalSend = socket.send.bind(socket);
+        socket.send = (data: Uint8Array) => {
+            console.log("[vex-ws][out]", describeWsFrame(data));
+            originalSend(data);
+        };
+        socket.on("message", inbound);
+        this.wsDebugSocket = socket;
+        this.wsDebugInboundListener = inbound;
+        this.wsDebugOriginalSend = originalSend;
+    }
+
+    private async clearStoredCredentials(
+        keyStore: KeyStore,
+        username: string,
+    ): Promise<void> {
+        try {
+            await keyStore.clear(username);
+        } catch {
+            /* ignore — best-effort cleanup */
+        }
+    }
+
+    private configureHttpForRuntime(client: Client): void {
+        if (!isReactNativeRuntime()) {
+            return;
+        }
+        const internals = client as unknown as ClientWithInternalHttp;
+        const defaults = internals.http?.defaults;
+        const http = internals.http;
+        if (!defaults || !http) {
+            return;
+        }
+        // In some RN environments axios + default AbortSignal can stall
+        // requests before dispatch. Keep abort semantics in SDK runtimes
+        // that support it reliably, but clear it on mobile app runtime.
+        defaults.signal = undefined;
+        if (typeof defaults.timeout !== "number" || defaults.timeout <= 0) {
+            defaults.timeout = 15000;
+        }
+        http.interceptors?.request?.use?.(
+            (
+                config: ClientHttpRequestConfigLike,
+            ): ClientHttpRequestConfigLike => {
+                config.signal = undefined;
+                if (typeof config.timeout !== "number" || config.timeout <= 0) {
+                    config.timeout = 15000;
+                }
+                return config;
+            },
+        );
+        this.wrapHttpMethodsWithTimeout(http);
+    }
+
+    private async createClientWithRecovery(
+        privateKey: string,
+        clientOptions: ClientOptions,
+        storage: Storage,
+        allowStorageReset: boolean,
+        username: string,
+    ): Promise<Client> {
+        try {
+            return await Client.create(privateKey, clientOptions, storage);
+        } catch (err: unknown) {
+            if (allowStorageReset && isDecryptMismatchError(err)) {
+                debugAuth("initClient:recover:purgeKeyData", { username });
+                await storage.purgeKeyData();
+                return Client.create(privateKey, clientOptions, storage);
+            }
+            throw err;
+        }
+    }
+
+    private detachWebsocketDebug(): void {
+        if (!this.wsDebugSocket) {
+            return;
+        }
+        if (this.wsDebugInboundListener) {
+            this.wsDebugSocket.off("message", this.wsDebugInboundListener);
+        }
+        if (this.wsDebugOriginalSend) {
+            this.wsDebugSocket.send = this.wsDebugOriginalSend;
+        }
+        this.wsDebugInboundListener = null;
+        this.wsDebugOriginalSend = null;
+        this.wsDebugSocket = null;
+    }
 
     private ensureFamiliarCached(userID: string): void {
         if ($familiarsWritable.get()[userID]) return;
@@ -518,18 +806,30 @@ class VexService {
         username: string,
         config: BootstrapConfig,
         options: ServerOptions,
+        allowStorageReset = false,
     ): Promise<void> {
+        debugAuth("initClient:start", { host: options.host, username });
         await this.close();
         this.resetAll();
 
         const storage = await config.createStorage(privateKey, username);
+        debugAuth("initClient:storage:ok", { username });
 
         const clientOptions: ClientOptions = {
             ...options,
             deviceName: config.deviceName,
         };
 
-        this.client = await Client.create(privateKey, clientOptions, storage);
+        this.client = await this.createClientWithRecovery(
+            privateKey,
+            clientOptions,
+            storage,
+            allowStorageReset,
+            username,
+        );
+        debugAuth("initClient:client:create:ok", { host: options.host });
+        this.configureHttpForRuntime(this.client);
+        this.attachWebsocketDebug();
         this.wireEvents();
     }
 
@@ -614,8 +914,10 @@ class VexService {
     }
 
     private resetAll(): void {
+        this.detachWebsocketDebug();
         this.client = null;
         this.failedUserLookups.clear();
+        $authStatusWritable.set("signed_out");
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
         $familiarsWritable.set({});
@@ -647,6 +949,19 @@ class VexService {
         }
     }
 
+    private setAuthStatus(
+        status:
+            | "authenticated"
+            | "checking"
+            | "offline"
+            | "signed_out"
+            | "unauthorized",
+    ): void {
+        if ($authStatusWritable.get() !== status) {
+            $authStatusWritable.set(status);
+        }
+    }
+
     private subscribe<E extends keyof ClientEvents>(
         evt: E,
         fn: ClientEvents[E],
@@ -671,6 +986,42 @@ class VexService {
             }
         });
     }
+
+    private wrapHttpMethodsWithTimeout(http: ClientHttpLike): void {
+        const wrapMethod = (
+            method: (...args: unknown[]) => Promise<unknown>,
+            label: string,
+        ): ((...args: unknown[]) => Promise<unknown>) => {
+            return async (...args: unknown[]): Promise<unknown> => {
+                return withTimeout(
+                    method(...args),
+                    15000,
+                    `HTTP ${label} timed out before dispatch/response.`,
+                );
+            };
+        };
+        if (typeof http.get === "function") {
+            const original = http.get.bind(http);
+            http.get = wrapMethod(original, "GET");
+        }
+        if (typeof http.post === "function") {
+            const original = http.post.bind(http);
+            http.post = wrapMethod(original, "POST");
+        }
+    }
+}
+
+function debugAuth(step: string, meta?: Record<string, unknown>): void {
+    if (!shouldDebugAuth()) {
+        return;
+    }
+    try {
+        const payload = meta ? ` ${JSON.stringify(meta)}` : "";
+
+        console.log(`[vex-auth] ${step}${payload}`);
+    } catch {
+        console.log(`[vex-auth] ${step}`);
+    }
 }
 
 function deduplicateMessages(messages: Message[]): Message[] {
@@ -682,11 +1033,45 @@ function deduplicateMessages(messages: Message[]): Message[] {
     });
 }
 
+function describeWsFrame(data: Uint8Array): {
+    bytes: number;
+    hex: string;
+    text: string;
+} {
+    const maxHexBytes = 32;
+    const maxTextChars = 120;
+    const shown = data.subarray(0, maxHexBytes);
+    const hex = Array.from(shown)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join(" ");
+    const suffix = data.length > maxHexBytes ? " ..." : "";
+    let text = "";
+    try {
+        text = new TextDecoder().decode(data).slice(0, maxTextChars);
+    } catch {
+        text = "<binary>";
+    }
+    return {
+        bytes: data.length,
+        hex: `${hex}${suffix}`,
+        text,
+    };
+}
+
+// ── VexService ──────────────────────────────────────────────────────────────
+
 function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
-// ── VexService ──────────────────────────────────────────────────────────────
+function getClientSocket(client: Client): null | WebSocketDebugLike {
+    const container = client as unknown as ClientWithSocketLike;
+    const maybeSocket = container.socket;
+    if (!isWebSocketDebugLike(maybeSocket)) {
+        return null;
+    }
+    return maybeSocket;
+}
 
 function hasHttpStatus(err: unknown): err is HttpErrorLike {
     if (!(err instanceof Error) || !("response" in err)) return false;
@@ -697,6 +1082,93 @@ function hasHttpStatus(err: unknown): err is HttpErrorLike {
         "status" in res &&
         typeof (res as { status: unknown }).status === "number"
     );
+}
+
+function isDecryptMismatchError(err: unknown): boolean {
+    if (!(err instanceof Error)) {
+        return false;
+    }
+    const msg = err.message.toLowerCase();
+    return (
+        msg.includes("failed to decrypt sealed column value") ||
+        msg.includes("couldn't decrypt messages on disk")
+    );
+}
+
+function isNetworkError(err: unknown): boolean {
+    if (!(err instanceof Error)) {
+        return false;
+    }
+    return /network error/i.test(err.message);
+}
+
+function isReactNativeRuntime(): boolean {
+    if (typeof navigator !== "object" || navigator === null) {
+        return false;
+    }
+    return (
+        "product" in navigator &&
+        (navigator as { product?: string }).product === "ReactNative"
+    );
+}
+
+function isUnauthorizedError(err: unknown): boolean {
+    if (hasHttpStatus(err)) {
+        return err.response.status === 401;
+    }
+    if (err instanceof Error) {
+        return /status code 401/i.test(err.message);
+    }
+    return false;
+}
+
+function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+    const candidate = value as {
+        off?: unknown;
+        on?: unknown;
+        send?: unknown;
+    };
+    return (
+        typeof candidate.on === "function" &&
+        typeof candidate.off === "function" &&
+        typeof candidate.send === "function"
+    );
+}
+
+function shouldDebugAuth(): boolean {
+    const g = globalThis as { __DEV__?: unknown };
+    if (g.__DEV__ === true) {
+        return true;
+    }
+    const p = globalThis as {
+        process?: { env?: Record<string, string | undefined> };
+    };
+    return p.process?.env?.["VEX_DEBUG_AUTH"] === "1";
+}
+
+async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage: string,
+): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<T>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error(timeoutMessage));
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer) {
+            clearTimeout(timer);
+        }
+    }
 }
 
 export const vexService = new VexService();

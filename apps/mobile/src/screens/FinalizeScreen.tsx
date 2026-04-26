@@ -13,7 +13,6 @@ import {
 import { vexService } from "@vex-chat/store";
 
 import { BackButton } from "../components/BackButton";
-import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
@@ -22,15 +21,21 @@ import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Finalize">;
-
-const AVATAR_PRESETS = ["🟥", "🔷", "🟢", "🟡", "🟣"] as const;
+const SIGNUP_TIMEOUT_MS = 20000;
+const AVATAR_COLORS = [
+    "#E53935",
+    "#3949AB",
+    "#00897B",
+    "#7B1FA2",
+    "#FB8C00",
+] as const;
 
 export function FinalizeScreen({ navigation: _navigation, route }: Props) {
     const method = route.params.method;
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
-    const [selectedAvatar, setSelectedAvatar] = useState(0);
+    const [selectedColor, setSelectedColor] = useState(0);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const [available, setAvailable] = useState<boolean | null>(null);
@@ -66,12 +71,16 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
         setError("");
 
         try {
-            const result = await vexService.register(
-                username,
-                password,
-                mobileConfig(),
-                getServerOptions(),
-                keychainKeyStore,
+            const result = await withTimeout(
+                vexService.register(
+                    username,
+                    password,
+                    mobileConfig(),
+                    getServerOptions(),
+                    keychainKeyStore,
+                ),
+                SIGNUP_TIMEOUT_MS,
+                "Signup timed out. Check your connection and try again.",
             );
 
             if (!result.ok) {
@@ -79,6 +88,10 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                 setLoading(false);
                 return;
             }
+
+            // Never block signup on avatar upload.
+            const color = AVATAR_COLORS[selectedColor] ?? AVATAR_COLORS[0];
+            void vexService.setAvatar(buildSolidAvatarSvgBytes(color));
             // Success — RootNavigator auto-navigates when $user is set
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error");
@@ -165,60 +178,69 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                     />
                 </View>
 
-                {/* Avatar grid */}
                 <View style={styles.field}>
-                    <Text style={styles.label}>AVATAR</Text>
-                    <View style={styles.avatarGrid}>
-                        {AVATAR_PRESETS.map((emoji, i) => (
+                    <Text style={styles.label}>AVATAR COLOR</Text>
+                    <View style={styles.colorRow}>
+                        {AVATAR_COLORS.map((color, i) => (
                             <TouchableOpacity
-                                key={i}
+                                key={color}
                                 onPress={() => {
-                                    setSelectedAvatar(i);
+                                    setSelectedColor(i);
                                 }}
-                            >
-                                <CornerBracketBox
-                                    color={
-                                        selectedAvatar === i
-                                            ? colors.accent
-                                            : colors.border
-                                    }
-                                    size={6}
-                                >
-                                    <View
-                                        style={[
-                                            styles.avatarCell,
-                                            selectedAvatar === i &&
-                                                styles.avatarSelected,
-                                        ]}
-                                    >
-                                        <Text style={styles.avatarEmoji}>
-                                            {emoji}
-                                        </Text>
-                                    </View>
-                                </CornerBracketBox>
-                            </TouchableOpacity>
+                                style={[
+                                    styles.colorSwatch,
+                                    { backgroundColor: color },
+                                    selectedColor === i && styles.colorSelected,
+                                ]}
+                            />
                         ))}
-                        <TouchableOpacity onPress={() => {}}>
-                            <CornerBracketBox color={colors.border} size={6}>
-                                <View style={styles.avatarCell}>
-                                    <Text style={styles.avatarPlus}>+</Text>
-                                </View>
-                            </CornerBracketBox>
-                        </TouchableOpacity>
                     </View>
+                    <Text style={styles.avatarHint}>
+                        We auto-generate a simple avatar from this color.
+                    </Text>
                 </View>
 
                 <VexButton
                     disabled={!username || !password || !confirm}
                     glow
                     loading={loading}
-                    onPress={() => void handleComplete()}
+                    onPress={() => {
+                        void handleComplete();
+                    }}
                     style={styles.completeBtn}
                     title="Complete Setup"
                 />
             </ScrollView>
         </ScreenLayout>
     );
+}
+
+function buildSolidAvatarSvgBytes(colorHex: string): Uint8Array {
+    const safe = /^#[0-9a-fA-F]{6}$/.test(colorHex) ? colorHex : "#E53935";
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="${safe}"/></svg>`;
+    return new TextEncoder().encode(svg);
+}
+
+async function withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    timeoutMessage: string,
+): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        return await Promise.race([
+            promise,
+            new Promise<T>((_resolve, reject) => {
+                timer = setTimeout(() => {
+                    reject(new Error(timeoutMessage));
+                }, timeoutMs);
+            }),
+        ]);
+    } finally {
+        if (timer) {
+            clearTimeout(timer);
+        }
+    }
 }
 
 const styles = StyleSheet.create({
@@ -237,28 +259,25 @@ const styles = StyleSheet.create({
     availOk: {
         color: "#22c55e",
     },
-    avatarCell: {
-        alignItems: "center",
-        backgroundColor: colors.surface,
-        height: 56,
-        justifyContent: "center",
-        width: 56,
+    avatarHint: {
+        ...typography.body,
+        color: colors.mutedDark,
+        fontSize: 12,
     },
-    avatarEmoji: {
-        fontSize: 28,
-    },
-    avatarGrid: {
+    colorRow: {
         flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 10,
+        gap: 12,
     },
-    avatarPlus: {
-        color: colors.muted,
-        fontSize: 24,
+    colorSelected: {
+        borderColor: colors.borderSubtle,
+        borderWidth: 3,
     },
-    avatarSelected: {
-        borderColor: colors.accent,
+    colorSwatch: {
+        borderColor: "rgba(255,255,255,0.25)",
+        borderRadius: 16,
         borderWidth: 1,
+        height: 32,
+        width: 32,
     },
     completeBtn: {
         marginBottom: 32,

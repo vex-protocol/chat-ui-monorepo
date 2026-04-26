@@ -5,6 +5,7 @@ import {
     Alert,
     ScrollView,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -16,11 +17,14 @@ import { useStore } from "@nanostores/react";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
 
-import { clearCredentials } from "../lib/keychain";
+import { ChatHeader } from "../components/ChatHeader";
 
-export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
+export function SettingsScreen({}: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
+        vexService.getWebsocketDebugEnabled(),
+    );
 
     function handleLogout() {
         Alert.alert(
@@ -44,36 +48,11 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
         );
     }
 
-    function handleClearKeys() {
-        Alert.alert(
-            "Clear device keys",
-            "This will permanently delete your device key from this device. You will need to re-register.",
-            [
-                { style: "cancel", text: "Cancel" },
-                {
-                    onPress: () => {
-                        void (async () => {
-                            try {
-                                await vexService.logout();
-                            } catch {
-                                /* ignore */
-                            }
-                            await clearCredentials();
-                        })();
-                    },
-                    style: "destructive",
-                    text: "Clear keys",
-                },
-            ],
-        );
-    }
-
     function handleSendTestNotification() {
         void (async () => {
             await Notifications.setNotificationChannelAsync("vex-messages", {
                 importance: AndroidImportance.HIGH,
                 name: "Messages",
-                sound: "default",
             });
             await Notifications.scheduleNotificationAsync({
                 content: {
@@ -82,7 +61,6 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                         authorID: "test",
                         username: "Test User",
                     },
-                    sound: "default",
                     title: "Test User",
                 },
                 trigger: { channelId: "vex-messages" },
@@ -91,117 +69,99 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     }
 
     return (
-        <ScrollView
-            contentContainerStyle={styles.content}
-            style={styles.container}
-        >
-            {/* Header with back */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    accessibilityLabel="Back"
-                    activeOpacity={0.7}
-                    hitSlop={12}
-                    onPress={() => {
-                        if (navigation.canGoBack()) navigation.goBack();
-                    }}
-                    style={styles.backBtn}
-                >
-                    <Text style={styles.backArrow}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Settings</Text>
-                <View style={styles.backBtn} />
-            </View>
+        <View style={styles.container}>
+            <ChatHeader title="Settings" />
+            <ScrollView contentContainerStyle={styles.content}>
+                {/* Account section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Account</Text>
 
-            {/* Account section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Account</Text>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>Username</Text>
-                    <Text style={styles.value}>{user?.username ?? "—"}</Text>
-                </View>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>User ID</Text>
-                    <Text style={[styles.value, styles.mono]}>
-                        {user?.userID.slice(0, 16) ?? "—"}…
-                    </Text>
-                </View>
-            </View>
-
-            {/* App info section */}
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>App</Text>
-
-                <View style={styles.row}>
-                    <Text style={styles.label}>Version</Text>
-                    <Text style={styles.value}>0.1.0</Text>
-                </View>
-
-                <View style={[styles.row, styles.rowLast]}>
-                    <View style={styles.rowInfo}>
-                        <Text style={styles.label}>Notifications</Text>
-                        <Text style={styles.desc}>
-                            Send a test notification
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Username</Text>
+                        <Text style={styles.value}>
+                            {user?.username ?? "—"}
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={handleSendTestNotification}
-                        style={styles.testBtn}
-                    >
-                        <Text style={styles.testBtnText}>Test</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
 
-            {/* Danger zone */}
-            <View style={[styles.section, styles.dangerSection]}>
-                <Text style={styles.sectionTitle}>Danger Zone</Text>
-
-                <View style={styles.row}>
-                    <View style={styles.rowInfo}>
-                        <Text style={styles.label}>Sign out</Text>
-                        <Text style={styles.desc}>
-                            Disconnect and return to the login screen
+                    <View style={styles.row}>
+                        <Text style={styles.label}>User ID</Text>
+                        <Text style={[styles.value, styles.mono]}>
+                            {user?.userID.slice(0, 16) ?? "—"}…
                         </Text>
                     </View>
-                    <TouchableOpacity
-                        disabled={loggingOut}
-                        onPress={handleLogout}
-                        style={styles.dangerBtn}
-                    >
-                        <Text style={styles.dangerBtnText}>
-                            {loggingOut ? "Signing out…" : "Sign out"}
-                        </Text>
-                    </TouchableOpacity>
                 </View>
 
-                <View style={[styles.row, styles.rowLast]}>
-                    <View style={styles.rowInfo}>
-                        <Text style={styles.label}>Clear device keys</Text>
-                        <Text style={styles.desc}>
-                            Delete keys and re-register
-                        </Text>
+                {/* App info section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>App</Text>
+
+                    <View style={styles.row}>
+                        <Text style={styles.label}>Version</Text>
+                        <Text style={styles.value}>0.1.0</Text>
                     </View>
-                    <TouchableOpacity
-                        onPress={handleClearKeys}
-                        style={styles.dangerBtn}
-                    >
-                        <Text style={styles.dangerBtnText}>Clear keys</Text>
-                    </TouchableOpacity>
+
+                    <View style={[styles.row, styles.rowLast]}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Notifications</Text>
+                            <Text style={styles.desc}>
+                                Send a test notification
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={handleSendTestNotification}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>Test</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={[styles.row, styles.rowLast]}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>
+                                WebSocket debug logs
+                            </Text>
+                            <Text style={styles.desc}>
+                                Print inbound/outbound frames to terminal
+                            </Text>
+                        </View>
+                        <Switch
+                            onValueChange={(value) => {
+                                setWsDebugEnabled(value);
+                                vexService.setWebsocketDebug(value);
+                            }}
+                            value={wsDebugEnabled}
+                        />
+                    </View>
                 </View>
-            </View>
-        </ScrollView>
+
+                {/* Danger zone */}
+                <View style={[styles.section, styles.dangerSection]}>
+                    <Text style={styles.sectionTitle}>Danger Zone</Text>
+
+                    <View style={[styles.row, styles.rowLast]}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Sign out</Text>
+                            <Text style={styles.desc}>
+                                Disconnect and return to the login screen
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            disabled={loggingOut}
+                            onPress={handleLogout}
+                            style={styles.dangerBtn}
+                        >
+                            <Text style={styles.dangerBtnText}>
+                                {loggingOut ? "Signing out…" : "Sign out"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </ScrollView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    backArrow: { color: "#FFFFFF", fontSize: 24, lineHeight: 24 },
-    backBtn: {
-        alignItems: "center",
-        justifyContent: "center",
-        width: 32,
-    },
     container: { backgroundColor: "#1a1a1a", flex: 1 },
     content: { gap: 16, padding: 16 },
     dangerBtn: {
@@ -222,17 +182,6 @@ const styles = StyleSheet.create({
     desc: {
         color: "#666666",
         fontSize: 12,
-    },
-    header: {
-        alignItems: "center",
-        flexDirection: "row",
-        justifyContent: "space-between",
-        paddingBottom: 8,
-    },
-    headerTitle: {
-        color: "#FFFFFF",
-        fontSize: 18,
-        fontWeight: "600",
     },
     label: {
         color: "#e8e8e8",

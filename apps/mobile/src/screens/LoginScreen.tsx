@@ -2,7 +2,6 @@ import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -14,9 +13,14 @@ import {
 
 import { vexService } from "@vex-chat/store";
 
+import { BackButton } from "../components/BackButton";
+import { ScreenLayout } from "../components/ScreenLayout";
+import { VexButton } from "../components/VexButton";
+import { VexLogo } from "../components/VexLogo";
 import { getServerOptions } from "../lib/config";
 import { keychainKeyStore } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
+import { colors, typography } from "../theme";
 
 export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     const [username, setUsername] = useState("");
@@ -49,139 +53,180 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     }
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={styles.page}
-        >
-            <View style={styles.card}>
-                <Text style={styles.title}>Welcome back</Text>
-                <Text style={styles.subtitle}>Sign in to Vex Chat</Text>
+        <ScreenLayout style={styles.layout}>
+            <BackButton />
 
-                {error ? (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{error}</Text>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={styles.container}
+            >
+                <View pointerEvents="none" style={styles.blackoutLayer} />
+                <View pointerEvents="none" style={styles.glowTop} />
+                <View pointerEvents="none" style={styles.glowBottom} />
+
+                <View style={styles.content}>
+                    <View style={styles.logoWrap}>
+                        <VexLogo size={38} />
                     </View>
-                ) : null}
+                    <Text style={styles.label}>SIGN IN</Text>
+                    <Text style={styles.heading}>Welcome back.</Text>
 
-                <View style={styles.field}>
-                    <Text style={styles.label}>USERNAME</Text>
-                    <TextInput
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        editable={!loading}
-                        onChange={(e) => {
-                            setUsername(e.nativeEvent.text);
-                        }}
-                        onChangeText={setUsername}
-                        placeholder="your username"
-                        placeholderTextColor="#666666"
-                        style={styles.input}
-                        value={username}
+                    {error ? (
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    ) : null}
+
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>USERNAME</Text>
+                        <TextInput
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!loading}
+                            onChangeText={setUsername}
+                            placeholder="your username"
+                            placeholderTextColor={colors.mutedDark}
+                            style={styles.input}
+                            value={username}
+                        />
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.fieldLabel}>PASSWORD</Text>
+                        <TextInput
+                            editable={!loading}
+                            onChangeText={setPassword}
+                            placeholder="••••••••"
+                            placeholderTextColor={colors.mutedDark}
+                            secureTextEntry
+                            style={styles.input}
+                            value={password}
+                        />
+                    </View>
+
+                    <VexButton
+                        disabled={loading || !username || !password}
+                        glow
+                        loading={loading}
+                        onPress={() => void handleLogin()}
+                        style={styles.signInButton}
+                        title="Sign In"
+                        variant="primary"
                     />
-                </View>
 
-                <View style={styles.field}>
-                    <Text style={styles.label}>PASSWORD</Text>
-                    <TextInput
-                        editable={!loading}
-                        onChange={(e) => {
-                            setPassword(e.nativeEvent.text);
-                        }}
-                        onChangeText={setPassword}
-                        placeholder="••••••••"
-                        placeholderTextColor="#666666"
-                        secureTextEntry
-                        style={styles.input}
-                        value={password}
-                    />
+                    <View style={styles.footer}>
+                        <Text style={styles.footerText}>
+                            Don't have an account?
+                        </Text>
+                        <TouchableOpacity
+                            onPress={() => {
+                                navigation.navigate("Initialize");
+                            }}
+                        >
+                            <Text style={styles.link}>Create account</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
-
-                <TouchableOpacity
-                    disabled={loading || !username || !password}
-                    onPress={() => void handleLogin()}
-                    style={[styles.button, loading && styles.buttonDisabled]}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                        <Text style={styles.buttonText}>Sign in</Text>
-                    )}
-                </TouchableOpacity>
-
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>
-                        Don't have an account?{" "}
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() => {
-                            navigation.navigate("Initialize");
-                        }}
-                    >
-                        <Text style={styles.link}>Create account</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </ScreenLayout>
     );
 }
 
 const styles = StyleSheet.create({
-    button: {
-        alignItems: "center",
-        backgroundColor: "#cc2a2a",
-        borderRadius: 4,
-        marginTop: 4,
-        paddingVertical: 12,
+    blackoutLayer: {
+        ...StyleSheet.absoluteFill,
+        backgroundColor: "#000000",
+        opacity: 0.72,
     },
-    buttonDisabled: { opacity: 0.5 },
-    buttonText: { color: "#fff", fontSize: 14, fontWeight: "600" },
-    card: {
-        backgroundColor: "#141414",
-        borderColor: "#2a2a2a",
-        borderRadius: 8,
-        borderWidth: 1,
-        gap: 16,
-        padding: 32,
-        width: 340,
+    container: {
+        flex: 1,
+        justifyContent: "center",
+        paddingBottom: 22,
+    },
+    content: {
+        alignSelf: "center",
+        gap: 14,
+        maxWidth: 460,
+        width: "100%",
+        zIndex: 1,
     },
     errorBox: {
         backgroundColor: "rgba(229, 57, 53, 0.15)",
-        borderColor: "#e53935",
-        borderRadius: 4,
+        borderColor: colors.error,
         borderWidth: 1,
         padding: 10,
     },
-    errorText: { color: "#e53935", fontSize: 13 },
-    field: { gap: 5 },
+    errorText: {
+        ...typography.body,
+        color: colors.error,
+    },
+    field: { gap: 6 },
+    fieldLabel: {
+        ...typography.label,
+        color: "rgba(255,255,255,0.48)",
+    },
     footer: {
         alignItems: "center",
         flexDirection: "row",
+        gap: 6,
         justifyContent: "center",
+        marginTop: 10,
     },
-    footerText: { color: "#a0a0a0", fontSize: 13 },
+    footerText: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.62)",
+    },
+    glowBottom: {
+        backgroundColor: colors.accent,
+        borderRadius: 120,
+        bottom: -40,
+        height: 140,
+        left: "30%",
+        opacity: 0.08,
+        position: "absolute",
+        width: 140,
+    },
+    glowTop: {
+        backgroundColor: colors.accent,
+        borderRadius: 140,
+        height: 160,
+        opacity: 0.1,
+        position: "absolute",
+        right: -44,
+        top: -48,
+        width: 160,
+    },
+    heading: {
+        ...typography.heading,
+        color: colors.text,
+        marginBottom: 10,
+    },
     input: {
-        backgroundColor: "#242424",
-        borderColor: "#2a2a2a",
-        borderRadius: 4,
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderColor: "rgba(255,255,255,0.10)",
         borderWidth: 1,
-        color: "#e8e8e8",
+        color: colors.textSecondary,
         fontSize: 14,
         paddingHorizontal: 12,
-        paddingVertical: 10,
+        paddingVertical: 12,
     },
     label: {
-        color: "#a0a0a0",
-        fontSize: 12,
-        fontWeight: "600",
-        letterSpacing: 0.5,
+        ...typography.label,
+        color: "rgba(255,255,255,0.48)",
     },
-    link: { color: "#cc2a2a", fontSize: 13, textDecorationLine: "underline" },
-    page: {
-        alignItems: "center",
-        backgroundColor: "#1a1a1a",
-        flex: 1,
-        justifyContent: "center",
+    layout: {
+        backgroundColor: "#000000",
     },
-    subtitle: { color: "#a0a0a0", fontSize: 13, marginTop: -8 },
-    title: { color: "#e8e8e8", fontSize: 22, fontWeight: "700" },
+    link: {
+        ...typography.body,
+        color: colors.accent,
+        textDecorationLine: "underline",
+    },
+    logoWrap: {
+        marginBottom: 4,
+    },
+    signInButton: {
+        marginTop: 4,
+        width: "100%",
+    },
 });
