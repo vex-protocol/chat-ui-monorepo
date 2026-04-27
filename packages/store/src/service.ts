@@ -141,6 +141,12 @@ interface ClientHttpRequestConfigLike {
     timeout?: number;
 }
 
+interface ClientWithDeviceApprovalFallbacks {
+    approveDeviceRequest?: (requestID: string) => Promise<unknown>;
+    listDeviceRegistrationRequests?: () => Promise<DeviceApprovalRequestLike[]>;
+    rejectDeviceRequest?: (requestID: string) => Promise<unknown>;
+}
+
 type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
     devices: DevicesWithApprovalLike;
 };
@@ -253,13 +259,19 @@ class VexService {
         try {
             const client =
                 this.requireClient() as unknown as ClientWithDeviceApprovals;
-            if (!client.devices.approveRequest) {
+            if (client.devices.approveRequest) {
+                await client.devices.approveRequest(requestID);
+                return { ok: true };
+            }
+            const fallback =
+                client as unknown as ClientWithDeviceApprovalFallbacks;
+            if (typeof fallback.approveDeviceRequest !== "function") {
                 return {
                     error: "Client does not support device approvals yet.",
                     ok: false,
                 };
             }
-            await client.devices.approveRequest(requestID);
+            await fallback.approveDeviceRequest(requestID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -611,10 +623,16 @@ class VexService {
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
         const client =
             this.requireClient() as unknown as ClientWithDeviceApprovals;
-        if (!client.devices.listRequests) {
-            return [];
+        if (client.devices.listRequests) {
+            return client.devices.listRequests();
         }
-        return client.devices.listRequests();
+        const fallback = client as unknown as ClientWithDeviceApprovalFallbacks;
+        if (typeof fallback.listDeviceRegistrationRequests === "function") {
+            return fallback.listDeviceRegistrationRequests();
+        }
+        throw new Error(
+            "Client does not support device approval request listing.",
+        );
     }
 
     /**
@@ -670,6 +688,23 @@ class VexService {
                 } catch (regErr: unknown) {
                     // 470 = device with this signing key already exists — reuse it
                     if (!this.isDeviceExistsError(regErr)) {
+                        const inferredPendingRequestID =
+                            await this.findPendingRequestAfterRegisterFailure(
+                                client,
+                                username,
+                                config.deviceName,
+                            );
+                        if (inferredPendingRequestID !== null) {
+                            await this.close();
+                            this.resetAll();
+                            this.setAuthStatus("signed_out");
+                            return {
+                                error: "This device needs approval from another signed-in device.",
+                                ok: false,
+                                pendingDeviceApproval: true,
+                                pendingRequestID: inferredPendingRequestID,
+                            };
+                        }
                         await this.close();
                         this.resetAll();
                         return { error: errorMessage(regErr), ok: false };
@@ -984,13 +1019,19 @@ class VexService {
         try {
             const client =
                 this.requireClient() as unknown as ClientWithDeviceApprovals;
-            if (!client.devices.rejectRequest) {
+            if (client.devices.rejectRequest) {
+                await client.devices.rejectRequest(requestID);
+                return { ok: true };
+            }
+            const fallback =
+                client as unknown as ClientWithDeviceApprovalFallbacks;
+            if (typeof fallback.rejectDeviceRequest !== "function") {
                 return {
                     error: "Client does not support device approvals yet.",
                     ok: false,
                 };
             }
-            await client.devices.rejectRequest(requestID);
+            await fallback.rejectDeviceRequest(requestID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1236,6 +1277,59 @@ class VexService {
             .catch(() => {
                 this.failedUserLookups.add(userID);
             });
+    }
+
+    private async findPendingRequestAfterRegisterFailure(
+        client: Client,
+        username: string,
+        deviceName: string,
+    ): Promise<null | string> {
+        try {
+            const withApprovals =
+                client as unknown as ClientWithDeviceApprovals;
+            let requests: DeviceApprovalRequestLike[] | null = null;
+            if (withApprovals.devices.listRequests) {
+                requests = await withApprovals.devices.listRequests();
+            } else {
+                const fallback =
+                    client as unknown as ClientWithDeviceApprovalFallbacks;
+                if (
+                    typeof fallback.listDeviceRegistrationRequests ===
+                    "function"
+                ) {
+                    requests = await fallback.listDeviceRegistrationRequests();
+                }
+            }
+            if (!requests || requests.length === 0) {
+                return null;
+            }
+            const pending = requests.filter((req) => req.status === "pending");
+            if (pending.length === 0) {
+                return null;
+            }
+            const ownSignKey = client.getKeys().public;
+            const bySignKey = pending.find((req) => req.signKey === ownSignKey);
+            if (bySignKey) {
+                return bySignKey.requestID;
+            }
+            const byExactMeta = pending.find(
+                (req) =>
+                    req.username === username && req.deviceName === deviceName,
+            );
+            if (byExactMeta) {
+                return byExactMeta.requestID;
+            }
+            const recent = pending
+                .filter((req) => req.username === username)
+                .sort(
+                    (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime(),
+                );
+            return recent[0]?.requestID ?? null;
+        } catch {
+            return null;
+        }
     }
 
     private handleDirectMessage(msg: Message): void {
