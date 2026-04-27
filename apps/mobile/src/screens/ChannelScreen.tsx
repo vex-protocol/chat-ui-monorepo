@@ -146,6 +146,7 @@ export function ChannelScreen({
             />
 
             <MessageInputBar
+                bottomInset={insets.bottom}
                 onChangeText={setText}
                 onSend={() => void sendMessage()}
                 placeholder={`Message #${channelName}`}

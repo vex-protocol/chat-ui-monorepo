@@ -47,6 +47,8 @@ function App() {
     const [pendingApprovalNotice, setPendingApprovalNotice] = useState<null | {
         count: number;
     }>(null);
+    const notifiedMailIDsRef = useRef<Set<string>>(new Set());
+    const notificationHistoryCutoffMsRef = useRef(0);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
@@ -112,6 +114,11 @@ function App() {
             clearTimeout(timer);
         };
     }, [pendingApprovalNotice]);
+
+    useEffect(() => {
+        notifiedMailIDsRef.current = new Set();
+        notificationHistoryCutoffMsRef.current = Date.now();
+    }, [user, user?.userID]);
 
     useEffect(() => {
         seenPendingRequestIDsRef.current = new Set();
@@ -277,28 +284,64 @@ function App() {
     const prevGroupsRef = useRef(allGroups);
 
     useEffect(() => {
+        if (!user) {
+            return;
+        }
         const prev = prevDmsRef.current;
         prevDmsRef.current = allDms;
         for (const [threadID, thread] of Object.entries(allDms)) {
             const prevThread = prev[threadID] ?? [];
             if (thread.length > prevThread.length) {
                 const newMsg = thread[thread.length - 1];
-                if (newMsg) void showMessageNotification(newMsg);
+                if (!newMsg) {
+                    continue;
+                }
+                if (notifiedMailIDsRef.current.has(newMsg.mailID)) {
+                    continue;
+                }
+                notifiedMailIDsRef.current.add(newMsg.mailID);
+                if (
+                    isHistoricalMessage(
+                        newMsg.timestamp,
+                        notificationHistoryCutoffMsRef.current,
+                    )
+                ) {
+                    continue;
+                }
+                void showMessageNotification(newMsg);
             }
         }
-    }, [allDms]);
+    }, [allDms, user]);
 
     useEffect(() => {
+        if (!user) {
+            return;
+        }
         const prev = prevGroupsRef.current;
         prevGroupsRef.current = allGroups;
         for (const [channelID, thread] of Object.entries(allGroups)) {
             const prevThread = prev[channelID] ?? [];
             if (thread.length > prevThread.length) {
                 const newMsg = thread[thread.length - 1];
-                if (newMsg) void showMessageNotification(newMsg);
+                if (!newMsg) {
+                    continue;
+                }
+                if (notifiedMailIDsRef.current.has(newMsg.mailID)) {
+                    continue;
+                }
+                notifiedMailIDsRef.current.add(newMsg.mailID);
+                if (
+                    isHistoricalMessage(
+                        newMsg.timestamp,
+                        notificationHistoryCutoffMsRef.current,
+                    )
+                ) {
+                    continue;
+                }
+                void showMessageNotification(newMsg);
             }
         }
-    }, [allGroups]);
+    }, [allGroups, user]);
 
     useEffect(() => {
         if (keyReplaced) {
@@ -429,3 +472,14 @@ const styles = StyleSheet.create({
 });
 
 export default App;
+
+function isHistoricalMessage(
+    timestamp: string,
+    notificationCutoffMs: number,
+): boolean {
+    const messageMs = Date.parse(timestamp);
+    if (!Number.isFinite(messageMs)) {
+        return false;
+    }
+    return messageMs <= notificationCutoffMs;
+}
