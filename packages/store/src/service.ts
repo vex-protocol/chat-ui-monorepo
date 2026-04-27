@@ -241,6 +241,7 @@ class VexService {
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
+    private pendingRateLimitNotice = false;
     private wsDebugEnabled = false;
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
     private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
@@ -299,7 +300,10 @@ class VexService {
             });
             const client = this.requireClient();
 
-            const authErr = await client.loginWithDeviceKey(creds.deviceID);
+            const authErr = await this.loginWithDeviceKeyWithRetry(
+                client,
+                creds.deviceID,
+            );
             if (authErr) {
                 await this.close();
                 if (isUnauthorizedError(authErr)) {
@@ -335,7 +339,8 @@ class VexService {
                         true,
                     );
                     const recovered = this.requireClient();
-                    const authErr = await recovered.loginWithDeviceKey(
+                    const authErr = await this.loginWithDeviceKeyWithRetry(
+                        recovered,
                         creds.deviceID,
                     );
                     if (authErr) {
@@ -425,6 +430,14 @@ class VexService {
 
     // ── Server CRUD ─────────────────────────────────────────────────────
 
+    consumeRateLimitNotice(): boolean {
+        if (!this.pendingRateLimitNotice) {
+            return false;
+        }
+        this.pendingRateLimitNotice = false;
+        return true;
+    }
+
     async createChannel(
         name: string,
         serverID: string,
@@ -508,6 +521,8 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
             const client = this.requireClient();
@@ -516,7 +531,6 @@ class VexService {
             let tokenExp: number | undefined;
             try {
                 const auth = await client.whoami();
-                $userWritable.set(auth.user);
                 tokenExp = auth.exp;
             } catch {
                 // If whoami fails we can still return local session metadata.
@@ -550,8 +564,6 @@ class VexService {
             return null;
         }
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
@@ -761,6 +773,12 @@ class VexService {
             this.setAuthStatus("authenticated");
             return "authenticated";
         } catch (err: unknown) {
+            if (isRateLimitedError(err)) {
+                // 429 should not cascade into forced logout flows.
+                this.markRateLimited("probeAuthSession");
+                this.setAuthStatus("authenticated");
+                return "authenticated";
+            }
             if (isUnauthorizedError(err)) {
                 this.setAuthStatus("unauthorized");
                 return "unauthorized";
@@ -806,6 +824,11 @@ class VexService {
             this.setAuthStatus("authenticated");
             return "authenticated";
         } catch (err: unknown) {
+            if (isRateLimitedError(err)) {
+                this.markRateLimited("refreshSessionAfterForeground");
+                this.setAuthStatus("authenticated");
+                return "authenticated";
+            }
             if (isUnauthorizedError(err)) {
                 this.setAuthStatus("unauthorized");
                 return "unauthorized";
@@ -832,7 +855,7 @@ class VexService {
         this.lastDeviceAuthRefreshAttemptAt = Date.now();
         try {
             const client = this.requireClient();
-            const authErr = await client.loginWithDeviceKey();
+            const authErr = await this.loginWithDeviceKeyWithRetry(client);
             if (authErr) {
                 debugAuth("session:refresh:failed", {
                     message: authErr.message,
@@ -987,8 +1010,6 @@ class VexService {
         $channelUnreadCountsWritable.set({});
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     async sendDM(
         recipientID: string,
         content: string,
@@ -1023,6 +1044,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     async sendGroupMessage(
         channelID: string,
@@ -1059,8 +1082,6 @@ class VexService {
         }
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
-
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -1072,6 +1093,8 @@ class VexService {
         }
     }
 
+    // ── Lifecycle ───────────────────────────────────────────────────────
+
     setWebsocketDebug(enabled: boolean): void {
         this.wsDebugEnabled = enabled;
         if (enabled) {
@@ -1080,8 +1103,6 @@ class VexService {
         }
         this.detachWebsocketDebug();
     }
-
-    // ── Private ─────────────────────────────────────────────────────────
 
     private attachWebsocketDebug(): void {
         if (!this.wsDebugEnabled || !this.client) {
@@ -1109,6 +1130,8 @@ class VexService {
         this.wsDebugOriginalSend = originalSend;
         console.log("[vex-ws] debug attached");
     }
+
+    // ── Private ─────────────────────────────────────────────────────────
 
     private async clearStoredCredentials(
         keyStore: KeyStore,
@@ -1277,6 +1300,34 @@ class VexService {
 
     private isDeviceExistsError(err: unknown): boolean {
         return hasHttpStatus(err) && err.response.status === 470;
+    }
+
+    private async loginWithDeviceKeyWithRetry(
+        client: Client,
+        deviceID?: string,
+    ): Promise<Error | null> {
+        let lastErr: Error | null = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            const err = await client.loginWithDeviceKey(deviceID);
+            if (!err) {
+                return null;
+            }
+            lastErr = err;
+            if (isRateLimitedError(err)) {
+                this.markRateLimited("loginWithDeviceKey");
+            }
+            if (!isRateLimitedError(err) || attempt === 2) {
+                return err;
+            }
+            const backoffMs = 500 * 2 ** attempt;
+            await waitMs(backoffMs);
+        }
+        return lastErr;
+    }
+
+    private markRateLimited(source: string): void {
+        this.pendingRateLimitNotice = true;
+        debugAuth("rate-limited", { source });
     }
 
     private async populateState(): Promise<void> {
@@ -1662,6 +1713,16 @@ function isNotAuthenticatedError(err: unknown): boolean {
     return /not authenticated|no token|login first/i.test(err.message);
 }
 
+function isRateLimitedError(err: unknown): boolean {
+    if (hasHttpStatus(err)) {
+        return err.response.status === 429;
+    }
+    if (err instanceof Error) {
+        return /status code 429|too many requests/i.test(err.message);
+    }
+    return false;
+}
+
 function isReactNativeRuntime(): boolean {
     if (typeof navigator !== "object" || navigator === null) {
         return false;
@@ -1712,6 +1773,12 @@ function shouldDebugAuth(): boolean {
         process?: { env?: Record<string, string | undefined> };
     };
     return p.process?.env?.["VEX_DEBUG_AUTH"] === "1";
+}
+
+function waitMs(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
 }
 
 async function withTimeout<T>(

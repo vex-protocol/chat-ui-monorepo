@@ -23,7 +23,9 @@ export function MessageBubbleRN({
     if (message.group === "__system__") {
         return (
             <View style={styles.systemContainer}>
-                <Text style={styles.systemText}>{message.message}</Text>
+                <Text selectable style={styles.systemText}>
+                    {message.message}
+                </Text>
             </View>
         );
     }
@@ -63,6 +65,7 @@ export function MessageBubbleRN({
                     </View>
                 )}
                 <Text
+                    selectable
                     style={[styles.text, !showIdentity && styles.textGrouped]}
                 >
                     {message.message}

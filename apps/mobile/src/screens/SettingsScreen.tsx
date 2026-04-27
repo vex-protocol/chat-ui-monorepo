@@ -70,7 +70,10 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
             return;
         }
         void refreshSessionAndDevices();
-    }, [refreshSessionAndDevices, user, user?.userID]);
+        // Depend on stable user identity only; full user object changes after whoami
+        // would retrigger this and cause rapid refresh flicker.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshSessionAndDevices, user?.userID]);
 
     function handleExportIdentityKey(): void {
         Alert.alert(

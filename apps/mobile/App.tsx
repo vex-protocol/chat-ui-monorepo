@@ -44,6 +44,7 @@ function App() {
     const networkRefreshInFlightRef = useRef(false);
     const resumeProbeInFlightRef = useRef(false);
     const [authNotice, setAuthNotice] = useState<null | string>(null);
+    const [rateLimitNotice, setRateLimitNotice] = useState<null | string>(null);
     const [pendingApprovalNotice, setPendingApprovalNotice] = useState<null | {
         count: number;
     }>(null);
@@ -104,6 +105,18 @@ function App() {
     }, [authNotice]);
 
     useEffect(() => {
+        if (!rateLimitNotice) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            setRateLimitNotice(null);
+        }, 6000);
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [rateLimitNotice]);
+
+    useEffect(() => {
         if (!pendingApprovalNotice) {
             return;
         }
@@ -114,6 +127,15 @@ function App() {
             clearTimeout(timer);
         };
     }, [pendingApprovalNotice]);
+
+    const maybeShowRateLimitNotice = () => {
+        if (!vexService.consumeRateLimitNotice()) {
+            return;
+        }
+        setRateLimitNotice(
+            "Server is rate limiting requests. Retrying automatically...",
+        );
+    };
 
     useEffect(() => {
         notifiedMailIDsRef.current = new Set();
@@ -179,6 +201,7 @@ function App() {
             authProbeInFlightRef.current = true;
             try {
                 const status = await vexService.probeAuthSession();
+                maybeShowRateLimitNotice();
                 if (!active) {
                     return;
                 }
@@ -190,6 +213,7 @@ function App() {
                     try {
                         const refreshed =
                             await vexService.refreshSessionAfterForeground();
+                        maybeShowRateLimitNotice();
                         if (refreshed !== "unauthorized") {
                             return;
                         }
@@ -242,6 +266,7 @@ function App() {
             networkRefreshInFlightRef.current = true;
             try {
                 const status = await vexService.refreshSessionAfterForeground();
+                maybeShowRateLimitNotice();
                 if (!active || status !== "unauthorized") {
                     return;
                 }
@@ -361,6 +386,15 @@ function App() {
                     </View>
                 </View>
             )}
+            {rateLimitNotice && (
+                <View pointerEvents="none" style={styles.rateNoticeWrap}>
+                    <View style={styles.rateNoticeCard}>
+                        <Text style={styles.rateNoticeText}>
+                            {rateLimitNotice}
+                        </Text>
+                    </View>
+                </View>
+            )}
             {pendingApprovalNotice && (
                 <View style={styles.approvalNoticeWrap}>
                     <Pressable
@@ -468,6 +502,28 @@ const styles = StyleSheet.create({
         right: 0,
         top: 54,
         zIndex: 999,
+    },
+    rateNoticeCard: {
+        backgroundColor: "rgba(73, 55, 20, 0.96)",
+        borderColor: "rgba(255, 205, 99, 0.38)",
+        borderRadius: 10,
+        borderWidth: 1,
+        maxWidth: 460,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    rateNoticeText: {
+        color: "#FFE7AE",
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    rateNoticeWrap: {
+        alignItems: "center",
+        left: 0,
+        position: "absolute",
+        right: 0,
+        top: 54,
+        zIndex: 1000,
     },
 });
 

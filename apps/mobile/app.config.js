@@ -21,11 +21,13 @@ const EAS_PROJECT_ID = "e0d4cba7-1f2a-4c26-9e66-1fd60178ad20";
 
 module.exports = ({ config }) => {
     const devMode = process.env.EAS_BUILD_PROFILE === "development";
+    const iconPath = devMode ? "./assets/icon-dev.png" : "./assets/icon-prod.png";
 
     return {
         ...config,
         version: pkg.version,
         name: devMode ? "Vex Dev" : config.name,
+        icon: iconPath,
         ios: {
             ...config.ios,
             bundleIdentifier: devMode
@@ -34,6 +36,10 @@ module.exports = ({ config }) => {
         },
         android: {
             ...config.android,
+            adaptiveIcon: {
+                backgroundColor: "#0a0a0a",
+                foregroundImage: iconPath,
+            },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
         },
         updates: devMode
