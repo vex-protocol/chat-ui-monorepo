@@ -24,9 +24,9 @@ export function navigateToConversation(userID: string, username: string): void {
     });
 }
 
-export function navigateToPendingApprovals(): void {
+export function navigateToDevices(): void {
     if (!navigationRef.isReady()) return;
     navigationRef.navigate("App", {
-        screen: "PendingApprovals",
+        screen: "Devices",
     });
 }

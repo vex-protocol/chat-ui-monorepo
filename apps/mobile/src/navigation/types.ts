@@ -10,11 +10,11 @@ export type AppStackParamList = {
     Channel: { channelID: string; channelName: string; serverID: string };
     ChannelList: { serverID: string; serverName?: string };
     Conversation: { userID: string; username: string };
+    Devices: undefined;
     DMList: undefined;
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
-    PendingApprovals: undefined;
     Settings: undefined;
 };
 

@@ -2,6 +2,7 @@ import type { AppScreenProps } from "../navigation/types";
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
+    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -9,17 +10,27 @@ import {
     View,
 } from "react-native";
 
-import { $user, vexService } from "@vex-chat/store";
+import { $authStatus, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
+import { getServerUrl } from "../lib/config";
 import { colors, typography } from "../theme";
 
 export function PendingApprovalsScreen({
     navigation,
-}: AppScreenProps<"PendingApprovals">) {
+}: AppScreenProps<"Devices">) {
+    const authStatus = useStore($authStatus);
     const user = useStore($user);
+    const [deviceBusyByID, setDeviceBusyByID] = useState<
+        Record<string, boolean>
+    >({});
+    const [deviceError, setDeviceError] = useState("");
+    const [devices, setDevices] = useState<
+        Awaited<ReturnType<typeof vexService.listMyDevices>>
+    >([]);
+    const [devicesLoading, setDevicesLoading] = useState(false);
     const [deviceRequestBusy, setDeviceRequestBusy] = useState<
         Record<string, boolean>
     >({});
@@ -27,6 +38,8 @@ export function PendingApprovalsScreen({
     const [deviceRequests, setDeviceRequests] = useState<
         Awaited<ReturnType<typeof vexService.listPendingDeviceRequests>>
     >([]);
+    const [sessionInfo, setSessionInfo] =
+        useState<Awaited<ReturnType<typeof vexService.getSessionInfo>>>(null);
     const [loadingDeviceRequests, setLoadingDeviceRequests] = useState(false);
 
     const refreshDeviceRequests = useCallback(async (): Promise<void> => {
@@ -52,18 +65,52 @@ export function PendingApprovalsScreen({
         }
     }, [user]);
 
+    const refreshSessionAndDevices = useCallback(async () => {
+        setDevicesLoading(true);
+        setDeviceError("");
+        try {
+            const [session, myDevices] = await Promise.all([
+                vexService.getSessionInfo(),
+                vexService.listMyDevices(),
+            ]);
+            setSessionInfo(session);
+            setDevices(myDevices);
+        } catch (err: unknown) {
+            setDeviceError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to load device/session details.",
+            );
+        } finally {
+            setDevicesLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         void refreshDeviceRequests();
     }, [refreshDeviceRequests, user?.userID]);
 
     useEffect(() => {
+        if (!user) {
+            setSessionInfo(null);
+            setDevices([]);
+            return;
+        }
+        void refreshSessionAndDevices();
+        // Depend on stable user identity only; full user object changes after whoami
+        // would retrigger this and cause rapid refresh flicker.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshSessionAndDevices, user?.userID]);
+
+    useEffect(() => {
         const unsubscribe = vexService.onDeviceRequestQueueChanged(() => {
             void refreshDeviceRequests();
+            void refreshSessionAndDevices();
         });
         return () => {
             unsubscribe();
         };
-    }, [refreshDeviceRequests, user?.userID]);
+    }, [refreshDeviceRequests, refreshSessionAndDevices, user?.userID]);
 
     async function approveDeviceRequest(requestID: string): Promise<void> {
         setDeviceRequestBusy((prev) => ({ ...prev, [requestID]: true }));
@@ -77,6 +124,7 @@ export function PendingApprovalsScreen({
                 return;
             }
             await refreshDeviceRequests();
+            await refreshSessionAndDevices();
         } finally {
             setDeviceRequestBusy((prev) => ({ ...prev, [requestID]: false }));
         }
@@ -99,16 +147,51 @@ export function PendingApprovalsScreen({
         }
     }
 
+    function handleRemoveDevice(deviceID: string, deviceName: string): void {
+        Alert.alert(
+            `Remove ${deviceName}?`,
+            "This device will be signed out and must be re-approved or re-authenticated.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void removeDevice(deviceID);
+                    },
+                    style: "destructive",
+                    text: "Remove",
+                },
+            ],
+        );
+    }
+
+    async function removeDevice(deviceID: string): Promise<void> {
+        setDeviceBusyByID((prev) => ({ ...prev, [deviceID]: true }));
+        setDeviceError("");
+        try {
+            const result = await vexService.removeDevice(deviceID);
+            if (!result.ok) {
+                setDeviceError(result.error ?? "Failed to remove device.");
+                return;
+            }
+            await refreshSessionAndDevices();
+        } finally {
+            setDeviceBusyByID((prev) => ({ ...prev, [deviceID]: false }));
+        }
+    }
+
+    const currentDeviceID = sessionInfo?.deviceID;
+
     return (
         <View style={styles.container}>
             <ChatHeader
                 onBack={() => {
                     navigation.goBack();
                 }}
-                title="Pending approvals"
+                title="Devices"
             />
             <ScrollView contentContainerStyle={styles.content}>
                 <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Pending approvals</Text>
                     <View style={styles.rowCard}>
                         <View style={styles.rowInfo}>
                             <Text style={styles.label}>Device requests</Text>
@@ -197,6 +280,146 @@ export function PendingApprovalsScreen({
                         );
                     })}
                 </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Session</Text>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Auth status</Text>
+                        <Text style={styles.value}>{authStatus}</Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Server</Text>
+                        <Text style={styles.value}>{getServerUrl()}</Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Current device</Text>
+                        <Text style={[styles.value, styles.mono]}>
+                            {sessionInfo?.deviceID?.slice(0, 20) ?? "—"}…
+                        </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Session expires</Text>
+                        <Text style={styles.value}>
+                            {sessionInfo?.tokenExpiresAt
+                                ? new Date(
+                                      sessionInfo.tokenExpiresAt,
+                                  ).toLocaleString()
+                                : "Unknown"}
+                        </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Time remaining</Text>
+                        <Text style={styles.value}>
+                            {typeof sessionInfo?.tokenRemainingHours ===
+                            "number"
+                                ? `${sessionInfo.tokenRemainingHours}h`
+                                : "Unknown"}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Current devices</Text>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Your devices</Text>
+                            <Text style={styles.desc}>
+                                Remove old devices you no longer use
+                            </Text>
+                            {devices.length <= 1 ? (
+                                <Text style={styles.desc}>
+                                    Your last remaining device cannot be
+                                    removed.
+                                </Text>
+                            ) : null}
+                        </View>
+                        <TouchableOpacity
+                            disabled={devicesLoading}
+                            onPress={() => {
+                                void refreshSessionAndDevices();
+                            }}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>
+                                {devicesLoading ? "Loading..." : "Refresh"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {deviceError !== "" ? (
+                        <View style={styles.errorCard}>
+                            <Text style={styles.errorText}>{deviceError}</Text>
+                        </View>
+                    ) : null}
+
+                    {devices.map((device) => {
+                        const isCurrent = device.deviceID === currentDeviceID;
+                        const canRemove = devices.length > 1;
+                        const busy = deviceBusyByID[device.deviceID] === true;
+                        return (
+                            <View key={device.deviceID} style={styles.rowCard}>
+                                <View style={styles.rowInfo}>
+                                    <Text style={styles.label}>
+                                        {device.name}
+                                    </Text>
+                                    <Text style={styles.desc}>
+                                        Last login{" "}
+                                        {new Date(
+                                            device.lastLogin,
+                                        ).toLocaleString()}
+                                    </Text>
+                                    <Text style={[styles.desc, styles.mono]}>
+                                        {device.deviceID.slice(0, 20)}…
+                                    </Text>
+                                </View>
+                                {isCurrent ? (
+                                    <View style={styles.currentDeviceBadge}>
+                                        <Text
+                                            style={
+                                                styles.currentDeviceBadgeText
+                                            }
+                                        >
+                                            This device
+                                        </Text>
+                                    </View>
+                                ) : !canRemove ? (
+                                    <View style={styles.currentDeviceBadge}>
+                                        <Text
+                                            style={
+                                                styles.currentDeviceBadgeText
+                                            }
+                                        >
+                                            Last device
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        disabled={busy}
+                                        onPress={() => {
+                                            handleRemoveDevice(
+                                                device.deviceID,
+                                                device.name,
+                                            );
+                                        }}
+                                        style={styles.removeDeviceBtn}
+                                    >
+                                        <Text
+                                            style={styles.removeDeviceBtnText}
+                                        >
+                                            {busy ? "Removing..." : "Remove"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        );
+                    })}
+                </View>
             </ScrollView>
         </View>
     );
@@ -226,6 +449,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
+    currentDeviceBadge: {
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.4)",
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    currentDeviceBadgeText: {
+        ...typography.button,
+        color: "#8DF5B0",
+        fontSize: 12,
+        fontWeight: "600",
+    },
     desc: {
         ...typography.body,
         color: "rgba(255,255,255,0.52)",
@@ -253,6 +490,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
     },
+    mono: {
+        fontFamily: typography.body.fontFamily,
+        fontSize: 12,
+        letterSpacing: 0.25,
+    },
     rejectBtn: {
         alignItems: "center",
         borderColor: "rgba(255,255,255,0.18)",
@@ -265,6 +507,20 @@ const styles = StyleSheet.create({
     rejectBtnText: {
         ...typography.button,
         color: colors.textSecondary,
+        fontWeight: "600",
+    },
+    removeDeviceBtn: {
+        alignItems: "center",
+        borderColor: "rgba(229, 57, 53, 0.4)",
+        borderRadius: 10,
+        borderWidth: 1,
+        minWidth: 86,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    removeDeviceBtnText: {
+        ...typography.button,
+        color: colors.error,
         fontWeight: "600",
     },
     rowCard: {
@@ -287,6 +543,12 @@ const styles = StyleSheet.create({
     section: {
         gap: 8,
     },
+    sectionTitle: {
+        ...typography.label,
+        color: "rgba(255,255,255,0.52)",
+        paddingHorizontal: 2,
+        textTransform: "uppercase",
+    },
     testBtn: {
         alignItems: "center",
         borderColor: "rgba(255,255,255,0.2)",
@@ -300,5 +562,10 @@ const styles = StyleSheet.create({
         ...typography.button,
         color: colors.textSecondary,
         fontWeight: "600",
+    },
+    value: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.66)",
+        fontSize: 13,
     },
 });

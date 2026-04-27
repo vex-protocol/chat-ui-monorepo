@@ -29,9 +29,9 @@ const SIDEBAR_WIDTH = 72;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
     "Conversation",
+    "Devices",
     "Invite",
     "JoinGroup",
-    "PendingApprovals",
     "Settings",
 ] as const;
 const CHAT_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
@@ -342,8 +342,8 @@ function ContentStack({
             />
             <Stack.Screen
                 component={PendingApprovalsScreen}
-                listeners={withFocus("PendingApprovals")}
-                name="PendingApprovals"
+                listeners={withFocus("Devices")}
+                name="Devices"
             />
         </Stack.Navigator>
     );

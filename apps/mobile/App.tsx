@@ -29,7 +29,7 @@ import {
 } from "./src/lib/notifications";
 import { mobileConfig } from "./src/lib/platform";
 import {
-    navigateToPendingApprovals,
+    navigateToDevices,
     navigationRef,
 } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
@@ -400,7 +400,7 @@ function App() {
                     <Pressable
                         onPress={() => {
                             setPendingApprovalNotice(null);
-                            navigateToPendingApprovals();
+                            navigateToDevices();
                         }}
                         style={styles.approvalNoticeCard}
                     >
