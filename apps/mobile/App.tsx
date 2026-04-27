@@ -1,3 +1,5 @@
+import type { Message } from "@vex-chat/libvex";
+
 import React, { useEffect, useRef, useState } from "react";
 import {
     AppState,
@@ -39,11 +41,19 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { colors, fontFamilies } from "./src/theme";
 
 const BACKGROUND_NETWORK_SYNC_TASK = "vex-background-network-sync";
+const BACKGROUND_NOTIFICATION_LIMIT = 8;
+const runtimeNotifiedMailIDs = new Set<string>();
 
 if (!TaskManager.isTaskDefined(BACKGROUND_NETWORK_SYNC_TASK)) {
     TaskManager.defineTask(BACKGROUND_NETWORK_SYNC_TASK, async () => {
         try {
+            const knownMailIDsBeforeSync = collectKnownMailIDs();
             const result = await vexService.runBackgroundNetworkFetch();
+            if (result === "new_data" && AppState.currentState !== "active") {
+                await notifyMessagesDownloadedInBackground(
+                    knownMailIDsBeforeSync,
+                );
+            }
             if (result === "new_data") {
                 return BackgroundTask.BackgroundTaskResult.Success;
             }
@@ -195,6 +205,7 @@ function App() {
 
     useEffect(() => {
         notifiedMailIDsRef.current = new Set();
+        runtimeNotifiedMailIDs.clear();
         notificationHistoryCutoffMsRef.current = Date.now();
     }, [user, user?.userID]);
 
@@ -377,10 +388,14 @@ function App() {
                 if (!newMsg) {
                     continue;
                 }
-                if (notifiedMailIDsRef.current.has(newMsg.mailID)) {
+                if (
+                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
+                    runtimeNotifiedMailIDs.has(newMsg.mailID)
+                ) {
                     continue;
                 }
                 notifiedMailIDsRef.current.add(newMsg.mailID);
+                runtimeNotifiedMailIDs.add(newMsg.mailID);
                 if (
                     isHistoricalMessage(
                         newMsg.timestamp,
@@ -407,10 +422,14 @@ function App() {
                 if (!newMsg) {
                     continue;
                 }
-                if (notifiedMailIDsRef.current.has(newMsg.mailID)) {
+                if (
+                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
+                    runtimeNotifiedMailIDs.has(newMsg.mailID)
+                ) {
                     continue;
                 }
                 notifiedMailIDsRef.current.add(newMsg.mailID);
+                runtimeNotifiedMailIDs.add(newMsg.mailID);
                 if (
                     isHistoricalMessage(
                         newMsg.timestamp,
@@ -585,6 +604,47 @@ const styles = StyleSheet.create({
 
 export default App;
 
+function collectKnownMailIDs(): Set<string> {
+    const known = new Set<string>();
+    const directMessages = $messages.get();
+    const groupMessages = $groupMessages.get();
+    for (const thread of Object.values(directMessages)) {
+        for (const msg of thread) {
+            known.add(msg.mailID);
+        }
+    }
+    for (const thread of Object.values(groupMessages)) {
+        for (const msg of thread) {
+            known.add(msg.mailID);
+        }
+    }
+    return known;
+}
+
+function collectLatestMessagesByThread(
+    threads: Record<string, Message[]>,
+    knownBefore: Set<string>,
+): Message[] {
+    const latest: Message[] = [];
+    for (const thread of Object.values(threads)) {
+        for (let i = thread.length - 1; i >= 0; i -= 1) {
+            const candidate = thread[i];
+            if (!candidate) {
+                continue;
+            }
+            if (
+                knownBefore.has(candidate.mailID) ||
+                runtimeNotifiedMailIDs.has(candidate.mailID)
+            ) {
+                continue;
+            }
+            latest.push(candidate);
+            break;
+        }
+    }
+    return latest;
+}
+
 function isHistoricalMessage(
     timestamp: string,
     notificationCutoffMs: number,
@@ -594,4 +654,27 @@ function isHistoricalMessage(
         return false;
     }
     return messageMs <= notificationCutoffMs;
+}
+
+async function notifyMessagesDownloadedInBackground(
+    knownBeforeSync: Set<string>,
+): Promise<void> {
+    const directLatest = collectLatestMessagesByThread(
+        $messages.get(),
+        knownBeforeSync,
+    );
+    const groupLatest = collectLatestMessagesByThread(
+        $groupMessages.get(),
+        knownBeforeSync,
+    );
+    const candidates = [...directLatest, ...groupLatest]
+        .sort(
+            (a, b) =>
+                (Date.parse(a.timestamp) || 0) - (Date.parse(b.timestamp) || 0),
+        )
+        .slice(-BACKGROUND_NOTIFICATION_LIMIT);
+    for (const msg of candidates) {
+        runtimeNotifiedMailIDs.add(msg.mailID);
+        await showMessageNotification(msg);
+    }
 }
