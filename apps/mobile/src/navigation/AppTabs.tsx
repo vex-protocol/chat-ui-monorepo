@@ -18,6 +18,7 @@ import { DMListScreen } from "../screens/DMListScreen";
 import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
+import { PendingApprovalsScreen } from "../screens/PendingApprovalsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { colors } from "../theme";
 
@@ -27,8 +28,10 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 const SIDEBAR_WIDTH = 72;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
+    "Conversation",
     "Invite",
     "JoinGroup",
+    "PendingApprovals",
     "Settings",
 ] as const;
 const CHAT_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
@@ -90,6 +93,12 @@ export function AppTabs() {
         if (topLeftShowsBack) {
             if (sidebarOpen) {
                 closeSidebar();
+            }
+            if (currentRoute === "Conversation") {
+                navigationRef.navigate("App", {
+                    screen: "DMList",
+                });
+                return;
             }
             if (navigationRef.canGoBack()) {
                 navigationRef.goBack();
@@ -330,6 +339,11 @@ function ContentStack({
                 component={SettingsScreen}
                 listeners={withFocus("Settings")}
                 name="Settings"
+            />
+            <Stack.Screen
+                component={PendingApprovalsScreen}
+                listeners={withFocus("PendingApprovals")}
+                name="PendingApprovals"
             />
         </Stack.Navigator>
     );

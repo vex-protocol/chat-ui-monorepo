@@ -14,6 +14,7 @@ export type AppStackParamList = {
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
+    PendingApprovals: undefined;
     Settings: undefined;
 };
 

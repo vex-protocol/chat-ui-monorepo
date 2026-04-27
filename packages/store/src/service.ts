@@ -49,6 +49,8 @@ export interface AuthResult {
     error?: string;
     keyReplaced?: boolean;
     ok: boolean;
+    pendingDeviceApproval?: boolean;
+    pendingRequestID?: string;
 }
 
 /** App-provided platform configuration for client bootstrap. */
@@ -123,6 +125,10 @@ interface ClientHttpRequestConfigLike {
     timeout?: number;
 }
 
+type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
+    devices: DevicesWithApprovalLike;
+};
+
 interface ClientWithInternalHttp {
     http?: ClientHttpLike;
 }
@@ -133,6 +139,44 @@ interface ClientWithSocketLike {
 
 interface ClientWithSyncInboxLike {
     syncInboxNow?: unknown;
+}
+
+interface DeviceApprovalRequestLike {
+    approvedDeviceID?: string;
+    createdAt: string;
+    deviceName: string;
+    error?: string;
+    expiresAt: string;
+    requestID: string;
+    signKey: string;
+    status: "approved" | "expired" | "pending" | "rejected";
+    username: string;
+}
+
+interface DeviceRegistrationPendingLike {
+    challenge: string;
+    expiresAt: string;
+    requestID: string;
+    status: "pending_approval";
+}
+
+type DeviceRegistrationResultLike =
+    | DeviceRegistrationPendingLike
+    | DeviceRegistrationResultLikeDevice;
+
+interface DeviceRegistrationResultLikeDevice {
+    deviceID: string;
+}
+
+interface DevicesWithApprovalLike {
+    approveRequest?: (requestID: string) => Promise<void>;
+    delete: (deviceID: string) => Promise<void>;
+    listRequests?: () => Promise<DeviceApprovalRequestLike[]>;
+    register: () => Promise<unknown>;
+    rejectRequest?: (requestID: string) => Promise<void>;
+    retrieve: (
+        deviceIdentifier: string,
+    ) => Promise<null | { deviceID: string }>;
 }
 
 interface HttpErrorLike {
@@ -170,6 +214,7 @@ class Disposable {
 class VexService {
     private client: Client | null = null;
     private connectionRecoveryInFlight = false;
+    private readonly deviceRequestQueueListeners = new Set<() => void>();
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
@@ -179,6 +224,22 @@ class VexService {
     private wsDebugSocket: null | WebSocketDebugLike = null;
 
     // ── Auth flows ──────────────────────────────────────────────────────
+
+    async approveDeviceRequest(requestID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient() as ClientWithDeviceApprovals;
+            if (!client.devices.approveRequest) {
+                return {
+                    error: "Client does not support device approvals yet.",
+                    ok: false,
+                };
+            }
+            await client.devices.approveRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
 
     /**
      * Auto-login from stored credentials → connect.
@@ -238,6 +299,66 @@ class VexService {
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
+            if (isDecryptMismatchError(err)) {
+                debugAuth("autoLogin:decrypt-mismatch:recover:start", {
+                    username: creds.username,
+                });
+                try {
+                    await this.initClient(
+                        creds.deviceKey,
+                        creds.username,
+                        config,
+                        options,
+                        true,
+                    );
+                    const recovered = this.requireClient();
+                    const authErr = await recovered.loginWithDeviceKey(
+                        creds.deviceID,
+                    );
+                    if (authErr) {
+                        await this.close();
+                        if (isUnauthorizedError(authErr)) {
+                            debugAuth(
+                                "autoLogin:decrypt-mismatch:recover:unauthorized:clearingCredentials",
+                                { username: creds.username },
+                            );
+                            await this.clearStoredCredentials(
+                                keyStore,
+                                creds.username,
+                            );
+                            this.setAuthStatus("unauthorized");
+                            return {
+                                error: "Session expired. Please sign in again.",
+                                ok: false,
+                            };
+                        }
+                        return { error: authErr.message, ok: false };
+                    }
+
+                    await recovered.connect();
+                    $userWritable.set(recovered.me.user());
+                    this.setAuthStatus("authenticated");
+                    await this.populateState();
+                    debugAuth("autoLogin:decrypt-mismatch:recover:ok", {
+                        username: creds.username,
+                    });
+                    return { ok: true };
+                } catch (recoveryErr: unknown) {
+                    try {
+                        await this.close();
+                    } catch {
+                        /* ignore close errors */
+                    }
+                    debugAuth("autoLogin:decrypt-mismatch:recover:failed", {
+                        message: errorMessage(recoveryErr),
+                        username: creds.username,
+                    });
+                    return {
+                        error: "Local encrypted data could not be recovered on this device. Please sign in again.",
+                        ok: false,
+                    };
+                }
+            }
             try {
                 await this.close();
             } catch {
@@ -279,6 +400,8 @@ class VexService {
         }
     }
 
+    // ── Server CRUD ─────────────────────────────────────────────────────
+
     async createChannel(
         name: string,
         serverID: string,
@@ -293,8 +416,6 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
-
-    // ── Server CRUD ─────────────────────────────────────────────────────
 
     async createInvite(serverID: string, duration: string): Promise<Invite> {
         const client = this.requireClient();
@@ -359,18 +480,16 @@ class VexService {
         return client.channels.userList(channelID);
     }
 
-    // ── Channel operations ──────────────────────────────────────────────
-
     async getInvites(serverID: string): Promise<Invite[]> {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     async joinInvite(inviteID: string): Promise<OperationResult> {
         try {
@@ -389,6 +508,16 @@ class VexService {
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
+    }
+
+    // ── Messaging ───────────────────────────────────────────────────────
+
+    async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
+        const client = this.requireClient() as ClientWithDeviceApprovals;
+        if (!client.devices.listRequests) {
+            return [];
+        }
+        return client.devices.listRequests();
     }
 
     /**
@@ -429,13 +558,18 @@ class VexService {
                 };
             }
 
-            await client.connect();
-            $userWritable.set(client.me.user());
-            this.setAuthStatus("authenticated");
-
             if (!creds) {
+                let registerResult: DeviceRegistrationResultLike | null = null;
+                let resolvedDeviceID: null | string = null;
                 try {
-                    await client.devices.register();
+                    const raw = await (
+                        client as ClientWithDeviceApprovals
+                    ).devices.register();
+                    if (isDeviceRegistrationPending(raw)) {
+                        registerResult = raw;
+                    } else if (hasDeviceID(raw)) {
+                        registerResult = raw;
+                    }
                 } catch (regErr: unknown) {
                     // 470 = device with this signing key already exists — reuse it
                     if (!this.isDeviceExistsError(regErr)) {
@@ -444,8 +578,40 @@ class VexService {
                         return { error: errorMessage(regErr), ok: false };
                     }
                 }
+                if (
+                    registerResult &&
+                    "status" in registerResult &&
+                    registerResult.status === "pending_approval"
+                ) {
+                    await this.close();
+                    this.resetAll();
+                    this.setAuthStatus("signed_out");
+                    return {
+                        error: "This device needs approval from another signed-in device.",
+                        ok: false,
+                        pendingDeviceApproval: true,
+                        pendingRequestID: registerResult.requestID,
+                    };
+                }
+                if (registerResult && "deviceID" in registerResult) {
+                    resolvedDeviceID = registerResult.deviceID;
+                }
+                if (!resolvedDeviceID) {
+                    const bySignKey = await client.devices.retrieve(
+                        client.getKeys().public,
+                    );
+                    resolvedDeviceID = bySignKey?.deviceID ?? null;
+                }
+                if (!resolvedDeviceID) {
+                    await this.close();
+                    this.resetAll();
+                    return {
+                        error: "Could not resolve this device registration.",
+                        ok: false,
+                    };
+                }
                 await this.saveCredentials(keyStore, {
-                    deviceID: client.me.device().deviceID,
+                    deviceID: resolvedDeviceID,
                     deviceKey: privateKey,
                     token: "",
                     username,
@@ -458,6 +624,9 @@ class VexService {
                 }
             }
 
+            await client.connect();
+            $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
@@ -486,12 +655,19 @@ class VexService {
         }
     }
 
-    // ── User operations ─────────────────────────────────────────────────
-
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
+
+    onDeviceRequestQueueChanged(listener: () => void): () => void {
+        this.deviceRequestQueueListeners.add(listener);
+        return () => {
+            this.deviceRequestQueueListeners.delete(listener);
+        };
+    }
+
+    // ── User operations ─────────────────────────────────────────────────
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
         try {
@@ -657,6 +833,22 @@ class VexService {
             } else if (isNetworkError(err)) {
                 this.setAuthStatus("offline");
             }
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async rejectDeviceRequest(requestID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient() as ClientWithDeviceApprovals;
+            if (!client.devices.rejectRequest) {
+                return {
+                    error: "Client does not support device approvals yet.",
+                    ok: false,
+                };
+            }
+            await client.devices.rejectRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
     }
@@ -1128,6 +1320,26 @@ class VexService {
         });
     }
 
+    private subscribeToDeviceRequestQueueChanges(): void {
+        const client = this.requireClient() as unknown as {
+            off: (event: string, fn: () => void) => void;
+            on: (event: string, fn: () => void) => void;
+        };
+        const onQueueChanged = () => {
+            for (const listener of this.deviceRequestQueueListeners) {
+                try {
+                    listener();
+                } catch {
+                    // ignore listener errors
+                }
+            }
+        };
+        client.on("deviceRequest", onQueueChanged);
+        this.disposable.add(() => {
+            client.off("deviceRequest", onQueueChanged);
+        });
+    }
+
     private unwireEvents(): void {
         this.disposable.dispose();
     }
@@ -1148,6 +1360,7 @@ class VexService {
                 this.handleDirectMessage(msg);
             }
         });
+        this.subscribeToDeviceRequestQueueChanges();
     }
 
     private wrapHttpMethodsWithTimeout(http: ClientHttpLike): void {
@@ -1236,6 +1449,17 @@ function getClientSocket(client: Client): null | WebSocketDebugLike {
     return maybeSocket;
 }
 
+function hasDeviceID(
+    value: unknown,
+): value is DeviceRegistrationResultLikeDevice {
+    return (
+        typeof value === "object" &&
+        value !== null &&
+        "deviceID" in value &&
+        typeof (value as { deviceID?: unknown }).deviceID === "string"
+    );
+}
+
 function hasHttpStatus(err: unknown): err is HttpErrorLike {
     if (!(err instanceof Error) || !("response" in err)) return false;
     const res = (err as { response: unknown }).response;
@@ -1262,6 +1486,26 @@ function isDecryptMismatchError(err: unknown): boolean {
     return (
         msg.includes("failed to decrypt sealed column value") ||
         msg.includes("couldn't decrypt messages on disk")
+    );
+}
+
+function isDeviceRegistrationPending(
+    value: unknown,
+): value is DeviceRegistrationPendingLike {
+    if (typeof value !== "object" || value === null) {
+        return false;
+    }
+    const v = value as {
+        challenge?: unknown;
+        expiresAt?: unknown;
+        requestID?: unknown;
+        status?: unknown;
+    };
+    return (
+        typeof v.requestID === "string" &&
+        typeof v.challenge === "string" &&
+        typeof v.expiresAt === "string" &&
+        v.status === "pending_approval"
     );
 }
 

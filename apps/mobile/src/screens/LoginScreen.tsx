@@ -42,7 +42,17 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
             );
 
             if (!result.ok) {
-                setError(result.error || "Invalid username or password");
+                if (result.pendingDeviceApproval) {
+                    const requestSuffix = result.pendingRequestID
+                        ? ` Request ID: ${result.pendingRequestID}`
+                        : "";
+                    setError(
+                        "This device is waiting for approval from another signed-in device." +
+                            requestSuffix,
+                    );
+                } else {
+                    setError(result.error || "Invalid username or password");
+                }
                 setLoading(false);
                 return;
             }

@@ -23,7 +23,7 @@ import { getServerUrl } from "../lib/config";
 import { loadCredentials } from "../lib/keychain";
 import { colors, typography } from "../theme";
 
-export function SettingsScreen({}: AppScreenProps<"Settings">) {
+export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [exportingIdentity, setExportingIdentity] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
@@ -165,6 +165,23 @@ export function SettingsScreen({}: AppScreenProps<"Settings">) {
                             <Text style={styles.testBtnText}>
                                 {exportingIdentity ? "Exporting…" : "Export"}
                             </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Device approvals</Text>
+                            <Text style={styles.desc}>
+                                Approve or reject new device sign-in requests
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => {
+                                navigation.navigate("PendingApprovals");
+                            }}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>Open</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
