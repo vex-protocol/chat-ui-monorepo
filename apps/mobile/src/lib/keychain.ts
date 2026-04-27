@@ -5,23 +5,87 @@ import * as SecureStore from "expo-secure-store";
 import { getServerUrl } from "./config";
 
 const CREDS_KEY_PREFIX = "vex-device-credentials";
+const ACTIVE_USER_KEY_PREFIX = "vex-active-user";
 
-export async function clearCredentials(): Promise<void> {
-    await SecureStore.deleteItemAsync(credsKey());
+export async function clearCredentials(username?: string): Promise<void> {
+    const user = username ?? (await loadActiveUsername());
+    if (!user) {
+        await SecureStore.deleteItemAsync(activeUserKey());
+        await SecureStore.deleteItemAsync(legacyCredsKey());
+        return;
+    }
+    await SecureStore.deleteItemAsync(credsKeyForUser(user));
+    const active = await loadActiveUsername();
+    if (active === user) {
+        await SecureStore.deleteItemAsync(activeUserKey());
+    }
+    const legacy = await readLegacyCredentials();
+    if (legacy?.username === user) {
+        await SecureStore.deleteItemAsync(legacyCredsKey());
+    }
 }
 
-export async function loadCredentials(): Promise<null | StoredCredentials> {
-    const raw = await SecureStore.getItemAsync(credsKey());
-    if (!raw) return null;
-    return JSON.parse(raw) as StoredCredentials;
+export async function loadCredentials(
+    username?: string,
+): Promise<null | StoredCredentials> {
+    const user = username ?? (await loadActiveUsername());
+    if (user) {
+        const raw = await SecureStore.getItemAsync(credsKeyForUser(user));
+        if (raw) {
+            return JSON.parse(raw) as StoredCredentials;
+        }
+    }
+    // Legacy fallback: older builds used a single host-scoped slot.
+    const legacy = await readLegacyCredentials();
+    if (!legacy) {
+        return null;
+    }
+    if (user && legacy.username !== user) {
+        return null;
+    }
+    await saveCredentials(legacy);
+    return legacy;
 }
 
 export async function saveCredentials(creds: StoredCredentials): Promise<void> {
-    await SecureStore.setItemAsync(credsKey(), JSON.stringify(creds));
+    await SecureStore.setItemAsync(
+        credsKeyForUser(creds.username),
+        JSON.stringify(creds),
+    );
+    await SecureStore.setItemAsync(activeUserKey(), creds.username);
+    await SecureStore.deleteItemAsync(legacyCredsKey());
 }
 
-function credsKey(): string {
+function activeUserKey(): string {
+    return `${ACTIVE_USER_KEY_PREFIX}.${scopeFromHost(getServerUrl())}`;
+}
+
+function credsKeyForUser(username: string): string {
+    return `${CREDS_KEY_PREFIX}.${scopeFromHost(getServerUrl())}.${scopeFromHost(
+        username,
+    )}`;
+}
+
+function legacyCredsKey(): string {
     return `${CREDS_KEY_PREFIX}.${scopeFromHost(getServerUrl())}`;
+}
+
+async function loadActiveUsername(): Promise<null | string> {
+    const raw = await SecureStore.getItemAsync(activeUserKey());
+    if (!raw) return null;
+    return raw;
+}
+
+async function readLegacyCredentials(): Promise<null | StoredCredentials> {
+    const raw = await SecureStore.getItemAsync(legacyCredsKey());
+    if (!raw) {
+        return null;
+    }
+    try {
+        return JSON.parse(raw) as StoredCredentials;
+    } catch {
+        return null;
+    }
 }
 
 /**
@@ -44,11 +108,11 @@ function scopeFromHost(host: string): string {
  * prod/staging/local uses isolated slots.
  */
 export const keychainKeyStore: KeyStore = {
-    async clear(_username: string): Promise<void> {
-        await clearCredentials();
+    async clear(username: string): Promise<void> {
+        await clearCredentials(username);
     },
-    async load(_username?: string): Promise<null | StoredCredentials> {
-        return loadCredentials();
+    async load(username?: string): Promise<null | StoredCredentials> {
+        return loadCredentials(username);
     },
     async save(creds: StoredCredentials): Promise<void> {
         await saveCredentials(creds);
