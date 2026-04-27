@@ -141,12 +141,6 @@ interface ClientHttpRequestConfigLike {
     timeout?: number;
 }
 
-interface ClientWithDeviceApprovalFallbacks {
-    approveDeviceRequest?: (requestID: string) => Promise<unknown>;
-    listDeviceRegistrationRequests?: () => Promise<DeviceApprovalRequestLike[]>;
-    rejectDeviceRequest?: (requestID: string) => Promise<unknown>;
-}
-
 type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
     devices: DevicesWithApprovalLike;
 };
@@ -263,19 +257,13 @@ class VexService {
         try {
             const client =
                 this.requireClient() as unknown as ClientWithDeviceApprovals;
-            if (client.devices.approveRequest) {
-                await client.devices.approveRequest(requestID);
-                return { ok: true };
-            }
-            const fallback =
-                client as unknown as ClientWithDeviceApprovalFallbacks;
-            if (typeof fallback.approveDeviceRequest !== "function") {
+            if (!client.devices.approveRequest) {
                 return {
                     error: "Client does not support device approvals yet.",
                     ok: false,
                 };
             }
-            await fallback.approveDeviceRequest(requestID);
+            await client.devices.approveRequest(requestID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -627,16 +615,10 @@ class VexService {
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
         const client =
             this.requireClient() as unknown as ClientWithDeviceApprovals;
-        if (client.devices.listRequests) {
-            return client.devices.listRequests();
+        if (!client.devices.listRequests) {
+            return [];
         }
-        const fallback = client as unknown as ClientWithDeviceApprovalFallbacks;
-        if (typeof fallback.listDeviceRegistrationRequests === "function") {
-            return fallback.listDeviceRegistrationRequests();
-        }
-        throw new Error(
-            "Client does not support device approval request listing.",
-        );
+        return client.devices.listRequests();
     }
 
     /**
@@ -1032,19 +1014,13 @@ class VexService {
         try {
             const client =
                 this.requireClient() as unknown as ClientWithDeviceApprovals;
-            if (client.devices.rejectRequest) {
-                await client.devices.rejectRequest(requestID);
-                return { ok: true };
-            }
-            const fallback =
-                client as unknown as ClientWithDeviceApprovalFallbacks;
-            if (typeof fallback.rejectDeviceRequest !== "function") {
+            if (!client.devices.rejectRequest) {
                 return {
                     error: "Client does not support device approvals yet.",
                     ok: false,
                 };
             }
-            await fallback.rejectDeviceRequest(requestID);
+            await client.devices.rejectRequest(requestID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1303,15 +1279,6 @@ class VexService {
             let requests: DeviceApprovalRequestLike[] | null = null;
             if (withApprovals.devices.listRequests) {
                 requests = await withApprovals.devices.listRequests();
-            } else {
-                const fallback =
-                    client as unknown as ClientWithDeviceApprovalFallbacks;
-                if (
-                    typeof fallback.listDeviceRegistrationRequests ===
-                    "function"
-                ) {
-                    requests = await fallback.listDeviceRegistrationRequests();
-                }
             }
             if (!requests || requests.length === 0) {
                 return null;
