@@ -197,6 +197,9 @@ interface DeviceRegistrationResultLikeDevice {
 interface DevicesWithApprovalLike {
     approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
+    getRequest?: (
+        requestID: string,
+    ) => Promise<DeviceApprovalRequestLike | null>;
     listRequests?: () => Promise<DeviceApprovalRequestLike[]>;
     register: () => Promise<unknown>;
     rejectRequest?: (requestID: string) => Promise<unknown>;
@@ -247,6 +250,7 @@ class VexService {
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
+    private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
     private wsDebugEnabled = false;
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
@@ -695,8 +699,12 @@ class VexService {
                                 config.deviceName,
                             );
                         if (inferredPendingRequestID !== null) {
-                            await this.close();
-                            this.resetAll();
+                            this.startPendingApprovalWatcher({
+                                deviceKey: privateKey,
+                                keyStore,
+                                requestID: inferredPendingRequestID,
+                                username,
+                            });
                             this.setAuthStatus("signed_out");
                             return {
                                 error: "This device needs approval from another signed-in device.",
@@ -715,8 +723,12 @@ class VexService {
                     "status" in registerResult &&
                     registerResult.status === "pending_approval"
                 ) {
-                    await this.close();
-                    this.resetAll();
+                    this.startPendingApprovalWatcher({
+                        deviceKey: privateKey,
+                        keyStore,
+                        requestID: registerResult.requestID,
+                        username,
+                    });
                     this.setAuthStatus("signed_out");
                     return {
                         error: "This device needs approval from another signed-in device.",
@@ -772,6 +784,7 @@ class VexService {
     }
 
     async logout(): Promise<void> {
+        this.stopPendingApprovalWatcher();
         await this.close();
         this.resetAll();
         this.setAuthStatus("signed_out");
@@ -1547,6 +1560,7 @@ class VexService {
     }
 
     private resetAll(): void {
+        this.stopPendingApprovalWatcher();
         this.detachWebsocketDebug();
         this.client = null;
         this.failedUserLookups.clear();
@@ -1593,6 +1607,93 @@ class VexService {
     ): void {
         if ($authStatusWritable.get() !== status) {
             $authStatusWritable.set(status);
+        }
+    }
+
+    private startPendingApprovalWatcher({
+        deviceKey,
+        keyStore,
+        requestID,
+        username,
+    }: {
+        deviceKey: string;
+        keyStore: KeyStore;
+        requestID: string;
+        username: string;
+    }): void {
+        this.stopPendingApprovalWatcher();
+        let cancelled = false;
+        this.pendingApprovalWatchCancel = () => {
+            cancelled = true;
+        };
+        const run = async () => {
+            for (let attempt = 0; attempt < 300; attempt++) {
+                if (cancelled) return;
+                await waitMs(2000);
+                if (cancelled) return;
+                const client = this.client;
+                if (!client) return;
+                const withApprovals =
+                    client as unknown as ClientWithDeviceApprovals;
+                let pending: DeviceApprovalRequestLike | null = null;
+                try {
+                    if (
+                        typeof withApprovals.devices.getRequest === "function"
+                    ) {
+                        pending =
+                            await withApprovals.devices.getRequest(requestID);
+                    } else if (
+                        typeof withApprovals.devices.listRequests === "function"
+                    ) {
+                        const requests =
+                            await withApprovals.devices.listRequests();
+                        pending =
+                            requests.find(
+                                (req) => req.requestID === requestID,
+                            ) ?? null;
+                    }
+                } catch {
+                    continue;
+                }
+                if (!pending || pending.status === "pending") {
+                    continue;
+                }
+                if (pending.status === "approved" && pending.approvedDeviceID) {
+                    try {
+                        await this.saveCredentials(keyStore, {
+                            deviceID: pending.approvedDeviceID,
+                            deviceKey,
+                            token: "",
+                            username,
+                        });
+                        const authErr = await this.loginWithDeviceKeyWithRetry(
+                            client,
+                            pending.approvedDeviceID,
+                        );
+                        if (authErr) {
+                            return;
+                        }
+                        await client.connect();
+                        $userWritable.set(client.me.user());
+                        this.setAuthStatus("authenticated");
+                        await this.populateState();
+                    } finally {
+                        this.stopPendingApprovalWatcher();
+                    }
+                    return;
+                }
+                this.stopPendingApprovalWatcher();
+                return;
+            }
+            this.stopPendingApprovalWatcher();
+        };
+        void run();
+    }
+
+    private stopPendingApprovalWatcher(): void {
+        if (this.pendingApprovalWatchCancel) {
+            this.pendingApprovalWatchCancel();
+            this.pendingApprovalWatchCancel = null;
         }
     }
 

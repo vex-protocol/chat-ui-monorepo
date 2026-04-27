@@ -2,6 +2,7 @@ import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useState } from "react";
 import {
+    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -27,10 +28,14 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+    const [pendingApprovalRequestID, setPendingApprovalRequestID] = useState<
+        null | string
+    >(null);
 
     async function handleLogin() {
         setLoading(true);
         setError("");
+        setPendingApprovalRequestID(null);
 
         try {
             const result = await vexService.login(
@@ -43,14 +48,10 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
 
             if (!result.ok) {
                 if (result.pendingDeviceApproval) {
-                    const requestSuffix = result.pendingRequestID
-                        ? ` Request ID: ${result.pendingRequestID}`
-                        : "";
-                    setError(
-                        "This device is waiting for approval from another signed-in device." +
-                            requestSuffix,
-                    );
+                    setPendingApprovalRequestID(result.pendingRequestID ?? "");
+                    setError("");
                 } else {
+                    setPendingApprovalRequestID(null);
                     setError(result.error || "Invalid username or password");
                 }
                 setLoading(false);
@@ -58,9 +59,13 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
             }
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Unexpected error");
+            setPendingApprovalRequestID(null);
             setLoading(false);
         }
     }
+
+    const pendingApproval = pendingApprovalRequestID !== null;
+    const formBusy = loading || pendingApproval;
 
     return (
         <ScreenLayout style={styles.layout}>
@@ -81,6 +86,30 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                     <Text style={styles.label}>SIGN IN</Text>
                     <Text style={styles.heading}>Welcome back.</Text>
 
+                    {pendingApproval ? (
+                        <View style={styles.pendingCard}>
+                            <View style={styles.pendingRow}>
+                                <ActivityIndicator
+                                    color={colors.accent}
+                                    size="small"
+                                />
+                                <Text style={styles.pendingTitle}>
+                                    Authenticating this device...
+                                </Text>
+                            </View>
+                            <Text style={styles.pendingText}>
+                                Waiting for approval from another signed-in
+                                device. You will be logged in automatically when
+                                approved.
+                            </Text>
+                            {pendingApprovalRequestID !== "" ? (
+                                <Text style={styles.pendingRequestID}>
+                                    Request ID: {pendingApprovalRequestID}
+                                </Text>
+                            ) : null}
+                        </View>
+                    ) : null}
+
                     {error ? (
                         <View style={styles.errorBox}>
                             <Text style={styles.errorText}>{error}</Text>
@@ -92,7 +121,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                         <TextInput
                             autoCapitalize="none"
                             autoCorrect={false}
-                            editable={!loading}
+                            editable={!formBusy}
                             onChangeText={setUsername}
                             placeholder="your username"
                             placeholderTextColor={colors.mutedDark}
@@ -104,7 +133,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                     <View style={styles.field}>
                         <Text style={styles.fieldLabel}>PASSWORD</Text>
                         <TextInput
-                            editable={!loading}
+                            editable={!formBusy}
                             onChangeText={setPassword}
                             placeholder="••••••••"
                             placeholderTextColor={colors.mutedDark}
@@ -115,7 +144,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                     </View>
 
                     <VexButton
-                        disabled={loading || !username || !password}
+                        disabled={formBusy || !username || !password}
                         glow
                         loading={loading}
                         onPress={() => void handleLogin()}
@@ -234,6 +263,32 @@ const styles = StyleSheet.create({
     },
     logoWrap: {
         marginBottom: 4,
+    },
+    pendingCard: {
+        backgroundColor: "rgba(43, 113, 255, 0.12)",
+        borderColor: "rgba(43, 113, 255, 0.38)",
+        borderWidth: 1,
+        gap: 8,
+        padding: 10,
+    },
+    pendingRequestID: {
+        ...typography.body,
+        color: "rgba(192,216,255,0.72)",
+        fontSize: 12,
+    },
+    pendingRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
+    },
+    pendingText: {
+        ...typography.body,
+        color: "rgba(212,228,255,0.9)",
+    },
+    pendingTitle: {
+        ...typography.button,
+        color: "#CFE2FF",
+        fontWeight: "700",
     },
     signInButton: {
         marginTop: 4,
