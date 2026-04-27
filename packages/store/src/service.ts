@@ -407,7 +407,13 @@ class VexService {
             const creds = await keyStore.load(username);
             const privateKey = creds?.deviceKey ?? Client.generateSecretKey();
 
-            await this.initClient(privateKey, username, config, options);
+            await this.initClient(
+                privateKey,
+                username,
+                config,
+                options,
+                !creds,
+            );
             debugAuth("login:initClient:ok", { host: options.host, username });
             const client = this.requireClient();
 
