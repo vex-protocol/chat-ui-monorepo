@@ -2,7 +2,7 @@
 // profile-conditional fields so the `development` and `production` EAS
 // build profiles produce two distinct APKs that can coexist on one device.
 //
-//   development profile → "Vex Dev",  chat.vex.mobile.dev,  OTA enabled
+//   development profile → "Vex Beta", chat.vex.mobile.dev,  OTA enabled
 //   production  profile → "Vex",      chat.vex.mobile,      OTA disabled
 //
 // The release APK has updates.enabled:false hard-baked into the native
@@ -26,7 +26,7 @@ module.exports = ({ config }) => {
     return {
         ...config,
         version: pkg.version,
-        name: devMode ? "Vex Dev" : config.name,
+        name: devMode ? "Vex Beta" : config.name,
         icon: iconPath,
         ios: {
             ...config.ios,
