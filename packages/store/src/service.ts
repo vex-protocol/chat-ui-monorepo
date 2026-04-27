@@ -54,6 +54,8 @@ export interface AuthResult {
     pendingRequestID?: string;
 }
 
+export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
+
 /** App-provided platform configuration for client bootstrap. */
 export interface BootstrapConfig {
     /**
@@ -1041,6 +1043,27 @@ class VexService {
     resetAllUnread(): void {
         $dmUnreadCountsWritable.set({});
         $channelUnreadCountsWritable.set({});
+    }
+
+    async runBackgroundNetworkFetch(): Promise<BackgroundNetworkFetchResult> {
+        const client = this.client;
+        if (!client) {
+            return "no_data";
+        }
+        try {
+            const status = await this.probeAuthSession();
+            if (status !== "authenticated") {
+                return status === "offline" ? "no_data" : "failed";
+            }
+            if (hasSyncInboxNow(client)) {
+                await client.syncInboxNow();
+            } else {
+                await this.populateState();
+            }
+            return "new_data";
+        } catch {
+            return "failed";
+        }
     }
 
     async sendDM(

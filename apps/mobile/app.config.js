@@ -59,5 +59,6 @@ module.exports = ({ config }) => {
             ...config.extra,
             eas: { projectId: EAS_PROJECT_ID },
         },
+        plugins: [...(config.plugins ?? []), "expo-background-task"],
     };
 };

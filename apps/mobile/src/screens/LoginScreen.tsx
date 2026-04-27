@@ -1,8 +1,9 @@
 import type { AuthScreenProps } from "../navigation/types";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     ActivityIndicator,
+    AppState,
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
@@ -31,6 +32,9 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
     const [pendingApprovalRequestID, setPendingApprovalRequestID] = useState<
         null | string
     >(null);
+    const pollInFlightRef = useRef(false);
+    const pollTimerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
+    const passwordInputRef = useRef<TextInput>(null);
 
     async function handleLogin() {
         setLoading(true);
@@ -66,6 +70,93 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
 
     const pendingApproval = pendingApprovalRequestID !== null;
     const formBusy = loading || pendingApproval;
+
+    useEffect(() => {
+        if (!pendingApproval) {
+            if (pollTimerRef.current) {
+                clearTimeout(pollTimerRef.current);
+                pollTimerRef.current = null;
+            }
+            pollInFlightRef.current = false;
+            return;
+        }
+        let active = true;
+        const scheduleNext = (ms: number) => {
+            if (!active) {
+                return;
+            }
+            if (pollTimerRef.current) {
+                clearTimeout(pollTimerRef.current);
+            }
+            pollTimerRef.current = setTimeout(() => {
+                void pollApprovalStatus();
+            }, ms);
+        };
+        const pollApprovalStatus = async () => {
+            if (!active || pollInFlightRef.current) {
+                return;
+            }
+            pollInFlightRef.current = true;
+            try {
+                const result = await vexService.login(
+                    username,
+                    password,
+                    mobileConfig(),
+                    getServerOptions(),
+                    keychainKeyStore,
+                );
+                if (!active) {
+                    return;
+                }
+                if (result.ok) {
+                    setPendingApprovalRequestID(null);
+                    setLoading(false);
+                    setError("");
+                    return;
+                }
+                if (result.pendingDeviceApproval) {
+                    setPendingApprovalRequestID(result.pendingRequestID ?? "");
+                    scheduleNext(
+                        AppState.currentState === "active" ? 4000 : 12000,
+                    );
+                    return;
+                }
+                setPendingApprovalRequestID(null);
+                setLoading(false);
+                setError(result.error || "Sign in failed");
+            } catch (err: unknown) {
+                if (!active) {
+                    return;
+                }
+                scheduleNext(AppState.currentState === "active" ? 5000 : 15000);
+                if (err instanceof Error) {
+                    setError(err.message);
+                }
+            } finally {
+                pollInFlightRef.current = false;
+            }
+        };
+        const appStateSubscription = AppState.addEventListener(
+            "change",
+            (state) => {
+                if (!active || !pendingApproval) {
+                    return;
+                }
+                if (state === "active") {
+                    void pollApprovalStatus();
+                }
+            },
+        );
+        scheduleNext(2000);
+        return () => {
+            active = false;
+            appStateSubscription.remove();
+            if (pollTimerRef.current) {
+                clearTimeout(pollTimerRef.current);
+                pollTimerRef.current = null;
+            }
+        };
+    }, [pendingApproval, password, username]);
 
     return (
         <ScreenLayout style={styles.layout}>
@@ -110,6 +201,7 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                             onPress={() => {
                                 setPendingApprovalRequestID(null);
                                 setLoading(false);
+                                setError("");
                             }}
                             style={styles.pendingCancelBtn}
                         >
@@ -136,12 +228,19 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                             <Text style={styles.fieldLabel}>USERNAME</Text>
                             <TextInput
                                 autoCapitalize="none"
+                                autoComplete="username"
                                 autoCorrect={false}
                                 editable={!formBusy}
+                                importantForAutofill="yes"
                                 onChangeText={setUsername}
+                                onSubmitEditing={() => {
+                                    passwordInputRef.current?.focus();
+                                }}
                                 placeholder="your username"
                                 placeholderTextColor={colors.mutedDark}
+                                returnKeyType="next"
                                 style={styles.input}
+                                textContentType="username"
                                 value={username}
                             />
                         </View>
@@ -149,12 +248,22 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                         <View style={styles.field}>
                             <Text style={styles.fieldLabel}>PASSWORD</Text>
                             <TextInput
+                                autoComplete="password"
                                 editable={!formBusy}
+                                importantForAutofill="yes"
                                 onChangeText={setPassword}
+                                onSubmitEditing={() => {
+                                    if (!formBusy && username && password) {
+                                        void handleLogin();
+                                    }
+                                }}
                                 placeholder="••••••••"
                                 placeholderTextColor={colors.mutedDark}
+                                ref={passwordInputRef}
+                                returnKeyType="done"
                                 secureTextEntry
                                 style={styles.input}
+                                textContentType="password"
                                 value={password}
                             />
                         </View>

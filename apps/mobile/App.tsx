@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
     AppState,
+    Platform,
     Pressable,
     StatusBar,
     StyleSheet,
@@ -18,6 +19,8 @@ import {
 
 import { useStore } from "@nanostores/react";
 import { NavigationContainer } from "@react-navigation/native";
+import * as BackgroundTask from "expo-background-task";
+import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { getServerOptions } from "./src/lib/config";
@@ -34,6 +37,25 @@ import {
 } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { colors, fontFamilies } from "./src/theme";
+
+const BACKGROUND_NETWORK_SYNC_TASK = "vex-background-network-sync";
+
+if (!TaskManager.isTaskDefined(BACKGROUND_NETWORK_SYNC_TASK)) {
+    TaskManager.defineTask(BACKGROUND_NETWORK_SYNC_TASK, async () => {
+        try {
+            const result = await vexService.runBackgroundNetworkFetch();
+            if (result === "new_data") {
+                return BackgroundTask.BackgroundTaskResult.Success;
+            }
+            if (result === "failed") {
+                return BackgroundTask.BackgroundTaskResult.Failed;
+            }
+            return BackgroundTask.BackgroundTaskResult.Success;
+        } catch {
+            return BackgroundTask.BackgroundTaskResult.Failed;
+        }
+    });
+}
 
 function App() {
     const keyReplaced = useStore($keyReplaced);
@@ -57,6 +79,40 @@ function App() {
         return () => {
             unsubNotif();
         };
+    }, []);
+
+    useEffect(() => {
+        if (Platform.OS !== "android") {
+            return;
+        }
+        const registerBackgroundSyncTask = async () => {
+            try {
+                const status = await BackgroundTask.getStatusAsync();
+                if (status !== BackgroundTask.BackgroundTaskStatus.Available) {
+                    return;
+                }
+                const alreadyRegistered =
+                    await TaskManager.isTaskRegisteredAsync(
+                        BACKGROUND_NETWORK_SYNC_TASK,
+                    );
+                if (alreadyRegistered) {
+                    return;
+                }
+                await BackgroundTask.registerTaskAsync(
+                    BACKGROUND_NETWORK_SYNC_TASK,
+                    {
+                        minimumInterval: 15 * 60,
+                    },
+                );
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-auth] background sync registration failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            }
+        };
+        void registerBackgroundSyncTask();
+        return;
     }, []);
 
     useEffect(() => {
@@ -145,7 +201,7 @@ function App() {
     useEffect(() => {
         seenPendingRequestIDsRef.current = new Set();
         setPendingApprovalNotice(null);
-        if (!user) {
+        if (!user?.userID) {
             return;
         }
         let active = true;

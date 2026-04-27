@@ -1,6 +1,6 @@
 import type { AppScreenProps } from "../navigation/types";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -41,50 +41,78 @@ export function PendingApprovalsScreen({
     const [sessionInfo, setSessionInfo] =
         useState<Awaited<ReturnType<typeof vexService.getSessionInfo>>>(null);
     const [loadingDeviceRequests, setLoadingDeviceRequests] = useState(false);
+    const deviceRequestsRefreshInFlightRef = useRef(false);
+    const devicesRefreshInFlightRef = useRef(false);
 
-    const refreshDeviceRequests = useCallback(async (): Promise<void> => {
-        if (!user) {
-            setDeviceRequests([]);
-            return;
-        }
-        setLoadingDeviceRequests(true);
-        setDeviceRequestError("");
-        try {
-            const requests = await vexService.listPendingDeviceRequests();
-            setDeviceRequests(
-                requests.filter((request) => request.status === "pending"),
-            );
-        } catch (err: unknown) {
-            setDeviceRequestError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load device requests.",
-            );
-        } finally {
-            setLoadingDeviceRequests(false);
-        }
-    }, [user]);
+    const refreshDeviceRequests = useCallback(
+        async (options?: { silent?: boolean }): Promise<void> => {
+            if (deviceRequestsRefreshInFlightRef.current) {
+                return;
+            }
+            deviceRequestsRefreshInFlightRef.current = true;
+            const silent = options?.silent === true;
+            try {
+                if (!user) {
+                    setDeviceRequests([]);
+                    return;
+                }
+                if (!silent) {
+                    setLoadingDeviceRequests(true);
+                }
+                setDeviceRequestError("");
+                const requests = await vexService.listPendingDeviceRequests();
+                setDeviceRequests(
+                    requests.filter((request) => request.status === "pending"),
+                );
+            } catch (err: unknown) {
+                setDeviceRequestError(
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to load device requests.",
+                );
+            } finally {
+                if (!silent) {
+                    setLoadingDeviceRequests(false);
+                }
+                deviceRequestsRefreshInFlightRef.current = false;
+            }
+        },
+        [user],
+    );
 
-    const refreshSessionAndDevices = useCallback(async () => {
-        setDevicesLoading(true);
-        setDeviceError("");
-        try {
-            const [session, myDevices] = await Promise.all([
-                vexService.getSessionInfo(),
-                vexService.listMyDevices(),
-            ]);
-            setSessionInfo(session);
-            setDevices(myDevices);
-        } catch (err: unknown) {
-            setDeviceError(
-                err instanceof Error
-                    ? err.message
-                    : "Failed to load device/session details.",
-            );
-        } finally {
-            setDevicesLoading(false);
-        }
-    }, []);
+    const refreshSessionAndDevices = useCallback(
+        async (options?: { silent?: boolean }) => {
+            if (devicesRefreshInFlightRef.current) {
+                return;
+            }
+            devicesRefreshInFlightRef.current = true;
+            const silent = options?.silent === true;
+            try {
+                if (!silent) {
+                    setDevicesLoading(true);
+                }
+                setDeviceError("");
+                const [session, myDevices] = await Promise.all([
+                    vexService.getSessionInfo(),
+                    vexService.listMyDevices(),
+                ]);
+                setSessionInfo(session);
+                setDevices(myDevices);
+            } catch (err: unknown) {
+                setDeviceError(
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to load device/session details.",
+                );
+            } finally {
+                if (!silent) {
+                    setDevicesLoading(false);
+                }
+                devicesRefreshInFlightRef.current = false;
+            }
+        },
+        [],
+    );
 
     useEffect(() => {
         void refreshDeviceRequests();
@@ -104,8 +132,8 @@ export function PendingApprovalsScreen({
 
     useEffect(() => {
         const unsubscribe = vexService.onDeviceRequestQueueChanged(() => {
-            void refreshDeviceRequests();
-            void refreshSessionAndDevices();
+            void refreshDeviceRequests({ silent: true });
+            void refreshSessionAndDevices({ silent: true });
         });
         return () => {
             unsubscribe();
