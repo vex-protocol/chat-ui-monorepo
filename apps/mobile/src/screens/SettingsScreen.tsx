@@ -1,6 +1,6 @@
 import type { AppScreenProps } from "../navigation/types";
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
     Alert,
     ScrollView,
@@ -12,7 +12,7 @@ import {
     View,
 } from "react-native";
 
-import { $user, vexService } from "@vex-chat/store";
+import { $authStatus, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import * as Notifications from "expo-notifications";
@@ -24,12 +24,53 @@ import { loadCredentials } from "../lib/keychain";
 import { colors, typography } from "../theme";
 
 export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
+    const authStatus = useStore($authStatus);
     const user = useStore($user);
+    const [deviceBusyByID, setDeviceBusyByID] = useState<
+        Record<string, boolean>
+    >({});
+    const [deviceError, setDeviceError] = useState("");
+    const [devices, setDevices] = useState<
+        Awaited<ReturnType<typeof vexService.listMyDevices>>
+    >([]);
+    const [devicesLoading, setDevicesLoading] = useState(false);
     const [exportingIdentity, setExportingIdentity] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [sessionInfo, setSessionInfo] =
+        useState<Awaited<ReturnType<typeof vexService.getSessionInfo>>>(null);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
     );
+
+    const refreshSessionAndDevices = useCallback(async () => {
+        setDevicesLoading(true);
+        setDeviceError("");
+        try {
+            const [session, myDevices] = await Promise.all([
+                vexService.getSessionInfo(),
+                vexService.listMyDevices(),
+            ]);
+            setSessionInfo(session);
+            setDevices(myDevices);
+        } catch (err: unknown) {
+            setDeviceError(
+                err instanceof Error
+                    ? err.message
+                    : "Failed to load device/session details.",
+            );
+        } finally {
+            setDevicesLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user) {
+            setSessionInfo(null);
+            setDevices([]);
+            return;
+        }
+        void refreshSessionAndDevices();
+    }, [refreshSessionAndDevices, user, user?.userID]);
 
     function handleExportIdentityKey(): void {
         Alert.alert(
@@ -127,6 +168,40 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
         })();
     }
 
+    function handleRemoveDevice(deviceID: string, deviceName: string): void {
+        Alert.alert(
+            `Remove ${deviceName}?`,
+            "This device will be signed out and must be re-approved or re-authenticated.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void removeDevice(deviceID);
+                    },
+                    style: "destructive",
+                    text: "Remove",
+                },
+            ],
+        );
+    }
+
+    async function removeDevice(deviceID: string): Promise<void> {
+        setDeviceBusyByID((prev) => ({ ...prev, [deviceID]: true }));
+        setDeviceError("");
+        try {
+            const result = await vexService.removeDevice(deviceID);
+            if (!result.ok) {
+                setDeviceError(result.error ?? "Failed to remove device.");
+                return;
+            }
+            await refreshSessionAndDevices();
+        } finally {
+            setDeviceBusyByID((prev) => ({ ...prev, [deviceID]: false }));
+        }
+    }
+
+    const currentDeviceID = sessionInfo?.deviceID;
+
     return (
         <View style={styles.container}>
             <ChatHeader title="Settings" />
@@ -146,6 +221,11 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                         <Text style={[styles.value, styles.mono]}>
                             {user?.userID.slice(0, 16) ?? "—"}…
                         </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Auth status</Text>
+                        <Text style={styles.value}>{authStatus}</Text>
                     </View>
 
                     <View style={styles.rowCard}>
@@ -184,6 +264,141 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                             <Text style={styles.testBtnText}>Open</Text>
                         </TouchableOpacity>
                     </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Session</Text>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Server</Text>
+                        <Text style={styles.value}>{getServerUrl()}</Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Current device</Text>
+                        <Text style={[styles.value, styles.mono]}>
+                            {sessionInfo?.deviceID?.slice(0, 20) ?? "—"}…
+                        </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Session expires</Text>
+                        <Text style={styles.value}>
+                            {sessionInfo?.tokenExpiresAt
+                                ? new Date(
+                                      sessionInfo.tokenExpiresAt,
+                                  ).toLocaleString()
+                                : "Unknown"}
+                        </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <Text style={styles.label}>Time remaining</Text>
+                        <Text style={styles.value}>
+                            {typeof sessionInfo?.tokenRemainingHours ===
+                            "number"
+                                ? `${sessionInfo.tokenRemainingHours}h`
+                                : "Unknown"}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Devices</Text>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Your devices</Text>
+                            <Text style={styles.desc}>
+                                Remove old devices you no longer use
+                            </Text>
+                            {devices.length <= 1 ? (
+                                <Text style={styles.desc}>
+                                    Your last remaining device cannot be
+                                    removed.
+                                </Text>
+                            ) : null}
+                        </View>
+                        <TouchableOpacity
+                            disabled={devicesLoading}
+                            onPress={() => {
+                                void refreshSessionAndDevices();
+                            }}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>
+                                {devicesLoading ? "Loading…" : "Refresh"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {deviceError !== "" ? (
+                        <View style={styles.errorCard}>
+                            <Text style={styles.errorText}>{deviceError}</Text>
+                        </View>
+                    ) : null}
+
+                    {devices.map((device) => {
+                        const isCurrent = device.deviceID === currentDeviceID;
+                        const canRemove = devices.length > 1;
+                        const busy = deviceBusyByID[device.deviceID] === true;
+                        return (
+                            <View key={device.deviceID} style={styles.rowCard}>
+                                <View style={styles.rowInfo}>
+                                    <Text style={styles.label}>
+                                        {device.name}
+                                    </Text>
+                                    <Text style={styles.desc}>
+                                        Last login{" "}
+                                        {new Date(
+                                            device.lastLogin,
+                                        ).toLocaleString()}
+                                    </Text>
+                                    <Text style={[styles.desc, styles.mono]}>
+                                        {device.deviceID.slice(0, 20)}…
+                                    </Text>
+                                </View>
+                                {isCurrent ? (
+                                    <View style={styles.currentDeviceBadge}>
+                                        <Text
+                                            style={
+                                                styles.currentDeviceBadgeText
+                                            }
+                                        >
+                                            This device
+                                        </Text>
+                                    </View>
+                                ) : !canRemove ? (
+                                    <View style={styles.currentDeviceBadge}>
+                                        <Text
+                                            style={
+                                                styles.currentDeviceBadgeText
+                                            }
+                                        >
+                                            Last device
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <TouchableOpacity
+                                        disabled={busy}
+                                        onPress={() => {
+                                            handleRemoveDevice(
+                                                device.deviceID,
+                                                device.name,
+                                            );
+                                        }}
+                                        style={styles.removeDeviceBtn}
+                                    >
+                                        <Text
+                                            style={styles.removeDeviceBtnText}
+                                        >
+                                            {busy ? "Removing…" : "Remove"}
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        );
+                    })}
                 </View>
 
                 <View style={styles.section}>
@@ -264,6 +479,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
+    currentDeviceBadge: {
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.4)",
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    currentDeviceBadgeText: {
+        ...typography.button,
+        color: "#8DF5B0",
+        fontSize: 12,
+        fontWeight: "600",
+    },
     dangerBtn: {
         alignItems: "center",
         borderColor: "rgba(229, 57, 53, 0.4)",
@@ -283,6 +512,18 @@ const styles = StyleSheet.create({
         color: "rgba(255,255,255,0.52)",
         fontSize: 12,
     },
+    errorCard: {
+        backgroundColor: "rgba(229, 57, 53, 0.14)",
+        borderColor: "rgba(229, 57, 53, 0.5)",
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    errorText: {
+        ...typography.body,
+        color: colors.error,
+    },
     label: {
         ...typography.button,
         color: colors.textSecondary,
@@ -293,6 +534,20 @@ const styles = StyleSheet.create({
         fontFamily: typography.body.fontFamily,
         fontSize: 12,
         letterSpacing: 0.25,
+    },
+    removeDeviceBtn: {
+        alignItems: "center",
+        borderColor: "rgba(229, 57, 53, 0.4)",
+        borderRadius: 10,
+        borderWidth: 1,
+        minWidth: 86,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    removeDeviceBtnText: {
+        ...typography.button,
+        color: colors.error,
+        fontWeight: "600",
     },
     rowCard: {
         alignItems: "center",

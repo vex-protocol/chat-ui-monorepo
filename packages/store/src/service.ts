@@ -9,6 +9,7 @@ import type {
     Channel,
     ClientEvents,
     ClientOptions,
+    Device,
     Invite,
     KeyStore,
     Message,
@@ -96,6 +97,21 @@ export interface ServerOptions {
     unsafeHttp?: boolean;
 }
 
+export interface SessionInfo {
+    authStatus:
+        | "authenticated"
+        | "checking"
+        | "offline"
+        | "signed_out"
+        | "unauthorized";
+    deviceID: string;
+    tokenExp?: number;
+    tokenExpiresAt?: string;
+    tokenRemainingHours?: number;
+    userID: string;
+    username: string;
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 interface ClientHttpDefaultsLike {
@@ -139,6 +155,10 @@ interface ClientWithSocketLike {
 
 interface ClientWithSyncInboxLike {
     syncInboxNow?: unknown;
+}
+
+interface ClientWithUserDeviceListLike {
+    getUserDeviceList?: (userID: string) => Promise<Device[] | null>;
 }
 
 interface DeviceApprovalRequestLike {
@@ -190,6 +210,8 @@ interface WebSocketDebugLike {
 }
 
 const REGISTER_STEP_TIMEOUT_MS = 12000;
+const DEVICE_AUTH_REFRESH_THRESHOLD_MS = 6 * 24 * 60 * 60 * 1000;
+const DEVICE_AUTH_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -218,6 +240,7 @@ class VexService {
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
+    private lastDeviceAuthRefreshAttemptAt = 0;
     private wsDebugEnabled = false;
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
     private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
@@ -485,6 +508,49 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
+    async getSessionInfo(): Promise<null | SessionInfo> {
+        try {
+            const client = this.requireClient();
+            const user = client.me.user();
+            const device = client.me.device();
+            let tokenExp: number | undefined;
+            try {
+                const auth = await client.whoami();
+                $userWritable.set(auth.user);
+                tokenExp = auth.exp;
+            } catch {
+                // If whoami fails we can still return local session metadata.
+            }
+            const expMs =
+                typeof tokenExp === "number"
+                    ? jwtExpToEpochMs(tokenExp)
+                    : undefined;
+            const remainingMs =
+                typeof expMs === "number"
+                    ? Math.max(0, expMs - Date.now())
+                    : undefined;
+            return {
+                authStatus: $authStatusWritable.get(),
+                deviceID: device.deviceID,
+                userID: user.userID,
+                username: user.username,
+                ...(typeof tokenExp === "number" ? { tokenExp } : {}),
+                ...(typeof expMs === "number"
+                    ? { tokenExpiresAt: new Date(expMs).toISOString() }
+                    : {}),
+                ...(typeof remainingMs === "number"
+                    ? {
+                          tokenRemainingHours: Math.floor(
+                              remainingMs / (1000 * 60 * 60),
+                          ),
+                      }
+                    : {}),
+            };
+        } catch {
+            return null;
+        }
+    }
+
     // ── Channel operations ──────────────────────────────────────────────
 
     getWebsocketDebugEnabled(): boolean {
@@ -511,6 +577,23 @@ class VexService {
     }
 
     // ── Messaging ───────────────────────────────────────────────────────
+
+    async listMyDevices(): Promise<Device[]> {
+        const client = this.requireClient();
+        const userID = client.me.user().userID;
+        const withList = client as unknown as ClientWithUserDeviceListLike;
+        let devices: Device[] = [];
+        if (typeof withList.getUserDeviceList === "function") {
+            devices = (await withList.getUserDeviceList(userID)) ?? [];
+        }
+        const sorted = [...devices].sort(
+            (a, b) =>
+                new Date(b.lastLogin).getTime() -
+                new Date(a.lastLogin).getTime(),
+        );
+        $devicesWritable.setKey(userID, sorted);
+        return sorted;
+    }
 
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
         const client = this.requireClient() as ClientWithDeviceApprovals;
@@ -674,6 +757,7 @@ class VexService {
             const client = this.requireClient();
             const auth = await client.whoami();
             $userWritable.set(auth.user);
+            await this.refreshSessionTokenIfStale(auth.exp);
             this.setAuthStatus("authenticated");
             return "authenticated";
         } catch (err: unknown) {
@@ -728,6 +812,40 @@ class VexService {
             }
             this.setAuthStatus("offline");
             return "offline";
+        }
+    }
+
+    async refreshSessionTokenIfStale(exp: number): Promise<void> {
+        const expMs = jwtExpToEpochMs(exp);
+        if (!Number.isFinite(expMs)) {
+            return;
+        }
+        const remainingMs = expMs - Date.now();
+        if (remainingMs > DEVICE_AUTH_REFRESH_THRESHOLD_MS) {
+            return;
+        }
+        const elapsedSinceAttempt =
+            Date.now() - this.lastDeviceAuthRefreshAttemptAt;
+        if (elapsedSinceAttempt < DEVICE_AUTH_REFRESH_INTERVAL_MS) {
+            return;
+        }
+        this.lastDeviceAuthRefreshAttemptAt = Date.now();
+        try {
+            const client = this.requireClient();
+            const authErr = await client.loginWithDeviceKey();
+            if (authErr) {
+                debugAuth("session:refresh:failed", {
+                    message: authErr.message,
+                });
+                return;
+            }
+            debugAuth("session:refresh:ok", {
+                remainingHours: Math.floor(remainingMs / (1000 * 60 * 60)),
+            });
+        } catch (err: unknown) {
+            debugAuth("session:refresh:error", {
+                message: errorMessage(err),
+            });
         }
     }
 
@@ -847,6 +965,17 @@ class VexService {
                 };
             }
             await client.devices.rejectRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async removeDevice(deviceID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.devices.delete(deviceID);
+            await this.listMyDevices();
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1210,6 +1339,15 @@ class VexService {
                 ...familiars.map((u) => loadFamiliar(u)),
             ]);
 
+            const withList = client as unknown as ClientWithUserDeviceListLike;
+            if (typeof withList.getUserDeviceList === "function") {
+                const devices =
+                    (await withList.getUserDeviceList(
+                        client.me.user().userID,
+                    )) ?? [];
+                $devicesWritable.setKey(client.me.user().userID, devices);
+            }
+
             $serversWritable.set(serversAcc);
             $channelsWritable.set(channelsAcc);
             $groupMessagesWritable.set(groupMessagesAcc);
@@ -1267,6 +1405,7 @@ class VexService {
         $authStatusWritable.set("signed_out");
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
+        this.lastDeviceAuthRefreshAttemptAt = 0;
         $familiarsWritable.set({});
         $devicesWritable.set({});
         $avatarHashWritable.set(0);
@@ -1557,6 +1696,11 @@ function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
         typeof candidate.off === "function" &&
         typeof candidate.send === "function"
     );
+}
+
+function jwtExpToEpochMs(exp: number): number {
+    // JWT exp is conventionally seconds since epoch; tolerate ms values too.
+    return exp > 1_000_000_000_000 ? exp : exp * 1000;
 }
 
 function shouldDebugAuth(): boolean {

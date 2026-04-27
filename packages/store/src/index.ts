@@ -53,4 +53,5 @@ export type {
     BootstrapConfig,
     OperationResult,
     ServerOptions,
+    SessionInfo,
 } from "./service.ts";
