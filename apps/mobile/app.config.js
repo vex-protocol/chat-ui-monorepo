@@ -21,7 +21,9 @@ const EAS_PROJECT_ID = "e0d4cba7-1f2a-4c26-9e66-1fd60178ad20";
 
 module.exports = ({ config }) => {
     const devMode = process.env.EAS_BUILD_PROFILE === "development";
-    const iconPath = devMode ? "./assets/icon-dev.png" : "./assets/icon-prod.png";
+    const iconPath = devMode
+        ? "./assets/icon-dev.png"
+        : "./assets/icon-prod.png";
 
     return {
         ...config,
