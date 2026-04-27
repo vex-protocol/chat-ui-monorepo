@@ -189,11 +189,11 @@ interface DeviceRegistrationResultLikeDevice {
 }
 
 interface DevicesWithApprovalLike {
-    approveRequest?: (requestID: string) => Promise<void>;
+    approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
     listRequests?: () => Promise<DeviceApprovalRequestLike[]>;
     register: () => Promise<unknown>;
-    rejectRequest?: (requestID: string) => Promise<void>;
+    rejectRequest?: (requestID: string) => Promise<unknown>;
     retrieve: (
         deviceIdentifier: string,
     ) => Promise<null | { deviceID: string }>;
@@ -251,7 +251,8 @@ class VexService {
 
     async approveDeviceRequest(requestID: string): Promise<OperationResult> {
         try {
-            const client = this.requireClient() as ClientWithDeviceApprovals;
+            const client =
+                this.requireClient() as unknown as ClientWithDeviceApprovals;
             if (!client.devices.approveRequest) {
                 return {
                     error: "Client does not support device approvals yet.",
@@ -608,7 +609,8 @@ class VexService {
     }
 
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
-        const client = this.requireClient() as ClientWithDeviceApprovals;
+        const client =
+            this.requireClient() as unknown as ClientWithDeviceApprovals;
         if (!client.devices.listRequests) {
             return [];
         }
@@ -658,7 +660,7 @@ class VexService {
                 let resolvedDeviceID: null | string = null;
                 try {
                     const raw = await (
-                        client as ClientWithDeviceApprovals
+                        client as unknown as ClientWithDeviceApprovals
                     ).devices.register();
                     if (isDeviceRegistrationPending(raw)) {
                         registerResult = raw;
@@ -980,7 +982,8 @@ class VexService {
 
     async rejectDeviceRequest(requestID: string): Promise<OperationResult> {
         try {
-            const client = this.requireClient() as ClientWithDeviceApprovals;
+            const client =
+                this.requireClient() as unknown as ClientWithDeviceApprovals;
             if (!client.devices.rejectRequest) {
                 return {
                     error: "Client does not support device approvals yet.",
