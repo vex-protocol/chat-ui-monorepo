@@ -79,93 +79,110 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                 <View pointerEvents="none" style={styles.glowTop} />
                 <View pointerEvents="none" style={styles.glowBottom} />
 
-                <View style={styles.content}>
-                    <View style={styles.logoWrap}>
-                        <VexLogo size={38} />
-                    </View>
-                    <Text style={styles.label}>SIGN IN</Text>
-                    <Text style={styles.heading}>Welcome back.</Text>
-
-                    {pendingApproval ? (
-                        <View style={styles.pendingCard}>
-                            <View style={styles.pendingRow}>
-                                <ActivityIndicator
-                                    color={colors.accent}
-                                    size="small"
-                                />
-                                <Text style={styles.pendingTitle}>
-                                    Authenticating this device...
-                                </Text>
-                            </View>
-                            <Text style={styles.pendingText}>
-                                Waiting for approval from another signed-in
-                                device. You will be logged in automatically when
-                                approved.
-                            </Text>
-                            {pendingApprovalRequestID !== "" ? (
-                                <Text style={styles.pendingRequestID}>
-                                    Request ID: {pendingApprovalRequestID}
-                                </Text>
-                            ) : null}
+                {pendingApproval ? (
+                    <View style={styles.pendingScreen}>
+                        <View style={styles.pendingLogoWrap}>
+                            <VexLogo size={42} />
                         </View>
-                    ) : null}
-
-                    {error ? (
-                        <View style={styles.errorBox}>
-                            <Text style={styles.errorText}>{error}</Text>
+                        <View style={styles.pendingSpinnerWrap}>
+                            <ActivityIndicator
+                                color={colors.accent}
+                                size="large"
+                            />
                         </View>
-                    ) : null}
-
-                    <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>USERNAME</Text>
-                        <TextInput
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!formBusy}
-                            onChangeText={setUsername}
-                            placeholder="your username"
-                            placeholderTextColor={colors.mutedDark}
-                            style={styles.input}
-                            value={username}
-                        />
-                    </View>
-
-                    <View style={styles.field}>
-                        <Text style={styles.fieldLabel}>PASSWORD</Text>
-                        <TextInput
-                            editable={!formBusy}
-                            onChangeText={setPassword}
-                            placeholder="••••••••"
-                            placeholderTextColor={colors.mutedDark}
-                            secureTextEntry
-                            style={styles.input}
-                            value={password}
-                        />
-                    </View>
-
-                    <VexButton
-                        disabled={formBusy || !username || !password}
-                        glow
-                        loading={loading}
-                        onPress={() => void handleLogin()}
-                        style={styles.signInButton}
-                        title="Sign In"
-                        variant="primary"
-                    />
-
-                    <View style={styles.footer}>
-                        <Text style={styles.footerText}>
-                            Don't have an account?
+                        <Text style={styles.pendingScreenLabel}>
+                            AUTHENTICATING
                         </Text>
+                        <Text style={styles.pendingScreenHeading}>
+                            Waiting for approval
+                        </Text>
+                        <Text style={styles.pendingScreenText}>
+                            Approve this sign-in from one of your existing
+                            devices. You will be logged in automatically as soon
+                            as approval is received.
+                        </Text>
+                        {pendingApprovalRequestID !== "" ? (
+                            <Text style={styles.pendingRequestID}>
+                                Request ID: {pendingApprovalRequestID}
+                            </Text>
+                        ) : null}
                         <TouchableOpacity
                             onPress={() => {
-                                navigation.navigate("Initialize");
+                                setPendingApprovalRequestID(null);
+                                setLoading(false);
                             }}
+                            style={styles.pendingCancelBtn}
                         >
-                            <Text style={styles.link}>Create account</Text>
+                            <Text style={styles.pendingCancelBtnText}>
+                                Cancel and edit login
+                            </Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                ) : (
+                    <View style={styles.content}>
+                        <View style={styles.logoWrap}>
+                            <VexLogo size={38} />
+                        </View>
+                        <Text style={styles.label}>SIGN IN</Text>
+                        <Text style={styles.heading}>Welcome back.</Text>
+
+                        {error ? (
+                            <View style={styles.errorBox}>
+                                <Text style={styles.errorText}>{error}</Text>
+                            </View>
+                        ) : null}
+
+                        <View style={styles.field}>
+                            <Text style={styles.fieldLabel}>USERNAME</Text>
+                            <TextInput
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!formBusy}
+                                onChangeText={setUsername}
+                                placeholder="your username"
+                                placeholderTextColor={colors.mutedDark}
+                                style={styles.input}
+                                value={username}
+                            />
+                        </View>
+
+                        <View style={styles.field}>
+                            <Text style={styles.fieldLabel}>PASSWORD</Text>
+                            <TextInput
+                                editable={!formBusy}
+                                onChangeText={setPassword}
+                                placeholder="••••••••"
+                                placeholderTextColor={colors.mutedDark}
+                                secureTextEntry
+                                style={styles.input}
+                                value={password}
+                            />
+                        </View>
+
+                        <VexButton
+                            disabled={formBusy || !username || !password}
+                            glow
+                            loading={loading}
+                            onPress={() => void handleLogin()}
+                            style={styles.signInButton}
+                            title="Sign In"
+                            variant="primary"
+                        />
+
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>
+                                Don't have an account?
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => {
+                                    navigation.navigate("Initialize");
+                                }}
+                            >
+                                <Text style={styles.link}>Create account</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
             </KeyboardAvoidingView>
         </ScreenLayout>
     );
@@ -264,6 +281,19 @@ const styles = StyleSheet.create({
     logoWrap: {
         marginBottom: 4,
     },
+    pendingCancelBtn: {
+        alignItems: "center",
+        borderColor: "rgba(255,255,255,0.24)",
+        borderWidth: 1,
+        marginTop: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    pendingCancelBtnText: {
+        ...typography.button,
+        color: "rgba(225,236,255,0.9)",
+        fontWeight: "600",
+    },
     pendingCard: {
         backgroundColor: "rgba(43, 113, 255, 0.12)",
         borderColor: "rgba(43, 113, 255, 0.38)",
@@ -271,15 +301,54 @@ const styles = StyleSheet.create({
         gap: 8,
         padding: 10,
     },
+    pendingLogoWrap: {
+        marginBottom: 8,
+    },
     pendingRequestID: {
         ...typography.body,
         color: "rgba(192,216,255,0.72)",
         fontSize: 12,
+        textAlign: "center",
     },
     pendingRow: {
         alignItems: "center",
         flexDirection: "row",
         gap: 8,
+    },
+    pendingScreen: {
+        alignItems: "center",
+        alignSelf: "center",
+        maxWidth: 460,
+        paddingHorizontal: 16,
+        width: "100%",
+        zIndex: 1,
+    },
+    pendingScreenHeading: {
+        ...typography.heading,
+        color: colors.text,
+        marginTop: 8,
+        textAlign: "center",
+    },
+    pendingScreenLabel: {
+        ...typography.label,
+        color: "rgba(189,211,255,0.62)",
+        marginTop: 10,
+    },
+    pendingScreenText: {
+        ...typography.body,
+        color: "rgba(212,228,255,0.9)",
+        marginTop: 8,
+        textAlign: "center",
+    },
+    pendingSpinnerWrap: {
+        alignItems: "center",
+        backgroundColor: "rgba(43,113,255,0.08)",
+        borderColor: "rgba(43,113,255,0.3)",
+        borderWidth: 1,
+        height: 68,
+        justifyContent: "center",
+        marginTop: 8,
+        width: 68,
     },
     pendingText: {
         ...typography.body,
