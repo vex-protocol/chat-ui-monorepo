@@ -101,6 +101,17 @@ const pathStubs = [
 ];
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+    // Some transitive noble consumers still import the old subpath with
+    // ".js". Metro can resolve it via filesystem fallback, but it warns on
+    // every reload because this subpath is not exported. Normalize it to the
+    // official exported entry to avoid terminal spam.
+    if (moduleName === "@noble/hashes/crypto.js") {
+        return context.resolveRequest(
+            context,
+            "@noble/hashes/crypto",
+            platform,
+        );
+    }
     const stub = nodeStubs[moduleName];
     if (stub !== undefined) {
         return context.resolveRequest(context, stub, platform);

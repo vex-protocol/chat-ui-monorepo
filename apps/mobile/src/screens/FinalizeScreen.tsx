@@ -2,6 +2,8 @@ import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useCallback, useRef, useState } from "react";
 import {
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -40,6 +42,8 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
     const [loading, setLoading] = useState(false);
     const [available, setAvailable] = useState<boolean | null>(null);
     const debounceRef = useRef<null | ReturnType<typeof setTimeout>>(null);
+    const passwordInputRef = useRef<TextInput>(null);
+    const confirmInputRef = useRef<TextInput>(null);
 
     const checkAvailability = useCallback((name: string) => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -103,114 +107,152 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
         <ScreenLayout>
             <BackButton />
 
-            <ScrollView
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                style={styles.scroll}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={styles.keyboardWrap}
             >
-                <View style={styles.methodBadge}>
-                    <Text style={styles.methodText}>
-                        AUTHENTICATED VIA: {method.toUpperCase()}
-                    </Text>
-                </View>
-
-                <Text style={styles.heading}>Finalize.</Text>
-
-                {error ? (
-                    <View style={styles.errorBox}>
-                        <Text style={styles.errorText}>{error}</Text>
+                <ScrollView
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    style={styles.scroll}
+                >
+                    <View style={styles.methodBadge}>
+                        <Text style={styles.methodText}>
+                            AUTHENTICATED VIA: {method.toUpperCase()}
+                        </Text>
                     </View>
-                ) : null}
 
-                {/* Username input */}
-                <View style={styles.field}>
-                    <Text style={styles.label}>HANDLE</Text>
-                    <View style={styles.inputRow}>
-                        <Text style={styles.atSign}>@</Text>
-                        <TextInput
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            editable={!loading}
-                            maxLength={19}
-                            onChangeText={handleUsernameChange}
-                            placeholder="username"
-                            placeholderTextColor={colors.mutedDark}
-                            style={styles.input}
-                            value={username}
-                        />
-                        {available !== null && (
-                            <Text
-                                style={[
-                                    styles.avail,
-                                    available ? styles.availOk : styles.availNo,
-                                ]}
-                            >
-                                {available ? "✓" : "✗"}
-                            </Text>
-                        )}
-                    </View>
-                </View>
+                    <Text style={styles.heading}>Finalize.</Text>
 
-                {/* Password */}
-                <View style={styles.field}>
-                    <Text style={styles.label}>PASSWORD</Text>
-                    <TextInput
-                        editable={!loading}
-                        onChangeText={setPassword}
-                        placeholder="••••••••"
-                        placeholderTextColor={colors.mutedDark}
-                        secureTextEntry
-                        style={[styles.input, styles.inputFull]}
-                        value={password}
-                    />
-                </View>
+                    {error ? (
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorText}>{error}</Text>
+                        </View>
+                    ) : null}
 
-                <View style={styles.field}>
-                    <Text style={styles.label}>CONFIRM PASSWORD</Text>
-                    <TextInput
-                        editable={!loading}
-                        onChangeText={setConfirm}
-                        placeholder="••••••••"
-                        placeholderTextColor={colors.mutedDark}
-                        secureTextEntry
-                        style={[styles.input, styles.inputFull]}
-                        value={confirm}
-                    />
-                </View>
-
-                <View style={styles.field}>
-                    <Text style={styles.label}>AVATAR COLOR</Text>
-                    <View style={styles.colorRow}>
-                        {AVATAR_COLORS.map((color, i) => (
-                            <TouchableOpacity
-                                key={color}
-                                onPress={() => {
-                                    setSelectedColor(i);
+                    {/* Username input */}
+                    <View style={styles.field}>
+                        <Text style={styles.label}>HANDLE</Text>
+                        <View style={styles.inputRow}>
+                            <Text style={styles.atSign}>@</Text>
+                            <TextInput
+                                autoCapitalize="none"
+                                autoComplete="username"
+                                autoCorrect={false}
+                                editable={!loading}
+                                importantForAutofill="yes"
+                                maxLength={19}
+                                onChangeText={handleUsernameChange}
+                                onSubmitEditing={() => {
+                                    passwordInputRef.current?.focus();
                                 }}
-                                style={[
-                                    styles.colorSwatch,
-                                    { backgroundColor: color },
-                                    selectedColor === i && styles.colorSelected,
-                                ]}
+                                placeholder="username"
+                                placeholderTextColor={colors.mutedDark}
+                                returnKeyType="next"
+                                style={styles.input}
+                                textContentType="username"
+                                value={username}
                             />
-                        ))}
+                            {available !== null && (
+                                <Text
+                                    style={[
+                                        styles.avail,
+                                        available
+                                            ? styles.availOk
+                                            : styles.availNo,
+                                    ]}
+                                >
+                                    {available ? "✓" : "✗"}
+                                </Text>
+                            )}
+                        </View>
                     </View>
-                    <Text style={styles.avatarHint}>
-                        We auto-generate a simple avatar from this color.
-                    </Text>
-                </View>
 
-                <VexButton
-                    disabled={!username || !password || !confirm}
-                    glow
-                    loading={loading}
-                    onPress={() => {
-                        void handleComplete();
-                    }}
-                    style={styles.completeBtn}
-                    title="Complete Setup"
-                />
-            </ScrollView>
+                    {/* Password */}
+                    <View style={styles.field}>
+                        <Text style={styles.label}>PASSWORD</Text>
+                        <TextInput
+                            autoComplete="new-password"
+                            editable={!loading}
+                            importantForAutofill="yes"
+                            onChangeText={setPassword}
+                            onSubmitEditing={() => {
+                                confirmInputRef.current?.focus();
+                            }}
+                            placeholder="••••••••"
+                            placeholderTextColor={colors.mutedDark}
+                            ref={passwordInputRef}
+                            returnKeyType="next"
+                            secureTextEntry
+                            style={[styles.input, styles.inputFull]}
+                            textContentType="newPassword"
+                            value={password}
+                        />
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>CONFIRM PASSWORD</Text>
+                        <TextInput
+                            autoComplete="new-password"
+                            editable={!loading}
+                            importantForAutofill="yes"
+                            onChangeText={setConfirm}
+                            onSubmitEditing={() => {
+                                if (
+                                    !loading &&
+                                    username &&
+                                    password &&
+                                    confirm
+                                ) {
+                                    void handleComplete();
+                                }
+                            }}
+                            placeholder="••••••••"
+                            placeholderTextColor={colors.mutedDark}
+                            ref={confirmInputRef}
+                            returnKeyType="done"
+                            secureTextEntry
+                            style={[styles.input, styles.inputFull]}
+                            textContentType="newPassword"
+                            value={confirm}
+                        />
+                    </View>
+
+                    <View style={styles.field}>
+                        <Text style={styles.label}>AVATAR COLOR</Text>
+                        <View style={styles.colorRow}>
+                            {AVATAR_COLORS.map((color, i) => (
+                                <TouchableOpacity
+                                    key={color}
+                                    onPress={() => {
+                                        setSelectedColor(i);
+                                    }}
+                                    style={[
+                                        styles.colorSwatch,
+                                        { backgroundColor: color },
+                                        selectedColor === i &&
+                                            styles.colorSelected,
+                                    ]}
+                                />
+                            ))}
+                        </View>
+                        <Text style={styles.avatarHint}>
+                            We auto-generate a simple avatar from this color.
+                        </Text>
+                    </View>
+
+                    <VexButton
+                        disabled={!username || !password || !confirm}
+                        glow
+                        loading={loading}
+                        onPress={() => {
+                            void handleComplete();
+                        }}
+                        style={styles.completeBtn}
+                        title="Complete Setup"
+                    />
+                </ScrollView>
+            </KeyboardAvoidingView>
         </ScreenLayout>
     );
 }
@@ -323,6 +365,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         flexDirection: "row",
         paddingHorizontal: 12,
+    },
+    keyboardWrap: {
+        flex: 1,
     },
     label: {
         ...typography.label,

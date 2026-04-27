@@ -54,6 +54,8 @@ export interface AuthResult {
     pendingRequestID?: string;
 }
 
+export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
+
 /** App-provided platform configuration for client bootstrap. */
 export interface BootstrapConfig {
     /**
@@ -191,6 +193,9 @@ interface DeviceRegistrationResultLikeDevice {
 interface DevicesWithApprovalLike {
     approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
+    getRequest?: (
+        requestID: string,
+    ) => Promise<DeviceApprovalRequestLike | null>;
     listRequests?: () => Promise<DeviceApprovalRequestLike[]>;
     register: () => Promise<unknown>;
     rejectRequest?: (requestID: string) => Promise<unknown>;
@@ -241,6 +246,7 @@ class VexService {
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
+    private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
     private wsDebugEnabled = false;
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
@@ -670,6 +676,27 @@ class VexService {
                 } catch (regErr: unknown) {
                     // 470 = device with this signing key already exists — reuse it
                     if (!this.isDeviceExistsError(regErr)) {
+                        const inferredPendingRequestID =
+                            await this.findPendingRequestAfterRegisterFailure(
+                                client,
+                                username,
+                                config.deviceName,
+                            );
+                        if (inferredPendingRequestID !== null) {
+                            this.startPendingApprovalWatcher({
+                                deviceKey: privateKey,
+                                keyStore,
+                                requestID: inferredPendingRequestID,
+                                username,
+                            });
+                            this.setAuthStatus("signed_out");
+                            return {
+                                error: "This device needs approval from another signed-in device.",
+                                ok: false,
+                                pendingDeviceApproval: true,
+                                pendingRequestID: inferredPendingRequestID,
+                            };
+                        }
                         await this.close();
                         this.resetAll();
                         return { error: errorMessage(regErr), ok: false };
@@ -680,8 +707,12 @@ class VexService {
                     "status" in registerResult &&
                     registerResult.status === "pending_approval"
                 ) {
-                    await this.close();
-                    this.resetAll();
+                    this.startPendingApprovalWatcher({
+                        deviceKey: privateKey,
+                        keyStore,
+                        requestID: registerResult.requestID,
+                        username,
+                    });
                     this.setAuthStatus("signed_out");
                     return {
                         error: "This device needs approval from another signed-in device.",
@@ -737,6 +768,7 @@ class VexService {
     }
 
     async logout(): Promise<void> {
+        this.stopPendingApprovalWatcher();
         await this.close();
         this.resetAll();
         this.setAuthStatus("signed_out");
@@ -1013,6 +1045,27 @@ class VexService {
         $channelUnreadCountsWritable.set({});
     }
 
+    async runBackgroundNetworkFetch(): Promise<BackgroundNetworkFetchResult> {
+        const client = this.client;
+        if (!client) {
+            return "no_data";
+        }
+        try {
+            const status = await this.probeAuthSession();
+            if (status !== "authenticated") {
+                return status === "offline" ? "no_data" : "failed";
+            }
+            if (hasSyncInboxNow(client)) {
+                await client.syncInboxNow();
+            } else {
+                await this.populateState();
+            }
+            return "new_data";
+        } catch {
+            return "failed";
+        }
+    }
+
     async sendDM(
         recipientID: string,
         content: string,
@@ -1238,6 +1291,50 @@ class VexService {
             });
     }
 
+    private async findPendingRequestAfterRegisterFailure(
+        client: Client,
+        username: string,
+        deviceName: string,
+    ): Promise<null | string> {
+        try {
+            const withApprovals =
+                client as unknown as ClientWithDeviceApprovals;
+            let requests: DeviceApprovalRequestLike[] | null = null;
+            if (withApprovals.devices.listRequests) {
+                requests = await withApprovals.devices.listRequests();
+            }
+            if (!requests || requests.length === 0) {
+                return null;
+            }
+            const pending = requests.filter((req) => req.status === "pending");
+            if (pending.length === 0) {
+                return null;
+            }
+            const ownSignKey = client.getKeys().public;
+            const bySignKey = pending.find((req) => req.signKey === ownSignKey);
+            if (bySignKey) {
+                return bySignKey.requestID;
+            }
+            const byExactMeta = pending.find(
+                (req) =>
+                    req.username === username && req.deviceName === deviceName,
+            );
+            if (byExactMeta) {
+                return byExactMeta.requestID;
+            }
+            const recent = pending
+                .filter((req) => req.username === username)
+                .sort(
+                    (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime(),
+                );
+            return recent[0]?.requestID ?? null;
+        } catch {
+            return null;
+        }
+    }
+
     private handleDirectMessage(msg: Message): void {
         const me = $userWritable.get();
         const isOwnMessage = Boolean(me && msg.authorID === me.userID);
@@ -1453,6 +1550,7 @@ class VexService {
     }
 
     private resetAll(): void {
+        this.stopPendingApprovalWatcher();
         this.detachWebsocketDebug();
         this.client = null;
         this.failedUserLookups.clear();
@@ -1499,6 +1597,93 @@ class VexService {
     ): void {
         if ($authStatusWritable.get() !== status) {
             $authStatusWritable.set(status);
+        }
+    }
+
+    private startPendingApprovalWatcher({
+        deviceKey,
+        keyStore,
+        requestID,
+        username,
+    }: {
+        deviceKey: string;
+        keyStore: KeyStore;
+        requestID: string;
+        username: string;
+    }): void {
+        this.stopPendingApprovalWatcher();
+        let cancelled = false;
+        this.pendingApprovalWatchCancel = () => {
+            cancelled = true;
+        };
+        const run = async () => {
+            for (let attempt = 0; attempt < 300; attempt++) {
+                if (cancelled) return;
+                await waitMs(2000);
+                if (cancelled) return;
+                const client = this.client;
+                if (!client) return;
+                const withApprovals =
+                    client as unknown as ClientWithDeviceApprovals;
+                let pending: DeviceApprovalRequestLike | null = null;
+                try {
+                    if (
+                        typeof withApprovals.devices.getRequest === "function"
+                    ) {
+                        pending =
+                            await withApprovals.devices.getRequest(requestID);
+                    } else if (
+                        typeof withApprovals.devices.listRequests === "function"
+                    ) {
+                        const requests =
+                            await withApprovals.devices.listRequests();
+                        pending =
+                            requests.find(
+                                (req) => req.requestID === requestID,
+                            ) ?? null;
+                    }
+                } catch {
+                    continue;
+                }
+                if (!pending || pending.status === "pending") {
+                    continue;
+                }
+                if (pending.status === "approved" && pending.approvedDeviceID) {
+                    try {
+                        await this.saveCredentials(keyStore, {
+                            deviceID: pending.approvedDeviceID,
+                            deviceKey,
+                            token: "",
+                            username,
+                        });
+                        const authErr = await this.loginWithDeviceKeyWithRetry(
+                            client,
+                            pending.approvedDeviceID,
+                        );
+                        if (authErr) {
+                            return;
+                        }
+                        await client.connect();
+                        $userWritable.set(client.me.user());
+                        this.setAuthStatus("authenticated");
+                        await this.populateState();
+                    } finally {
+                        this.stopPendingApprovalWatcher();
+                    }
+                    return;
+                }
+                this.stopPendingApprovalWatcher();
+                return;
+            }
+            this.stopPendingApprovalWatcher();
+        };
+        void run();
+    }
+
+    private stopPendingApprovalWatcher(): void {
+        if (this.pendingApprovalWatchCancel) {
+            this.pendingApprovalWatchCancel();
+            this.pendingApprovalWatchCancel = null;
         }
     }
 
