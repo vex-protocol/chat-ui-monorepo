@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import {
+    Platform,
     StyleSheet,
     Text,
     TextInput,
@@ -10,6 +11,7 @@ import {
 import { colors } from "../theme";
 
 interface MessageInputBarProps {
+    bottomInset?: number;
     onChangeText: (text: string) => void;
     onSend: () => void;
     placeholder?: string;
@@ -18,6 +20,7 @@ interface MessageInputBarProps {
 }
 
 export function MessageInputBar({
+    bottomInset = 0,
     onChangeText,
     onSend,
     placeholder = "Message...",
@@ -40,7 +43,14 @@ export function MessageInputBar({
     };
 
     return (
-        <View style={styles.container}>
+        <View
+            style={[
+                styles.container,
+                Platform.OS === "ios"
+                    ? { paddingBottom: 8 + Math.max(0, bottomInset - 2) }
+                    : null,
+            ]}
+        >
             <TouchableOpacity style={styles.actionBtn}>
                 <Text style={styles.actionIcon}>+</Text>
             </TouchableOpacity>

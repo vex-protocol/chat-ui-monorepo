@@ -188,43 +188,6 @@
         color: var(--text-primary);
     }
 
-    .fingerprint-panel__code {
-        display: block;
-        font-family: monospace;
-        font-size: 16px;
-        letter-spacing: 0.1em;
-        color: var(--text-primary);
-        padding: 8px 0;
-        word-break: break-all;
-    }
-
-    .fingerprint-panel__desc {
-        font-size: 12px;
-        color: var(--text-muted);
-        margin: 4px 0 8px;
-        line-height: 1.4;
-    }
-
-    .fingerprint-panel__btn {
-        padding: 6px 14px;
-        border-radius: 4px;
-        font-size: 13px;
-        font-weight: 600;
-        background: var(--bg-surface);
-        color: var(--text-primary);
-        border: 1px solid var(--border);
-    }
-
-    .fingerprint-panel__btn:hover {
-        background: var(--bg-hover);
-    }
-
-    .fingerprint-panel__btn--verified {
-        background: color-mix(in srgb, var(--accent) 15%, transparent);
-        border-color: var(--accent);
-        color: var(--accent);
-    }
-
     .dm-pane__error {
         padding: 6px 16px;
         background: color-mix(in srgb, var(--danger) 15%, transparent);

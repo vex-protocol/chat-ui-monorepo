@@ -140,6 +140,7 @@ export function ConversationScreen({
             )}
 
             <MessageInputBar
+                bottomInset={insets.bottom}
                 onChangeText={setText}
                 onSend={() => void sendMessage()}
                 placeholder={`Message @${username}`}

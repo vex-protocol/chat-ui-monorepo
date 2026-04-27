@@ -8,12 +8,21 @@ import { $channels, $familiars, $servers } from "@vex-chat/store";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 
-import { navigateToConversation } from "../navigation/navigationRef";
+import {
+    navigateToChannel,
+    navigateToConversation,
+} from "../navigation/navigationRef";
 
 const CHANNEL_ID = "vex-messages";
 
 let channelReady = false;
 let activeConversation: null | string = null;
+
+interface GroupNotificationTarget {
+    channelID: string;
+    channelName: string;
+    serverID: string;
+}
 
 // Show banner + play sound when a notification arrives while the app is open.
 Notifications.setNotificationHandler({
@@ -75,6 +84,9 @@ export async function showMessageNotification(mail: Message): Promise<void> {
 
     const channels = $channels.get();
     const servers = $servers.get();
+    const groupTarget = mail.group
+        ? resolveGroupTarget(mail.group, channels)
+        : null;
     const payload = shouldNotify(
         mail,
         activeConversation,
@@ -104,6 +116,10 @@ export async function showMessageNotification(mail: Message): Promise<void> {
             body: payload.body,
             data: {
                 authorID: payload.authorID,
+                channelID: groupTarget?.channelID,
+                channelName: groupTarget?.channelName,
+                kind: payload.group ? "group" : "dm",
+                serverID: groupTarget?.serverID,
                 username: payload.title,
             },
             title: payload.title,
@@ -124,8 +140,43 @@ async function ensureChannel(): Promise<void> {
 function handleNotificationPress(
     data: Record<string, unknown> | undefined,
 ): void {
+    const kind = data?.["kind"];
     const authorID = data?.["authorID"];
+    const channelID = data?.["channelID"];
+    const channelName = data?.["channelName"];
+    const serverID = data?.["serverID"];
     const username = data?.["username"];
-    if (typeof authorID !== "string" || typeof username !== "string") return;
+    if (
+        kind === "group" &&
+        typeof channelID === "string" &&
+        typeof channelName === "string" &&
+        typeof serverID === "string"
+    ) {
+        navigateToChannel(channelID, channelName, serverID);
+        return;
+    }
+    if (typeof authorID !== "string" || typeof username !== "string") {
+        return;
+    }
     navigateToConversation(authorID, username);
+}
+
+function resolveGroupTarget(
+    channelID: string,
+    channels: ReturnType<typeof $channels.get>,
+): GroupNotificationTarget | null {
+    for (const [serverID, serverChannels] of Object.entries(channels)) {
+        const channel = serverChannels.find(
+            (item) => item.channelID === channelID,
+        );
+        if (!channel) {
+            continue;
+        }
+        return {
+            channelID: channel.channelID,
+            channelName: channel.name,
+            serverID,
+        };
+    }
+    return null;
 }

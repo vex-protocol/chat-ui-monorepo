@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import {
     Alert,
     ScrollView,
+    Share,
     StyleSheet,
     Switch,
     Text,
@@ -18,14 +19,33 @@ import * as Notifications from "expo-notifications";
 import { AndroidImportance } from "expo-notifications";
 
 import { ChatHeader } from "../components/ChatHeader";
+import { getServerUrl } from "../lib/config";
+import { loadCredentials } from "../lib/keychain";
 import { colors, typography } from "../theme";
 
-export function SettingsScreen({}: AppScreenProps<"Settings">) {
+export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
+    const [exportingIdentity, setExportingIdentity] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
     );
+
+    function handleExportIdentityKey(): void {
+        Alert.alert(
+            "Export identity key?",
+            "Store this securely. Anyone with this key can access your account on this server.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void exportIdentityKey();
+                    },
+                    text: "Export",
+                },
+            ],
+        );
+    }
 
     function handleLogout() {
         Alert.alert(
@@ -47,6 +67,44 @@ export function SettingsScreen({}: AppScreenProps<"Settings">) {
                 },
             ],
         );
+    }
+
+    async function exportIdentityKey(): Promise<void> {
+        const username = user?.username;
+        if (!username) {
+            Alert.alert("Export failed", "No active account found.");
+            return;
+        }
+        setExportingIdentity(true);
+        try {
+            const creds = await loadCredentials(username);
+            if (!creds?.deviceKey) {
+                Alert.alert(
+                    "Export failed",
+                    "No identity key is saved for this account on this device.",
+                );
+                return;
+            }
+            const exportText = [
+                "# Vex identity key backup",
+                `server: ${getServerUrl()}`,
+                `username: ${creds.username}`,
+                `deviceID: ${creds.deviceID}`,
+                `identityKey: ${creds.deviceKey}`,
+            ].join("\n");
+
+            await Share.share({
+                message: exportText,
+                title: "Vex identity key backup",
+            });
+        } catch (err: unknown) {
+            Alert.alert(
+                "Export failed",
+                err instanceof Error ? err.message : "Unexpected export error.",
+            );
+        } finally {
+            setExportingIdentity(false);
+        }
     }
 
     function handleSendTestNotification() {
@@ -88,6 +146,43 @@ export function SettingsScreen({}: AppScreenProps<"Settings">) {
                         <Text style={[styles.value, styles.mono]}>
                             {user?.userID.slice(0, 16) ?? "—"}…
                         </Text>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>
+                                Identity key backup
+                            </Text>
+                            <Text style={styles.desc}>
+                                Export this account's identity key for recovery
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            disabled={exportingIdentity}
+                            onPress={handleExportIdentityKey}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>
+                                {exportingIdentity ? "Exporting…" : "Export"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Devices</Text>
+                            <Text style={styles.desc}>
+                                Manage pending approvals and current devices
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => {
+                                navigation.navigate("Devices");
+                            }}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>Open</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 

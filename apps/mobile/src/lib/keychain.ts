@@ -32,7 +32,25 @@ export async function loadCredentials(
     if (user) {
         const raw = await SecureStore.getItemAsync(credsKeyForUser(user));
         if (raw) {
-            return JSON.parse(raw) as StoredCredentials;
+            try {
+                const parsed = JSON.parse(raw) as Partial<StoredCredentials>;
+                if (
+                    typeof parsed.deviceID === "string" &&
+                    typeof parsed.deviceKey === "string" &&
+                    typeof parsed.username === "string"
+                ) {
+                    return parsed as StoredCredentials;
+                }
+            } catch {
+                // fall through to cleanup below
+            }
+            // Corrupted keystore payloads can happen on Android restore/migration.
+            // Drop the bad slot so bootstrap can prompt a clean sign-in path.
+            await SecureStore.deleteItemAsync(credsKeyForUser(user));
+            const active = await loadActiveUsername();
+            if (active === user) {
+                await SecureStore.deleteItemAsync(activeUserKey());
+            }
         }
     }
     // Legacy fallback: older builds used a single host-scoped slot.
