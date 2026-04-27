@@ -141,7 +141,6 @@ interface ClientHttpRequestConfigLike {
     timeout?: number;
 }
 
-
 type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
     devices: DevicesWithApprovalLike;
 };
@@ -1267,15 +1266,6 @@ class VexService {
             let requests: DeviceApprovalRequestLike[] | null = null;
             if (withApprovals.devices.listRequests) {
                 requests = await withApprovals.devices.listRequests();
-            } else {
-                const fallback =
-                    client as unknown as ClientWithDeviceApprovalFallbacks;
-                if (
-                    typeof fallback.listDeviceRegistrationRequests ===
-                    "function"
-                ) {
-                    requests = await fallback.listDeviceRegistrationRequests();
-                }
             }
             if (!requests || requests.length === 0) {
                 return null;
