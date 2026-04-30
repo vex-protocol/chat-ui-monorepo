@@ -1,10 +1,10 @@
 // Dynamic Expo config. app.json is the static base; this file overlays
-// profile-conditional fields so the `development` and `production` EAS
-// build profiles produce two distinct APKs that can coexist on one device.
+// profile-conditional fields so `development` and `production` EAS build
+// profiles can produce two distinct APKs that can coexist on one device.
 //
-//   development profile → "Vex Beta", chat.vex.mobile.dev,  OTA enabled
-//   production  profile → "Vex",      chat.vex.mobile,      OTA disabled
-//   env override         → VEX_IOS_BUNDLE_IDENTIFIER (optional)
+//   default (all profiles)             → production flavor
+//   VEX_ENABLE_DEV_BUILD=1 + profile=development → dev flavor (opt-in)
+//   env override                        → VEX_IOS_BUNDLE_IDENTIFIER (optional)
 //
 // The release APK has updates.enabled:false hard-baked into the native
 // config — no EAS Update runtime, no network calls, no OTA code path.
@@ -21,7 +21,9 @@ const pkg = require("./package.json");
 const EAS_PROJECT_ID = "e0d4cba7-1f2a-4c26-9e66-1fd60178ad20";
 
 module.exports = ({ config }) => {
-    const devMode = process.env.EAS_BUILD_PROFILE === "development";
+    const devFlavorEnabled = process.env.VEX_ENABLE_DEV_BUILD === "1";
+    const devMode =
+        devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
