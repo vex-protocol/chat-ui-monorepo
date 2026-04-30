@@ -29,7 +29,6 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 const SIDEBAR_WIDTH = 304;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
-    "Conversation",
     "Devices",
     "Invite",
     "JoinGroup",
@@ -330,7 +329,6 @@ export function AppTabs() {
                         });
                     }}
                     onSelectHome={() => {
-                        closeSidebar();
                         setActiveServerId(null);
                         setActiveDmUserId(null);
                         navigationRef.navigate("App", {

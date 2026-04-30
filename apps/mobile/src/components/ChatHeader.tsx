@@ -10,6 +10,7 @@ interface ChatHeaderProps {
     onBack?: () => void;
     onOverflow?: () => void;
     onTitlePress?: () => void;
+    onUsers?: () => void;
     overflowIcon?: "dots" | "users";
     subtitle?: string;
     title: string;
@@ -19,6 +20,7 @@ export function ChatHeader({
     onBack,
     onOverflow,
     onTitlePress,
+    onUsers,
     overflowIcon = "dots",
     subtitle,
     title,
@@ -75,6 +77,20 @@ export function ChatHeader({
                         )}
                     </TouchableOpacity>
                 )}
+                {onUsers && (
+                    <TouchableOpacity
+                        accessibilityLabel="Channel members"
+                        hitSlop={8}
+                        onPress={onUsers}
+                        style={styles.actionBtn}
+                    >
+                        <View style={styles.usersIcon}>
+                            <View style={styles.usersBackHead} />
+                            <View style={styles.usersFrontHead} />
+                            <View style={styles.usersBody} />
+                        </View>
+                    </TouchableOpacity>
+                )}
             </View>
         </View>
     );
@@ -97,7 +113,6 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         flexShrink: 0,
         gap: 4,
-        width: 36,
     },
     backArrow: {
         color: colors.text,

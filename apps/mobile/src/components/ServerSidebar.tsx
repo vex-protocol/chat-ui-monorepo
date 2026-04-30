@@ -14,6 +14,7 @@ import {
     $familiars,
     $messages,
     $totalDmUnread,
+    avatarHue,
 } from "@vex-chat/store";
 import { $servers } from "@vex-chat/store";
 
@@ -217,16 +218,43 @@ export function ServerSidebar({
                                         ]}
                                     >
                                         <View style={styles.dmRow}>
-                                            <Text
-                                                numberOfLines={1}
+                                            <View
                                                 style={[
-                                                    styles.channelItemText,
-                                                    active &&
-                                                        styles.channelItemTextActive,
+                                                    styles.dmAvatar,
+                                                    {
+                                                        backgroundColor: `hsl(${avatarHue(user.userID)}, 45%, 40%)`,
+                                                    },
                                                 ]}
                                             >
-                                                @ {user.username}
-                                            </Text>
+                                                <Text
+                                                    style={styles.dmAvatarText}
+                                                >
+                                                    {user.username
+                                                        .slice(0, 1)
+                                                        .toUpperCase()}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.dmMeta}>
+                                                <View style={styles.dmNameRow}>
+                                                    <Text
+                                                        numberOfLines={1}
+                                                        style={[
+                                                            styles.channelItemText,
+                                                            active &&
+                                                                styles.channelItemTextActive,
+                                                        ]}
+                                                    >
+                                                        {user.username}
+                                                    </Text>
+                                                    {unread > 0 ? (
+                                                        <View
+                                                            style={
+                                                                styles.dmNewDot
+                                                            }
+                                                        />
+                                                    ) : null}
+                                                </View>
+                                            </View>
                                             {unread > 0 ? (
                                                 <View style={styles.dmBadge}>
                                                     <Text
@@ -383,6 +411,18 @@ const styles = StyleSheet.create({
         marginVertical: 8,
         width: 40,
     },
+    dmAvatar: {
+        alignItems: "center",
+        borderRadius: 12,
+        height: 24,
+        justifyContent: "center",
+        width: 24,
+    },
+    dmAvatarText: {
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: "700",
+    },
     dmBadge: {
         alignItems: "center",
         backgroundColor: colors.error,
@@ -397,9 +437,26 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontWeight: "700",
     },
+    dmMeta: {
+        flex: 1,
+        minWidth: 0,
+    },
+    dmNameRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 6,
+    },
+    dmNewDot: {
+        backgroundColor: colors.accent,
+        borderRadius: 999,
+        height: 6,
+        marginTop: 1,
+        width: 6,
+    },
     dmRow: {
         alignItems: "center",
         flexDirection: "row",
+        gap: 8,
         justifyContent: "space-between",
     },
     drawerContainer: {
