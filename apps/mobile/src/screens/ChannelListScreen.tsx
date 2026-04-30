@@ -49,7 +49,10 @@ export function ChannelListScreen({
         <View style={styles.container}>
             <ChatHeader
                 onOverflow={() => {
-                    navigation.navigate("Invite", { serverID, serverName });
+                    navigation.navigate("ServerSettings", {
+                        serverID,
+                        serverName,
+                    });
                 }}
                 title={serverName}
             />

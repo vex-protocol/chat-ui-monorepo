@@ -65,6 +65,11 @@ All atoms are exported as `readonlyType()` wrappers — apps can subscribe but n
 
 `VexService` is the sole gateway between apps and the SDK. It privately owns the `Client` instance and exposes named methods for all operations. See [ADR-009](../architecture/adr-009-vexservice-facade.md).
 
+Current exported service types from [packages/store/src/index.ts](../../packages/store/src/index.ts) include:
+- `AuthProbeStatus`, `AuthResult`, `BackgroundNetworkFetchResult`
+- `BootstrapConfig`, `CreateServerResult`, `DeviceApprovalRequest`
+- `OperationResult`, `ResumeNetworkStatus`, `ServerOptions`, `SessionInfo`
+
 **Auth methods** accept a `BootstrapConfig` (see [ADR-011](../architecture/adr-011-platform-config-ownership.md)) that provides platform-specific WebSocket, storage, and device name:
 
 ```ts

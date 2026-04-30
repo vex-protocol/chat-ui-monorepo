@@ -134,7 +134,10 @@ export function ChannelScreen({
         >
             <ChatHeader
                 onOverflow={() => {
-                    navigation.navigate("Invite", { serverID, serverName });
+                    navigation.navigate("ServerSettings", {
+                        serverID,
+                        serverName,
+                    });
                 }}
                 subtitle={`# ${channelName}`}
                 title={serverName || "Server"}

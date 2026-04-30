@@ -3,7 +3,7 @@ import type { AppStackParamList } from "./types";
 import React, { useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
-import { $authStatus, $channels } from "@vex-chat/store";
+import { $authStatus, $channels, $familiars, $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -19,6 +19,7 @@ import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { PendingApprovalsScreen } from "../screens/PendingApprovalsScreen";
+import { ServerSettingsScreen } from "../screens/ServerSettingsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { colors } from "../theme";
 
@@ -32,6 +33,7 @@ const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "Devices",
     "Invite",
     "JoinGroup",
+    "ServerSettings",
     "Settings",
 ] as const;
 const CHAT_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
@@ -44,8 +46,13 @@ export function AppTabs() {
     const [activeServerId, setActiveServerId] = useState<null | string>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const channels = useStore($channels);
+    const familiars = useStore($familiars);
+    const servers = useStore($servers);
     const authStatus = useStore($authStatus);
-    const initialRoute: keyof AppStackParamList = "DMList";
+    const initialRoute: keyof AppStackParamList =
+        Object.keys(servers).length === 0 && Object.keys(familiars).length === 0
+            ? "OnboardingEmpty"
+            : "DMList";
     const [currentRoute, setCurrentRoute] =
         useState<keyof AppStackParamList>(initialRoute);
     const topLeftShowsBack = TOP_LEFT_BACK_ROUTES.includes(currentRoute);
@@ -334,6 +341,11 @@ function ContentStack({
                 component={InviteScreen}
                 listeners={withFocus("Invite")}
                 name="Invite"
+            />
+            <Stack.Screen
+                component={ServerSettingsScreen}
+                listeners={withFocus("ServerSettings")}
+                name="ServerSettings"
             />
             <Stack.Screen
                 component={SettingsScreen}

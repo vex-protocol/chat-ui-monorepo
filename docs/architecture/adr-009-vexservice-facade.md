@@ -99,13 +99,17 @@ name. This keeps the service platform-agnostic.
 
 ### Public API surface
 
+The snippet below is illustrative. The source of truth is
+`packages/store/src/service.ts` and exported public types in
+`packages/store/src/index.ts`.
+
 ```typescript
 class VexService {
     // Auth
     autoLogin(keyStore, config, options): Promise<AuthResult>
     login(username, password, config, options, keyStore): Promise<AuthResult>
     register(username, password, config, options, keyStore): Promise<AuthResult>
-    logout(): void
+    logout(): Promise<void>
 
     // Messaging
     sendDM(recipientID, content): Promise<OperationResult>
@@ -114,18 +118,18 @@ class VexService {
     resetAllUnread(): void
 
     // Servers & channels
-    createServer(name): Promise<OperationResult>
+    createServer(name): Promise<CreateServerResult>
     deleteServer(serverID): Promise<OperationResult>
     createChannel(name, serverID): Promise<OperationResult>
     joinInvite(inviteID): Promise<OperationResult>
-    createInvite(serverID, duration): Promise<IInvite | null>
+    createInvite(serverID, duration): Promise<IInvite>
     getInvites(serverID): Promise<IInvite[]>
     getChannelMembers(channelID): Promise<IUser[]>
 
     // User
-    lookupUser(query): Promise<IUser[]>
+    lookupUser(query): Promise<IUser | null>
     setAvatar(data: Uint8Array): Promise<OperationResult>
-    close(): void
+    close(): Promise<void>
 }
 ```
 

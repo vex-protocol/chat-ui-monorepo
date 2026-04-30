@@ -49,9 +49,14 @@ export type { NotificationPayload } from "./notifications.ts";
 
 export { vexService } from "./service.ts";
 export type {
+    AuthProbeStatus,
     AuthResult,
+    BackgroundNetworkFetchResult,
     BootstrapConfig,
+    CreateServerResult,
+    DeviceApprovalRequest,
     OperationResult,
+    ResumeNetworkStatus,
     ServerOptions,
     SessionInfo,
 } from "./service.ts";
