@@ -1,7 +1,14 @@
 import type { Message } from "@vex-chat/libvex";
 
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import {
+    Alert,
+    Clipboard,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 
 import { avatarHue, formatTime } from "@vex-chat/store";
 
@@ -11,6 +18,7 @@ interface MessageBubbleRNProps {
     authorName: string;
     isOwn: boolean;
     message: Message;
+    onDeleteMessage?: (message: Message) => void;
     showIdentity?: boolean;
 }
 
@@ -18,60 +26,97 @@ export function MessageBubbleRN({
     authorName,
     isOwn,
     message,
+    onDeleteMessage,
     showIdentity = true,
 }: MessageBubbleRNProps) {
+    const handleLongPress = () => {
+        const buttons = [
+            {
+                onPress: () => {
+                    // eslint-disable-next-line @typescript-eslint/no-deprecated -- RN Clipboard is the supported API on bare app
+                    Clipboard.setString(message.message);
+                },
+                text: "Copy text",
+            },
+        ];
+        if (onDeleteMessage) {
+            buttons.push({
+                onPress: () => {
+                    onDeleteMessage(message);
+                },
+                style: "destructive",
+                text: "Delete message",
+            });
+        }
+        buttons.push({ style: "cancel", text: "Cancel" });
+        Alert.alert("Message options", undefined, buttons);
+    };
+
     if (message.group === "__system__") {
         return (
-            <View style={styles.systemContainer}>
-                <Text selectable style={styles.systemText}>
-                    {message.message}
-                </Text>
-            </View>
+            <Pressable onLongPress={handleLongPress}>
+                <View style={styles.systemContainer}>
+                    <Text selectable style={styles.systemText}>
+                        {message.message}
+                    </Text>
+                </View>
+            </Pressable>
         );
     }
 
     return (
-        <View
-            style={[styles.container, !showIdentity && styles.containerGrouped]}
-        >
-            {showIdentity ? (
-                <View
-                    style={[
-                        styles.avatar,
-                        {
-                            backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
-                        },
-                    ]}
-                >
-                    <Text style={styles.avatarText}>
-                        {authorName.charAt(0).toUpperCase()}
-                    </Text>
-                </View>
-            ) : (
-                <View style={styles.avatarSpacer} />
-            )}
-
-            <View style={styles.content}>
-                {showIdentity && (
-                    <View style={styles.meta}>
-                        <Text
-                            style={[styles.author, isOwn && styles.authorSelf]}
-                        >
-                            {authorName}
-                        </Text>
-                        <Text style={styles.timestamp}>
-                            {formatTime(message.timestamp)}
+        <Pressable onLongPress={handleLongPress}>
+            <View
+                style={[
+                    styles.container,
+                    !showIdentity && styles.containerGrouped,
+                ]}
+            >
+                {showIdentity ? (
+                    <View
+                        style={[
+                            styles.avatar,
+                            {
+                                backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
+                            },
+                        ]}
+                    >
+                        <Text style={styles.avatarText}>
+                            {authorName.charAt(0).toUpperCase()}
                         </Text>
                     </View>
+                ) : (
+                    <View style={styles.avatarSpacer} />
                 )}
-                <Text
-                    selectable
-                    style={[styles.text, !showIdentity && styles.textGrouped]}
-                >
-                    {message.message}
-                </Text>
+
+                <View style={styles.content}>
+                    {showIdentity && (
+                        <View style={styles.meta}>
+                            <Text
+                                style={[
+                                    styles.author,
+                                    isOwn && styles.authorSelf,
+                                ]}
+                            >
+                                {authorName}
+                            </Text>
+                            <Text style={styles.timestamp}>
+                                {formatTime(message.timestamp)}
+                            </Text>
+                        </View>
+                    )}
+                    <Text
+                        selectable
+                        style={[
+                            styles.text,
+                            !showIdentity && styles.textGrouped,
+                        ]}
+                    >
+                        {message.message}
+                    </Text>
+                </View>
             </View>
-        </View>
+        </Pressable>
     );
 }
 

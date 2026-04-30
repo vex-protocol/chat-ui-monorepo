@@ -502,6 +502,24 @@ class VexService {
         this.resetAll();
     }
 
+    deleteLocalMessage(
+        conversationKey: string,
+        mailID: string,
+        isGroup: boolean,
+    ): boolean {
+        const writable = isGroup ? $groupMessagesWritable : $messagesWritable;
+        const thread = writable.get()[conversationKey] ?? [];
+        if (thread.length === 0) {
+            return false;
+        }
+        const nextThread = thread.filter((msg) => msg.mailID !== mailID);
+        if (nextThread.length === thread.length) {
+            return false;
+        }
+        writable.setKey(conversationKey, nextThread);
+        return true;
+    }
+
     async deleteServer(serverID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -523,12 +541,12 @@ class VexService {
         return client.channels.userList(channelID);
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     async getInvites(serverID: string): Promise<Invite[]> {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -576,6 +594,8 @@ class VexService {
         return this.wsDebugEnabled;
     }
 
+    // ── Messaging ───────────────────────────────────────────────────────
+
     async joinInvite(inviteID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -594,8 +614,6 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     async listMyDevices(): Promise<Device[]> {
         const client = this.requireClient();

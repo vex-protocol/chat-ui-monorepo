@@ -83,6 +83,20 @@ export function ConversationScreen({
         }
     }, [text, user, userID, sendInFlightRef]);
 
+    const deleteMessage = useCallback(
+        (message: Message) => {
+            const deleted = vexService.deleteLocalMessage(
+                userID,
+                message.mailID,
+                false,
+            );
+            if (!deleted) {
+                setError("Failed to delete message");
+            }
+        },
+        [userID],
+    );
+
     function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
         const ownName = user?.username ?? "Unknown";
@@ -92,6 +106,7 @@ export function ConversationScreen({
                 authorName={isOwn ? ownName : username}
                 isOwn={isOwn}
                 message={item}
+                onDeleteMessage={deleteMessage}
                 showIdentity={showIdentity}
             />
         );

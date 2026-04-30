@@ -99,6 +99,13 @@ export function ChannelScreen({
         }
     }, [text, user, channelID, sendInFlightRef]);
 
+    const deleteMessage = useCallback(
+        (message: Message) => {
+            void vexService.deleteLocalMessage(channelID, message.mailID, true);
+        },
+        [channelID],
+    );
+
     function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
         const ownName = user?.username ?? "Unknown";
@@ -113,6 +120,7 @@ export function ChannelScreen({
                 }
                 isOwn={isOwn}
                 message={item}
+                onDeleteMessage={deleteMessage}
                 showIdentity={showIdentity}
             />
         );
