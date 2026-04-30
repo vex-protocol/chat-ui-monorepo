@@ -1,12 +1,20 @@
 import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+    ActivityIndicator,
+    Animated,
+    Easing,
+    StyleSheet,
+    Text,
+    Vibration,
+    View,
+} from "react-native";
 
 import { vexService } from "@vex-chat/store";
 
-import { ApprovalCodeDisplay } from "../components/ApprovalCodeDisplay";
 import { BackButton } from "../components/BackButton";
+import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { getServerOptions } from "../lib/config";
 import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
@@ -19,8 +27,9 @@ type Props = AuthScreenProps<"Authenticate">;
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
 const POLL_MS = 1500;
+const SUCCESS_DELAY_MS = 850;
 
-type VerifyPhase = "error" | "loading" | "waiting";
+type VerifyPhase = "error" | "success" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
     const [code, setCode] = useState("");
@@ -29,8 +38,9 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     const [phase, setPhase] = useState<VerifyPhase>("waiting");
     const [statusText, setStatusText] = useState("Waiting for approval...");
     const pollRef = useRef<null | ReturnType<typeof setInterval>>(null);
-    const pollInFlightRef = useRef(false);
     const completingAuthRef = useRef(false);
+    const successOpacity = useRef(new Animated.Value(0)).current;
+    const successScale = useRef(new Animated.Value(0.86)).current;
 
     useEffect(() => {
         const requestID = route.params?.requestID;
@@ -80,6 +90,27 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         }, POLL_MS);
     }
 
+    async function playSuccessAnimation(): Promise<void> {
+        Vibration.vibrate(20);
+        await new Promise<void>((resolve) => {
+            Animated.parallel([
+                Animated.timing(successOpacity, {
+                    duration: 240,
+                    easing: Easing.out(Easing.quad),
+                    toValue: 1,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(successScale, {
+                    damping: 14,
+                    mass: 0.65,
+                    stiffness: 260,
+                    toValue: 1,
+                    useNativeDriver: true,
+                }),
+            ]).start(() => resolve());
+        });
+    }
+
     async function handleApproved(requestID: string): Promise<void> {
         if (completingAuthRef.current) {
             return;
@@ -87,11 +118,11 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         completingAuthRef.current = true;
         stopPolling();
         setError("");
-        setPhase("loading");
-        setStatusText("Approval confirmed. Loading account...");
+        setPhase("success");
+        setStatusText("Code matched. Signing you in...");
         setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
-        // Ensure the blue loading state paints before login starts.
-        await waitMs(80);
+        await playSuccessAnimation();
+        await waitMs(SUCCESS_DELAY_MS);
         const auth = await vexService.autoLogin(
             keychainKeyStore,
             mobileConfig(),
@@ -102,15 +133,13 @@ export function AuthenticateScreen({ navigation, route }: Props) {
             setPhase("error");
             setError(auth.error ?? "Failed to complete sign-in.");
             setStatusText("");
-            return;
         }
     }
 
     async function verifyCode(requestID: string): Promise<void> {
-        if (completingAuthRef.current || pollInFlightRef.current) {
+        if (completingAuthRef.current) {
             return;
         }
-        pollInFlightRef.current = true;
         try {
             const request = await vexService.getDeviceRequest(requestID);
             if (!request) {
@@ -148,8 +177,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 err instanceof Error ? err.message : "Verification failed.",
             );
             setStatusText("");
-        } finally {
-            pollInFlightRef.current = false;
         }
     }
 
@@ -164,7 +191,29 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     Please make sure the codes match on both devices.
                 </Text>
 
-                <ApprovalCodeDisplay code={code} />
+                <View style={styles.codeRow}>
+                    {Array.from({ length: CODE_LENGTH }).map((_, i) => {
+                        const filled = i < code.length;
+                        return (
+                            <CornerBracketBox
+                                color={filled ? colors.accent : colors.border}
+                                key={i}
+                                size={6}
+                            >
+                                <View
+                                    style={[
+                                        styles.cell,
+                                        filled && styles.cellFilled,
+                                    ]}
+                                >
+                                    <Text style={styles.cellText}>
+                                        {code[i] ?? ""}
+                                    </Text>
+                                </View>
+                            </CornerBracketBox>
+                        );
+                    })}
+                </View>
 
                 <Text style={styles.timer}>
                     Expires in: {minutes}:{seconds}
@@ -183,20 +232,23 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     </View>
                 ) : null}
 
-                {phase === "loading" ? (
-                    <View style={styles.loadingCard}>
-                        <View style={styles.loadingIconBadge}>
-                            <Text style={styles.loadingIcon}>⇣</Text>
+                {phase === "success" ? (
+                    <Animated.View
+                        style={[
+                            styles.successCard,
+                            {
+                                opacity: successOpacity,
+                                transform: [{ scale: successScale }],
+                            },
+                        ]}
+                    >
+                        <View style={styles.successBadge}>
+                            <Text style={styles.successCheck}>✓</Text>
                         </View>
-                        <ActivityIndicator
-                            animating
-                            color="#60A5FA"
-                            size="small"
-                        />
-                        <Text style={styles.loadingText}>
-                            {statusText || "Loading account..."}
+                        <Text style={styles.successText}>
+                            Approved. Loading your account...
                         </Text>
-                    </View>
+                    </Animated.View>
                 ) : null}
 
                 {error !== "" ? (
@@ -217,16 +269,14 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                             Retry verification
                         </Text>
                     ) : null}
-                    {(phase === "waiting" || phase === "error") && (
-                        <Text
-                            onPress={() => {
-                                navigation.replace("Login");
-                            }}
-                            style={styles.link}
-                        >
-                            Back to login
-                        </Text>
-                    )}
+                    <Text
+                        onPress={() => {
+                            navigation.replace("Login");
+                        }}
+                        style={styles.link}
+                    >
+                        Back to login
+                    </Text>
                 </View>
             </View>
         </ScreenLayout>
@@ -244,6 +294,29 @@ async function waitMs(ms: number): Promise<void> {
 }
 
 const styles = StyleSheet.create({
+    cell: {
+        alignItems: "center",
+        backgroundColor: colors.surface,
+        borderColor: colors.border,
+        borderWidth: 1,
+        height: 56,
+        justifyContent: "center",
+        width: 48,
+    },
+    cellFilled: {
+        borderColor: colors.accent,
+    },
+    cellText: {
+        ...typography.headingSmall,
+        color: colors.text,
+        fontSize: 24,
+    },
+    codeRow: {
+        flexDirection: "row",
+        gap: 10,
+        justifyContent: "center",
+        marginTop: 10,
+    },
     content: {
         flex: 1,
         gap: 14,
@@ -275,40 +348,40 @@ const styles = StyleSheet.create({
         gap: 10,
         marginTop: 8,
     },
-    loadingCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(37, 99, 235, 0.14)",
-        borderColor: "rgba(96, 165, 250, 0.4)",
-        borderRadius: 12,
-        borderWidth: 1,
-        gap: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    loadingIcon: {
-        color: "#93C5FD",
-        fontSize: 14,
-        fontWeight: "700",
-        marginTop: -1,
-    },
-    loadingIconBadge: {
-        alignItems: "center",
-        backgroundColor: "rgba(59,130,246,0.2)",
-        borderColor: "rgba(147,197,253,0.42)",
-        borderRadius: 999,
-        borderWidth: 1,
-        height: 22,
-        justifyContent: "center",
-        width: 22,
-    },
-    loadingText: {
-        ...typography.body,
-        color: "#BFDBFE",
-        textAlign: "center",
-    },
     statusText: {
         ...typography.body,
         color: colors.textSecondary,
+        textAlign: "center",
+    },
+    successBadge: {
+        alignItems: "center",
+        backgroundColor: "rgba(74, 222, 128, 0.18)",
+        borderColor: "rgba(74, 222, 128, 0.45)",
+        borderRadius: 24,
+        borderWidth: 1,
+        height: 48,
+        justifyContent: "center",
+        width: 48,
+    },
+    successCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(26,42,33,0.45)",
+        borderColor: "rgba(74, 222, 128, 0.25)",
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    successCheck: {
+        color: "#4ADE80",
+        fontSize: 30,
+        fontWeight: "700",
+        marginTop: -2,
+    },
+    successText: {
+        ...typography.body,
+        color: "#D8FCE5",
         textAlign: "center",
     },
     timer: {
