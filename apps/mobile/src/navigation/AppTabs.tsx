@@ -26,7 +26,7 @@ import { colors } from "../theme";
 import { navigationRef } from "./navigationRef";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
-const SIDEBAR_WIDTH = 72;
+const SIDEBAR_WIDTH = 304;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
     "Conversation",
@@ -55,6 +55,8 @@ export function AppTabs() {
             : "DMList";
     const [currentRoute, setCurrentRoute] =
         useState<keyof AppStackParamList>(initialRoute);
+    const [activeChannelId, setActiveChannelId] = useState<null | string>(null);
+    const [activeDmUserId, setActiveDmUserId] = useState<null | string>(null);
     const topLeftShowsBack = TOP_LEFT_BACK_ROUTES.includes(currentRoute);
     const isChatRoute = CHAT_ROUTES.includes(currentRoute);
     const sidebarX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -132,7 +134,53 @@ export function AppTabs() {
             >
                 <ContentStack
                     initialRoute={initialRoute}
-                    onRouteChange={setCurrentRoute}
+                    onRouteChange={(route, params) => {
+                        setCurrentRoute(route);
+                        if (
+                            route === "Channel" ||
+                            route === "ChannelList" ||
+                            route === "Invite" ||
+                            route === "ServerSettings"
+                        ) {
+                            const serverID =
+                                params &&
+                                typeof params === "object" &&
+                                "serverID" in params &&
+                                typeof params.serverID === "string"
+                                    ? params.serverID
+                                    : null;
+                            setActiveServerId(serverID);
+                        } else if (
+                            route === "DMList" ||
+                            route === "Conversation"
+                        ) {
+                            setActiveServerId(null);
+                        }
+                        if (route === "Channel") {
+                            const channelID =
+                                params &&
+                                typeof params === "object" &&
+                                "channelID" in params &&
+                                typeof params.channelID === "string"
+                                    ? params.channelID
+                                    : null;
+                            setActiveChannelId(channelID);
+                        } else {
+                            setActiveChannelId(null);
+                        }
+                        if (route === "Conversation") {
+                            const userID =
+                                params &&
+                                typeof params === "object" &&
+                                "userID" in params &&
+                                typeof params.userID === "string"
+                                    ? params.userID
+                                    : null;
+                            setActiveDmUserId(userID);
+                        } else {
+                            setActiveDmUserId(null);
+                        }
+                    }}
                 />
             </View>
 
@@ -233,24 +281,63 @@ export function AppTabs() {
                     },
                 ]}
             >
+                {/**
+                 * Channel pane shows channels for the currently active server.
+                 */}
                 <ServerSidebar
+                    activeChannelId={activeChannelId}
+                    activeDmUserId={activeDmUserId}
                     activeServerId={activeServerId}
                     authStatus={authStatus}
+                    channels={
+                        activeServerId ? (channels[activeServerId] ?? []) : []
+                    }
+                    currentServerName={
+                        activeServerId
+                            ? (servers[activeServerId]?.name ?? "Server")
+                            : ""
+                    }
                     onAddServer={() => {
                         closeSidebar();
                         navigationRef.navigate("App", {
                             screen: "AddServer",
                         });
                     }}
+                    onSelectChannel={(channel) => {
+                        if (!activeServerId) {
+                            return;
+                        }
+                        closeSidebar();
+                        setActiveChannelId(channel.channelID);
+                        navigationRef.navigate("App", {
+                            params: {
+                                channelID: channel.channelID,
+                                channelName: channel.name,
+                                serverID: activeServerId,
+                            },
+                            screen: "Channel",
+                        });
+                    }}
+                    onSelectDM={(user) => {
+                        closeSidebar();
+                        setActiveDmUserId(user.userID);
+                        navigationRef.navigate("App", {
+                            params: {
+                                userID: user.userID,
+                                username: user.username,
+                            },
+                            screen: "Conversation",
+                        });
+                    }}
                     onSelectHome={() => {
                         closeSidebar();
                         setActiveServerId(null);
+                        setActiveDmUserId(null);
                         navigationRef.navigate("App", {
                             screen: "DMList",
                         });
                     }}
                     onSelectServer={(id) => {
-                        closeSidebar();
                         setActiveServerId(id);
                         const serverChannels = channels[id] ?? [];
                         const ch = serverChannels[0];
@@ -263,11 +350,13 @@ export function AppTabs() {
                                 },
                                 screen: "Channel",
                             });
+                            setActiveChannelId(ch.channelID);
                         } else {
                             navigationRef.navigate("App", {
                                 params: { serverID: id },
                                 screen: "ChannelList",
                             });
+                            setActiveChannelId(null);
                         }
                     }}
                     onSettings={() => {
@@ -289,13 +378,21 @@ function ContentStack({
     onRouteChange,
 }: {
     initialRoute: keyof AppStackParamList;
-    onRouteChange: (route: keyof AppStackParamList) => void;
+    onRouteChange: (
+        route: keyof AppStackParamList,
+        params?: AppStackParamList[keyof AppStackParamList],
+    ) => void;
 }) {
-    const withFocus = (name: keyof AppStackParamList) => ({
-        focus: () => {
-            onRouteChange(name);
-        },
-    });
+    const withFocus =
+        (name: keyof AppStackParamList) =>
+        ({ route }: { route: { params?: unknown } }) => ({
+            focus: () => {
+                onRouteChange(
+                    name,
+                    route.params as AppStackParamList[keyof AppStackParamList],
+                );
+            },
+        });
 
     return (
         <Stack.Navigator
