@@ -76,6 +76,18 @@ export interface CreateServerResult extends OperationResult {
     serverName?: string;
 }
 
+export interface DeviceApprovalRequest {
+    approvedDeviceID?: string;
+    createdAt: string;
+    deviceName: string;
+    error?: string;
+    expiresAt: string;
+    requestID: string;
+    signKey: string;
+    status: "approved" | "expired" | "pending" | "rejected";
+    username: string;
+}
+
 /** Result from any mutation operation. */
 export interface OperationResult {
     error?: string;
@@ -99,6 +111,8 @@ export interface ServerOptions {
     unsafeHttp?: boolean;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
 export interface SessionInfo {
     authStatus:
         | "authenticated"
@@ -113,8 +127,6 @@ export interface SessionInfo {
     userID: string;
     username: string;
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
 
 interface ClientHttpDefaultsLike {
     signal?: unknown;
@@ -163,18 +175,6 @@ interface ClientWithUserDeviceListLike {
     getUserDeviceList?: (userID: string) => Promise<Device[] | null>;
 }
 
-interface DeviceApprovalRequestLike {
-    approvedDeviceID?: string;
-    createdAt: string;
-    deviceName: string;
-    error?: string;
-    expiresAt: string;
-    requestID: string;
-    signKey: string;
-    status: "approved" | "expired" | "pending" | "rejected";
-    username: string;
-}
-
 interface DeviceRegistrationPendingLike {
     challenge: string;
     expiresAt: string;
@@ -193,10 +193,8 @@ interface DeviceRegistrationResultLikeDevice {
 interface DevicesWithApprovalLike {
     approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
-    getRequest?: (
-        requestID: string,
-    ) => Promise<DeviceApprovalRequestLike | null>;
-    listRequests?: () => Promise<DeviceApprovalRequestLike[]>;
+    getRequest?: (requestID: string) => Promise<DeviceApprovalRequest | null>;
+    listRequests?: () => Promise<DeviceApprovalRequest[]>;
     register: () => Promise<unknown>;
     rejectRequest?: (requestID: string) => Promise<unknown>;
     retrieve: (
@@ -543,6 +541,24 @@ class VexService {
 
     // ── Channel operations ──────────────────────────────────────────────
 
+    async getDeviceRequest(
+        requestID: string,
+    ): Promise<DeviceApprovalRequest | null> {
+        const client =
+            this.requireClient() as unknown as ClientWithDeviceApprovals;
+        if (typeof client.devices.getRequest === "function") {
+            return client.devices.getRequest(requestID);
+        }
+        if (typeof client.devices.listRequests === "function") {
+            const requests = await client.devices.listRequests();
+            return (
+                requests.find((request) => request.requestID === requestID) ??
+                null
+            );
+        }
+        return null;
+    }
+
     async getInvites(serverID: string): Promise<Invite[]> {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
@@ -590,11 +606,11 @@ class VexService {
         }
     }
 
+    // ── Messaging ───────────────────────────────────────────────────────
+
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     async joinInvite(inviteID: string): Promise<OperationResult> {
         try {
@@ -632,7 +648,7 @@ class VexService {
         return sorted;
     }
 
-    async listPendingDeviceRequests(): Promise<DeviceApprovalRequestLike[]> {
+    async listPendingDeviceRequests(): Promise<DeviceApprovalRequest[]> {
         const client =
             this.requireClient() as unknown as ClientWithDeviceApprovals;
         if (!client.devices.listRequests) {
@@ -1317,7 +1333,7 @@ class VexService {
         try {
             const withApprovals =
                 client as unknown as ClientWithDeviceApprovals;
-            let requests: DeviceApprovalRequestLike[] | null = null;
+            let requests: DeviceApprovalRequest[] | null = null;
             if (withApprovals.devices.listRequests) {
                 requests = await withApprovals.devices.listRequests();
             }
@@ -1643,7 +1659,7 @@ class VexService {
                 if (!client) return;
                 const withApprovals =
                     client as unknown as ClientWithDeviceApprovals;
-                let pending: DeviceApprovalRequestLike | null = null;
+                let pending: DeviceApprovalRequest | null = null;
                 try {
                     if (
                         typeof withApprovals.devices.getRequest === "function"

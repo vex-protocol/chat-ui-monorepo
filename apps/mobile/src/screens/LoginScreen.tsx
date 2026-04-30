@@ -51,6 +51,11 @@ export function LoginScreen({ navigation }: AuthScreenProps<"Login">) {
                 if (result.pendingDeviceApproval) {
                     setPendingApprovalRequestID(result.pendingRequestID ?? "");
                     setError("");
+                    setLoading(false);
+                    navigation.navigate("Authenticate", {
+                        requestID: result.pendingRequestID,
+                        username,
+                    });
                 } else {
                     setPendingApprovalRequestID(null);
                     setError(result.error || "Invalid username or password");

@@ -15,6 +15,7 @@ export type AppStackParamList = {
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
+    ServerSettings: { serverID: string; serverName?: string };
     Settings: undefined;
 };
 
@@ -24,7 +25,7 @@ export type AuthScreenProps<T extends keyof AuthStackParamList> =
 
 // ── Auth stack ──────────────────────────────────────────────────────────────
 export type AuthStackParamList = {
-    Authenticate: undefined;
+    Authenticate: undefined | { requestID?: string; username?: string };
     Finalize: { method: string };
     HangTight: undefined;
     Initialize: undefined;

@@ -1,11 +1,12 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Invite } from "@vex-chat/libvex";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
     Clipboard,
+    FlatList,
     Share,
     StyleSheet,
     Text,
@@ -30,20 +31,42 @@ const INVITE_URL_BASE = "https://vex.chat/invite";
 export function InviteScreen({ route }: AppScreenProps<"Invite">) {
     const { serverID, serverName } = route.params;
     const [duration, setDuration] = useState("7d");
-    const [invite, setInvite] = useState<Invite | null>(null);
+    const [invites, setInvites] = useState<Invite[]>([]);
+    const [loadingInvites, setLoadingInvites] = useState(true);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState("");
 
-    async function handleCreate(): Promise<void> {
+    async function loadInvites(): Promise<void> {
+        setLoadingInvites(true);
+        try {
+            const loaded = await vexService.getInvites(serverID);
+            setInvites(loaded);
+        } catch (err: unknown) {
+            setError(
+                err instanceof Error ? err.message : "Failed to load invites",
+            );
+        } finally {
+            setLoadingInvites(false);
+        }
+    }
+
+    useEffect(() => {
+        void loadInvites();
+        // serverID changes only when navigating to a different server invite screen
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [serverID]);
+
+    async function handleCreateInvite(): Promise<void> {
         setCreating(true);
         setError("");
         try {
             const result = await vexService.createInvite(serverID, duration);
-            setInvite(result);
+            setInvites((prev) => [result, ...prev]);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to create");
+        } finally {
+            setCreating(false);
         }
-        setCreating(false);
     }
 
     function copy(text: string, label: string): void {
@@ -65,111 +88,39 @@ export function InviteScreen({ route }: AppScreenProps<"Invite">) {
     return (
         <View style={styles.container}>
             <ChatHeader title={`Invite to ${serverName ?? "server"}`} />
-
-            {invite ? (
-                <View style={styles.body}>
-                    <Text style={styles.label}>Invite link</Text>
-                    <View style={styles.field}>
-                        <Text numberOfLines={1} style={styles.fieldValue}>
-                            {buildInviteLink(invite.inviteID)}
-                        </Text>
-                    </View>
-
-                    <Text style={styles.label}>Invite code</Text>
-                    <View style={styles.field}>
-                        <Text
-                            numberOfLines={1}
-                            style={[styles.fieldValue, styles.mono]}
-                        >
-                            {invite.inviteID}
-                        </Text>
-                    </View>
-
-                    <Text style={styles.expires}>
-                        Expires {new Date(invite.expiration).toLocaleString()}
-                    </Text>
-
-                    <View style={styles.actions}>
-                        <TouchableOpacity
-                            onPress={() =>
-                                copy(
-                                    buildInviteLink(invite.inviteID),
-                                    "Invite link",
-                                )
-                            }
-                            style={styles.btn}
-                        >
-                            <Text style={styles.btnText}>Copy link</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => copy(invite.inviteID, "Invite code")}
-                            style={styles.btn}
-                        >
-                            <Text style={styles.btnText}>Copy code</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() =>
-                                void handleShare(
-                                    buildInviteLink(invite.inviteID),
-                                )
-                            }
-                            style={[styles.btn, styles.btnPrimary]}
-                        >
-                            <Text
-                                style={[styles.btnText, styles.btnPrimaryText]}
+            <View style={styles.body}>
+                <Text style={styles.label}>Create invite</Text>
+                <View style={styles.durationRow}>
+                    {DURATIONS.map((d) => {
+                        const selected = duration === d.value;
+                        return (
+                            <TouchableOpacity
+                                key={d.value}
+                                onPress={() => {
+                                    setDuration(d.value);
+                                }}
+                                style={[
+                                    styles.durationChip,
+                                    selected && styles.durationChipActive,
+                                ]}
                             >
-                                Share…
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                        onPress={() => {
-                            setInvite(null);
-                            setError("");
-                        }}
-                        style={styles.resetBtn}
-                    >
-                        <Text style={styles.resetText}>Create another</Text>
-                    </TouchableOpacity>
-                </View>
-            ) : (
-                <View style={styles.body}>
-                    <Text style={styles.label}>Expires in</Text>
-                    <View style={styles.durationRow}>
-                        {DURATIONS.map((d) => {
-                            const selected = duration === d.value;
-                            return (
-                                <TouchableOpacity
-                                    key={d.value}
-                                    onPress={() => {
-                                        setDuration(d.value);
-                                    }}
+                                <Text
                                     style={[
-                                        styles.durationChip,
-                                        selected && styles.durationChipActive,
+                                        styles.durationLabel,
+                                        selected && styles.durationLabelActive,
                                     ]}
                                 >
-                                    <Text
-                                        style={[
-                                            styles.durationLabel,
-                                            selected &&
-                                                styles.durationLabelActive,
-                                        ]}
-                                    >
-                                        {d.label}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {error !== "" && <Text style={styles.error}>{error}</Text>}
-
+                                    {d.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+                <View style={styles.actions}>
                     <TouchableOpacity
                         disabled={creating}
-                        onPress={() => void handleCreate()}
-                        style={[styles.btn, styles.btnPrimary, styles.submit]}
+                        onPress={() => void handleCreateInvite()}
+                        style={[styles.btn, styles.btnPrimary]}
                     >
                         {creating ? (
                             <ActivityIndicator color="#FFFFFF" />
@@ -177,12 +128,102 @@ export function InviteScreen({ route }: AppScreenProps<"Invite">) {
                             <Text
                                 style={[styles.btnText, styles.btnPrimaryText]}
                             >
-                                Generate invite
+                                Create invite link
                             </Text>
                         )}
                     </TouchableOpacity>
+                    <TouchableOpacity
+                        disabled={loadingInvites}
+                        onPress={() => {
+                            void loadInvites();
+                        }}
+                        style={styles.btn}
+                    >
+                        <Text style={styles.btnText}>
+                            {loadingInvites ? "Refreshing..." : "Refresh list"}
+                        </Text>
+                    </TouchableOpacity>
                 </View>
-            )}
+
+                <Text style={[styles.label, styles.listLabel]}>
+                    Active invites
+                </Text>
+                {loadingInvites ? (
+                    <ActivityIndicator color={colors.textSecondary} />
+                ) : invites.length === 0 ? (
+                    <Text style={styles.resetText}>
+                        No active invite links yet.
+                    </Text>
+                ) : (
+                    <FlatList
+                        data={invites}
+                        keyExtractor={(item) => item.inviteID}
+                        renderItem={({ item }) => {
+                            const link = buildInviteLink(item.inviteID);
+                            return (
+                                <View style={styles.inviteCard}>
+                                    <Text
+                                        numberOfLines={1}
+                                        style={styles.fieldValue}
+                                    >
+                                        {link}
+                                    </Text>
+                                    <Text style={styles.expires}>
+                                        Expires{" "}
+                                        {new Date(
+                                            item.expiration,
+                                        ).toLocaleString()}
+                                    </Text>
+                                    <View style={styles.actions}>
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                copy(link, "Invite link")
+                                            }
+                                            style={styles.btn}
+                                        >
+                                            <Text style={styles.btnText}>
+                                                Copy link
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                copy(
+                                                    item.inviteID,
+                                                    "Invite code",
+                                                )
+                                            }
+                                            style={styles.btn}
+                                        >
+                                            <Text style={styles.btnText}>
+                                                Copy code
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                void handleShare(link)
+                                            }
+                                            style={[
+                                                styles.btn,
+                                                styles.btnPrimary,
+                                            ]}
+                                        >
+                                            <Text
+                                                style={[
+                                                    styles.btnText,
+                                                    styles.btnPrimaryText,
+                                                ]}
+                                            >
+                                                Share
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        }}
+                    />
+                )}
+                {error !== "" && <Text style={styles.error}>{error}</Text>}
+            </View>
         </View>
     );
 }
@@ -253,7 +294,16 @@ const styles = StyleSheet.create({
         padding: 12,
     },
     fieldValue: { ...typography.body, color: colors.text },
+    inviteCard: {
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: colors.borderSubtle,
+        borderRadius: 8,
+        borderWidth: 1,
+        marginBottom: 10,
+        padding: 10,
+    },
     label: { ...typography.label, color: colors.muted, fontSize: 12 },
+    listLabel: { marginTop: 12 },
     mono: { fontFamily: fontFamilies.mono },
     resetBtn: { alignItems: "center", marginTop: 24, padding: 8 },
     resetText: { color: colors.muted },

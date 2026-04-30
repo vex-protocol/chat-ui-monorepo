@@ -20,12 +20,13 @@ import { AndroidImportance } from "expo-notifications";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { getServerUrl } from "../lib/config";
-import { loadCredentials } from "../lib/keychain";
+import { clearCredentials, loadCredentials } from "../lib/keychain";
 import { colors, typography } from "../theme";
 
 export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const user = useStore($user);
     const [exportingIdentity, setExportingIdentity] = useState(false);
+    const [erasingData, setErasingData] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
@@ -67,6 +68,62 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                 },
             ],
         );
+    }
+
+    function handleResetUnreadCounts(): void {
+        Alert.alert(
+            "Reset unread counters?",
+            "This only resets local unread badges on this device.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        vexService.resetAllUnread();
+                        Alert.alert("Done", "Unread counters have been reset.");
+                    },
+                    text: "Reset",
+                },
+            ],
+        );
+    }
+
+    function handleDeleteAllLocalData(): void {
+        Alert.alert(
+            "Delete all local data?",
+            "This removes all local messages and session data from this device. This cannot be undone.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void deleteAllLocalData();
+                    },
+                    style: "destructive",
+                    text: erasingData ? "Deleting..." : "Delete data",
+                },
+            ],
+        );
+    }
+
+    async function deleteAllLocalData(): Promise<void> {
+        if (erasingData) return;
+        setErasingData(true);
+        try {
+            await clearCredentials();
+            await vexService.deleteAllData();
+            Alert.alert(
+                "Local data deleted",
+                "You have been signed out on this device.",
+            );
+        } catch (err: unknown) {
+            Alert.alert(
+                "Delete failed",
+                err instanceof Error
+                    ? err.message
+                    : "Failed to delete local data.",
+            );
+        } finally {
+            setErasingData(false);
+        }
     }
 
     async function exportIdentityKey(): Promise<void> {
@@ -230,6 +287,42 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Danger Zone</Text>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>
+                                Reset unread counters
+                            </Text>
+                            <Text style={styles.desc}>
+                                Clear all DM and channel unread badges on this
+                                device
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={handleResetUnreadCounts}
+                            style={styles.testBtn}
+                        >
+                            <Text style={styles.testBtnText}>Reset</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={[styles.rowCard, styles.rowCardDanger]}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>Delete local data</Text>
+                            <Text style={styles.desc}>
+                                Wipe messages and session data from this device
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            disabled={erasingData}
+                            onPress={handleDeleteAllLocalData}
+                            style={styles.dangerBtn}
+                        >
+                            <Text style={styles.dangerBtnText}>
+                                {erasingData ? "Deleting..." : "Delete"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
                     <View style={[styles.rowCard, styles.rowCardDanger]}>
                         <View style={styles.rowInfo}>
