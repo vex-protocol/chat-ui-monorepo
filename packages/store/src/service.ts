@@ -863,7 +863,18 @@ class VexService {
         }
         this.setAuthStatus("checking");
         const probe = await this.probeAuthSession();
-        if (probe !== "authenticated") {
+        if (probe === "unauthorized") {
+            const client = this.requireClient();
+            const authErr = await this.loginWithDeviceKeyWithRetry(client);
+            if (authErr) {
+                this.setAuthStatus("unauthorized");
+                return "unauthorized";
+            }
+            const afterRelogin = await this.probeAuthSession();
+            if (afterRelogin !== "authenticated") {
+                return afterRelogin;
+            }
+        } else if (probe !== "authenticated") {
             return probe;
         }
 

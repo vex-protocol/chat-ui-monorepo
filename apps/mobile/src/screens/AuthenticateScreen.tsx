@@ -16,6 +16,7 @@ import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { getServerOptions } from "../lib/config";
+import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
 import { keychainKeyStore } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
@@ -33,6 +34,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     const [statusText, setStatusText] = useState("");
     const inputRef = useRef<TextInput>(null);
     const pollRef = useRef<null | ReturnType<typeof setInterval>>(null);
+    const completingAuthRef = useRef(false);
 
     useEffect(() => {
         const initialRequestID = route.params?.requestID;
@@ -74,14 +76,15 @@ export function AuthenticateScreen({ navigation, route }: Props) {
             return null;
         }
         const requests = await vexService.listPendingDeviceRequests();
-        const match = requests.find((request) =>
-            normalizeCode(request.requestID).startsWith(normalizedCode),
-        );
+        const match = requests.find((request) => {
+            const displayCode = approvalCodeForRequest(request);
+            return normalizeCode(displayCode).startsWith(normalizedCode);
+        });
         return match?.requestID ?? null;
     }
 
     async function verifyCode(requestIDOverride?: string): Promise<void> {
-        if (busy) return;
+        if (busy || completingAuthRef.current) return;
         const normalized = normalizeCode(code);
         if (!requestIDOverride && normalized.length < CODE_LENGTH) {
             setError("Enter the full verification code.");
@@ -101,6 +104,12 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 return;
             }
             if (request.status === "approved") {
+                if (pollRef.current) {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                }
+                completingAuthRef.current = true;
+                setCode(normalizeCode(approvalCodeForRequest(request)));
                 setStatusText("Approved. Finishing sign-in...");
                 const auth = await vexService.autoLogin(
                     keychainKeyStore,
@@ -108,12 +117,17 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     getServerOptions(),
                 );
                 if (!auth.ok) {
+                    completingAuthRef.current = false;
                     setError(auth.error ?? "Failed to complete sign-in.");
                     return;
                 }
                 return;
             }
             if (request.status === "rejected" || request.status === "expired") {
+                if (pollRef.current) {
+                    clearInterval(pollRef.current);
+                    pollRef.current = null;
+                }
                 setError(
                     request.status === "rejected"
                         ? "This verification was rejected."
@@ -122,6 +136,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 return;
             }
             setStatusText("Waiting for approval on your signed-in device...");
+            setCode(normalizeCode(approvalCodeForRequest(request)));
             if (!pollRef.current) {
                 pollRef.current = setInterval(() => {
                     void verifyCode(requestID);

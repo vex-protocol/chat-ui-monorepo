@@ -295,9 +295,23 @@ function App() {
                 if (status !== "unauthorized") {
                     return;
                 }
-                await clearCredentials();
-                await vexService.logout();
-                setAuthNotice("Session expired. Please sign in again.");
+                if (networkRefreshInFlightRef.current) {
+                    return;
+                }
+                networkRefreshInFlightRef.current = true;
+                try {
+                    const refreshed =
+                        await vexService.refreshSessionAfterForeground();
+                    maybeShowRateLimitNotice();
+                    if (refreshed !== "unauthorized") {
+                        return;
+                    }
+                    await clearCredentials();
+                    await vexService.logout();
+                    setAuthNotice("Session expired. Please sign in again.");
+                } finally {
+                    networkRefreshInFlightRef.current = false;
+                }
             } catch (err: unknown) {
                 console.warn(
                     "[vex-auth] whoami poll failed",
