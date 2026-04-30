@@ -7,7 +7,7 @@ blockExoticSubdeps: true
 catalog:
     "@nanostores/react": ^1.1.0
     "@types/node": ^24.10.1
-    "@vex-chat/libvex": 5.5.0
+    "@vex-chat/libvex": 5.5.1
     dompurify: ^3.2.6
     expo-background-fetch: ~55.0.15
     expo-background-task: ~55.0.17
