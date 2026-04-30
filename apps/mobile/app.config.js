@@ -4,6 +4,7 @@
 //
 //   development profile → "Vex Beta", chat.vex.mobile.dev,  OTA enabled
 //   production  profile → "Vex",      chat.vex.mobile,      OTA disabled
+//   env override         → VEX_IOS_BUNDLE_IDENTIFIER (optional)
 //
 // The release APK has updates.enabled:false hard-baked into the native
 // config — no EAS Update runtime, no network calls, no OTA code path.
@@ -24,6 +25,9 @@ module.exports = ({ config }) => {
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
+    const iosBundleIdentifier =
+        process.env.VEX_IOS_BUNDLE_IDENTIFIER ||
+        (devMode ? "chat.vex.mobile.dev" : config.ios?.bundleIdentifier);
 
     return {
         ...config,
@@ -32,9 +36,7 @@ module.exports = ({ config }) => {
         icon: iconPath,
         ios: {
             ...config.ios,
-            bundleIdentifier: devMode
-                ? "chat.vex.mobile.dev"
-                : config.ios?.bundleIdentifier,
+            bundleIdentifier: iosBundleIdentifier,
         },
         android: {
             ...config.android,
