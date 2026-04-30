@@ -48,9 +48,11 @@ describe("shouldNotify", () => {
             expect(shouldNotify(msg, null, true)).toBeNull();
         });
 
-        test("returns null when app is focused on the active DM conversation", () => {
+        test("notifies even when app is focused on the active DM conversation", () => {
             const msg = makeMessage({ authorID: "alice" });
-            expect(shouldNotify(msg, "alice", true)).toBeNull();
+            const payload = shouldNotify(msg, "alice", true);
+            expect(payload).not.toBeNull();
+            expect(payload?.conversationKey).toBe("alice");
         });
 
         test("notifies when app is focused but on a different conversation", () => {

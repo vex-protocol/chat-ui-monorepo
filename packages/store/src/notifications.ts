@@ -21,15 +21,15 @@ export interface NotificationPayload {
  *   - Mobile: Notifee displayNotification
  *
  * @param msg                 - The incoming message
- * @param activeConversation  - The conversation key the user is currently viewing (null if none)
- * @param appFocused          - Whether the app window/screen is in the foreground
+ * @param activeConversation  - Deprecated, kept for compatibility
+ * @param appFocused          - Deprecated, kept for compatibility
  * @param resolveAuthorName   - Optional lookup from userID to display name
  * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
  */
 export function shouldNotify(
     msg: Message,
-    activeConversation: null | string,
-    appFocused: boolean,
+    _activeConversation: null | string,
+    _appFocused: boolean,
     resolveAuthorName?: (userID: string) => string | undefined,
     resolveChannelInfo?: (
         channelID: string,
@@ -40,7 +40,6 @@ export function shouldNotify(
     if (msg.authorID === me.userID) return null;
 
     const conversationKey = msg.group ?? msg.authorID;
-    if (appFocused && activeConversation === conversationKey) return null;
 
     const authorName =
         resolveAuthorName?.(msg.authorID) ?? msg.authorID.slice(0, 8);
