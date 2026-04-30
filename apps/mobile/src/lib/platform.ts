@@ -10,6 +10,8 @@ import type { BootstrapConfig } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
+import * as SecureStore from "expo-secure-store";
+
 import { getServerUrl } from "./config";
 
 export function mobileConfig(): BootstrapConfig {
@@ -30,10 +32,34 @@ export function mobileConfig(): BootstrapConfig {
             const atRestAes = deriveAtRestAesKey(privateKey);
             const storage = new SqliteStorage(db, atRestAes);
             await storage.init();
+            await applyLibvex6RatchetMigration(dbName, db, username);
             return storage;
         },
         deviceName: Platform.OS,
     };
+}
+
+async function applyLibvex6RatchetMigration(
+    dbName: string,
+    db: {
+        deleteFrom: (table: string) => {
+            execute: () => Promise<unknown>;
+        };
+    },
+    username: string,
+): Promise<void> {
+    const key = libv6MigrationKey(username);
+    const already = await SecureStore.getItemAsync(key);
+    if (already === "1") {
+        return;
+    }
+    // libvex 6 ratchet rollout: force fresh device sessions once per account/server.
+    await db.deleteFrom("sessions").execute();
+    await SecureStore.setItemAsync(key, "1");
+    console.info("[vex-mobile] applied libvex6 session migration", {
+        dbName,
+        username,
+    });
 }
 
 function decodeHex(hex: string): Uint8Array {
@@ -58,6 +84,10 @@ function deriveAtRestAesKey(privateKeyHex: string): Uint8Array {
     const out = new Uint8Array(32);
     out.set(raw);
     return out;
+}
+
+function libv6MigrationKey(username: string): string {
+    return `vex-libvex6-migrated.${sanitize(getServerUrl())}.${sanitize(username)}`;
 }
 
 function sanitize(s: string): string {
