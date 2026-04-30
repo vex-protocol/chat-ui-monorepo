@@ -46,14 +46,7 @@ module.exports = ({ config }) => {
             },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
         },
-        updates: devMode
-            ? {
-                  enabled: true,
-                  url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
-                  fallbackToCacheTimeout: 0,
-                  checkAutomatically: "ON_LOAD",
-              }
-            : { enabled: false },
+        updates: { enabled: false },
         runtimeVersion: devMode
             ? { policy: "fingerprint" }
             : { policy: "appVersion" },
