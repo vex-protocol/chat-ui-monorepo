@@ -46,6 +46,14 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
     const timerRef = useRef<null | ReturnType<typeof setTimeout>>(null);
 
     const familiarList = useMemo(() => Object.values(familiars), [familiars]);
+    const dmConversationList = useMemo(
+        () =>
+            familiarList.filter((user) => {
+                const thread = allMessages[user.userID];
+                return Boolean(thread && thread.length > 0);
+            }),
+        [allMessages, familiarList],
+    );
     const friendsBackdropOpacity = useMemo(
         () =>
             friendsBarAnim.interpolate({
@@ -328,10 +336,12 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>DIRECT MESSAGES</Text>
-                <Text style={styles.sectionMeta}>{familiarList.length}</Text>
+                <Text style={styles.sectionMeta}>
+                    {dmConversationList.length}
+                </Text>
             </View>
 
-            {familiarList.length === 0 && !query.trim() ? (
+            {dmConversationList.length === 0 && !query.trim() ? (
                 <View style={styles.empty}>
                     <Text style={styles.emptyText}>No conversations yet</Text>
                     <Text style={styles.emptyHint}>
@@ -340,7 +350,7 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 </View>
             ) : (
                 <FlatList
-                    data={familiarList}
+                    data={dmConversationList}
                     keyboardShouldPersistTaps="handled"
                     keyExtractor={(u) => u.userID}
                     renderItem={renderFamiliar}

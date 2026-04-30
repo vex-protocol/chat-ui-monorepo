@@ -35,7 +35,7 @@ describe("shouldNotify", () => {
 
     test("returns null when no current user (not logged in)", () => {
         const msg = makeMessage();
-        expect(shouldNotify(msg, null, true)).toBeNull();
+        expect(shouldNotify(msg)).toBeNull();
     });
 
     describe("with logged-in user", () => {
@@ -45,24 +45,26 @@ describe("shouldNotify", () => {
 
         test("returns null for messages authored by self", () => {
             const msg = makeMessage({ authorID: ME.userID });
-            expect(shouldNotify(msg, null, true)).toBeNull();
+            expect(shouldNotify(msg)).toBeNull();
         });
 
-        test("returns null when app is focused on the active DM conversation", () => {
+        test("notifies even when app is focused on the active DM conversation", () => {
             const msg = makeMessage({ authorID: "alice" });
-            expect(shouldNotify(msg, "alice", true)).toBeNull();
+            const payload = shouldNotify(msg);
+            expect(payload).not.toBeNull();
+            expect(payload?.conversationKey).toBe("alice");
         });
 
         test("notifies when app is focused but on a different conversation", () => {
             const msg = makeMessage({ authorID: "alice" });
-            const payload = shouldNotify(msg, "bob", true);
+            const payload = shouldNotify(msg);
             expect(payload).not.toBeNull();
             expect(payload?.conversationKey).toBe("alice");
         });
 
         test("notifies when app is unfocused even on active conversation", () => {
             const msg = makeMessage({ authorID: "alice" });
-            const payload = shouldNotify(msg, "alice", false);
+            const payload = shouldNotify(msg);
             expect(payload).not.toBeNull();
         });
 
@@ -71,7 +73,7 @@ describe("shouldNotify", () => {
                 authorID: "alice",
                 group: "channel-42",
             });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.conversationKey).toBe("channel-42");
             expect(payload?.group).toBe("channel-42");
         });
@@ -81,7 +83,7 @@ describe("shouldNotify", () => {
                 authorID: "alice",
                 group: "channel-42",
             });
-            const payload = shouldNotify(msg, null, false, undefined, () => ({
+            const payload = shouldNotify(msg, undefined, () => ({
                 channelName: "general",
                 serverName: "DevHub",
             }));
@@ -93,13 +95,13 @@ describe("shouldNotify", () => {
                 authorID: "alice",
                 group: "channel-42",
             });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.title).toBe("alice (#channel)");
         });
 
         test("DM title is just the author name", () => {
             const msg = makeMessage({ authorID: "alice-uuid" });
-            const payload = shouldNotify(msg, null, false, (uid) =>
+            const payload = shouldNotify(msg, (uid) =>
                 uid === "alice-uuid" ? "Alice Smith" : undefined,
             );
             expect(payload?.title).toBe("Alice Smith");
@@ -107,20 +109,20 @@ describe("shouldNotify", () => {
 
         test("DM title falls back to truncated userID prefix when no resolver", () => {
             const msg = makeMessage({ authorID: "abcdef1234567890" });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.title).toBe("abcdef12");
         });
 
         test("body passes through short messages unchanged", () => {
             const msg = makeMessage({ message: "short message" });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.body).toBe("short message");
         });
 
         test("body truncates messages over 100 chars with ellipsis", () => {
             const long = "a".repeat(150);
             const msg = makeMessage({ message: long });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.body.length).toBe(100);
             expect(payload?.body.endsWith("...")).toBe(true);
         });
@@ -128,7 +130,7 @@ describe("shouldNotify", () => {
         test("body renders exactly 100 char messages without truncation", () => {
             const exact = "a".repeat(100);
             const msg = makeMessage({ message: exact });
-            const payload = shouldNotify(msg, null, false);
+            const payload = shouldNotify(msg);
             expect(payload?.body).toBe(exact);
         });
     });

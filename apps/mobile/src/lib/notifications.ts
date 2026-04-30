@@ -1,7 +1,5 @@
 import type { Message } from "@vex-chat/libvex";
 
-import { AppState } from "react-native";
-
 import { shouldNotify, vexService } from "@vex-chat/store";
 import { $channels, $familiars, $servers } from "@vex-chat/store";
 
@@ -16,7 +14,6 @@ import {
 const CHANNEL_ID = "vex-messages";
 
 let channelReady = false;
-let activeConversation: null | string = null;
 
 interface GroupNotificationTarget {
     channelID: string;
@@ -45,11 +42,6 @@ export async function requestNotificationPermission(): Promise<boolean> {
     );
 }
 
-/** Call from screens to track which conversation the user is viewing. */
-export function setActiveConversation(key: null | string): void {
-    activeConversation = key;
-}
-
 export function setupNotificationHandlers(): () => void {
     // Single listener covers foreground, background, and cold-start taps.
     const subscription = Notifications.addNotificationResponseReceivedListener(
@@ -70,7 +62,6 @@ export function setupNotificationHandlers(): () => void {
 }
 
 export async function showMessageNotification(mail: Message): Promise<void> {
-    const appFocused = AppState.currentState === "active";
     const familiars = $familiars.get();
 
     // Resolve author name: check familiars first, then fetch from server
@@ -89,8 +80,6 @@ export async function showMessageNotification(mail: Message): Promise<void> {
         : null;
     const payload = shouldNotify(
         mail,
-        activeConversation,
-        appFocused,
         (id) =>
             id === mail.authorID && authorName
                 ? authorName

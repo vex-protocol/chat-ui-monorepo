@@ -30,7 +30,6 @@ export function setNotificationsEnabled(enabled: boolean): void {
  * Returns an unsubscribe function.
  */
 export function setupNotifications(
-    activeConversation: () => null | string,
     resolveAuthorName?: (userID: string) => string | undefined,
     resolveChannelInfo?: (
         channelID: string,
@@ -47,8 +46,6 @@ export function setupNotifications(
 
         const payload = shouldNotify(
             msg,
-            activeConversation(),
-            focused,
             resolveAuthorName,
             resolveChannelInfo,
         );

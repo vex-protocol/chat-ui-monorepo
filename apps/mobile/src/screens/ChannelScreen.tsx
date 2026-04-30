@@ -23,7 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
-import { setActiveConversation } from "../lib/notifications";
 import { colors } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -49,13 +48,9 @@ export function ChannelScreen({
         [messages],
     );
 
-    // Track active channel for notification suppression + mark read
+    // Mark this channel as read while the screen is active
     useEffect(() => {
-        setActiveConversation(channelID);
         vexService.markRead(channelID);
-        return () => {
-            setActiveConversation(null);
-        };
     }, [channelID]);
 
     useEffect(() => {
@@ -104,6 +99,13 @@ export function ChannelScreen({
         }
     }, [text, user, channelID, sendInFlightRef]);
 
+    const deleteMessage = useCallback(
+        (message: Message) => {
+            void vexService.deleteLocalMessage(channelID, message.mailID, true);
+        },
+        [channelID],
+    );
+
     function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
         const ownName = user?.username ?? "Unknown";
@@ -118,6 +120,7 @@ export function ChannelScreen({
                 }
                 isOwn={isOwn}
                 message={item}
+                onDeleteMessage={deleteMessage}
                 showIdentity={showIdentity}
             />
         );
