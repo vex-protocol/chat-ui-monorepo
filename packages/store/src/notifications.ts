@@ -21,15 +21,11 @@ export interface NotificationPayload {
  *   - Mobile: Notifee displayNotification
  *
  * @param msg                 - The incoming message
- * @param activeConversation  - Deprecated, kept for compatibility
- * @param appFocused          - Deprecated, kept for compatibility
  * @param resolveAuthorName   - Optional lookup from userID to display name
  * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
  */
 export function shouldNotify(
     msg: Message,
-    _activeConversation: null | string,
-    _appFocused: boolean,
     resolveAuthorName?: (userID: string) => string | undefined,
     resolveChannelInfo?: (
         channelID: string,

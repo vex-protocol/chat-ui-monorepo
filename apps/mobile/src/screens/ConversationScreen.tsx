@@ -25,7 +25,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
-import { setActiveConversation } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -48,13 +47,9 @@ export function ConversationScreen({
         [messages],
     );
 
-    // Track active conversation for notification suppression + mark read
+    // Mark this DM as read while the screen is active
     useEffect(() => {
-        setActiveConversation(userID);
         vexService.markRead(userID);
-        return () => {
-            setActiveConversation(null);
-        };
     }, [userID]);
 
     // Mark read whenever new messages arrive while viewing

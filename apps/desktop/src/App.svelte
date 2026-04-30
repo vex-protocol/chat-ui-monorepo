@@ -69,20 +69,10 @@
         }
     });
 
-    // Active conversation key derived from URL (userID for DMs, channelID for channels)
-    const activeConversationKey = $derived(
-        $location.startsWith("/messaging/")
-            ? ($location.split("/")[2] ?? null)
-            : $location.startsWith("/server/")
-              ? ($location.split("/")[3] ?? null)
-              : null,
-    );
-
     // Desktop notifications — subscribe to message atoms, not Client events
     $effect(() => {
         if (!$user) return;
         const unsub = setupNotifications(
-            () => activeConversationKey,
             (uid) => $familiars[uid]?.username,
             (cid) => {
                 for (const [sid, chs] of Object.entries($channels)) {
