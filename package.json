@@ -18,6 +18,7 @@
         "lint:pkg": "pnpm dlx npm-package-json-lint .",
         "license:check": "pnpm -r --if-present license:check",
         "mobile": "pnpm -F mobile dev",
+        "install:android": "pnpm -F mobile run android:release:install-all",
         "preinstall": "npx only-allow pnpm"
     },
     "packageManager": "pnpm@10.30.3",

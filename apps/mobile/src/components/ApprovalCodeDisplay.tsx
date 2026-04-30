@@ -29,7 +29,7 @@ export function ApprovalCodeDisplay({
                         <CornerBracketBox
                             color={filled ? colors.accent : colors.border}
                             key={i}
-                            size={compact ? 4 : 6}
+                            size={compact ? 3 : 6}
                         >
                             <View
                                 style={[
@@ -69,8 +69,8 @@ const styles = StyleSheet.create({
         width: 48,
     },
     cellCompact: {
-        height: 34,
-        width: 28,
+        height: 30,
+        width: 24,
     },
     cellFilled: {
         borderColor: colors.accent,
@@ -81,15 +81,15 @@ const styles = StyleSheet.create({
         fontSize: 24,
     },
     cellTextCompact: {
-        fontSize: 14,
-        lineHeight: 18,
+        fontSize: 12,
+        lineHeight: 14,
     },
     codeRow: {
         flexDirection: "row",
         gap: 10,
     },
     codeRowCompact: {
-        gap: 6,
+        gap: 4,
     },
     container: {
         gap: 8,

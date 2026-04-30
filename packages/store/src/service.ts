@@ -52,6 +52,7 @@ export interface AuthResult {
     ok: boolean;
     pendingDeviceApproval?: boolean;
     pendingRequestID?: string;
+    user?: User;
 }
 
 export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
@@ -278,8 +279,10 @@ class VexService {
         keyStore: KeyStore,
         config: BootstrapConfig,
         options: ServerOptions,
+        behavior?: { commitUser?: boolean },
     ): Promise<AuthResult> {
         this.setAuthStatus("checking");
+        const shouldCommitUser = behavior?.commitUser !== false;
         debugAuth("autoLogin:start", { host: options.host });
         let creds;
         try {
@@ -326,10 +329,15 @@ class VexService {
             }
 
             await client.connect();
-            $userWritable.set(client.me.user());
+            const authenticatedUser = client.me.user();
+            if (shouldCommitUser) {
+                $userWritable.set(authenticatedUser);
+            }
             this.setAuthStatus("authenticated");
             await this.populateState();
-            return { ok: true };
+            return shouldCommitUser
+                ? { ok: true }
+                : { ok: true, user: authenticatedUser };
         } catch (err: unknown) {
             if (isDecryptMismatchError(err)) {
                 debugAuth("autoLogin:decrypt-mismatch:recover:start", {
@@ -369,13 +377,18 @@ class VexService {
                     }
 
                     await recovered.connect();
-                    $userWritable.set(recovered.me.user());
+                    const recoveredUser = recovered.me.user();
+                    if (shouldCommitUser) {
+                        $userWritable.set(recoveredUser);
+                    }
                     this.setAuthStatus("authenticated");
                     await this.populateState();
                     debugAuth("autoLogin:decrypt-mismatch:recover:ok", {
                         username: creds.username,
                     });
-                    return { ok: true };
+                    return shouldCommitUser
+                        ? { ok: true }
+                        : { ok: true, user: recoveredUser };
                 } catch (recoveryErr: unknown) {
                     try {
                         await this.close();
@@ -418,6 +431,10 @@ class VexService {
         }
     }
 
+    cancelPendingApprovalWatcher(): void {
+        this.stopPendingApprovalWatcher();
+    }
+
     async close(): Promise<void> {
         if (this.client) {
             this.detachWebsocketDebug();
@@ -431,6 +448,11 @@ class VexService {
                 // half-open WebSocket that throws on teardown.
             }
         }
+    }
+
+    commitAuthenticatedUser(user: User): void {
+        $userWritable.set(user);
+        this.setAuthStatus("authenticated");
     }
 
     // ── Server CRUD ─────────────────────────────────────────────────────

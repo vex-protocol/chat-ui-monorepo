@@ -27,9 +27,9 @@ type Props = AuthScreenProps<"Authenticate">;
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
 const POLL_MS = 1500;
-const SUCCESS_DELAY_MS = 850;
+const LOGGED_IN_DELAY_MS = 700;
 
-type VerifyPhase = "error" | "success" | "waiting";
+type VerifyPhase = "error" | "loading" | "logged_in" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
     const [code, setCode] = useState("");
@@ -91,8 +91,8 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         }, POLL_MS);
     }
 
-    async function playSuccessAnimation(): Promise<void> {
-        Vibration.vibrate(20);
+    async function playLoggedInAnimation(): Promise<void> {
+        Vibration.vibrate(24);
         await new Promise<void>((resolve) => {
             Animated.parallel([
                 Animated.timing(successOpacity, {
@@ -118,23 +118,41 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         }
         completingAuthRef.current = true;
         stopPolling();
+        vexService.cancelPendingApprovalWatcher();
         setError("");
-        setPhase("success");
-        setStatusText("Code matched. Signing you in...");
+        setPhase("loading");
+        setStatusText("Approval confirmed. Loading account...");
         setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
-        await playSuccessAnimation();
-        await waitMs(SUCCESS_DELAY_MS);
+        Vibration.vibrate(12);
         const auth = await vexService.autoLogin(
             keychainKeyStore,
             mobileConfig(),
             getServerOptions(),
+            { commitUser: false },
         );
         if (!auth.ok) {
+            const existingSession = await vexService.getSessionInfo();
+            if (existingSession?.authStatus === "authenticated") {
+                return;
+            }
             completingAuthRef.current = false;
             setPhase("error");
             setError(auth.error ?? "Failed to complete sign-in.");
             setStatusText("");
+            return;
         }
+        if (!auth.user) {
+            completingAuthRef.current = false;
+            setPhase("error");
+            setError("Signed in, but user profile was unavailable.");
+            setStatusText("");
+            return;
+        }
+        setPhase("logged_in");
+        setStatusText("Logged in. Opening Vex...");
+        await playLoggedInAnimation();
+        await waitMs(LOGGED_IN_DELAY_MS);
+        vexService.commitAuthenticatedUser(auth.user);
     }
 
     async function verifyCode(requestID: string): Promise<void> {
@@ -214,7 +232,23 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     </View>
                 ) : null}
 
-                {phase === "success" ? (
+                {phase === "loading" ? (
+                    <View style={styles.loadingCard}>
+                        <View style={styles.loadingIconBadge}>
+                            <Text style={styles.loadingIcon}>⇣</Text>
+                        </View>
+                        <ActivityIndicator
+                            animating
+                            color="#60A5FA"
+                            size="small"
+                        />
+                        <Text style={styles.loadingText}>
+                            {statusText || "Loading account..."}
+                        </Text>
+                    </View>
+                ) : null}
+
+                {phase === "logged_in" ? (
                     <Animated.View
                         style={[
                             styles.successCard,
@@ -227,9 +261,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                         <View style={styles.successBadge}>
                             <Text style={styles.successCheck}>✓</Text>
                         </View>
-                        <Text style={styles.successText}>
-                            Approved. Loading your account...
-                        </Text>
+                        <Text style={styles.successText}>{statusText}</Text>
                     </Animated.View>
                 ) : null}
 
@@ -251,14 +283,16 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                             Retry verification
                         </Text>
                     ) : null}
-                    <Text
-                        onPress={() => {
-                            navigation.replace("Login");
-                        }}
-                        style={styles.link}
-                    >
-                        Back to login
-                    </Text>
+                    {(phase === "waiting" || phase === "error") && (
+                        <Text
+                            onPress={() => {
+                                navigation.replace("Login");
+                            }}
+                            style={styles.link}
+                        >
+                            Back to login
+                        </Text>
+                    )}
                 </View>
             </View>
         </ScreenLayout>
@@ -306,6 +340,37 @@ const styles = StyleSheet.create({
     links: {
         gap: 10,
         marginTop: 8,
+    },
+    loadingCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(37, 99, 235, 0.14)",
+        borderColor: "rgba(96, 165, 250, 0.4)",
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    loadingIcon: {
+        color: "#93C5FD",
+        fontSize: 14,
+        fontWeight: "700",
+        marginTop: -1,
+    },
+    loadingIconBadge: {
+        alignItems: "center",
+        backgroundColor: "rgba(59,130,246,0.2)",
+        borderColor: "rgba(147,197,253,0.42)",
+        borderRadius: 999,
+        borderWidth: 1,
+        height: 22,
+        justifyContent: "center",
+        width: 22,
+    },
+    loadingText: {
+        ...typography.body,
+        color: "#BFDBFE",
+        textAlign: "center",
     },
     statusText: {
         ...typography.body,

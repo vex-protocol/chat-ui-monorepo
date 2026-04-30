@@ -30,7 +30,17 @@ export function ChatHeader({
             <View style={styles.breadcrumb}>
                 {onBack && (
                     <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <Text style={styles.backArrow}>←</Text>
+                        <View style={styles.backIcon}>
+                            <View
+                                style={[styles.backIconBar, styles.backIconTop]}
+                            />
+                            <View
+                                style={[
+                                    styles.backIconBar,
+                                    styles.backIconBottom,
+                                ]}
+                            />
+                        </View>
                     </TouchableOpacity>
                 )}
                 {onTitlePress ? (
@@ -114,12 +124,39 @@ const styles = StyleSheet.create({
         flexShrink: 0,
         gap: 4,
     },
-    backArrow: {
-        color: colors.text,
-        fontSize: 18,
-    },
     backBtn: {
+        alignItems: "center",
+        height: 24,
+        justifyContent: "center",
         marginRight: 4,
+        width: 24,
+    },
+    backIcon: {
+        alignItems: "center",
+        height: 12,
+        justifyContent: "center",
+        width: 12,
+    },
+    backIconBar: {
+        backgroundColor: colors.text,
+        borderRadius: 999,
+        height: 2,
+        position: "absolute",
+        width: 10,
+    },
+    backIconBottom: {
+        transform: [
+            { rotate: "-45deg" },
+            { translateX: -1.4 },
+            { translateY: -2.6 },
+        ],
+    },
+    backIconTop: {
+        transform: [
+            { rotate: "45deg" },
+            { translateX: -1.4 },
+            { translateY: 2.6 },
+        ],
     },
     breadcrumb: {
         alignItems: "center",

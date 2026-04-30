@@ -274,42 +274,78 @@ export function PendingApprovalsScreen({
                                     <Text style={styles.label}>
                                         {req.deviceName}
                                     </Text>
-                                    <Text style={styles.desc}>
-                                        Request {req.requestID.slice(0, 8)}...
-                                    </Text>
-                                    <ApprovalCodeDisplay
-                                        code={approvalCodeForRequest(req)}
-                                        compact
-                                        helperText="Confirm this code matches on the new device."
-                                    />
-                                </View>
-                                <View style={styles.inlineActions}>
-                                    <TouchableOpacity
-                                        disabled={busy}
-                                        onPress={() => {
-                                            void rejectDeviceRequest(
-                                                req.requestID,
-                                            );
-                                        }}
-                                        style={styles.rejectBtn}
-                                    >
-                                        <Text style={styles.rejectBtnText}>
-                                            Reject
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        disabled={busy}
-                                        onPress={() => {
-                                            void approveDeviceRequest(
-                                                req.requestID,
-                                            );
-                                        }}
-                                        style={styles.approveBtn}
-                                    >
-                                        <Text style={styles.approveBtnText}>
-                                            {busy ? "..." : "Approve"}
-                                        </Text>
-                                    </TouchableOpacity>
+                                    <View style={styles.metaGrid}>
+                                        <View style={styles.metaPill}>
+                                            <Text style={styles.metaLabel}>
+                                                Requested
+                                            </Text>
+                                            <Text style={styles.metaValue}>
+                                                {formatRelativePast(
+                                                    req.createdAt,
+                                                )}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.metaPill}>
+                                            <Text style={styles.metaLabel}>
+                                                Expires
+                                            </Text>
+                                            <Text style={styles.metaValue}>
+                                                {formatRelativeFuture(
+                                                    req.expiresAt,
+                                                )}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.metaPill}>
+                                            <Text style={styles.metaLabel}>
+                                                User
+                                            </Text>
+                                            <Text style={styles.metaValue}>
+                                                @{req.username}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.codeAndActionsRow}>
+                                        <ApprovalCodeDisplay
+                                            code={approvalCodeForRequest(req)}
+                                            compact
+                                        />
+                                        <View style={styles.inlineActions}>
+                                            <TouchableOpacity
+                                                accessibilityLabel="Reject device request"
+                                                disabled={busy}
+                                                onPress={() => {
+                                                    void rejectDeviceRequest(
+                                                        req.requestID,
+                                                    );
+                                                }}
+                                                style={styles.rejectBtn}
+                                            >
+                                                <Text
+                                                    style={styles.rejectBtnText}
+                                                >
+                                                    ✕
+                                                </Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity
+                                                accessibilityLabel="Approve device request"
+                                                disabled={busy}
+                                                onPress={() => {
+                                                    void approveDeviceRequest(
+                                                        req.requestID,
+                                                    );
+                                                }}
+                                                style={styles.approveBtn}
+                                            >
+                                                <Text
+                                                    style={
+                                                        styles.approveBtnText
+                                                    }
+                                                >
+                                                    {busy ? "…" : "✓"}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    </View>
                                 </View>
                             </View>
                         );
@@ -464,16 +500,23 @@ const styles = StyleSheet.create({
     approveBtn: {
         alignItems: "center",
         borderColor: "rgba(74, 222, 128, 0.45)",
-        borderRadius: 10,
+        borderRadius: 8,
         borderWidth: 1,
-        minWidth: 74,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        height: 30,
+        justifyContent: "center",
+        width: 30,
     },
     approveBtnText: {
-        ...typography.button,
         color: "#4ADE80",
+        fontSize: 16,
         fontWeight: "600",
+    },
+    codeAndActionsRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 10,
+        justifyContent: "space-between",
+        marginTop: 4,
     },
     container: {
         backgroundColor: colors.bg,
@@ -517,13 +560,39 @@ const styles = StyleSheet.create({
     },
     inlineActions: {
         flexDirection: "row",
-        gap: 8,
+        gap: 6,
     },
     label: {
         ...typography.button,
         color: colors.textSecondary,
         fontSize: 14,
         fontWeight: "600",
+    },
+    metaGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 2,
+    },
+    metaLabel: {
+        ...typography.label,
+        color: "rgba(255,255,255,0.52)",
+        fontSize: 10,
+        textTransform: "uppercase",
+    },
+    metaPill: {
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderColor: "rgba(255,255,255,0.12)",
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 6,
+    },
+    metaValue: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.82)",
+        fontSize: 12,
     },
     mono: {
         fontFamily: typography.body.fontFamily,
@@ -532,16 +601,16 @@ const styles = StyleSheet.create({
     },
     rejectBtn: {
         alignItems: "center",
-        borderColor: "rgba(255,255,255,0.18)",
-        borderRadius: 10,
+        borderColor: "rgba(255,69,58,0.45)",
+        borderRadius: 8,
         borderWidth: 1,
-        minWidth: 70,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        height: 30,
+        justifyContent: "center",
+        width: 30,
     },
     rejectBtnText: {
-        ...typography.button,
-        color: colors.textSecondary,
+        color: "#FF453A",
+        fontSize: 16,
         fontWeight: "600",
     },
     removeDeviceBtn: {
@@ -604,3 +673,53 @@ const styles = StyleSheet.create({
         fontSize: 13,
     },
 });
+
+function formatDateTime(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
+    return parsed.toLocaleString();
+}
+
+function formatRelativeFuture(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return formatDateTime(value);
+    }
+    const deltaMs = parsed.getTime() - Date.now();
+    if (deltaMs <= 0) {
+        return "expired";
+    }
+    if (deltaMs < 60_000) {
+        return `in ${Math.ceil(deltaMs / 1000)}s`;
+    }
+    if (deltaMs < 60 * 60 * 1000) {
+        return `in ${Math.ceil(deltaMs / (60 * 1000))}m`;
+    }
+    if (deltaMs < 24 * 60 * 60 * 1000) {
+        return `in ${Math.ceil(deltaMs / (60 * 60 * 1000))}h`;
+    }
+    return `in ${Math.ceil(deltaMs / (24 * 60 * 60 * 1000))}d`;
+}
+
+function formatRelativePast(value: string): string {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return formatDateTime(value);
+    }
+    const deltaMs = Date.now() - parsed.getTime();
+    if (deltaMs < 30_000) {
+        return "just now";
+    }
+    if (deltaMs < 60_000) {
+        return `${Math.floor(deltaMs / 1000)}s ago`;
+    }
+    if (deltaMs < 60 * 60 * 1000) {
+        return `${Math.floor(deltaMs / (60 * 1000))}m ago`;
+    }
+    if (deltaMs < 24 * 60 * 60 * 1000) {
+        return `${Math.floor(deltaMs / (60 * 60 * 1000))}h ago`;
+    }
+    return `${Math.floor(deltaMs / (24 * 60 * 60 * 1000))}d ago`;
+}
