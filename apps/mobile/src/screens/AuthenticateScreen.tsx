@@ -1,15 +1,7 @@
 import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useEffect, useRef, useState } from "react";
-import {
-    ActivityIndicator,
-    Animated,
-    Easing,
-    StyleSheet,
-    Text,
-    Vibration,
-    View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
 import { vexService } from "@vex-chat/store";
 
@@ -27,9 +19,8 @@ type Props = AuthScreenProps<"Authenticate">;
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
 const POLL_MS = 1500;
-const LOGGED_IN_DELAY_MS = 700;
 
-type VerifyPhase = "error" | "loading" | "logged_in" | "waiting";
+type VerifyPhase = "error" | "loading" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
     const [code, setCode] = useState("");
@@ -40,8 +31,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     const pollRef = useRef<null | ReturnType<typeof setInterval>>(null);
     const pollInFlightRef = useRef(false);
     const completingAuthRef = useRef(false);
-    const successOpacity = useRef(new Animated.Value(0)).current;
-    const successScale = useRef(new Animated.Value(0.86)).current;
 
     useEffect(() => {
         const requestID = route.params?.requestID;
@@ -91,27 +80,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         }, POLL_MS);
     }
 
-    async function playLoggedInAnimation(): Promise<void> {
-        Vibration.vibrate(24);
-        await new Promise<void>((resolve) => {
-            Animated.parallel([
-                Animated.timing(successOpacity, {
-                    duration: 240,
-                    easing: Easing.out(Easing.quad),
-                    toValue: 1,
-                    useNativeDriver: true,
-                }),
-                Animated.spring(successScale, {
-                    damping: 14,
-                    mass: 0.65,
-                    stiffness: 260,
-                    toValue: 1,
-                    useNativeDriver: true,
-                }),
-            ]).start(() => resolve());
-        });
-    }
-
     async function handleApproved(requestID: string): Promise<void> {
         if (completingAuthRef.current) {
             return;
@@ -122,7 +90,8 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         setPhase("loading");
         setStatusText("Approval confirmed. Loading account...");
         setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
-        Vibration.vibrate(12);
+        // Ensure the blue loading state paints before login starts.
+        await waitMs(80);
         const auth = await vexService.autoLogin(
             keychainKeyStore,
             mobileConfig(),
@@ -135,10 +104,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
             setStatusText("");
             return;
         }
-        setPhase("logged_in");
-        setStatusText("Logged in. Opening Vex...");
-        await playLoggedInAnimation();
-        await waitMs(LOGGED_IN_DELAY_MS);
     }
 
     async function verifyCode(requestID: string): Promise<void> {
@@ -232,23 +197,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                             {statusText || "Loading account..."}
                         </Text>
                     </View>
-                ) : null}
-
-                {phase === "logged_in" ? (
-                    <Animated.View
-                        style={[
-                            styles.successCard,
-                            {
-                                opacity: successOpacity,
-                                transform: [{ scale: successScale }],
-                            },
-                        ]}
-                    >
-                        <View style={styles.successBadge}>
-                            <Text style={styles.successCheck}>✓</Text>
-                        </View>
-                        <Text style={styles.successText}>{statusText}</Text>
-                    </Animated.View>
                 ) : null}
 
                 {error !== "" ? (
@@ -361,37 +309,6 @@ const styles = StyleSheet.create({
     statusText: {
         ...typography.body,
         color: colors.textSecondary,
-        textAlign: "center",
-    },
-    successBadge: {
-        alignItems: "center",
-        backgroundColor: "rgba(74, 222, 128, 0.18)",
-        borderColor: "rgba(74, 222, 128, 0.45)",
-        borderRadius: 24,
-        borderWidth: 1,
-        height: 48,
-        justifyContent: "center",
-        width: 48,
-    },
-    successCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(26,42,33,0.45)",
-        borderColor: "rgba(74, 222, 128, 0.25)",
-        borderRadius: 12,
-        borderWidth: 1,
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    successCheck: {
-        color: "#4ADE80",
-        fontSize: 30,
-        fontWeight: "700",
-        marginTop: -2,
-    },
-    successText: {
-        ...typography.body,
-        color: "#D8FCE5",
         textAlign: "center",
     },
     timer: {
