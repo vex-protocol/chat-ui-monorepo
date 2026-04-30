@@ -10,7 +10,7 @@ import {
     View,
 } from "react-native";
 
-import { $channels, $servers } from "@vex-chat/store";
+import { $channels, $permissions, $servers, $user } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
@@ -22,10 +22,28 @@ export function ChannelListScreen({
 }: AppScreenProps<"ChannelList">) {
     const { serverID } = route.params;
     const allChannels = useStore($channels, { keys: [serverID] });
+    const permissions = useStore($permissions);
     const servers = useStore($servers, { keys: [serverID] });
+    const user = useStore($user);
     const channels: Channel[] = allChannels[serverID] ?? [];
     const serverName =
         servers[serverID]?.name ?? route.params.serverName ?? "Server";
+    const canOpenServerSettings = React.useMemo(() => {
+        const myUserID = user?.userID;
+        if (!myUserID) return false;
+        const highestPower = Object.values(permissions)
+            .filter(
+                (permission) =>
+                    permission.resourceID === serverID &&
+                    permission.userID === myUserID,
+            )
+            .reduce(
+                (maxPower, permission) =>
+                    Math.max(maxPower, permission.powerLevel),
+                0,
+            );
+        return highestPower >= 1;
+    }, [permissions, serverID, user?.userID]);
 
     function renderChannel({ item }: { item: Channel }) {
         return (
@@ -48,12 +66,16 @@ export function ChannelListScreen({
     return (
         <View style={styles.container}>
             <ChatHeader
-                onOverflow={() => {
-                    navigation.navigate("ServerSettings", {
-                        serverID,
-                        serverName,
-                    });
-                }}
+                onOverflow={
+                    canOpenServerSettings
+                        ? () => {
+                              navigation.navigate("ServerSettings", {
+                                  serverID,
+                                  serverName,
+                              });
+                          }
+                        : undefined
+                }
                 title={serverName}
             />
 

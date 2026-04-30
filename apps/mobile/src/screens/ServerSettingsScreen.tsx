@@ -10,7 +10,13 @@ import {
     View,
 } from "react-native";
 
-import { $channels, $servers, vexService } from "@vex-chat/store";
+import {
+    $channels,
+    $permissions,
+    $servers,
+    $user,
+    vexService,
+} from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
@@ -23,7 +29,9 @@ export function ServerSettingsScreen({
 }: AppScreenProps<"ServerSettings">) {
     const { serverID } = route.params;
     const channelsByServer = useStore($channels, { keys: [serverID] });
+    const permissions = useStore($permissions);
     const servers = useStore($servers, { keys: [serverID] });
+    const user = useStore($user);
     const [channelName, setChannelName] = useState("");
     const [creatingChannel, setCreatingChannel] = useState(false);
     const [createChannelError, setCreateChannelError] = useState("");
@@ -31,6 +39,24 @@ export function ServerSettingsScreen({
     const serverName =
         servers[serverID]?.name ?? route.params.serverName ?? "Server";
     const channels = channelsByServer[serverID] ?? [];
+    const serverPowerLevel = useMemo(() => {
+        const myUserID = user?.userID;
+        if (!myUserID) return 0;
+        const matchingPermissions = Object.values(permissions).filter(
+            (permission) =>
+                permission.resourceID === serverID &&
+                permission.userID === myUserID,
+        );
+        if (matchingPermissions.length === 0) {
+            return 0;
+        }
+        return Math.max(
+            ...matchingPermissions.map((permission) => permission.powerLevel),
+        );
+    }, [permissions, serverID, user?.userID]);
+    const canCreateChannelByRole = serverPowerLevel >= 50;
+    const canDeleteServerByRole = serverPowerLevel >= 100;
+    const canManageInvitesByRole = serverPowerLevel >= 1;
 
     const canCreateChannel = useMemo(
         () => channelName.trim().length > 0 && !creatingChannel,
@@ -38,6 +64,9 @@ export function ServerSettingsScreen({
     );
 
     async function handleCreateChannel(): Promise<void> {
+        if (!canCreateChannelByRole) {
+            return;
+        }
         const nextName = channelName.trim();
         if (!nextName || creatingChannel) {
             return;
@@ -68,6 +97,9 @@ export function ServerSettingsScreen({
     }
 
     function confirmDeleteServer(): void {
+        if (!canDeleteServerByRole) {
+            return;
+        }
         Alert.alert(
             "Delete server?",
             `Delete ${serverName}? This cannot be undone.`,
@@ -120,68 +152,97 @@ export function ServerSettingsScreen({
                         {channels.length} existing channel
                         {channels.length === 1 ? "" : "s"}
                     </Text>
-                    <View style={styles.inputRow}>
-                        <TextInput
-                            autoCapitalize="none"
-                            editable={!creatingChannel}
-                            onChangeText={setChannelName}
-                            placeholder="new-channel-name"
-                            placeholderTextColor={colors.mutedDark}
-                            style={styles.input}
-                            value={channelName}
-                        />
-                        <TouchableOpacity
-                            disabled={!canCreateChannel}
-                            onPress={() => {
-                                void handleCreateChannel();
-                            }}
-                            style={[
-                                styles.button,
-                                styles.buttonPrimary,
-                                !canCreateChannel && styles.buttonDisabled,
-                            ]}
-                        >
-                            <Text style={styles.buttonPrimaryText}>
-                                {creatingChannel ? "Creating..." : "Create"}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                    {createChannelError !== "" ? (
-                        <Text style={styles.errorText}>
-                            {createChannelError}
+                    {canCreateChannelByRole ? (
+                        <>
+                            <View style={styles.inputRow}>
+                                <TextInput
+                                    autoCapitalize="none"
+                                    editable={!creatingChannel}
+                                    onChangeText={setChannelName}
+                                    placeholder="new-channel-name"
+                                    placeholderTextColor={colors.mutedDark}
+                                    style={styles.input}
+                                    value={channelName}
+                                />
+                                <TouchableOpacity
+                                    disabled={!canCreateChannel}
+                                    onPress={() => {
+                                        void handleCreateChannel();
+                                    }}
+                                    style={[
+                                        styles.button,
+                                        styles.buttonPrimary,
+                                        !canCreateChannel &&
+                                            styles.buttonDisabled,
+                                    ]}
+                                >
+                                    <Text style={styles.buttonPrimaryText}>
+                                        {creatingChannel
+                                            ? "Creating..."
+                                            : "Create"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            {createChannelError !== "" ? (
+                                <Text style={styles.errorText}>
+                                    {createChannelError}
+                                </Text>
+                            ) : null}
+                        </>
+                    ) : (
+                        <Text style={styles.sectionHint}>
+                            Requires moderator power level (50+).
                         </Text>
-                    ) : null}
+                    )}
                 </View>
 
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Invites</Text>
-                    <TouchableOpacity
-                        onPress={() => {
-                            navigation.navigate("Invite", {
-                                serverID,
-                                serverName,
-                            });
-                        }}
-                        style={[styles.button, styles.buttonSecondary]}
-                    >
-                        <Text style={styles.buttonSecondaryText}>
-                            Manage invite links
+                    {canManageInvitesByRole ? (
+                        <TouchableOpacity
+                            onPress={() => {
+                                navigation.navigate("Invite", {
+                                    serverID,
+                                    serverName,
+                                });
+                            }}
+                            style={[styles.button, styles.buttonSecondary]}
+                        >
+                            <Text style={styles.buttonSecondaryText}>
+                                Manage invite links
+                            </Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <Text style={styles.sectionHint}>
+                            Requires member access.
                         </Text>
-                    </TouchableOpacity>
+                    )}
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Danger zone</Text>
-                    <TouchableOpacity
-                        disabled={deletingServer}
-                        onPress={confirmDeleteServer}
-                        style={[styles.button, styles.buttonDanger]}
-                    >
-                        <Text style={styles.buttonDangerText}>
-                            {deletingServer ? "Deleting..." : "Delete server"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                {canDeleteServerByRole ? (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Danger zone</Text>
+                        <TouchableOpacity
+                            disabled={deletingServer}
+                            onPress={confirmDeleteServer}
+                            style={[styles.button, styles.buttonDanger]}
+                        >
+                            <Text style={styles.buttonDangerText}>
+                                {deletingServer
+                                    ? "Deleting..."
+                                    : "Delete server"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
+
+                {!canManageInvitesByRole &&
+                !canCreateChannelByRole &&
+                !canDeleteServerByRole ? (
+                    <Text style={styles.sectionHint}>
+                        You do not have permission to manage this server.
+                    </Text>
+                ) : null}
             </View>
         </View>
     );
