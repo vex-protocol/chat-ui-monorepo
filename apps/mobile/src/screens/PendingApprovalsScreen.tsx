@@ -14,6 +14,7 @@ import { $authStatus, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
+import { ApprovalCodeDisplay } from "../components/ApprovalCodeDisplay";
 import { ChatHeader } from "../components/ChatHeader";
 import { getServerUrl } from "../lib/config";
 import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
@@ -276,9 +277,11 @@ export function PendingApprovalsScreen({
                                     <Text style={styles.desc}>
                                         Request {req.requestID.slice(0, 8)}...
                                     </Text>
-                                    <Text style={styles.desc}>
-                                        Code {approvalCodeForRequest(req)}
-                                    </Text>
+                                    <ApprovalCodeDisplay
+                                        code={approvalCodeForRequest(req)}
+                                        compact
+                                        helperText="Confirm this code matches on the new device."
+                                    />
                                 </View>
                                 <View style={styles.inlineActions}>
                                     <TouchableOpacity

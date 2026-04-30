@@ -13,8 +13,8 @@ import {
 
 import { vexService } from "@vex-chat/store";
 
+import { ApprovalCodeDisplay } from "../components/ApprovalCodeDisplay";
 import { BackButton } from "../components/BackButton";
-import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { getServerOptions } from "../lib/config";
 import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
@@ -38,6 +38,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     const [phase, setPhase] = useState<VerifyPhase>("waiting");
     const [statusText, setStatusText] = useState("Waiting for approval...");
     const pollRef = useRef<null | ReturnType<typeof setInterval>>(null);
+    const pollInFlightRef = useRef(false);
     const completingAuthRef = useRef(false);
     const successOpacity = useRef(new Animated.Value(0)).current;
     const successScale = useRef(new Animated.Value(0.86)).current;
@@ -137,9 +138,10 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     }
 
     async function verifyCode(requestID: string): Promise<void> {
-        if (completingAuthRef.current) {
+        if (completingAuthRef.current || pollInFlightRef.current) {
             return;
         }
+        pollInFlightRef.current = true;
         try {
             const request = await vexService.getDeviceRequest(requestID);
             if (!request) {
@@ -177,6 +179,8 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 err instanceof Error ? err.message : "Verification failed.",
             );
             setStatusText("");
+        } finally {
+            pollInFlightRef.current = false;
         }
     }
 
@@ -191,29 +195,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     Please make sure the codes match on both devices.
                 </Text>
 
-                <View style={styles.codeRow}>
-                    {Array.from({ length: CODE_LENGTH }).map((_, i) => {
-                        const filled = i < code.length;
-                        return (
-                            <CornerBracketBox
-                                color={filled ? colors.accent : colors.border}
-                                key={i}
-                                size={6}
-                            >
-                                <View
-                                    style={[
-                                        styles.cell,
-                                        filled && styles.cellFilled,
-                                    ]}
-                                >
-                                    <Text style={styles.cellText}>
-                                        {code[i] ?? ""}
-                                    </Text>
-                                </View>
-                            </CornerBracketBox>
-                        );
-                    })}
-                </View>
+                <ApprovalCodeDisplay code={code} />
 
                 <Text style={styles.timer}>
                     Expires in: {minutes}:{seconds}
@@ -294,29 +276,6 @@ async function waitMs(ms: number): Promise<void> {
 }
 
 const styles = StyleSheet.create({
-    cell: {
-        alignItems: "center",
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        height: 56,
-        justifyContent: "center",
-        width: 48,
-    },
-    cellFilled: {
-        borderColor: colors.accent,
-    },
-    cellText: {
-        ...typography.headingSmall,
-        color: colors.text,
-        fontSize: 24,
-    },
-    codeRow: {
-        flexDirection: "row",
-        gap: 10,
-        justifyContent: "center",
-        marginTop: 10,
-    },
     content: {
         flex: 1,
         gap: 14,
