@@ -45,13 +45,10 @@ export function AppTabs() {
     const [activeServerId, setActiveServerId] = useState<null | string>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const channels = useStore($channels);
-    const familiars = useStore($familiars);
+    const _familiars = useStore($familiars);
     const servers = useStore($servers);
     const authStatus = useStore($authStatus);
-    const initialRoute: keyof AppStackParamList =
-        Object.keys(servers).length === 0 && Object.keys(familiars).length === 0
-            ? "OnboardingEmpty"
-            : "DMList";
+    const initialRoute: keyof AppStackParamList = "DMList";
     const [currentRoute, setCurrentRoute] =
         useState<keyof AppStackParamList>(initialRoute);
     const [activeChannelId, setActiveChannelId] = useState<null | string>(null);
