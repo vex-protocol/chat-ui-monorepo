@@ -118,7 +118,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         }
         completingAuthRef.current = true;
         stopPolling();
-        vexService.cancelPendingApprovalWatcher();
         setError("");
         setPhase("loading");
         setStatusText("Approval confirmed. Loading account...");
@@ -128,23 +127,11 @@ export function AuthenticateScreen({ navigation, route }: Props) {
             keychainKeyStore,
             mobileConfig(),
             getServerOptions(),
-            { commitUser: false },
         );
         if (!auth.ok) {
-            const existingSession = await vexService.getSessionInfo();
-            if (existingSession?.authStatus === "authenticated") {
-                return;
-            }
             completingAuthRef.current = false;
             setPhase("error");
             setError(auth.error ?? "Failed to complete sign-in.");
-            setStatusText("");
-            return;
-        }
-        if (!auth.user) {
-            completingAuthRef.current = false;
-            setPhase("error");
-            setError("Signed in, but user profile was unavailable.");
             setStatusText("");
             return;
         }
@@ -152,7 +139,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         setStatusText("Logged in. Opening Vex...");
         await playLoggedInAnimation();
         await waitMs(LOGGED_IN_DELAY_MS);
-        vexService.commitAuthenticatedUser(auth.user);
     }
 
     async function verifyCode(requestID: string): Promise<void> {
