@@ -175,21 +175,6 @@ interface ClientWithUserDeviceListLike {
     getUserDeviceList?: (userID: string) => Promise<Device[] | null>;
 }
 
-interface DeviceRegistrationPendingLike {
-    challenge: string;
-    expiresAt: string;
-    requestID: string;
-    status: "pending_approval";
-}
-
-type DeviceRegistrationResultLike =
-    | DeviceRegistrationPendingLike
-    | DeviceRegistrationResultLikeDevice;
-
-interface DeviceRegistrationResultLikeDevice {
-    deviceID: string;
-}
-
 interface DevicesWithApprovalLike {
     approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
@@ -668,11 +653,11 @@ class VexService {
     }
 
     /**
-     * Login with username/password → register device if needed → connect.
+     * Login with stored device key → register device if needed → connect.
      */
     async login(
         username: string,
-        password: string,
+        _password: string,
         config: BootstrapConfig,
         options: ServerOptions,
         keyStore: KeyStore,
@@ -693,107 +678,25 @@ class VexService {
             debugAuth("login:initClient:ok", { host: options.host, username });
             const client = this.requireClient();
 
-            const loginResult = await client.login(username, password);
-            debugAuth("login:http:done", {
-                error: loginResult.error ?? null,
-                ok: loginResult.ok,
-            });
-            if (!loginResult.ok) {
+            if (!creds) {
                 return {
-                    error: loginResult.error ?? "Invalid username or password",
+                    error: "No local device key found for this username. Register this device first.",
                     ok: false,
                 };
             }
+            const authErr = await client.loginWithDeviceKey(creds.deviceID);
+            debugAuth("login:device-key:done", {
+                error: authErr?.message ?? null,
+                ok: !authErr,
+            });
+            if (authErr) {
+                return { error: authErr.message, ok: false };
+            }
 
-            if (!creds) {
-                let registerResult: DeviceRegistrationResultLike | null = null;
-                let resolvedDeviceID: null | string = null;
-                try {
-                    const raw = await (
-                        client as unknown as ClientWithDeviceApprovals
-                    ).devices.register();
-                    if (isDeviceRegistrationPending(raw)) {
-                        registerResult = raw;
-                    } else if (hasDeviceID(raw)) {
-                        registerResult = raw;
-                    }
-                } catch (regErr: unknown) {
-                    // 470 = device with this signing key already exists — reuse it
-                    if (!this.isDeviceExistsError(regErr)) {
-                        const inferredPendingRequestID =
-                            await this.findPendingRequestAfterRegisterFailure(
-                                client,
-                                username,
-                                config.deviceName,
-                            );
-                        if (inferredPendingRequestID !== null) {
-                            this.startPendingApprovalWatcher({
-                                deviceKey: privateKey,
-                                keyStore,
-                                requestID: inferredPendingRequestID,
-                                username,
-                            });
-                            this.setAuthStatus("signed_out");
-                            return {
-                                error: "This device needs approval from another signed-in device.",
-                                ok: false,
-                                pendingDeviceApproval: true,
-                                pendingRequestID: inferredPendingRequestID,
-                            };
-                        }
-                        await this.close();
-                        this.resetAll();
-                        return { error: errorMessage(regErr), ok: false };
-                    }
-                }
-                if (
-                    registerResult &&
-                    "status" in registerResult &&
-                    registerResult.status === "pending_approval"
-                ) {
-                    this.startPendingApprovalWatcher({
-                        deviceKey: privateKey,
-                        keyStore,
-                        requestID: registerResult.requestID,
-                        username,
-                    });
-                    this.setAuthStatus("signed_out");
-                    return {
-                        error: "This device needs approval from another signed-in device.",
-                        ok: false,
-                        pendingDeviceApproval: true,
-                        pendingRequestID: registerResult.requestID,
-                    };
-                }
-                if (registerResult && "deviceID" in registerResult) {
-                    resolvedDeviceID = registerResult.deviceID;
-                }
-                if (!resolvedDeviceID) {
-                    const bySignKey = await client.devices.retrieve(
-                        client.getKeys().public,
-                    );
-                    resolvedDeviceID = bySignKey?.deviceID ?? null;
-                }
-                if (!resolvedDeviceID) {
-                    await this.close();
-                    this.resetAll();
-                    return {
-                        error: "Could not resolve this device registration.",
-                        ok: false,
-                    };
-                }
-                await this.saveCredentials(keyStore, {
-                    deviceID: resolvedDeviceID,
-                    deviceKey: privateKey,
-                    token: "",
-                    username,
-                });
-            } else {
-                try {
-                    await keyStore.save({ ...creds, token: "" });
-                } catch {
-                    /* non-fatal token update */
-                }
+            try {
+                await keyStore.save({ ...creds, token: "" });
+            } catch {
+                /* non-fatal token update */
             }
 
             await client.connect();
@@ -966,7 +869,7 @@ class VexService {
      */
     async register(
         username: string,
-        password: string,
+        _password: string,
         config: BootstrapConfig,
         options: ServerOptions,
         keyStore: KeyStore,
@@ -997,8 +900,16 @@ class VexService {
             debugAuth("register:http:begin", {
                 endpoint: `${options.host}/register`,
             });
+            const registrationUsername =
+                username.trim().length > 0
+                    ? username.trim()
+                    : Client.randomUsername();
+            const ignoredPasswordForCompatibility = "";
             const [user, regErr] = await withTimeout(
-                client.register(username, password),
+                client.register(
+                    registrationUsername,
+                    ignoredPasswordForCompatibility,
+                ),
                 REGISTER_STEP_TIMEOUT_MS,
                 `Signup stalled before reaching server registration at ${options.host}.`,
             );
@@ -1009,24 +920,6 @@ class VexService {
             if (regErr || !user) {
                 return {
                     error: regErr?.message ?? "Registration failed",
-                    ok: false,
-                };
-            }
-
-            const loginResult = await withTimeout(
-                client.login(username, password),
-                REGISTER_STEP_TIMEOUT_MS,
-                "Signup stalled while logging in the new account.",
-            );
-            debugAuth("register:login:done", {
-                error: loginResult.error ?? null,
-                ok: loginResult.ok,
-            });
-            if (!loginResult.ok) {
-                return {
-                    error:
-                        "Registered but login failed: " +
-                        (loginResult.error ?? "unknown"),
                     ok: false,
                 };
             }
@@ -1044,7 +937,7 @@ class VexService {
                 deviceID: client.me.device().deviceID,
                 deviceKey: privateKey,
                 token: "",
-                username,
+                username: client.me.user().username,
             });
 
             await withTimeout(
@@ -1910,17 +1803,6 @@ function getClientSocket(client: Client): null | WebSocketDebugLike {
     return maybeSocket;
 }
 
-function hasDeviceID(
-    value: unknown,
-): value is DeviceRegistrationResultLikeDevice {
-    return (
-        typeof value === "object" &&
-        value !== null &&
-        "deviceID" in value &&
-        typeof (value as { deviceID?: unknown }).deviceID === "string"
-    );
-}
-
 function hasHttpStatus(err: unknown): err is HttpErrorLike {
     if (!(err instanceof Error) || !("response" in err)) return false;
     const res = (err as { response: unknown }).response;
@@ -1947,26 +1829,6 @@ function isDecryptMismatchError(err: unknown): boolean {
     return (
         msg.includes("failed to decrypt sealed column value") ||
         msg.includes("couldn't decrypt messages on disk")
-    );
-}
-
-function isDeviceRegistrationPending(
-    value: unknown,
-): value is DeviceRegistrationPendingLike {
-    if (typeof value !== "object" || value === null) {
-        return false;
-    }
-    const v = value as {
-        challenge?: unknown;
-        expiresAt?: unknown;
-        requestID?: unknown;
-        status?: unknown;
-    };
-    return (
-        typeof v.requestID === "string" &&
-        typeof v.challenge === "string" &&
-        typeof v.expiresAt === "string" &&
-        v.status === "pending_approval"
     );
 }
 
