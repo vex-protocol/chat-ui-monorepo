@@ -55,18 +55,12 @@ export function ChannelScreen({
     const canOpenServerSettings = useMemo(() => {
         const myUserID = user?.userID;
         if (!myUserID) return false;
-        const highestPower = Object.values(permissions)
-            .filter(
-                (permission) =>
-                    permission.resourceID === serverID &&
-                    permission.userID === myUserID,
-            )
-            .reduce(
-                (maxPower, permission) =>
-                    Math.max(maxPower, permission.powerLevel),
-                0,
-            );
-        return highestPower >= 1;
+        const matchingPermissions = Object.values(permissions).filter(
+            (permission) =>
+                permission.resourceID === serverID &&
+                permission.userID === myUserID,
+        );
+        return matchingPermissions.length > 0;
     }, [permissions, serverID, user?.userID]);
 
     // Store keeps messages oldest-first; inverted FlatList needs newest-first
