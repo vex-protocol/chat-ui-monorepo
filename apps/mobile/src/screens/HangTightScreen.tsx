@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import {
+    Animated,
+    Easing,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 
 import { $user, vexService } from "@vex-chat/store";
 
@@ -16,6 +23,8 @@ export function HangTightScreen() {
     const _user = useStore($user);
     const [bootError, setBootError] = useState("");
     const [booting, setBooting] = useState(true);
+    const [username, setUsername] = useState("");
+    const [needsUsername, setNeedsUsername] = useState(false);
     // Use useMemo instead of useRef(...).current so the eslint
     // react-hooks/refs rule is satisfied (it flags accessing .current
     // during render). Animated.Value is stable across renders so
@@ -62,13 +71,16 @@ export function HangTightScreen() {
         const run = async () => {
             setBooting(true);
             setBootError("");
+            setNeedsUsername(false);
             try {
-                const result = await vexService.bootstrapAuth(
+                const result = await vexService.autoLogin(
                     keychainKeyStore,
                     mobileConfig(),
                     getServerOptions(),
                 );
-                if (!cancelled && !result.ok) {
+                if (!cancelled && !result.ok && !result.error) {
+                    setNeedsUsername(true);
+                } else if (!cancelled && !result.ok) {
                     setBootError(
                         result.error ?? "Could not initialize account.",
                     );
@@ -106,8 +118,66 @@ export function HangTightScreen() {
                 </Animated.Text>
                 <Text style={styles.heading}>Hang tight.</Text>
                 <Text style={styles.subtitle}>
-                    We're getting your account ready
+                    {needsUsername
+                        ? "Choose a username to create your account"
+                        : "We're getting your account ready"}
                 </Text>
+                {needsUsername ? (
+                    <View style={styles.setupWrap}>
+                        <TextInput
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            editable={!booting}
+                            onChangeText={setUsername}
+                            placeholder="username"
+                            placeholderTextColor={colors.muted}
+                            style={styles.usernameInput}
+                            value={username}
+                        />
+                        <VexButton
+                            disabled={booting}
+                            onPress={() => {
+                                const candidate = username.trim();
+                                if (!/^[A-Za-z0-9_]{3,19}$/.test(candidate)) {
+                                    setBootError(
+                                        "Username must be 3-19 letters, digits, or underscores.",
+                                    );
+                                    return;
+                                }
+                                setBootError("");
+                                setBooting(true);
+                                void vexService
+                                    .register(
+                                        candidate,
+                                        "",
+                                        mobileConfig(),
+                                        getServerOptions(),
+                                        keychainKeyStore,
+                                    )
+                                    .then((result) => {
+                                        if (!result.ok) {
+                                            setBootError(
+                                                result.error ??
+                                                    "Could not create account.",
+                                            );
+                                        }
+                                    })
+                                    .catch((err: unknown) => {
+                                        setBootError(
+                                            err instanceof Error
+                                                ? err.message
+                                                : "Could not create account.",
+                                        );
+                                    })
+                                    .finally(() => {
+                                        setBooting(false);
+                                    });
+                            }}
+                            title={booting ? "Creating..." : "Create account"}
+                            variant="outline"
+                        />
+                    </View>
+                ) : null}
                 {bootError ? (
                     <View style={styles.errorWrap}>
                         <Text style={styles.errorText}>{bootError}</Text>
@@ -116,13 +186,18 @@ export function HangTightScreen() {
                             onPress={() => {
                                 setBooting(true);
                                 setBootError("");
+                                setNeedsUsername(false);
                                 void vexService
-                                    .bootstrapAuth(
+                                    .autoLogin(
                                         keychainKeyStore,
                                         mobileConfig(),
                                         getServerOptions(),
                                     )
                                     .then((result) => {
+                                        if (!result.ok && !result.error) {
+                                            setNeedsUsername(true);
+                                            return;
+                                        }
                                         if (!result.ok) {
                                             setBootError(
                                                 result.error ??
@@ -178,8 +253,23 @@ const styles = StyleSheet.create({
         fontSize: 48,
         marginBottom: 24,
     },
+    setupWrap: {
+        alignItems: "center",
+        gap: 10,
+        marginTop: 14,
+        width: "100%",
+    },
     subtitle: {
         ...typography.body,
         color: colors.muted,
+    },
+    usernameInput: {
+        borderColor: colors.borderSubtle,
+        borderRadius: 8,
+        borderWidth: 1,
+        color: colors.text,
+        minWidth: 250,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
     },
 });
