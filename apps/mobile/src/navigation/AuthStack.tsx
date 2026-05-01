@@ -1,10 +1,9 @@
 import type { AuthStackParamList } from "./types";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
-import { loadCredentials } from "../lib/keychain";
 import { AuthenticateScreen } from "../screens/AuthenticateScreen";
 import { FinalizeScreen } from "../screens/FinalizeScreen";
 import { HangTightScreen } from "../screens/HangTightScreen";
@@ -16,21 +15,9 @@ import { WelcomeScreen } from "../screens/WelcomeScreen";
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export function AuthStack() {
-    const [initialRoute, setInitialRoute] = useState<
-        "Welcome" | "WelcomeBack" | null
-    >(null);
-
-    useEffect(() => {
-        void loadCredentials().then((creds) => {
-            setInitialRoute(creds ? "WelcomeBack" : "Welcome");
-        });
-    }, []);
-
-    if (!initialRoute) return null; // brief wait while checking keychain
-
     return (
         <Stack.Navigator
-            initialRouteName={initialRoute}
+            initialRouteName="HangTight"
             screenOptions={{ headerShown: false }}
         >
             <Stack.Screen component={WelcomeScreen} name="Welcome" />

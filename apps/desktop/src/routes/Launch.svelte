@@ -21,7 +21,7 @@
         loading = true;
         try {
             const result = await Promise.race([
-                vexService.autoLogin(
+                vexService.bootstrapAuth(
                     keyStore,
                     desktopConfig(),
                     getServerOptions(),

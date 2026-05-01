@@ -405,6 +405,29 @@ class VexService {
         }
     }
 
+    /**
+     * Zero-input bootstrap flow used on app startup:
+     * 1) attempt device-key auto-login from local credentials
+     * 2) if no credentials exist, auto-provision a fresh key cluster/device
+     */
+    async bootstrapAuth(
+        keyStore: KeyStore,
+        config: BootstrapConfig,
+        options: ServerOptions,
+    ): Promise<AuthResult> {
+        const existing = await this.autoLogin(keyStore, config, options);
+        if (existing.ok) {
+            return existing;
+        }
+        // Only auto-provision when there is no local credential material.
+        if (existing.error) {
+            return existing;
+        }
+
+        const autoUsername = `key_${Client.randomUsername()}`;
+        return this.register(autoUsername, "", config, options, keyStore);
+    }
+
     async close(): Promise<void> {
         if (this.client) {
             this.detachWebsocketDebug();
@@ -665,17 +688,24 @@ class VexService {
         this.setAuthStatus("checking");
         debugAuth("login:start", { host: options.host, username });
         try {
-            const creds = await keyStore.load(username);
+            const identifier = username.trim();
+            const creds =
+                identifier.length > 0
+                    ? await keyStore.load(identifier)
+                    : await keyStore.load();
             const privateKey = creds?.deviceKey ?? Client.generateSecretKey();
 
             await this.initClient(
                 privateKey,
-                username,
+                identifier.length > 0 ? identifier : (creds?.username ?? ""),
                 config,
                 options,
                 !creds,
             );
-            debugAuth("login:initClient:ok", { host: options.host, username });
+            debugAuth("login:initClient:ok", {
+                host: options.host,
+                username: identifier.length > 0 ? identifier : creds?.username,
+            });
             const client = this.requireClient();
 
             if (!creds) {
@@ -904,12 +934,8 @@ class VexService {
                 username.trim().length > 0
                     ? username.trim()
                     : Client.randomUsername();
-            const ignoredPasswordForCompatibility = "";
             const [user, regErr] = await withTimeout(
-                client.register(
-                    registrationUsername,
-                    ignoredPasswordForCompatibility,
-                ),
+                client.register(registrationUsername),
                 REGISTER_STEP_TIMEOUT_MS,
                 `Signup stalled before reaching server registration at ${options.host}.`,
             );
