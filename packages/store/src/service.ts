@@ -424,7 +424,7 @@ class VexService {
             return existing;
         }
 
-        const autoUsername = `key_${Client.randomUsername()}`;
+        const autoUsername = generateAutoProvisionUsername();
         return this.register(autoUsername, "", config, options, keyStore);
     }
 
@@ -933,7 +933,7 @@ class VexService {
             const registrationUsername =
                 username.trim().length > 0
                     ? username.trim()
-                    : Client.randomUsername();
+                    : generateAutoProvisionUsername();
             const [user, regErr] = await withTimeout(
                 client.register(registrationUsername),
                 REGISTER_STEP_TIMEOUT_MS,
@@ -1818,6 +1818,11 @@ function describeWsFrame(data: Uint8Array): {
 
 function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
+}
+
+function generateAutoProvisionUsername(): string {
+    const entropy = Math.random().toString(36).slice(2, 10);
+    return `key_${entropy}`;
 }
 
 function getClientSocket(client: Client): null | WebSocketDebugLike {

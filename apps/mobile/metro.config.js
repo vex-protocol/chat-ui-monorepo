@@ -88,6 +88,11 @@ const nodeStubs = {
     winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
 };
 
+const linkedLibvexSqliteEntry = path.resolve(
+    linkedProtocolRoot,
+    "packages/libvex/dist/storage/sqlite.js",
+);
+
 // Kysely's FileMigrationProvider uses `yield import(runtime-path)` in
 // BOTH its ESM and CJS builds — Node 14+ supports dynamic import() in
 // CJS so the compiler preserves the syntax. conditionNames can't help;
@@ -106,6 +111,27 @@ const pathStubs = [
 ];
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+    // When using local link overrides to sibling vex-protocol packages, Metro's
+    // package-exports resolution can intermittently fail to resolve the
+    // "@vex-chat/libvex/storage/sqlite" subpath even though dist files exist.
+    // Resolve it directly to the built sibling dist entry for local debugging.
+    if (fs.existsSync(linkedLibvexSqliteEntry)) {
+        if (moduleName === "@vex-chat/libvex/storage/sqlite") {
+            return {
+                filePath: linkedLibvexSqliteEntry,
+                type: "sourceFile",
+            };
+        }
+        if (
+            moduleName === "./vex-protocol/packages/libvex/dist/storage/sqlite" ||
+            moduleName.endsWith("/vex-protocol/packages/libvex/dist/storage/sqlite")
+        ) {
+            return {
+                filePath: linkedLibvexSqliteEntry,
+                type: "sourceFile",
+            };
+        }
+    }
     // Some transitive noble consumers still import the old subpath with
     // ".js". Metro can resolve it via filesystem fallback, but it warns on
     // every reload because this subpath is not exported. Normalize it to the
