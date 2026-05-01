@@ -222,6 +222,7 @@ class Disposable {
 }
 
 class VexService {
+    private autoLoginInFlight: null | Promise<AuthResult> = null;
     private client: Client | null = null;
     private connectionRecoveryInFlight = false;
     private readonly deviceRequestQueueListeners = new Set<() => void>();
@@ -266,42 +267,151 @@ class VexService {
         config: BootstrapConfig,
         options: ServerOptions,
     ): Promise<AuthResult> {
-        this.setAuthStatus("checking");
-        debugAuth("autoLogin:start", { host: options.host });
-        let creds;
-        try {
-            creds = await keyStore.load();
-        } catch (loadErr: unknown) {
-            return { error: errorMessage(loadErr), ok: false };
+        if (this.autoLoginInFlight) {
+            return this.autoLoginInFlight;
         }
-        if (!creds) {
-            this.setAuthStatus("signed_out");
-            return { ok: false };
-        }
+        const run = async (): Promise<AuthResult> => {
+            if (
+                this.client &&
+                $userWritable.get() !== null &&
+                $authStatusWritable.get() === "authenticated"
+            ) {
+                debugAuth("autoLogin:skip:already-authenticated", {
+                    host: options.host,
+                });
+                return { ok: true };
+            }
+            this.setAuthStatus("checking");
+            debugAuth("autoLogin:start", { host: options.host });
+            let creds;
+            try {
+                creds = await keyStore.load();
+            } catch (loadErr: unknown) {
+                return { error: errorMessage(loadErr), ok: false };
+            }
+            if (!creds) {
+                this.setAuthStatus("signed_out");
+                return { ok: false };
+            }
 
-        try {
-            await this.initClient(
-                creds.deviceKey,
-                creds.username,
-                config,
-                options,
-            );
-            debugAuth("autoLogin:initClient:ok", {
-                host: options.host,
-                username: creds.username,
-            });
-            const client = this.requireClient();
+            try {
+                await this.initClient(
+                    creds.deviceKey,
+                    creds.username,
+                    config,
+                    options,
+                );
+                debugAuth("autoLogin:initClient:ok", {
+                    host: options.host,
+                    username: creds.username,
+                });
+                const client = this.requireClient();
 
-            const authErr = await this.loginWithDeviceKeyWithRetry(
-                client,
-                creds.deviceID,
-            );
-            if (authErr) {
-                await this.close();
-                if (isUnauthorizedError(authErr)) {
-                    debugAuth("autoLogin:unauthorized:clearingCredentials", {
+                const authErr = await this.loginWithDeviceKeyWithRetry(
+                    client,
+                    creds.deviceID,
+                );
+                if (authErr) {
+                    await this.close();
+                    if (isUnauthorizedError(authErr)) {
+                        debugAuth(
+                            "autoLogin:unauthorized:clearingCredentials",
+                            {
+                                username: creds.username,
+                            },
+                        );
+                        await this.clearStoredCredentials(
+                            keyStore,
+                            creds.username,
+                        );
+                        this.setAuthStatus("unauthorized");
+                        return {
+                            error: "Session expired. Please sign in again.",
+                            ok: false,
+                        };
+                    }
+                    return { error: authErr.message, ok: false };
+                }
+
+                await client.connect();
+                $userWritable.set(client.me.user());
+                this.setAuthStatus("authenticated");
+                await this.populateState();
+                return { ok: true };
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    debugAuth("autoLogin:decrypt-mismatch:recover:start", {
                         username: creds.username,
                     });
+                    try {
+                        await this.initClient(
+                            creds.deviceKey,
+                            creds.username,
+                            config,
+                            options,
+                            true,
+                        );
+                        const recovered = this.requireClient();
+                        const authErr = await this.loginWithDeviceKeyWithRetry(
+                            recovered,
+                            creds.deviceID,
+                        );
+                        if (authErr) {
+                            await this.close();
+                            if (isUnauthorizedError(authErr)) {
+                                debugAuth(
+                                    "autoLogin:decrypt-mismatch:recover:unauthorized:clearingCredentials",
+                                    { username: creds.username },
+                                );
+                                await this.clearStoredCredentials(
+                                    keyStore,
+                                    creds.username,
+                                );
+                                this.setAuthStatus("unauthorized");
+                                return {
+                                    error: "Session expired. Please sign in again.",
+                                    ok: false,
+                                };
+                            }
+                            return { error: authErr.message, ok: false };
+                        }
+
+                        await recovered.connect();
+                        $userWritable.set(recovered.me.user());
+                        this.setAuthStatus("authenticated");
+                        await this.populateState();
+                        debugAuth("autoLogin:decrypt-mismatch:recover:ok", {
+                            username: creds.username,
+                        });
+                        return { ok: true };
+                    } catch (recoveryErr: unknown) {
+                        try {
+                            await this.close();
+                        } catch {
+                            /* ignore close errors */
+                        }
+                        debugAuth("autoLogin:decrypt-mismatch:recover:failed", {
+                            message: errorMessage(recoveryErr),
+                            username: creds.username,
+                        });
+                        return {
+                            error: "Local encrypted data could not be recovered on this device. Please sign in again.",
+                            ok: false,
+                        };
+                    }
+                }
+                try {
+                    await this.close();
+                } catch {
+                    /* ignore close errors */
+                }
+                if (isUnauthorizedError(err)) {
+                    debugAuth(
+                        "autoLogin:catch:unauthorized:clearingCredentials",
+                        {
+                            username: creds.username,
+                        },
+                    );
                     await this.clearStoredCredentials(keyStore, creds.username);
                     this.setAuthStatus("unauthorized");
                     return {
@@ -309,99 +419,20 @@ class VexService {
                         ok: false,
                     };
                 }
-                return { error: authErr.message, ok: false };
-            }
-
-            await client.connect();
-            $userWritable.set(client.me.user());
-            this.setAuthStatus("authenticated");
-            await this.populateState();
-            return { ok: true };
-        } catch (err: unknown) {
-            if (isDecryptMismatchError(err)) {
-                debugAuth("autoLogin:decrypt-mismatch:recover:start", {
-                    username: creds.username,
-                });
-                try {
-                    await this.initClient(
-                        creds.deviceKey,
-                        creds.username,
-                        config,
-                        options,
-                        true,
-                    );
-                    const recovered = this.requireClient();
-                    const authErr = await this.loginWithDeviceKeyWithRetry(
-                        recovered,
-                        creds.deviceID,
-                    );
-                    if (authErr) {
-                        await this.close();
-                        if (isUnauthorizedError(authErr)) {
-                            debugAuth(
-                                "autoLogin:decrypt-mismatch:recover:unauthorized:clearingCredentials",
-                                { username: creds.username },
-                            );
-                            await this.clearStoredCredentials(
-                                keyStore,
-                                creds.username,
-                            );
-                            this.setAuthStatus("unauthorized");
-                            return {
-                                error: "Session expired. Please sign in again.",
-                                ok: false,
-                            };
-                        }
-                        return { error: authErr.message, ok: false };
-                    }
-
-                    await recovered.connect();
-                    $userWritable.set(recovered.me.user());
-                    this.setAuthStatus("authenticated");
-                    await this.populateState();
-                    debugAuth("autoLogin:decrypt-mismatch:recover:ok", {
-                        username: creds.username,
-                    });
-                    return { ok: true };
-                } catch (recoveryErr: unknown) {
-                    try {
-                        await this.close();
-                    } catch {
-                        /* ignore close errors */
-                    }
-                    debugAuth("autoLogin:decrypt-mismatch:recover:failed", {
-                        message: errorMessage(recoveryErr),
-                        username: creds.username,
-                    });
-                    return {
-                        error: "Local encrypted data could not be recovered on this device. Please sign in again.",
-                        ok: false,
-                    };
+                if (isNetworkError(err)) {
+                    this.setAuthStatus("offline");
                 }
+                if ($keyReplacedWritable.get()) {
+                    return { keyReplaced: true, ok: false };
+                }
+                return { error: errorMessage(err), ok: false };
             }
-            try {
-                await this.close();
-            } catch {
-                /* ignore close errors */
-            }
-            if (isUnauthorizedError(err)) {
-                debugAuth("autoLogin:catch:unauthorized:clearingCredentials", {
-                    username: creds.username,
-                });
-                await this.clearStoredCredentials(keyStore, creds.username);
-                this.setAuthStatus("unauthorized");
-                return {
-                    error: "Session expired. Please sign in again.",
-                    ok: false,
-                };
-            }
-            if (isNetworkError(err)) {
-                this.setAuthStatus("offline");
-            }
-            if ($keyReplacedWritable.get()) {
-                return { keyReplaced: true, ok: false };
-            }
-            return { error: errorMessage(err), ok: false };
+        };
+        this.autoLoginInFlight = run();
+        try {
+            return await this.autoLoginInFlight;
+        } finally {
+            this.autoLoginInFlight = null;
         }
     }
 
@@ -944,6 +975,17 @@ class VexService {
                 regErr: regErr?.message ?? null,
             });
             if (regErr || !user) {
+                const pendingRequestID = regErr
+                    ? this.extractPendingRequestID(regErr.message)
+                    : null;
+                if (pendingRequestID) {
+                    return {
+                        error: "Device approval requested. Confirm this new device from an existing signed-in device, then retry.",
+                        ok: false,
+                        pendingDeviceApproval: true,
+                        pendingRequestID,
+                    };
+                }
                 return {
                     error: regErr?.message ?? "Registration failed",
                     ok: false,
@@ -1282,6 +1324,11 @@ class VexService {
             .catch(() => {
                 this.failedUserLookups.add(userID);
             });
+    }
+
+    private extractPendingRequestID(message: string): null | string {
+        const match = /requestID=([0-9a-fA-F-]+)/.exec(message);
+        return match?.[1] ?? null;
     }
 
     private async findPendingRequestAfterRegisterFailure(
