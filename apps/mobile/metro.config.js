@@ -123,8 +123,11 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
             };
         }
         if (
-            moduleName === "./vex-protocol/packages/libvex/dist/storage/sqlite" ||
-            moduleName.endsWith("/vex-protocol/packages/libvex/dist/storage/sqlite")
+            moduleName ===
+                "./vex-protocol/packages/libvex/dist/storage/sqlite" ||
+            moduleName.endsWith(
+                "/vex-protocol/packages/libvex/dist/storage/sqlite",
+            )
         ) {
             return {
                 filePath: linkedLibvexSqliteEntry,
