@@ -1,12 +1,17 @@
+const fs = require("fs");
 const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
+const linkedProtocolRoot = path.resolve(monorepoRoot, "../vex-protocol");
 
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [monorepoRoot];
+if (fs.existsSync(linkedProtocolRoot)) {
+    config.watchFolders.push(linkedProtocolRoot);
+}
 config.resolver.nodeModulesPaths = [
     path.resolve(projectRoot, "node_modules"),
     path.resolve(monorepoRoot, "node_modules"),

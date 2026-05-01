@@ -39,24 +39,26 @@ export function ServerSettingsScreen({
     const serverName =
         servers[serverID]?.name ?? route.params.serverName ?? "Server";
     const channels = channelsByServer[serverID] ?? [];
-    const serverPowerLevel = useMemo(() => {
+    const membershipPermissions = useMemo(() => {
         const myUserID = user?.userID;
-        if (!myUserID) return 0;
-        const matchingPermissions = Object.values(permissions).filter(
+        if (!myUserID) return [];
+        return Object.values(permissions).filter(
             (permission) =>
                 permission.resourceID === serverID &&
                 permission.userID === myUserID,
         );
-        if (matchingPermissions.length === 0) {
+    }, [permissions, serverID, user?.userID]);
+    const serverPowerLevel = useMemo(() => {
+        if (membershipPermissions.length === 0) {
             return 0;
         }
         return Math.max(
-            ...matchingPermissions.map((permission) => permission.powerLevel),
+            ...membershipPermissions.map((permission) => permission.powerLevel),
         );
-    }, [permissions, serverID, user?.userID]);
+    }, [membershipPermissions]);
     const canCreateChannelByRole = serverPowerLevel >= 50;
     const canDeleteServerByRole = serverPowerLevel >= 100;
-    const canManageInvitesByRole = serverPowerLevel >= 1;
+    const canManageInvitesByRole = membershipPermissions.length > 0;
 
     const canCreateChannel = useMemo(
         () => channelName.trim().length > 0 && !creatingChannel,
