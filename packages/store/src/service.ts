@@ -1868,7 +1868,14 @@ function errorMessage(err: unknown): string {
 }
 
 function generateAutoProvisionUsername(): string {
-    const entropy = Math.random().toString(36).slice(2, 10);
+    const bytes = new Uint8Array(4);
+    if (typeof globalThis.crypto?.getRandomValues !== "function") {
+        throw new Error("Secure random generator unavailable.");
+    }
+    globalThis.crypto.getRandomValues(bytes);
+    const entropy = Array.from(bytes, (b) =>
+        b.toString(16).padStart(2, "0"),
+    ).join("");
     return `key_${entropy}`;
 }
 
