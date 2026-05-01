@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "android:clean-autolinking": "node -e \"require('node:fs').rmSync('android/build/generated/autolinking', { recursive: true, force: true })\"",
-        "android": "pnpm run android:clean-autolinking && expo run:android",
+        "android": "pnpm run android:with-logs",
         "android:with-logs": "bash ./scripts/android-with-logs.sh",
         "android:release:install-all": "bash ./scripts/release-apk-install-all.sh",
         "ios:release:install": "bash ./scripts/install-ios-release.sh",
