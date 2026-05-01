@@ -1,0 +1,114 @@
+name: Update vex-protocol dependencies
+
+on:
+    repository_dispatch:
+        types: [vex-protocol-published]
+    workflow_dispatch:
+        inputs:
+            packages_json:
+                description: "JSON array of published packages (name/version)"
+                required: false
+                type: string
+
+concurrency:
+    group: update-vex-protocol-deps
+    cancel-in-progress: true
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    update-deps:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Harden Runner
+              uses: step-security/harden-runner@f808768d1510423e83855289c910610ca9b43176 # v2.17.0
+              with:
+                  egress-policy: audit
+
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version-file: .tool-versions
+
+            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+              with:
+                  run_install: false
+
+            - name: Resolve published package payload
+              id: payload
+              env:
+                  DISPATCH_PAYLOAD: ${{ toJSON(github.event.client_payload.packages) }}
+                  MANUAL_PAYLOAD: ${{ inputs.packages_json }}
+              run: |
+                  set -euo pipefail
+
+                  if [ -n "${MANUAL_PAYLOAD}" ]; then
+                      json="${MANUAL_PAYLOAD}"
+                  else
+                      json="${DISPATCH_PAYLOAD}"
+                  fi
+
+                  if [ -z "${json}" ] || [ "${json}" = "null" ] || [ "${json}" = "[]" ]; then
+                      echo "has_packages=false" >> "${GITHUB_OUTPUT}"
+                      echo "packages_json=[]" >> "${GITHUB_OUTPUT}"
+                      exit 0
+                  fi
+
+                  echo "${json}" | jq -e 'if type == "array" then . else error("payload must be array") end' > /dev/null
+
+                  {
+                      echo "has_packages=true"
+                      echo "packages_json=${json}"
+                  } >> "${GITHUB_OUTPUT}"
+
+            - name: Stop when no matching package updates
+              if: steps.payload.outputs.has_packages != 'true'
+              run: echo "No published package payload received."
+
+            - name: Update @vex-chat catalog versions
+              if: steps.payload.outputs.has_packages == 'true'
+              env:
+                  PACKAGES_JSON: ${{ steps.payload.outputs.packages_json }}
+              run: node ./scripts/update-vex-chat-catalog.mjs
+
+            - name: Refresh lockfile
+              if: steps.payload.outputs.has_packages == 'true'
+              run: pnpm install --lockfile-only --ignore-scripts
+
+            - name: Detect dependency changes
+              if: steps.payload.outputs.has_packages == 'true'
+              id: diff
+              run: |
+                  set -euo pipefail
+                  if git diff --quiet -- pnpm-workspace.yaml pnpm-lock.yaml; then
+                      echo "changed=false" >> "${GITHUB_OUTPUT}"
+                  else
+                      echo "changed=true" >> "${GITHUB_OUTPUT}"
+                  fi
+
+            - name: Create pull request
+              if: steps.diff.outputs.changed == 'true'
+              uses: peter-evans/create-pull-request@v7
+              with:
+                  branch: chore/update-vex-protocol-dependencies
+                  delete-branch: false
+                  commit-message: "chore: bump vex-protocol dependencies"
+                  title: "chore: bump vex-protocol dependencies"
+                  body: |
+                      Automated update after a `vex-protocol` publish.
+
+                      This PR updates `@vex-chat/*` versions in `pnpm-workspace.yaml`
+                      and refreshes `pnpm-lock.yaml`.
+                  labels: dependencies
+                  add-paths: |
+                      pnpm-workspace.yaml
+                      pnpm-lock.yaml
+
+            - name: Report no-op
+              if: steps.payload.outputs.has_packages == 'true' && steps.diff.outputs.changed != 'true'
+              run: echo "No dependency changes were needed."
