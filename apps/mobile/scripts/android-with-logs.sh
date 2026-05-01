@@ -96,7 +96,7 @@ for serial in "${DEVICES[@]}"; do
     echo "[$serial] adb reverse tcp:8081"
     adb -s "$serial" reverse tcp:8081 tcp:8081 >/dev/null 2>&1 || true
     echo "[$serial] install"
-    adb -s "$serial" install -r "$APK_PATH" >/dev/null
+    adb -s "$serial" install -r -d "$APK_PATH" >/dev/null
     echo "[$serial] launch"
     adb -s "$serial" shell monkey -p "$APP_PACKAGE" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1
 done
