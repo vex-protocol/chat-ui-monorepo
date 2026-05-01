@@ -20,6 +20,7 @@ import type {
 } from "@vex-chat/libvex";
 
 import { Client } from "@vex-chat/libvex";
+import { randomBytes } from "crypto";
 
 import {
     $authStatusWritable,
@@ -1868,7 +1869,7 @@ function errorMessage(err: unknown): string {
 }
 
 function generateAutoProvisionUsername(): string {
-    const entropy = Math.random().toString(36).slice(2, 10);
+    const entropy = randomBytes(8).toString("hex");
     return `key_${entropy}`;
 }
 
