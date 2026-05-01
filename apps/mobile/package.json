@@ -5,6 +5,7 @@
     "scripts": {
         "android:clean-autolinking": "node -e \"require('node:fs').rmSync('android/build/generated/autolinking', { recursive: true, force: true })\"",
         "android": "pnpm run android:clean-autolinking && expo run:android",
+        "android:with-logs": "bash ./scripts/android-with-logs.sh",
         "android:release:install-all": "bash ./scripts/release-apk-install-all.sh",
         "ios:release:install": "bash ./scripts/install-ios-release.sh",
         "ios": "expo run:ios",
@@ -14,6 +15,7 @@
         "dev:android-reverse": "adb reverse tcp:16777 tcp:16777 && EXPO_PUBLIC_ENABLE_DEV_SERVER=1 EXPO_PUBLIC_SERVER_URL=localhost:16777 expo start --dev-client",
         "prebuild": "expo prebuild --clean",
         "start": "expo start",
+        "logs:android:all": "bash ./scripts/logcat-all-devices.sh",
         "lint": "eslint src/",
         "lint:fix": "eslint src/ --fix",
         "license:check": "npx @onebeyond/license-checker scan --allowOnly MIT ISC BSD-2-Clause BSD-3-Clause Apache-2.0 0BSD MPL-2.0 CC0-1.0 CC-BY-4.0 Unlicense BlueOak-1.0.0 Python-2.0 Zlib PSF-2.0 Artistic-2.0 AGPL-3.0-or-later WTFPL --ignoreRootPackageLicense --disableReport"

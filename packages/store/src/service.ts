@@ -246,10 +246,12 @@ class VexService {
     private lastDeviceAuthRefreshAttemptAt = 0;
     private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
-    private wsDebugEnabled = false;
+    private wsDebugEnabled = shouldDebugAuth();
+    private wsDebugFrameLogsEnabled = shouldDebugAuth();
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
     private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
     private wsDebugSocket: null | WebSocketDebugLike = null;
+    private wsDebugStateLogsEnabled = shouldDebugAuth();
 
     // ── Auth flows ──────────────────────────────────────────────────────
 
@@ -610,6 +612,14 @@ class VexService {
 
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
+    }
+
+    getWebsocketFrameDebugEnabled(): boolean {
+        return this.wsDebugFrameLogsEnabled;
+    }
+
+    getWebsocketStateDebugEnabled(): boolean {
+        return this.wsDebugStateLogsEnabled;
     }
 
     async joinInvite(inviteID: string): Promise<OperationResult> {
@@ -1205,6 +1215,19 @@ class VexService {
         this.detachWebsocketDebug();
     }
 
+    setWebsocketFrameDebug(enabled: boolean): void {
+        this.wsDebugFrameLogsEnabled = enabled;
+        if (!this.wsDebugEnabled) {
+            return;
+        }
+        this.detachWebsocketDebug();
+        this.attachWebsocketDebug();
+    }
+
+    setWebsocketStateDebug(enabled: boolean): void {
+        this.wsDebugStateLogsEnabled = enabled;
+    }
+
     private attachWebsocketDebug(): void {
         if (!this.wsDebugEnabled || !this.client) {
             return;
@@ -1217,19 +1240,24 @@ class VexService {
             return;
         }
         this.detachWebsocketDebug();
+        if (!this.wsDebugFrameLogsEnabled) {
+            this.wsDebugSocket = socket;
+            this.logWsState("ws:debug:attached", { frames: false });
+            return;
+        }
         const inbound = (data: Uint8Array) => {
-            console.log("[vex-ws][in]", describeWsFrame(data));
+            debugAuth("ws:in", describeWsFrame(data));
         };
         const originalSend = socket.send.bind(socket);
         socket.send = (data: Uint8Array) => {
-            console.log("[vex-ws][out]", describeWsFrame(data));
+            debugAuth("ws:out", describeWsFrame(data));
             originalSend(data);
         };
         socket.on("message", inbound);
         this.wsDebugSocket = socket;
         this.wsDebugInboundListener = inbound;
         this.wsDebugOriginalSend = originalSend;
-        console.log("[vex-ws] debug attached");
+        this.logWsState("ws:debug:attached", { frames: true });
     }
 
     // ── Private ─────────────────────────────────────────────────────────
@@ -1308,6 +1336,7 @@ class VexService {
         this.wsDebugInboundListener = null;
         this.wsDebugOriginalSend = null;
         this.wsDebugSocket = null;
+        this.logWsState("ws:debug:detached");
     }
 
     private ensureFamiliarCached(userID: string): void {
@@ -1468,6 +1497,13 @@ class VexService {
             await waitMs(backoffMs);
         }
         return lastErr;
+    }
+
+    private logWsState(step: string, meta?: Record<string, unknown>): void {
+        if (!this.wsDebugEnabled || !this.wsDebugStateLogsEnabled) {
+            return;
+        }
+        debugAuth(step, meta);
     }
 
     private markRateLimited(source: string): void {
@@ -1769,10 +1805,12 @@ class VexService {
 
     private wireEvents(): void {
         this.subscribe("connected", () => {
+            this.logWsState("ws:connected");
             this.setAuthStatus("authenticated");
             this.attachWebsocketDebug();
         });
         this.subscribe("disconnect", () => {
+            this.logWsState("ws:disconnect");
             this.setAuthStatus("offline");
             void this.recoverConnection("disconnect");
         });

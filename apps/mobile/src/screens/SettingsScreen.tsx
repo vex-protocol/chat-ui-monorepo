@@ -31,6 +31,12 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
     );
+    const [wsFrameDebugEnabled, setWsFrameDebugEnabled] = useState(() =>
+        vexService.getWebsocketFrameDebugEnabled(),
+    );
+    const [wsStateDebugEnabled, setWsStateDebugEnabled] = useState(() =>
+        vexService.getWebsocketStateDebugEnabled(),
+    );
 
     function handleExportIdentityKey(): void {
         Alert.alert(
@@ -281,6 +287,42 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                                 vexService.setWebsocketDebug(value);
                             }}
                             value={wsDebugEnabled}
+                        />
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>
+                                WebSocket frame payload logs
+                            </Text>
+                            <Text style={styles.desc}>
+                                Log raw inbound/outbound frame payloads
+                            </Text>
+                        </View>
+                        <Switch
+                            onValueChange={(value) => {
+                                setWsFrameDebugEnabled(value);
+                                vexService.setWebsocketFrameDebug(value);
+                            }}
+                            value={wsFrameDebugEnabled}
+                        />
+                    </View>
+
+                    <View style={styles.rowCard}>
+                        <View style={styles.rowInfo}>
+                            <Text style={styles.label}>
+                                WebSocket state transition logs
+                            </Text>
+                            <Text style={styles.desc}>
+                                Log connect/disconnect/recover lifecycle events
+                            </Text>
+                        </View>
+                        <Switch
+                            onValueChange={(value) => {
+                                setWsStateDebugEnabled(value);
+                                vexService.setWebsocketStateDebug(value);
+                            }}
+                            value={wsStateDebugEnabled}
                         />
                     </View>
                 </View>
