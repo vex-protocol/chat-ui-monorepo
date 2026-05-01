@@ -47,7 +47,10 @@ const updated = [];
 
 for (const [name, version] of publishedByName) {
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const linePattern = new RegExp(`^(\\s*"${escapedName}"\\s*:\\s*)([^\\n#]+)`, "m");
+    const linePattern = new RegExp(
+        `^(\\s*"${escapedName}"\\s*:\\s*)([^\\n#]+)`,
+        "m",
+    );
     const match = nextWorkspace.match(linePattern);
 
     if (!match) {
