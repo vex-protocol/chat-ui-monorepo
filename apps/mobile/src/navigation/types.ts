@@ -26,11 +26,7 @@ export type AuthScreenProps<T extends keyof AuthStackParamList> =
 // ── Auth stack ──────────────────────────────────────────────────────────────
 export type AuthStackParamList = {
     Authenticate: undefined | { requestID?: string; username?: string };
-    Finalize: { method: string };
-    HangTight: undefined;
-    Initialize: undefined;
-    Login: undefined;
-    Register: undefined;
+    HangTight: undefined | { force?: boolean };
     Welcome: undefined;
     WelcomeBack: undefined;
 };

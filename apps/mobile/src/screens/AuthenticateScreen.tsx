@@ -7,92 +7,68 @@ import {
     Easing,
     StyleSheet,
     Text,
+    TouchableOpacity,
     Vibration,
     View,
 } from "react-native";
 
-import { vexService } from "@vex-chat/store";
+import { $user } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
-import { getServerOptions } from "../lib/config";
-import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
-import { keychainKeyStore } from "../lib/keychain";
-import { mobileConfig } from "../lib/platform";
+import { VexButton } from "../components/VexButton";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Authenticate">;
 
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
-const POLL_MS = 1500;
-const SUCCESS_DELAY_MS = 850;
 
-type VerifyPhase = "error" | "success" | "waiting";
+type VerifyPhase = "expired" | "success" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
+    const user = useStore($user);
     const [code, setCode] = useState("");
     const [secondsLeft, setSecondsLeft] = useState(EXPIRY_SECONDS);
-    const [error, setError] = useState("");
     const [phase, setPhase] = useState<VerifyPhase>("waiting");
-    const [statusText, setStatusText] = useState("Waiting for approval...");
-    const pollRef = useRef<null | ReturnType<typeof setInterval>>(null);
-    const completingAuthRef = useRef(false);
     const successOpacity = useRef(new Animated.Value(0)).current;
     const successScale = useRef(new Animated.Value(0.86)).current;
 
     useEffect(() => {
         const requestID = route.params?.requestID;
-        if (!requestID) {
-            setPhase("error");
-            setError(
-                "No verification request was provided. Please try signing in again.",
-            );
-        } else {
+        if (requestID) {
             setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
-            void verifyCode(requestID);
         }
-        return () => {
-            stopPolling();
-        };
         // route params are static for this mounted screen
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
+        if (phase !== "waiting") {
+            return;
+        }
         const timer = setInterval(() => {
-            setSecondsLeft((s) => (s > 0 ? s - 1 : 0));
+            setSecondsLeft((s) => {
+                if (s <= 1) {
+                    clearInterval(timer);
+                    setPhase("expired");
+                    return 0;
+                }
+                return s - 1;
+            });
         }, 1000);
         return () => {
             clearInterval(timer);
         };
-    }, []);
+    }, [phase]);
 
-    const minutes = Math.floor(secondsLeft / 60)
-        .toString()
-        .padStart(2, "0");
-    const seconds = (secondsLeft % 60).toString().padStart(2, "0");
-
-    function stopPolling(): void {
-        if (pollRef.current) {
-            clearInterval(pollRef.current);
-            pollRef.current = null;
-        }
-    }
-
-    function ensurePolling(requestID: string): void {
-        if (pollRef.current) {
-            return;
-        }
-        pollRef.current = setInterval(() => {
-            void verifyCode(requestID);
-        }, POLL_MS);
-    }
-
-    async function playSuccessAnimation(): Promise<void> {
-        Vibration.vibrate(20);
-        await new Promise<void>((resolve) => {
+    useEffect(() => {
+        if (user && phase !== "success") {
+            setPhase("success");
+            Vibration.vibrate(20);
             Animated.parallel([
                 Animated.timing(successOpacity, {
                     duration: 240,
@@ -107,77 +83,17 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     toValue: 1,
                     useNativeDriver: true,
                 }),
-            ]).start(() => resolve());
-        });
-    }
+            ]).start();
+        }
+    }, [user, phase, successOpacity, successScale]);
 
-    async function handleApproved(requestID: string): Promise<void> {
-        if (completingAuthRef.current) {
-            return;
-        }
-        completingAuthRef.current = true;
-        stopPolling();
-        setError("");
-        setPhase("success");
-        setStatusText("Code matched. Signing you in...");
-        setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
-        await playSuccessAnimation();
-        await waitMs(SUCCESS_DELAY_MS);
-        const auth = await vexService.autoLogin(
-            keychainKeyStore,
-            mobileConfig(),
-            getServerOptions(),
-        );
-        if (!auth.ok) {
-            completingAuthRef.current = false;
-            setPhase("error");
-            setError(auth.error ?? "Failed to complete sign-in.");
-            setStatusText("");
-        }
-    }
+    const minutes = Math.floor(secondsLeft / 60)
+        .toString()
+        .padStart(2, "0");
+    const seconds = (secondsLeft % 60).toString().padStart(2, "0");
 
-    async function verifyCode(requestID: string): Promise<void> {
-        if (completingAuthRef.current) {
-            return;
-        }
-        try {
-            const request = await vexService.getDeviceRequest(requestID);
-            if (!request) {
-                setPhase("error");
-                setError("Verification request was not found on the server.");
-                return;
-            }
-            const requestCode = normalizeCode(
-                approvalCodeForRequest(request),
-            ).slice(0, CODE_LENGTH);
-            if (requestCode.length > 0) {
-                setCode(requestCode);
-            }
-            if (request.status === "approved") {
-                await handleApproved(request.requestID);
-                return;
-            }
-            if (request.status === "rejected" || request.status === "expired") {
-                stopPolling();
-                setPhase("error");
-                setError(
-                    request.status === "rejected"
-                        ? "This verification was rejected."
-                        : "This verification has expired.",
-                );
-                setStatusText("");
-                return;
-            }
-            setPhase("waiting");
-            setStatusText("Waiting for approval on your signed-in device...");
-            ensurePolling(requestID);
-        } catch (err: unknown) {
-            setPhase("error");
-            setError(
-                err instanceof Error ? err.message : "Verification failed.",
-            );
-            setStatusText("");
-        }
+    function goBackToSignIn(): void {
+        navigation.replace("HangTight", { force: true });
     }
 
     return (
@@ -188,7 +104,8 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 <Text style={styles.label}>VERIFICATION REQUIRED</Text>
                 <Text style={styles.heading}>Match This Code.</Text>
                 <Text style={styles.instructions}>
-                    Please make sure the codes match on both devices.
+                    Confirm this code on a device you&apos;re already signed in
+                    on. Once approved, this device will sign in automatically.
                 </Text>
 
                 <View style={styles.codeRow}>
@@ -216,18 +133,18 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 </View>
 
                 <Text style={styles.timer}>
-                    Expires in: {minutes}:{seconds}
+                    Expires in {minutes}:{seconds}
                 </Text>
 
                 {phase === "waiting" ? (
-                    <View style={styles.waitingCard}>
+                    <View style={styles.statusCard}>
                         <ActivityIndicator
                             animating
                             color={colors.accent}
-                            size="large"
+                            size="small"
                         />
                         <Text style={styles.statusText}>
-                            {statusText || "Waiting for approval..."}
+                            Waiting for approval on your other device...
                         </Text>
                     </View>
                 ) : null}
@@ -251,33 +168,45 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     </Animated.View>
                 ) : null}
 
-                {error !== "" ? (
-                    <Text style={styles.errorText}>{error}</Text>
+                {phase === "expired" ? (
+                    <View style={styles.expiredCard}>
+                        <Text style={styles.expiredTitle}>
+                            This verification expired
+                        </Text>
+                        <Text style={styles.expiredBody}>
+                            Approval wasn&apos;t confirmed in time. Start over
+                            to request a fresh code.
+                        </Text>
+                    </View>
+                ) : null}
+            </View>
+
+            <View style={styles.footer}>
+                {phase === "expired" ? (
+                    <View style={styles.primaryButtonRow}>
+                        <VexButton
+                            glow
+                            onPress={goBackToSignIn}
+                            title="Retry verification"
+                            variant="outline"
+                        />
+                    </View>
                 ) : null}
 
-                <View style={styles.links}>
-                    {phase === "error" && route.params?.requestID ? (
-                        <Text
-                            onPress={() => {
-                                setError("");
-                                setPhase("waiting");
-                                setStatusText("Waiting for approval...");
-                                void verifyCode(route.params.requestID);
-                            }}
-                            style={styles.link}
-                        >
-                            Retry verification
-                        </Text>
-                    ) : null}
-                    <Text
-                        onPress={() => {
-                            navigation.replace("Login");
-                        }}
-                        style={styles.link}
-                    >
-                        Back to login
-                    </Text>
-                </View>
+                <TouchableOpacity
+                    activeOpacity={0.7}
+                    hitSlop={{
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                        top: 12,
+                    }}
+                    onPress={goBackToSignIn}
+                    style={styles.linkRow}
+                >
+                    <Text style={styles.linkArrow}>‹</Text>
+                    <Text style={styles.linkText}>Back to sign in</Text>
+                </TouchableOpacity>
             </View>
         </ScreenLayout>
     );
@@ -285,12 +214,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
 
 function normalizeCode(value: string): string {
     return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
-async function waitMs(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
 }
 
 const styles = StyleSheet.create({
@@ -322,10 +245,29 @@ const styles = StyleSheet.create({
         gap: 14,
         marginTop: 32,
     },
-    errorText: {
+    expiredBody: {
+        ...typography.body,
+        color: colors.textSecondary,
+        textAlign: "center",
+    },
+    expiredCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(229, 57, 53, 0.10)",
+        borderColor: "rgba(229, 57, 53, 0.4)",
+        borderWidth: 1,
+        gap: 6,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
+    expiredTitle: {
         ...typography.body,
         color: colors.error,
-        textAlign: "center",
+        fontWeight: "600",
+    },
+    footer: {
+        alignItems: "center",
+        gap: 16,
+        paddingBottom: 24,
     },
     heading: {
         ...typography.heading,
@@ -340,18 +282,43 @@ const styles = StyleSheet.create({
         ...typography.label,
         color: colors.muted,
     },
-    link: {
+    linkArrow: {
         ...typography.body,
-        color: colors.muted,
+        color: colors.accent,
+        fontSize: 18,
+        marginTop: -2,
     },
-    links: {
-        gap: 10,
-        marginTop: 8,
+    linkRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    linkText: {
+        ...typography.body,
+        color: colors.accent,
+        textDecorationColor: colors.accent,
+        textDecorationLine: "underline",
+        textDecorationStyle: "dotted",
+    },
+    primaryButtonRow: {
+        alignItems: "center",
+    },
+    statusCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
     },
     statusText: {
         ...typography.body,
         color: colors.textSecondary,
-        textAlign: "center",
+        flex: 1,
     },
     successBadge: {
         alignItems: "center",
@@ -367,7 +334,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "rgba(26,42,33,0.45)",
         borderColor: "rgba(74, 222, 128, 0.25)",
-        borderRadius: 12,
         borderWidth: 1,
         gap: 10,
         paddingHorizontal: 14,
@@ -388,15 +354,5 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.muted,
         textAlign: "center",
-    },
-    waitingCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.02)",
-        borderColor: "rgba(255,255,255,0.08)",
-        borderRadius: 12,
-        borderWidth: 1,
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 16,
     },
 });

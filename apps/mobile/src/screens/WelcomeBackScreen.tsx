@@ -82,7 +82,7 @@ export function WelcomeBackScreen({ navigation }: Props) {
 
     async function handleSwitchAccount() {
         await clearCredentials();
-        navigation.navigate("Login");
+        navigation.navigate("HangTight", { force: true });
     }
 
     return (
@@ -160,7 +160,11 @@ export function WelcomeBackScreen({ navigation }: Props) {
                     <Text style={styles.footerLabel}>New here?</Text>
                     <Text
                         onPress={() => {
-                            navigation.navigate("Initialize");
+                            void clearCredentials().then(() => {
+                                navigation.navigate("HangTight", {
+                                    force: true,
+                                });
+                            });
                         }}
                         style={styles.footerLink}
                     >
