@@ -181,6 +181,10 @@ interface DevicesWithApprovalLike {
     delete: (deviceID: string) => Promise<void>;
     getRequest?: (requestID: string) => Promise<DeviceApprovalRequest | null>;
     listRequests?: () => Promise<DeviceApprovalRequest[]>;
+    pollPendingRegistration?: (args: {
+        challenge: string;
+        requestID: string;
+    }) => Promise<DeviceApprovalRequest | null>;
     register: () => Promise<unknown>;
     rejectRequest?: (requestID: string) => Promise<unknown>;
     retrieve: (
@@ -984,10 +988,10 @@ class VexService {
                 regErr: regErr?.message ?? null,
             });
             if (regErr || !user) {
-                const pendingRequestID = regErr
-                    ? this.extractPendingRequestID(regErr.message)
+                const pending = regErr
+                    ? this.extractPendingApprovalDetails(regErr)
                     : null;
-                if (pendingRequestID) {
+                if (pending) {
                     // Background-watch the pending request so when the existing
                     // device approves it we can save creds, complete login, and
                     // flip the navigator into the App stack automatically.
@@ -995,16 +999,17 @@ class VexService {
                     // with no creds saved (register() returns before saving)
                     // and "approved" would never advance the user.
                     this.startPendingApprovalWatcher({
+                        challenge: pending.challenge,
                         deviceKey: privateKey,
                         keyStore,
-                        requestID: pendingRequestID,
+                        requestID: pending.requestID,
                         username: registrationUsername,
                     });
                     return {
                         error: "Device approval requested. Confirm this new device from an existing signed-in device.",
                         ok: false,
                         pendingDeviceApproval: true,
-                        pendingRequestID,
+                        pendingRequestID: pending.requestID,
                     };
                 }
                 return {
@@ -1347,9 +1352,37 @@ class VexService {
             });
     }
 
-    private extractPendingRequestID(message: string): null | string {
+    private extractPendingApprovalDetails(err: unknown): null | {
+        challenge: null | string;
+        requestID: string;
+    } {
+        // libvex >=6.1.4 throws a typed error carrying both fields.
+        if (
+            err !== null &&
+            typeof err === "object" &&
+            "requestID" in err &&
+            typeof (err as { requestID: unknown }).requestID === "string"
+        ) {
+            const requestID = (err as { requestID: string }).requestID;
+            const maybeChallenge = (err as { challenge?: unknown }).challenge;
+            return {
+                challenge:
+                    typeof maybeChallenge === "string" ? maybeChallenge : null,
+                requestID,
+            };
+        }
+        const message =
+            err !== null &&
+            typeof err === "object" &&
+            "message" in err &&
+            typeof (err as { message: unknown }).message === "string"
+                ? (err as { message: string }).message
+                : "";
         const match = /requestID=([0-9a-fA-F-]+)/.exec(message);
-        return match?.[1] ?? null;
+        if (match?.[1]) {
+            return { challenge: null, requestID: match[1] };
+        }
+        return null;
     }
 
     private async findPendingRequestAfterRegisterFailure(
@@ -1669,11 +1702,13 @@ class VexService {
     }
 
     private startPendingApprovalWatcher({
+        challenge,
         deviceKey,
         keyStore,
         requestID,
         username,
     }: {
+        challenge: null | string;
         deviceKey: string;
         keyStore: KeyStore;
         requestID: string;
@@ -1695,7 +1730,20 @@ class VexService {
                     client as unknown as ClientWithDeviceApprovals;
                 let pending: DeviceApprovalRequest | null = null;
                 try {
+                    // Prefer the unauthenticated poll when we have a challenge
+                    // — the new device has no token until approval lands, so
+                    // the protected getRequest/listRequests endpoints would
+                    // throw "auth event not emitted" forever.
                     if (
+                        challenge !== null &&
+                        typeof withApprovals.devices.pollPendingRegistration ===
+                            "function"
+                    ) {
+                        pending =
+                            await withApprovals.devices.pollPendingRegistration(
+                                { challenge, requestID },
+                            );
+                    } else if (
                         typeof withApprovals.devices.getRequest === "function"
                     ) {
                         pending =
