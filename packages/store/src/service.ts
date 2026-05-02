@@ -27,6 +27,7 @@ import {
     $devicesWritable,
     $familiarsWritable,
     $keyReplacedWritable,
+    $signedOutIntentWritable,
     $userWritable,
 } from "./domains/identity.ts";
 import {
@@ -270,6 +271,9 @@ class VexService {
         if (this.autoLoginInFlight) {
             return this.autoLoginInFlight;
         }
+        // An autoLogin attempt is intentional re-auth; clear the explicit
+        // sign-out intent so subsequent flows behave normally.
+        $signedOutIntentWritable.set(false);
         const run = async (): Promise<AuthResult> => {
             if (
                 this.client &&
@@ -716,6 +720,7 @@ class VexService {
         options: ServerOptions,
         keyStore: KeyStore,
     ): Promise<AuthResult> {
+        $signedOutIntentWritable.set(false);
         this.setAuthStatus("checking");
         debugAuth("login:start", { host: options.host, username });
         try {
@@ -780,6 +785,9 @@ class VexService {
         await this.close();
         this.resetAll();
         this.setAuthStatus("signed_out");
+        // Mark sign-out as explicit so the auth UI does not auto-login from
+        // the keychain credentials we intentionally keep around.
+        $signedOutIntentWritable.set(true);
     }
 
     async lookupUser(query: string): Promise<null | User> {
@@ -935,6 +943,7 @@ class VexService {
         options: ServerOptions,
         keyStore: KeyStore,
     ): Promise<AuthResult> {
+        $signedOutIntentWritable.set(false);
         this.setAuthStatus("checking");
         debugAuth("register:start", { host: options.host, username });
         try {
@@ -979,8 +988,20 @@ class VexService {
                     ? this.extractPendingRequestID(regErr.message)
                     : null;
                 if (pendingRequestID) {
+                    // Background-watch the pending request so when the existing
+                    // device approves it we can save creds, complete login, and
+                    // flip the navigator into the App stack automatically.
+                    // Without this the AuthenticateScreen would call autoLogin
+                    // with no creds saved (register() returns before saving)
+                    // and "approved" would never advance the user.
+                    this.startPendingApprovalWatcher({
+                        deviceKey: privateKey,
+                        keyStore,
+                        requestID: pendingRequestID,
+                        username: registrationUsername,
+                    });
                     return {
-                        error: "Device approval requested. Confirm this new device from an existing signed-in device, then retry.",
+                        error: "Device approval requested. Confirm this new device from an existing signed-in device.",
                         ok: false,
                         pendingDeviceApproval: true,
                         pendingRequestID,

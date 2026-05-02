@@ -11,6 +11,7 @@ export {
     $devices,
     $familiars,
     $keyReplaced,
+    $signedOutIntent,
     $user,
 } from "./domains/identity.ts";
 export type { AuthStatus } from "./domains/identity.ts";

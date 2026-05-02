@@ -11,15 +11,14 @@ import {
     View,
 } from "react-native";
 
-import { vexService } from "@vex-chat/store";
+import { $user, vexService } from "@vex-chat/store";
+
+import { useStore } from "@nanostores/react";
 
 import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
-import { getServerOptions } from "../lib/config";
 import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
-import { keychainKeyStore } from "../lib/keychain";
-import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Authenticate">;
@@ -27,11 +26,11 @@ type Props = AuthScreenProps<"Authenticate">;
 const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
 const POLL_MS = 1500;
-const SUCCESS_DELAY_MS = 850;
 
 type VerifyPhase = "error" | "success" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
+    const user = useStore($user);
     const [code, setCode] = useState("");
     const [secondsLeft, setSecondsLeft] = useState(EXPIRY_SECONDS);
     const [error, setError] = useState("");
@@ -41,6 +40,21 @@ export function AuthenticateScreen({ navigation, route }: Props) {
     const completingAuthRef = useRef(false);
     const successOpacity = useRef(new Animated.Value(0)).current;
     const successScale = useRef(new Animated.Value(0.86)).current;
+
+    // The vexService starts a background watcher when register() returns
+    // pendingDeviceApproval. That watcher saves credentials + completes
+    // login the moment status flips to "approved", then sets $user.
+    // RootNavigator auto-switches to the App stack as soon as that happens,
+    // so this screen unmounts. We just observe the same status to render
+    // success UI; we no longer race the watcher with our own autoLogin.
+    useEffect(() => {
+        if (user) {
+            stopPolling();
+            setPhase("success");
+            setError("");
+            setStatusText("Approved. Loading your account...");
+        }
+    }, [user]);
 
     useEffect(() => {
         const requestID = route.params?.requestID;
@@ -122,18 +136,9 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         setStatusText("Code matched. Signing you in...");
         setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
         await playSuccessAnimation();
-        await waitMs(SUCCESS_DELAY_MS);
-        const auth = await vexService.autoLogin(
-            keychainKeyStore,
-            mobileConfig(),
-            getServerOptions(),
-        );
-        if (!auth.ok) {
-            completingAuthRef.current = false;
-            setPhase("error");
-            setError(auth.error ?? "Failed to complete sign-in.");
-            setStatusText("");
-        }
+        // The in-service approval watcher will save creds + finish login and
+        // set $user; the user-effect above will keep the success UI shown
+        // and RootNavigator will swap to the App stack. We just wait.
     }
 
     async function verifyCode(requestID: string): Promise<void> {
@@ -285,12 +290,6 @@ export function AuthenticateScreen({ navigation, route }: Props) {
 
 function normalizeCode(value: string): string {
     return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
-async function waitMs(ms: number): Promise<void> {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
-    });
 }
 
 const styles = StyleSheet.create({

@@ -32,7 +32,7 @@ const AVATAR_COLORS = [
     "#FB8C00",
 ] as const;
 
-export function FinalizeScreen({ navigation: _navigation, route }: Props) {
+export function FinalizeScreen({ navigation, route }: Props) {
     const method = route.params.method;
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -86,6 +86,23 @@ export function FinalizeScreen({ navigation: _navigation, route }: Props) {
                 SIGNUP_TIMEOUT_MS,
                 "Signup timed out. Check your connection and try again.",
             );
+
+            if (
+                !result.ok &&
+                result.pendingDeviceApproval &&
+                result.pendingRequestID
+            ) {
+                // The username already belongs to an existing account on
+                // this server. Server returned a pending device-approval
+                // request; flow continues on Authenticate, which polls and
+                // auto-completes sign-in once an existing device approves.
+                setLoading(false);
+                navigation.replace("Authenticate", {
+                    requestID: result.pendingRequestID,
+                    username,
+                });
+                return;
+            }
 
             if (!result.ok) {
                 setError(result.error || "Registration failed");
