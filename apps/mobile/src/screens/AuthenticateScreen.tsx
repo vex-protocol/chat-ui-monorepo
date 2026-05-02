@@ -1,6 +1,6 @@
 import type { AuthScreenProps } from "../navigation/types";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Animated,
@@ -12,7 +12,7 @@ import {
     View,
 } from "react-native";
 
-import { $user } from "@vex-chat/store";
+import { $pendingApprovalStage, $user } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
@@ -20,32 +20,66 @@ import { BackButton } from "../components/BackButton";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
+import { matchingCodeForSignKey } from "../lib/deviceApprovalCode";
 import { colors, typography } from "../theme";
 
 type Props = AuthScreenProps<"Authenticate">;
 
-const CODE_LENGTH = 6;
 const EXPIRY_SECONDS = 5 * 60;
+const APPROVE_GLOW = "rgba(74, 222, 128, 0.45)";
+const SIGNING_BLUE = "#5DADE2";
 
-type VerifyPhase = "expired" | "success" | "waiting";
+type DisplayPhase = "expired" | "loading_account" | "signing_in" | "waiting";
 
 export function AuthenticateScreen({ navigation, route }: Props) {
     const user = useStore($user);
-    const [code, setCode] = useState("");
+    const stage = useStore($pendingApprovalStage);
+    const signKey = route.params?.signKey ?? null;
+    const codeChars = matchingCodeForSignKey(signKey);
     const [secondsLeft, setSecondsLeft] = useState(EXPIRY_SECONDS);
-    const [phase, setPhase] = useState<VerifyPhase>("waiting");
-    const successOpacity = useRef(new Animated.Value(0)).current;
-    const successScale = useRef(new Animated.Value(0.86)).current;
+    const [expired, setExpired] = useState(false);
 
+    const phase: DisplayPhase = expired
+        ? "expired"
+        : stage === "loading_account" || user
+          ? "loading_account"
+          : stage === "signing_in"
+            ? "signing_in"
+            : "waiting";
+
+    // Soft pulsing focus ring around the code while we're still waiting,
+    // so it's clear the digits are "live" and to be matched against the
+    // approver's screen.
+    const halo = useMemo(() => new Animated.Value(0), []);
     useEffect(() => {
-        const requestID = route.params?.requestID;
-        if (requestID) {
-            setCode(normalizeCode(requestID).slice(0, CODE_LENGTH));
+        if (phase !== "waiting") {
+            halo.stopAnimation();
+            halo.setValue(0);
+            return;
         }
-        // route params are static for this mounted screen
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        const loop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(halo, {
+                    duration: 900,
+                    easing: Easing.inOut(Easing.quad),
+                    toValue: 1,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(halo, {
+                    duration: 900,
+                    easing: Easing.inOut(Easing.quad),
+                    toValue: 0,
+                    useNativeDriver: true,
+                }),
+            ]),
+        );
+        loop.start();
+        return () => {
+            loop.stop();
+        };
+    }, [phase, halo]);
 
+    // Countdown timer — only meaningful while waiting.
     useEffect(() => {
         if (phase !== "waiting") {
             return;
@@ -54,7 +88,7 @@ export function AuthenticateScreen({ navigation, route }: Props) {
             setSecondsLeft((s) => {
                 if (s <= 1) {
                     clearInterval(timer);
-                    setPhase("expired");
+                    setExpired(true);
                     return 0;
                 }
                 return s - 1;
@@ -65,27 +99,14 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         };
     }, [phase]);
 
+    // Tactile cue at each big phase transition.
     useEffect(() => {
-        if (user && phase !== "success") {
-            setPhase("success");
+        if (phase === "signing_in") {
+            Vibration.vibrate([0, 12, 40, 12]);
+        } else if (phase === "loading_account") {
             Vibration.vibrate(20);
-            Animated.parallel([
-                Animated.timing(successOpacity, {
-                    duration: 240,
-                    easing: Easing.out(Easing.quad),
-                    toValue: 1,
-                    useNativeDriver: true,
-                }),
-                Animated.spring(successScale, {
-                    damping: 14,
-                    mass: 0.65,
-                    stiffness: 260,
-                    toValue: 1,
-                    useNativeDriver: true,
-                }),
-            ]).start();
         }
-    }, [user, phase, successOpacity, successScale]);
+    }, [phase]);
 
     const minutes = Math.floor(secondsLeft / 60)
         .toString()
@@ -96,6 +117,15 @@ export function AuthenticateScreen({ navigation, route }: Props) {
         navigation.replace("HangTight", { force: true });
     }
 
+    const haloOpacity = halo.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.18, 0.55],
+    });
+    const haloScale = halo.interpolate({
+        inputRange: [0, 1],
+        outputRange: [1, 1.04],
+    });
+
     return (
         <ScreenLayout>
             <BackButton />
@@ -104,43 +134,51 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                 <Text style={styles.label}>VERIFICATION REQUIRED</Text>
                 <Text style={styles.heading}>Match This Code.</Text>
                 <Text style={styles.instructions}>
-                    Confirm this code on a device you&apos;re already signed in
-                    on. Once approved, this device will sign in automatically.
+                    The same four characters should appear on a device
+                    you&apos;re already signed in on. Tap Approve there to
+                    finish signing this device in.
                 </Text>
 
-                <View style={styles.codeRow}>
-                    {Array.from({ length: CODE_LENGTH }).map((_, i) => {
-                        const filled = i < code.length;
-                        return (
+                <View style={styles.codeStage}>
+                    <Animated.View
+                        pointerEvents="none"
+                        style={[
+                            styles.halo,
+                            {
+                                opacity: haloOpacity,
+                                transform: [{ scale: haloScale }],
+                            },
+                        ]}
+                    />
+                    <View style={styles.codeRow}>
+                        {codeChars.map((char, i) => (
                             <CornerBracketBox
-                                color={filled ? colors.accent : colors.border}
+                                color={colors.error}
                                 key={i}
                                 size={6}
+                                thickness={1.5}
                             >
-                                <View
-                                    style={[
-                                        styles.cell,
-                                        filled && styles.cellFilled,
-                                    ]}
-                                >
-                                    <Text style={styles.cellText}>
-                                        {code[i] ?? ""}
-                                    </Text>
+                                <View style={styles.cell}>
+                                    <Text style={styles.cellText}>{char}</Text>
                                 </View>
                             </CornerBracketBox>
-                        );
-                    })}
+                        ))}
+                    </View>
                 </View>
 
                 <Text style={styles.timer}>
-                    Expires in {minutes}:{seconds}
+                    {phase === "waiting"
+                        ? `Expires in ${minutes}:${seconds}`
+                        : phase === "expired"
+                          ? "Verification window closed"
+                          : "Code matched"}
                 </Text>
 
                 {phase === "waiting" ? (
                     <View style={styles.statusCard}>
                         <ActivityIndicator
                             animating
-                            color={colors.accent}
+                            color={colors.muted}
                             size="small"
                         />
                         <Text style={styles.statusText}>
@@ -149,23 +187,30 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     </View>
                 ) : null}
 
-                {phase === "success" ? (
-                    <Animated.View
-                        style={[
-                            styles.successCard,
-                            {
-                                opacity: successOpacity,
-                                transform: [{ scale: successScale }],
-                            },
-                        ]}
-                    >
-                        <View style={styles.successBadge}>
-                            <Text style={styles.successCheck}>✓</Text>
-                        </View>
-                        <Text style={styles.successText}>
-                            Approved. Loading your account...
+                {phase === "signing_in" ? (
+                    <View style={[styles.statusCard, styles.statusCardActive]}>
+                        <ActivityIndicator
+                            animating
+                            color={SIGNING_BLUE}
+                            size="small"
+                        />
+                        <Text style={styles.statusTextActive}>
+                            Signing in...
                         </Text>
-                    </Animated.View>
+                    </View>
+                ) : null}
+
+                {phase === "loading_account" ? (
+                    <View style={[styles.statusCard, styles.statusCardActive]}>
+                        <ActivityIndicator
+                            animating
+                            color={SIGNING_BLUE}
+                            size="small"
+                        />
+                        <Text style={styles.statusTextActive}>
+                            Loading your account...
+                        </Text>
+                    </View>
                 ) : null}
 
                 {phase === "expired" ? (
@@ -193,52 +238,53 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     </View>
                 ) : null}
 
-                <TouchableOpacity
-                    activeOpacity={0.7}
-                    hitSlop={{
-                        bottom: 12,
-                        left: 12,
-                        right: 12,
-                        top: 12,
-                    }}
-                    onPress={goBackToSignIn}
-                    style={styles.linkRow}
-                >
-                    <Text style={styles.linkArrow}>‹</Text>
-                    <Text style={styles.linkText}>Back to sign in</Text>
-                </TouchableOpacity>
+                {phase === "waiting" || phase === "expired" ? (
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        hitSlop={{
+                            bottom: 12,
+                            left: 12,
+                            right: 12,
+                            top: 12,
+                        }}
+                        onPress={goBackToSignIn}
+                        style={styles.linkRow}
+                    >
+                        <Text style={styles.linkArrow}>‹</Text>
+                        <Text style={styles.linkText}>Back to sign in</Text>
+                    </TouchableOpacity>
+                ) : null}
             </View>
         </ScreenLayout>
     );
 }
 
-function normalizeCode(value: string): string {
-    return value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
-}
-
 const styles = StyleSheet.create({
     cell: {
         alignItems: "center",
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
+        backgroundColor: "rgba(229, 57, 53, 0.08)",
+        borderColor: "rgba(229, 57, 53, 0.4)",
         borderWidth: 1,
-        height: 56,
+        height: 64,
         justifyContent: "center",
-        width: 48,
-    },
-    cellFilled: {
-        borderColor: colors.accent,
+        width: 56,
     },
     cellText: {
         ...typography.headingSmall,
         color: colors.text,
-        fontSize: 24,
+        fontSize: 28,
+        letterSpacing: 1,
     },
     codeRow: {
         flexDirection: "row",
-        gap: 10,
+        gap: 12,
         justifyContent: "center",
-        marginTop: 10,
+    },
+    codeStage: {
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 12,
+        paddingVertical: 16,
     },
     content: {
         flex: 1,
@@ -268,6 +314,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         gap: 16,
         paddingBottom: 24,
+    },
+    halo: {
+        backgroundColor: APPROVE_GLOW,
+        borderRadius: 50,
+        height: 92,
+        position: "absolute",
+        width: 320,
     },
     heading: {
         ...typography.heading,
@@ -315,40 +368,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingVertical: 14,
     },
+    statusCardActive: {
+        backgroundColor: "rgba(93, 173, 226, 0.10)",
+        borderColor: "rgba(93, 173, 226, 0.45)",
+    },
     statusText: {
         ...typography.body,
         color: colors.textSecondary,
         flex: 1,
     },
-    successBadge: {
-        alignItems: "center",
-        backgroundColor: "rgba(74, 222, 128, 0.18)",
-        borderColor: "rgba(74, 222, 128, 0.45)",
-        borderRadius: 24,
-        borderWidth: 1,
-        height: 48,
-        justifyContent: "center",
-        width: 48,
-    },
-    successCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(26,42,33,0.45)",
-        borderColor: "rgba(74, 222, 128, 0.25)",
-        borderWidth: 1,
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    successCheck: {
-        color: "#4ADE80",
-        fontSize: 30,
-        fontWeight: "700",
-        marginTop: -2,
-    },
-    successText: {
+    statusTextActive: {
         ...typography.body,
-        color: "#D8FCE5",
-        textAlign: "center",
+        color: "#D4ECFB",
+        flex: 1,
+        fontWeight: "600",
     },
     timer: {
         ...typography.body,

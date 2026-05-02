@@ -8,6 +8,7 @@ import {
     StatusBar,
     StyleSheet,
     Text,
+    Vibration,
     View,
 } from "react-native";
 
@@ -240,6 +241,9 @@ function App() {
                     return;
                 }
                 if (hasNewPending) {
+                    // Soft tactile cue so the approver notices a fresh
+                    // device request even if the toast is partly out of view.
+                    Vibration.vibrate([0, 18, 60, 18]);
                     setPendingApprovalNotice({ count: pending.length });
                 }
             } catch {

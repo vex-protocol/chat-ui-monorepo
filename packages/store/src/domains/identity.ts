@@ -9,6 +9,17 @@ export type AuthStatus =
     | "signed_out"
     | "unauthorized";
 
+// Sub-status for the multi-device enrollment flow on the *new* (requesting)
+// device. Lets the AuthenticateScreen show distinct UI states between
+// "still waiting for the existing device to approve", "approval landed —
+// signing in", and "signed in — loading your account" before the
+// navigator swaps to the App stack on $user.
+export type PendingApprovalStage =
+    | "idle"
+    | "loading_account"
+    | "signing_in"
+    | "waiting";
+
 // ── Writable (internal — only VexService imports these) ─────────────────────
 
 export const $userWritable = atom<null | User>(null);
@@ -21,6 +32,7 @@ export const $keyReplacedWritable = atom<boolean>(false);
 // "fresh boot, never tried" from "user just hit Sign Out" so we don't loop
 // straight back into autoLogin from the kept keychain credentials.
 export const $signedOutIntentWritable = atom<boolean>(false);
+export const $pendingApprovalStageWritable = atom<PendingApprovalStage>("idle");
 
 // ── Readable (public — components subscribe to these) ───────────────────────
 
@@ -31,3 +43,6 @@ export const $avatarHash = readonlyType($avatarHashWritable);
 export const $authStatus = readonlyType($authStatusWritable);
 export const $keyReplaced = readonlyType($keyReplacedWritable);
 export const $signedOutIntent = readonlyType($signedOutIntentWritable);
+export const $pendingApprovalStage = readonlyType(
+    $pendingApprovalStageWritable,
+);

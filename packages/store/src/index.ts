@@ -11,10 +11,11 @@ export {
     $devices,
     $familiars,
     $keyReplaced,
+    $pendingApprovalStage,
     $signedOutIntent,
     $user,
 } from "./domains/identity.ts";
-export type { AuthStatus } from "./domains/identity.ts";
+export type { AuthStatus, PendingApprovalStage } from "./domains/identity.ts";
 
 export {
     $channelUnreadCounts,
