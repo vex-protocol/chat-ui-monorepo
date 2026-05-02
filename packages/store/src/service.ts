@@ -27,6 +27,7 @@ import {
     $devicesWritable,
     $familiarsWritable,
     $keyReplacedWritable,
+    $pendingApprovalStageWritable,
     $signedOutIntentWritable,
     $userWritable,
 } from "./domains/identity.ts";
@@ -53,6 +54,14 @@ export interface AuthResult {
     ok: boolean;
     pendingDeviceApproval?: boolean;
     pendingRequestID?: string;
+    /**
+     * The new device's own public signing key (hex). Provided so the
+     * AuthenticateScreen can render the same matching code on both the
+     * new and the approving device — both derive it from these bytes
+     * (the new device from `client.getKeys().public`, the approver from
+     * the request payload's `signKey`).
+     */
+    pendingSignKey?: string;
 }
 
 export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
@@ -948,6 +957,7 @@ class VexService {
         keyStore: KeyStore,
     ): Promise<AuthResult> {
         $signedOutIntentWritable.set(false);
+        $pendingApprovalStageWritable.set("idle");
         this.setAuthStatus("checking");
         debugAuth("register:start", { host: options.host, username });
         try {
@@ -1010,11 +1020,20 @@ class VexService {
                         requestID: pending.requestID,
                         username: registrationUsername,
                     });
+                    let pendingSignKey: string | undefined;
+                    try {
+                        pendingSignKey = client.getKeys().public;
+                    } catch {
+                        pendingSignKey = undefined;
+                    }
                     return {
                         error: "Device approval requested. Confirm this new device from an existing signed-in device.",
                         ok: false,
                         pendingDeviceApproval: true,
                         pendingRequestID: pending.requestID,
+                        ...(pendingSignKey !== undefined
+                            ? { pendingSignKey }
+                            : {}),
                     };
                 }
                 return {
@@ -1663,6 +1682,7 @@ class VexService {
         $authStatusWritable.set("signed_out");
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
+        $pendingApprovalStageWritable.set("idle");
         this.lastDeviceAuthRefreshAttemptAt = 0;
         $familiarsWritable.set({});
         $devicesWritable.set({});
@@ -1729,6 +1749,7 @@ class VexService {
             requestID,
             username,
         });
+        $pendingApprovalStageWritable.set("waiting");
         const run = async () => {
             for (let attempt = 0; attempt < 300; attempt++) {
                 if (cancelled) return;
@@ -1803,6 +1824,7 @@ class VexService {
                         requestID,
                     });
                     try {
+                        $pendingApprovalStageWritable.set("signing_in");
                         await this.saveCredentials(keyStore, {
                             deviceID: pending.approvedDeviceID,
                             deviceKey,
@@ -1817,8 +1839,10 @@ class VexService {
                             debugAuth("approvalWatcher:loginFailed", {
                                 message: authErr.message,
                             });
+                            $pendingApprovalStageWritable.set("idle");
                             return;
                         }
+                        $pendingApprovalStageWritable.set("loading_account");
                         await client.connect();
                         $userWritable.set(client.me.user());
                         this.setAuthStatus("authenticated");
@@ -1827,6 +1851,7 @@ class VexService {
                             requestID,
                         });
                     } finally {
+                        $pendingApprovalStageWritable.set("idle");
                         this.stopPendingApprovalWatcher();
                     }
                     return;
@@ -1834,10 +1859,12 @@ class VexService {
                 debugAuth("approvalWatcher:terminal", {
                     status: pending.status,
                 });
+                $pendingApprovalStageWritable.set("idle");
                 this.stopPendingApprovalWatcher();
                 return;
             }
             debugAuth("approvalWatcher:givingUp", { requestID });
+            $pendingApprovalStageWritable.set("idle");
             this.stopPendingApprovalWatcher();
         };
         void run();

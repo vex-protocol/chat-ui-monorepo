@@ -2,6 +2,7 @@ import type { AuthScreenProps } from "../navigation/types";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+    ActivityIndicator,
     Animated,
     Easing,
     Keyboard,
@@ -279,6 +280,9 @@ export function HangTightScreen({
                     Vibration.vibrate([0, 20, 40, 20]);
                     navigation.replace("Authenticate", {
                         requestID: result.pendingRequestID,
+                        ...(result.pendingSignKey !== undefined
+                            ? { signKey: result.pendingSignKey }
+                            : {}),
                         username: candidate,
                     });
                     return;
@@ -474,10 +478,24 @@ export function HangTightScreen({
                             />
                         </Animated.View>
 
-                        <Text style={styles.bottomHint}>
-                            We'll create an account if this handle is new, or
-                            request approval from one of your existing devices.
-                        </Text>
+                        {busy ? (
+                            <View style={styles.signingCard}>
+                                <ActivityIndicator
+                                    animating
+                                    color={colors.accent}
+                                    size="small"
+                                />
+                                <Text style={styles.signingText}>
+                                    Signing in...
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text style={styles.bottomHint}>
+                                We'll create an account if this handle is new,
+                                or request approval from one of your existing
+                                devices.
+                            </Text>
+                        )}
                     </Animated.View>
                 </KeyboardAvoidingView>
             </ScreenLayout>
@@ -677,6 +695,21 @@ const styles = StyleSheet.create({
     signInBtn: {
         marginTop: 20,
         width: "100%",
+    },
+    signingCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: "rgba(255,255,255,0.10)",
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        marginTop: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    signingText: {
+        ...typography.body,
+        color: colors.textSecondary,
     },
     subheading: {
         ...typography.body,

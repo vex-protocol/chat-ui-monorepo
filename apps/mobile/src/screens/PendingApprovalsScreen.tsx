@@ -7,6 +7,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
+    Vibration,
     View,
 } from "react-native";
 
@@ -15,8 +16,9 @@ import { $authStatus, $user, vexService } from "@vex-chat/store";
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
+import { CornerBracketBox } from "../components/CornerBracketBox";
 import { getServerUrl } from "../lib/config";
-import { approvalCodeForRequest } from "../lib/deviceApprovalCode";
+import { matchingCodeForSignKey } from "../lib/deviceApprovalCode";
 import { colors, typography } from "../theme";
 
 export function PendingApprovalsScreen({
@@ -142,6 +144,7 @@ export function PendingApprovalsScreen({
     }, [refreshDeviceRequests, refreshSessionAndDevices, user?.userID]);
 
     async function approveDeviceRequest(requestID: string): Promise<void> {
+        Vibration.vibrate([0, 12, 40, 12]);
         setDeviceRequestBusy((prev) => ({ ...prev, [requestID]: true }));
         setDeviceRequestError("");
         try {
@@ -152,6 +155,7 @@ export function PendingApprovalsScreen({
                 );
                 return;
             }
+            Vibration.vibrate(20);
             await refreshDeviceRequests();
             await refreshSessionAndDevices();
         } finally {
@@ -267,18 +271,41 @@ export function PendingApprovalsScreen({
 
                     {deviceRequests.map((req) => {
                         const busy = deviceRequestBusy[req.requestID] === true;
+                        const codeChars = matchingCodeForSignKey(
+                            req.signKey ?? null,
+                        );
                         return (
-                            <View key={req.requestID} style={styles.rowCard}>
-                                <View style={styles.rowInfo}>
+                            <View
+                                key={req.requestID}
+                                style={styles.requestCard}
+                            >
+                                <View style={styles.requestHeader}>
                                     <Text style={styles.label}>
                                         {req.deviceName}
                                     </Text>
                                     <Text style={styles.desc}>
                                         Request {req.requestID.slice(0, 8)}...
                                     </Text>
-                                    <Text style={styles.desc}>
-                                        Code {approvalCodeForRequest(req)}
-                                    </Text>
+                                </View>
+                                <Text style={styles.matchHint}>
+                                    Confirm this code matches what you see on
+                                    the new device:
+                                </Text>
+                                <View style={styles.codeRow}>
+                                    {codeChars.map((char, i) => (
+                                        <CornerBracketBox
+                                            color={colors.error}
+                                            key={i}
+                                            size={5}
+                                            thickness={1.5}
+                                        >
+                                            <View style={styles.cell}>
+                                                <Text style={styles.cellText}>
+                                                    {char}
+                                                </Text>
+                                            </View>
+                                        </CornerBracketBox>
+                                    ))}
                                 </View>
                                 <View style={styles.inlineActions}>
                                     <TouchableOpacity
@@ -472,6 +499,27 @@ const styles = StyleSheet.create({
         color: "#4ADE80",
         fontWeight: "600",
     },
+    cell: {
+        alignItems: "center",
+        backgroundColor: "rgba(229, 57, 53, 0.08)",
+        borderColor: "rgba(229, 57, 53, 0.4)",
+        borderWidth: 1,
+        height: 52,
+        justifyContent: "center",
+        width: 44,
+    },
+    cellText: {
+        ...typography.button,
+        color: colors.text,
+        fontSize: 22,
+        letterSpacing: 1,
+    },
+    codeRow: {
+        flexDirection: "row",
+        gap: 10,
+        justifyContent: "center",
+        paddingVertical: 6,
+    },
     container: {
         backgroundColor: colors.bg,
         flex: 1,
@@ -515,12 +563,18 @@ const styles = StyleSheet.create({
     inlineActions: {
         flexDirection: "row",
         gap: 8,
+        justifyContent: "flex-end",
     },
     label: {
         ...typography.button,
         color: colors.textSecondary,
         fontSize: 14,
         fontWeight: "600",
+    },
+    matchHint: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.62)",
+        fontSize: 12,
     },
     mono: {
         fontFamily: typography.body.fontFamily,
@@ -554,6 +608,19 @@ const styles = StyleSheet.create({
         ...typography.button,
         color: colors.error,
         fontWeight: "600",
+    },
+    requestCard: {
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderBottomWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        borderRadius: 10,
+        borderWidth: 1,
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+    requestHeader: {
+        gap: 2,
     },
     rowCard: {
         alignItems: "center",
