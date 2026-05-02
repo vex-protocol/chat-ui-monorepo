@@ -31,7 +31,14 @@ type Phase = "boot" | "error" | "form";
 
 const HANDLE_PATTERN = /^[A-Za-z0-9_]{3,19}$/;
 
-export function HangTightScreen({ navigation }: AuthScreenProps<"HangTight">) {
+export function HangTightScreen({
+    navigation,
+    route,
+}: AuthScreenProps<"HangTight">) {
+    // `force: true` skips autoLogin and goes straight to the handle form —
+    // used when the user explicitly chooses "Sign in with a different
+    // account" or "Create an account" from a non-bootstrap entry point.
+    const forceForm = route.params?.force === true;
     const _user = useStore($user);
     const [bootError, setBootError] = useState("");
     const [busy, setBusy] = useState(true);
@@ -131,6 +138,14 @@ export function HangTightScreen({ navigation }: AuthScreenProps<"HangTight">) {
     useEffect(() => {
         let cancelled = false;
         const run = async () => {
+            // Explicit "switch account" / "create account" entries pass
+            // force=true so we skip autoLogin and present the handle form.
+            if (forceForm) {
+                setBusy(false);
+                setPhase("form");
+                return;
+            }
+
             // After an explicit sign-out we must NOT autoLogin from the
             // kept keychain credentials — that produced an immediate-resign
             // loop. Bounce to WelcomeBack (or Welcome if no creds) and let

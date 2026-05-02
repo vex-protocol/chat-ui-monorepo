@@ -276,11 +276,11 @@ export function AuthenticateScreen({ navigation, route }: Props) {
                     ) : null}
                     <Text
                         onPress={() => {
-                            navigation.replace("Login");
+                            navigation.replace("HangTight", { force: true });
                         }}
                         style={styles.link}
                     >
-                        Back to login
+                        Back to sign in
                     </Text>
                 </View>
             </View>
