@@ -991,6 +991,11 @@ class VexService {
                 const pending = regErr
                     ? this.extractPendingApprovalDetails(regErr)
                     : null;
+                debugAuth("register:pendingDetect", {
+                    hasChallenge: pending?.challenge !== null,
+                    pendingRequestID: pending?.requestID ?? null,
+                    regErrName: regErr?.name ?? null,
+                });
                 if (pending) {
                     // Background-watch the pending request so when the existing
                     // device approves it we can save creds, complete login, and
@@ -1719,15 +1724,28 @@ class VexService {
         this.pendingApprovalWatchCancel = () => {
             cancelled = true;
         };
+        debugAuth("approvalWatcher:start", {
+            hasChallenge: challenge !== null,
+            requestID,
+            username,
+        });
         const run = async () => {
             for (let attempt = 0; attempt < 300; attempt++) {
                 if (cancelled) return;
                 await waitMs(2000);
                 if (cancelled) return;
                 const client = this.client;
-                if (!client) return;
+                if (!client) {
+                    debugAuth("approvalWatcher:noClient", { attempt });
+                    return;
+                }
                 const withApprovals =
                     client as unknown as ClientWithDeviceApprovals;
+                const pollPendingRegistration =
+                    withApprovals.devices.pollPendingRegistration;
+                const usingUnauth =
+                    challenge !== null &&
+                    typeof pollPendingRegistration === "function";
                 let pending: DeviceApprovalRequest | null = null;
                 try {
                     // Prefer the unauthenticated poll when we have a challenge
@@ -1735,14 +1753,14 @@ class VexService {
                     // the protected getRequest/listRequests endpoints would
                     // throw "auth event not emitted" forever.
                     if (
-                        challenge !== null &&
-                        typeof withApprovals.devices.pollPendingRegistration ===
-                            "function"
+                        usingUnauth &&
+                        typeof pollPendingRegistration === "function" &&
+                        challenge !== null
                     ) {
-                        pending =
-                            await withApprovals.devices.pollPendingRegistration(
-                                { challenge, requestID },
-                            );
+                        pending = await pollPendingRegistration({
+                            challenge,
+                            requestID,
+                        });
                     } else if (
                         typeof withApprovals.devices.getRequest === "function"
                     ) {
@@ -1758,13 +1776,32 @@ class VexService {
                                 (req) => req.requestID === requestID,
                             ) ?? null;
                     }
-                } catch {
+                    debugAuth("approvalWatcher:poll", {
+                        attempt,
+                        method: usingUnauth
+                            ? "pollPendingRegistration"
+                            : "getRequest",
+                        requestID,
+                        status: pending?.status ?? "null",
+                    });
+                } catch (err: unknown) {
+                    debugAuth("approvalWatcher:pollError", {
+                        attempt,
+                        message: errorMessage(err),
+                        method: usingUnauth
+                            ? "pollPendingRegistration"
+                            : "getRequest",
+                    });
                     continue;
                 }
                 if (!pending || pending.status === "pending") {
                     continue;
                 }
                 if (pending.status === "approved" && pending.approvedDeviceID) {
+                    debugAuth("approvalWatcher:approved", {
+                        approvedDeviceID: pending.approvedDeviceID,
+                        requestID,
+                    });
                     try {
                         await this.saveCredentials(keyStore, {
                             deviceID: pending.approvedDeviceID,
@@ -1777,20 +1814,30 @@ class VexService {
                             pending.approvedDeviceID,
                         );
                         if (authErr) {
+                            debugAuth("approvalWatcher:loginFailed", {
+                                message: authErr.message,
+                            });
                             return;
                         }
                         await client.connect();
                         $userWritable.set(client.me.user());
                         this.setAuthStatus("authenticated");
                         await this.populateState();
+                        debugAuth("approvalWatcher:done", {
+                            requestID,
+                        });
                     } finally {
                         this.stopPendingApprovalWatcher();
                     }
                     return;
                 }
+                debugAuth("approvalWatcher:terminal", {
+                    status: pending.status,
+                });
                 this.stopPendingApprovalWatcher();
                 return;
             }
+            debugAuth("approvalWatcher:givingUp", { requestID });
             this.stopPendingApprovalWatcher();
         };
         void run();
