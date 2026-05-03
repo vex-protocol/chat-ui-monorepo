@@ -28,6 +28,13 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { getServerOptions } from "./src/lib/config";
 import { hydrateDevOptionsUnlocked } from "./src/lib/devMode";
+import {
+    $alwaysOnEnabled,
+    hydrateAlwaysOnPreference,
+    isAlwaysOnSupported,
+    startAlwaysOn,
+    suspendAlwaysOn,
+} from "./src/lib/foregroundService";
 import { clearCredentials, keychainKeyStore } from "./src/lib/keychain";
 import {
     requestNotificationPermission,
@@ -92,6 +99,12 @@ function App() {
         // SecureStore. Fire-and-forget — the atom defaults to false
         // until the persisted value lands.
         void hydrateDevOptionsUnlocked();
+        // Hydrate the always-on connection preference. Service start
+        // is gated on the sign-in transition below, so we don't spin
+        // up a foreground service before there's anything to connect.
+        if (isAlwaysOnSupported()) {
+            void hydrateAlwaysOnPreference();
+        }
         return () => {
             unsubNotif();
         };
@@ -473,6 +486,45 @@ function App() {
             // Navigation auto-redirects to Auth via $user becoming null
         }
     }, [keyReplaced]);
+
+    // Drop the foreground service (and its persistent "Connected"
+    // notification) on sign-out, and resume it on sign-in if the user
+    // had it enabled. The persisted preference (SecureStore) is the
+    // source of truth across sign-out/sign-in cycles.
+    const userPresentRef = useRef(user != null);
+    useEffect(() => {
+        const wasPresent = userPresentRef.current;
+        const present = user != null;
+        userPresentRef.current = present;
+        if (!isAlwaysOnSupported()) {
+            return;
+        }
+        if (wasPresent && !present) {
+            void suspendAlwaysOn().catch(() => {
+                // Best-effort; the service will stop with the process
+                // anyway when Android reclaims it.
+            });
+        }
+        if (!wasPresent && present) {
+            // User just signed in. Wait for the persisted preference
+            // to land (the boot effect kicks off hydration but it's
+            // async; autoLogin can complete first), then start the
+            // FGS if the user had it enabled.
+            void (async () => {
+                try {
+                    await hydrateAlwaysOnPreference();
+                    if ($alwaysOnEnabled.get()) {
+                        await startAlwaysOn();
+                    }
+                } catch (err: unknown) {
+                    console.warn(
+                        "[vex-fgs] post-login start failed",
+                        err instanceof Error ? err.message : String(err),
+                    );
+                }
+            })();
+        }
+    }, [user]);
 
     return (
         <SafeAreaProvider>

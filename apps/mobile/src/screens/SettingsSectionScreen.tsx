@@ -29,6 +29,13 @@ import { MenuRow, MenuSection } from "../components/MenuRow";
 import { $avatarCropResult } from "../lib/avatarCropResult";
 import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
+import {
+    $alwaysOnEnabled,
+    openBatteryOptimizationSettings,
+    startAlwaysOn,
+    stopAlwaysOn,
+} from "../lib/foregroundService";
+import { requestNotificationPermission } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
 const DEV_UNLOCK_TAPS = 7;
@@ -142,6 +149,8 @@ export function SettingsSectionScreen({
                 return "About";
             case "account":
                 return "Account";
+            case "connection":
+                return "Connection";
             case "data":
                 return "Data";
             case "developer":
@@ -150,6 +159,55 @@ export function SettingsSectionScreen({
                 return "Settings";
         }
     }, [section]);
+
+    const alwaysOn = useStore($alwaysOnEnabled);
+    const [alwaysOnBusy, setAlwaysOnBusy] = useState(false);
+
+    async function handleAlwaysOnToggle(next: boolean): Promise<void> {
+        if (alwaysOnBusy) {
+            return;
+        }
+        setAlwaysOnBusy(true);
+        try {
+            if (next) {
+                // Permission for the persistent notification (API 33+).
+                // Without this the FGS still runs but the notification
+                // is silently suppressed, leaving the user with no
+                // visible signal that the connection is alive.
+                const granted = await requestNotificationPermission();
+                if (!granted) {
+                    Alert.alert(
+                        "Notification permission needed",
+                        "Always-on connection shows an ongoing notification while it's running. Grant notifications and try again.",
+                    );
+                    return;
+                }
+                await startAlwaysOn();
+                Alert.alert(
+                    "Battery optimization",
+                    "For the connection to survive while your phone sleeps, exempt Vex from battery optimization on the next screen (Battery → Unrestricted).",
+                    [
+                        { style: "cancel", text: "Later" },
+                        {
+                            onPress: () => {
+                                void openBatteryOptimizationSettings();
+                            },
+                            text: "Open settings",
+                        },
+                    ],
+                );
+            } else {
+                await stopAlwaysOn();
+            }
+        } catch (err: unknown) {
+            console.warn(
+                "[vex-fgs] toggle failed",
+                err instanceof Error ? err.message : String(err),
+            );
+        } finally {
+            setAlwaysOnBusy(false);
+        }
+    }
 
     function handleLogout(): void {
         Alert.alert(
@@ -599,6 +657,50 @@ export function SettingsSectionScreen({
                                 tone="danger"
                             />
                         </MenuSection>
+                    </>
+                ) : null}
+
+                {section === "connection" ? (
+                    <>
+                        <MenuSection
+                            footer="Keeps a persistent connection while the app is in the background. Shows an ongoing notification and uses extra battery — recommended only if push notifications aren't reliable on your device."
+                            title="Always-on connection"
+                        >
+                            <MenuRow
+                                accessory={
+                                    <Switch
+                                        disabled={alwaysOnBusy}
+                                        onValueChange={(value) => {
+                                            void handleAlwaysOnToggle(value);
+                                        }}
+                                        value={alwaysOn}
+                                    />
+                                }
+                                description={
+                                    alwaysOn
+                                        ? "Background connection is active"
+                                        : "Background connection is off"
+                                }
+                                icon="wifi-outline"
+                                label="Always-on connection"
+                            />
+                        </MenuSection>
+                        {alwaysOn ? (
+                            <MenuSection
+                                footer="Some manufacturers (Samsung, Xiaomi, Oppo, etc.) ship aggressive battery managers that override the system whitelist. If messages still stop arriving when the screen is off, see dontkillmyapp.com for OEM-specific instructions."
+                                title="Reliability"
+                            >
+                                <MenuRow
+                                    description="Allow Vex to run without battery limits"
+                                    icon="battery-charging-outline"
+                                    label="Battery optimization"
+                                    onPress={() => {
+                                        void openBatteryOptimizationSettings();
+                                    }}
+                                    showChevron
+                                />
+                            </MenuSection>
+                        ) : null}
                     </>
                 ) : null}
 

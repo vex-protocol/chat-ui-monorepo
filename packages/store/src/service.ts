@@ -215,6 +215,12 @@ interface WebSocketDebugLike {
 const REGISTER_STEP_TIMEOUT_MS = 12000;
 const DEVICE_AUTH_REFRESH_THRESHOLD_MS = 6 * 24 * 60 * 60 * 1000;
 const DEVICE_AUTH_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+// WebSocket watchdog: spire pings every 5s, libvex's own keep-alive
+// fires after ~30s of silence (post-fix in 6.1.7+). 45s gives that
+// path a chance to run first; the watchdog only triggers if libvex's
+// detector didn't (older SDK, or some edge case where it didn't).
+const WS_WATCHDOG_CHECK_INTERVAL_MS = 30_000;
+const WS_WATCHDOG_STALE_THRESHOLD_MS = 45_000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -253,6 +259,16 @@ class VexService {
     private wsDebugOriginalSend: ((data: Uint8Array) => void) | null = null;
     private wsDebugSocket: null | WebSocketDebugLike = null;
     private wsDebugStateLogsEnabled = shouldDebugAuth();
+    // Watchdog state. Tracks the last time *any* inbound frame
+    // (including server pings every 5s) arrived on the underlying
+    // WebSocket. If the gap exceeds {@link WS_WATCHDOG_STALE_THRESHOLD_MS}
+    // we force a reconnect — backstop for half-open sockets where
+    // neither libvex's ping detector nor the OS surfaces a close event
+    // (Android emulator NAT timeouts, sleeping mobile radios).
+    private wsWatchdogInterval: null | ReturnType<typeof setInterval> = null;
+    private wsWatchdogLastFrameAt = 0;
+    private wsWatchdogListener: ((data: Uint8Array) => void) | null = null;
+    private wsWatchdogSocket: null | WebSocketDebugLike = null;
 
     // ── Auth flows ──────────────────────────────────────────────────────
 
@@ -1307,6 +1323,55 @@ class VexService {
 
     // ── Private ─────────────────────────────────────────────────────────
 
+    /**
+     * Binds the watchdog's "any inbound frame" listener to the
+     * underlying WebSocket and starts the periodic stale check.
+     * Idempotent when called against the same socket; on a socket
+     * swap (after `reconnectWebsocket`), detaches the old listener
+     * and re-binds to the new one.
+     */
+    private attachWebsocketWatchdog(): void {
+        if (!this.client) {
+            return;
+        }
+        const socket = getClientSocket(this.client);
+        if (!socket) {
+            return;
+        }
+        if (this.wsWatchdogSocket === socket && this.wsWatchdogListener) {
+            return;
+        }
+        this.detachWebsocketWatchdogListener();
+        const listener = (_data: Uint8Array) => {
+            this.wsWatchdogLastFrameAt = Date.now();
+        };
+        socket.on("message", listener);
+        this.wsWatchdogSocket = socket;
+        this.wsWatchdogListener = listener;
+        this.wsWatchdogLastFrameAt = Date.now();
+        if (!this.wsWatchdogInterval) {
+            this.wsWatchdogInterval = setInterval(() => {
+                this.checkWebsocketWatchdog();
+            }, WS_WATCHDOG_CHECK_INTERVAL_MS);
+        }
+    }
+
+    private checkWebsocketWatchdog(): void {
+        if (!this.client || this.wsWatchdogLastFrameAt === 0) {
+            return;
+        }
+        const elapsed = Date.now() - this.wsWatchdogLastFrameAt;
+        if (elapsed <= WS_WATCHDOG_STALE_THRESHOLD_MS) {
+            return;
+        }
+        this.logWsState("ws:watchdog:stale", { elapsedMs: elapsed });
+        // Reset so we don't fire repeatedly while recovery is in
+        // flight; the new connection's first inbound frame will
+        // refresh the timestamp organically.
+        this.wsWatchdogLastFrameAt = Date.now();
+        void this.recoverConnection("watchdog-stale");
+    }
+
     private async clearStoredCredentials(
         keyStore: KeyStore,
         username: string,
@@ -1382,6 +1447,24 @@ class VexService {
         this.wsDebugOriginalSend = null;
         this.wsDebugSocket = null;
         this.logWsState("ws:debug:detached");
+    }
+
+    /**
+     * Removes only the inbound-frame listener and clears the socket
+     * pointer; leaves the periodic interval running so the next
+     * `attachWebsocketWatchdog` call can re-bind without restarting
+     * the timer.
+     */
+    private detachWebsocketWatchdogListener(): void {
+        if (this.wsWatchdogSocket && this.wsWatchdogListener) {
+            try {
+                this.wsWatchdogSocket.off("message", this.wsWatchdogListener);
+            } catch {
+                // socket may already be in a torn-down state; ignore.
+            }
+        }
+        this.wsWatchdogSocket = null;
+        this.wsWatchdogListener = null;
     }
 
     private ensureFamiliarCached(userID: string): void {
@@ -1711,6 +1794,7 @@ class VexService {
     private resetAll(): void {
         this.stopPendingApprovalWatcher();
         this.detachWebsocketDebug();
+        this.stopWebsocketWatchdog();
         this.client = null;
         this.failedUserLookups.clear();
         $authStatusWritable.set("signed_out");
@@ -1912,6 +1996,15 @@ class VexService {
         }
     }
 
+    private stopWebsocketWatchdog(): void {
+        if (this.wsWatchdogInterval) {
+            clearInterval(this.wsWatchdogInterval);
+            this.wsWatchdogInterval = null;
+        }
+        this.detachWebsocketWatchdogListener();
+        this.wsWatchdogLastFrameAt = 0;
+    }
+
     private subscribe<E extends keyof ClientEvents>(
         evt: E,
         fn: ClientEvents[E],
@@ -1944,6 +2037,7 @@ class VexService {
     }
 
     private unwireEvents(): void {
+        this.stopWebsocketWatchdog();
         this.disposable.dispose();
     }
 
@@ -1952,6 +2046,10 @@ class VexService {
             this.logWsState("ws:connected");
             this.setAuthStatus("authenticated");
             this.attachWebsocketDebug();
+            // The underlying socket object is swapped on every
+            // (re)connect, so re-bind the watchdog listener to the
+            // fresh instance.
+            this.attachWebsocketWatchdog();
         });
         this.subscribe("disconnect", () => {
             this.logWsState("ws:disconnect");
@@ -1966,6 +2064,10 @@ class VexService {
             }
         });
         this.subscribeToDeviceRequestQueueChanges();
+        // Initial bind for the socket the freshly-connected client
+        // already owns (in case `connected` fired before this method
+        // ran, or the SDK doesn't re-emit it for the first session).
+        this.attachWebsocketWatchdog();
     }
 
     private wrapHttpMethodsWithTimeout(http: ClientHttpLike): void {

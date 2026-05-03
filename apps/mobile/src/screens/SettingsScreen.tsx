@@ -2,13 +2,14 @@ import type { AppScreenProps } from "../navigation/types";
 import type { Ionicons } from "@expo/vector-icons";
 
 import React from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, View } from "react-native";
 
 import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
 import { $devOptionsUnlocked } from "../lib/devMode";
+import { isAlwaysOnSupported } from "../lib/foregroundService";
 import { colors } from "../theme";
 
 interface SettingsRow {
@@ -40,6 +41,23 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     ];
 
     const systemRows: ReadonlyArray<SettingsRow> = [
+        // Foreground-service toggle is Android-only — iOS strictly
+        // suspends backgrounded apps and there's no equivalent surface.
+        ...(isAlwaysOnSupported() && Platform.OS === "android"
+            ? [
+                  {
+                      description:
+                          "Keep receiving messages while in background",
+                      icon: "wifi-outline" as const,
+                      label: "Connection",
+                      onPress: () => {
+                          navigation.navigate("SettingsSection", {
+                              section: "connection",
+                          });
+                      },
+                  },
+              ]
+            : []),
         {
             description: "Unread badges and storage",
             icon: "folder-open-outline",
