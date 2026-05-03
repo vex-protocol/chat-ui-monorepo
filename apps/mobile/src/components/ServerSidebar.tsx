@@ -237,9 +237,11 @@ export function ServerSidebar({
                                             <View style={styles.dmMeta}>
                                                 <View style={styles.dmNameRow}>
                                                     <Text
+                                                        ellipsizeMode="tail"
                                                         numberOfLines={1}
                                                         style={[
                                                             styles.channelItemText,
+                                                            styles.dmName,
                                                             active &&
                                                                 styles.channelItemTextActive,
                                                         ]}
@@ -439,6 +441,11 @@ const styles = StyleSheet.create({
     },
     dmMeta: {
         flex: 1,
+        minWidth: 0,
+    },
+    dmName: {
+        flex: 1,
+        flexShrink: 1,
         minWidth: 0,
     },
     dmNameRow: {

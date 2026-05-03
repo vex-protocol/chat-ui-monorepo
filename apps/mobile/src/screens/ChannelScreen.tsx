@@ -35,6 +35,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -93,6 +94,7 @@ export function ChannelScreen({
     const [membersDrawerOpen, setMembersDrawerOpen] = useState(false);
     const [membersDrawerVisible, setMembersDrawerVisible] = useState(false);
     const [membersDrawerAnim] = useState(() => new Animated.Value(0));
+    const leftSidebarOpen = useStore($leftSidebarOpen);
 
     const membersBackdropOpacity = useMemo(
         () =>
@@ -149,6 +151,8 @@ export function ChannelScreen({
     }, [membersDrawerOpen, syncChannelMembers]);
 
     function openMembersDrawer(): void {
+        $leftSidebarOpen.set(false);
+        $rightSidebarOpen.set(true);
         setMembersDrawerVisible(true);
         setMembersDrawerOpen(true);
         Animated.spring(membersDrawerAnim, {
@@ -161,6 +165,7 @@ export function ChannelScreen({
     }
 
     function closeMembersDrawer(): void {
+        $rightSidebarOpen.set(false);
         setMembersDrawerOpen(false);
         Animated.timing(membersDrawerAnim, {
             duration: 180,
@@ -180,6 +185,18 @@ export function ChannelScreen({
         }
         openMembersDrawer();
     }
+
+    useEffect(() => {
+        if (leftSidebarOpen && membersDrawerOpen) {
+            closeMembersDrawer();
+        }
+    }, [leftSidebarOpen, membersDrawerOpen]);
+
+    useEffect(() => {
+        return () => {
+            $rightSidebarOpen.set(false);
+        };
+    }, []);
 
     function isOnline(member: User): boolean {
         if (!member.lastSeen) return false;
