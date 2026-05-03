@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import {
     Animated,
+    Easing,
     FlatList,
     KeyboardAvoidingView,
     Platform,
@@ -36,12 +37,18 @@ import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { haptic } from "../lib/haptics";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
 const MEMBERS_DRAWER_WIDTH = 232;
 const ONLINE_WINDOW_MS = 15 * 60 * 1000;
+// Match the left sidebar's "machined slot-in" feel.
+const MEMBERS_OPEN_DURATION_MS = 240;
+const MEMBERS_CLOSE_DURATION_MS = 180;
+const MEMBERS_OPEN_EASING = Easing.bezier(0.2, 0.0, 0.0, 1.0);
+const MEMBERS_CLOSE_EASING = Easing.bezier(0.4, 0.0, 0.2, 1.0);
 
 export function ChannelScreen({
     navigation,
@@ -151,15 +158,29 @@ export function ChannelScreen({
         };
     }, [membersDrawerOpen, syncChannelMembers]);
 
+    // Pending haptic timer for the members drawer click+CLICK pair.
+    const membersLandingHapticRef = useRef<(() => void) | null>(null);
+    const cancelPendingMembersHaptic = (): void => {
+        if (membersLandingHapticRef.current) {
+            membersLandingHapticRef.current();
+            membersLandingHapticRef.current = null;
+        }
+    };
+
     function openMembersDrawer(): void {
         $leftSidebarOpen.set(false);
         $rightSidebarOpen.set(true);
         setMembersDrawerVisible(true);
         setMembersDrawerOpen(true);
-        Animated.spring(membersDrawerAnim, {
-            damping: 20,
-            mass: 0.8,
-            stiffness: 280,
+        cancelPendingMembersHaptic();
+        haptic("slotIn");
+        membersLandingHapticRef.current = haptic.scheduled(
+            "slotOut",
+            MEMBERS_OPEN_DURATION_MS,
+        );
+        Animated.timing(membersDrawerAnim, {
+            duration: MEMBERS_OPEN_DURATION_MS,
+            easing: MEMBERS_OPEN_EASING,
             toValue: 1,
             useNativeDriver: true,
         }).start();
@@ -168,8 +189,15 @@ export function ChannelScreen({
     function closeMembersDrawer(): void {
         $rightSidebarOpen.set(false);
         setMembersDrawerOpen(false);
+        cancelPendingMembersHaptic();
+        haptic("slotIn");
+        membersLandingHapticRef.current = haptic.scheduled(
+            "slotOut",
+            MEMBERS_CLOSE_DURATION_MS,
+        );
         Animated.timing(membersDrawerAnim, {
-            duration: 180,
+            duration: MEMBERS_CLOSE_DURATION_MS,
+            easing: MEMBERS_CLOSE_EASING,
             toValue: 0,
             useNativeDriver: true,
         }).start(({ finished }) => {

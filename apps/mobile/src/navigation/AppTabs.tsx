@@ -1,7 +1,7 @@
 import type { AppStackParamList } from "./types";
 
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 
 import { $authStatus, $channels, $familiars, $servers } from "@vex-chat/store";
 
@@ -35,6 +35,13 @@ import { navigationRef } from "./navigationRef";
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 const SIDEBAR_WIDTH = 304;
+// "Machined slot-in" feel: aggressive ease-out so the drawer
+// decelerates into place without bounce. Cubic-bezier modeled on
+// Material's "decelerate emphasized" curve (fast in, hard land).
+const SIDEBAR_OPEN_DURATION_MS = 240;
+const SIDEBAR_CLOSE_DURATION_MS = 180;
+const SIDEBAR_OPEN_EASING = Easing.bezier(0.2, 0.0, 0.0, 1.0);
+const SIDEBAR_CLOSE_EASING = Easing.bezier(0.4, 0.0, 0.2, 1.0);
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
     "AvatarCrop",
@@ -107,6 +114,17 @@ export function AppTabs() {
         outputRange: [8, SIDEBAR_WIDTH + 8],
     });
 
+    // Pending haptic timer for the "click ... CLICK" pair tied to the
+    // sidebar slide. We hold the cancel function so an interrupted
+    // animation doesn't fire a stale landing tick.
+    const sidebarLandingHapticRef = useRef<(() => void) | null>(null);
+    const cancelPendingSidebarHaptic = () => {
+        if (sidebarLandingHapticRef.current) {
+            sidebarLandingHapticRef.current();
+            sidebarLandingHapticRef.current = null;
+        }
+    };
+
     const openSidebar = () => {
         $rightSidebarOpen.set(false);
         $leftSidebarOpen.set(true);
@@ -116,10 +134,18 @@ export function AppTabs() {
         // starting point. Subsequent server taps can diverge it (peek)
         // until the drawer is closed and reopened.
         setPaneServerId(activeServerId);
-        Animated.spring(sidebarX, {
-            damping: 18,
-            mass: 0.8,
-            stiffness: 260,
+        cancelPendingSidebarHaptic();
+        // Click on motion start, CLICK as it lands. Drawer snaps into
+        // place rather than bouncing — paired with the timing curve
+        // below to feel like a machined part slotting in.
+        haptic("slotIn");
+        sidebarLandingHapticRef.current = haptic.scheduled(
+            "slotOut",
+            SIDEBAR_OPEN_DURATION_MS,
+        );
+        Animated.timing(sidebarX, {
+            duration: SIDEBAR_OPEN_DURATION_MS,
+            easing: SIDEBAR_OPEN_EASING,
             toValue: 0,
             useNativeDriver: true,
         }).start();
@@ -127,8 +153,15 @@ export function AppTabs() {
 
     const closeSidebar = () => {
         $leftSidebarOpen.set(false);
+        cancelPendingSidebarHaptic();
+        haptic("slotIn");
+        sidebarLandingHapticRef.current = haptic.scheduled(
+            "slotOut",
+            SIDEBAR_CLOSE_DURATION_MS,
+        );
         Animated.timing(sidebarX, {
-            duration: 150,
+            duration: SIDEBAR_CLOSE_DURATION_MS,
+            easing: SIDEBAR_CLOSE_EASING,
             toValue: -SIDEBAR_WIDTH,
             useNativeDriver: true,
         }).start(({ finished }) => {
@@ -151,8 +184,11 @@ export function AppTabs() {
         }
     }, [rightSidebarOpen, sidebarOpen]);
     const handleTopLeftPress = () => {
-        haptic("tap");
         if (topLeftShowsBack) {
+            // Back-button context: closeSidebar() already does its own
+            // click+CLICK pair if the drawer happens to be open, so we
+            // only need to add a light tap for the back-nav itself.
+            haptic("tap");
             if (sidebarOpen) {
                 closeSidebar();
             }
@@ -171,6 +207,8 @@ export function AppTabs() {
             });
             return;
         }
+        // openSidebar / closeSidebar already fire their own slot
+        // haptic — let the drawer toggle do the talking.
         toggleSidebar();
     };
 
