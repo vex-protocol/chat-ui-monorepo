@@ -32,7 +32,16 @@ else
 fi
 
 export ANDROID_SDK_ROOT="${ANDROID_HOME}"
-export ANDROID_AVD_HOME="${ANDROID_AVD_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/.android/avd}"
+# The Android emulator hard-codes `~/.android/avd` on macOS (and the
+# Studio Device Manager writes there). On Linux we follow the
+# XDG_CONFIG_HOME convention used by the rest of the toolchain. Don't
+# clobber an explicit override the user has already set.
+if [[ -z "${ANDROID_AVD_HOME:-}" ]]; then
+  case "$(uname -s)" in
+    Darwin) export ANDROID_AVD_HOME="${HOME}/.android/avd" ;;
+    *)      export ANDROID_AVD_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/.android/avd" ;;
+  esac
+fi
 mkdir -p "${ANDROID_AVD_HOME}"
 
 _vex_prepend_path() {

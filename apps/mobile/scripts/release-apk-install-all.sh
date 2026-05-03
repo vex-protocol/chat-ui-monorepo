@@ -28,7 +28,11 @@ detect_architectures_from_connected_devices() {
     abi="$(adb -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r')"
     case "$abi" in
       arm64-v8a|armeabi-v7a|x86|x86_64)
-        if [[ " ${archs[*]} " != *" ${abi} "* ]]; then
+        # bash 3.2 on macOS errors on `${archs[*]}` of an empty array
+        # under `set -u`, so guard the membership check by length.
+        if [[ ${#archs[@]} -eq 0 ]]; then
+          archs+=("$abi")
+        elif [[ " ${archs[*]} " != *" ${abi} "* ]]; then
           archs+=("$abi")
         fi
         ;;

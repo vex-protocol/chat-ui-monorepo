@@ -7,7 +7,13 @@ source "$SCRIPT_DIR/ensure-java-home.sh"
 # shellcheck source=ensure-android-sdk.sh
 source "$SCRIPT_DIR/ensure-android-sdk.sh"
 
-export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+# macOS Qt builds use `cocoa`; only force `xcb` on Linux. Honor any
+# explicit override the caller already set.
+if [[ -z "${QT_QPA_PLATFORM:-}" ]]; then
+  case "$(uname -s)" in
+    Linux) export QT_QPA_PLATFORM="xcb" ;;
+  esac
+fi
 
 _args=("$@")
 while [[ ${#_args[@]} -gt 0 && "${_args[0]}" == "--" ]]; do

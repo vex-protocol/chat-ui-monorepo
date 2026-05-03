@@ -9,11 +9,39 @@ elif [[ -n "${JAVA_HOME:-}" && -x "${JAVA_HOME}/bin/java" ]]; then
 else
   _vex_java_home=""
 
-  if command -v java >/dev/null 2>&1; then
-    _vex_java_bin="$(readlink -f "$(command -v java)" 2>/dev/null || true)"
+  # macOS ships /usr/libexec/java_home which prints the canonical
+  # JDK home for a requested major version. Use that first so we
+  # don't need GNU readlink (BSD readlink lacks `-f`).
+  if [[ -x /usr/libexec/java_home ]]; then
+    if _candidate="$(/usr/libexec/java_home -v 17 2>/dev/null)" && [[ -n "$_candidate" && -x "$_candidate/bin/java" ]]; then
+      _vex_java_home="$_candidate"
+    elif _candidate="$(/usr/libexec/java_home 2>/dev/null)" && [[ -n "$_candidate" && -x "$_candidate/bin/java" ]]; then
+      _vex_java_home="$_candidate"
+    fi
+    unset _candidate
+  fi
+
+  # Linux / fallback: derive JAVA_HOME from the resolved `java`
+  # binary. Prefer GNU `readlink -f` when available; fall back to a
+  # portable shell loop so this works on macOS too.
+  if [[ -z "$_vex_java_home" ]] && command -v java >/dev/null 2>&1; then
+    _vex_java_bin=""
+    if readlink -f / >/dev/null 2>&1; then
+      _vex_java_bin="$(readlink -f "$(command -v java)" 2>/dev/null || true)"
+    else
+      _vex_java_bin="$(command -v java)"
+      while [[ -L "$_vex_java_bin" ]]; do
+        _link="$(readlink "$_vex_java_bin")"
+        case "$_link" in
+          /*) _vex_java_bin="$_link" ;;
+          *)  _vex_java_bin="$(cd "$(dirname "$_vex_java_bin")" && cd "$(dirname "$_link")" && pwd)/$(basename "$_link")" ;;
+        esac
+      done
+    fi
     if [[ -n "$_vex_java_bin" ]]; then
       _vex_java_home="$(dirname "$(dirname "$_vex_java_bin")")"
     fi
+    unset _vex_java_bin _link
   fi
 
   if [[ -z "$_vex_java_home" ]]; then
@@ -23,6 +51,7 @@ else
       "$HOME/bin/android-studio-panda4-linux/android-studio/jbr"
       "$HOME/android-studio/jbr"
       "/opt/android-studio/jbr"
+      "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
     )
     shopt -s nullglob
     _vex_java_candidates+=("$HOME"/.jdks/jdk-17*)
@@ -52,4 +81,4 @@ case ":${PATH:-}:" in *":${JAVA_HOME}/bin:"*) ;; *)
   ;;
 esac
 
-unset _vex_java_home _vex_java_bin _vex_java_candidates _vex_dir
+unset _vex_java_home _vex_java_candidates _vex_dir

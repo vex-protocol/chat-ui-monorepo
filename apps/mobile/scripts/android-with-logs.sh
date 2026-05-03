@@ -20,6 +20,13 @@ START_METRO="${START_METRO:-1}"
 METRO_FORCE_RESTART="${METRO_FORCE_RESTART:-1}"
 GRACEFUL_STOP=0
 
+# Only force the emulator's Qt platform on Linux; macOS Qt builds use
+# `cocoa`, and pinning xcb makes the emulator window hang invisibly.
+case "$(uname -s)" in
+  Linux) EMULATOR_QT_PLATFORM="${EMULATOR_QT_PLATFORM:-xcb}" ;;
+  *)     EMULATOR_QT_PLATFORM="${EMULATOR_QT_PLATFORM:-}" ;;
+esac
+
 if [ ! -x "$LOG_SCRIPT" ]; then
     chmod +x "$LOG_SCRIPT"
 fi
@@ -52,7 +59,14 @@ detect_architectures_from_connected_devices() {
         abi="$(adb -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r')"
         case "$abi" in
             arm64-v8a|armeabi-v7a|x86|x86_64)
-                if [[ " ${archs[*]} " != *" ${abi} "* ]]; then
+                # macOS still ships bash 3.2, where `${archs[*]}` of an
+                # empty array trips `set -u` ("unbound variable").
+                # Guard the membership check by length so the first
+                # element is always added without dereferencing the
+                # empty array.
+                if [[ ${#archs[@]} -eq 0 ]]; then
+                    archs+=("$abi")
+                elif [[ " ${archs[*]} " != *" ${abi} "* ]]; then
                     archs+=("$abi")
                 fi
                 ;;
@@ -60,21 +74,50 @@ detect_architectures_from_connected_devices() {
     done
 
     if [[ ${#archs[@]} -eq 0 ]]; then
-        echo "x86_64"
+        # Default to the host arch so a Mac M-series user with no
+        # adb-attached device still produces an installable APK on its
+        # next adb-attach. arm64-v8a covers nearly every modern phone.
+        echo "arm64-v8a"
         return 0
     fi
 
     (IFS=,; echo "${archs[*]}")
 }
 
-emulator_avd_exists() {
-    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
-    emulator -list-avds | awk -v target="$avd" 'BEGIN { found=0 } $0==target { found=1 } END { exit(found ? 0 : 1) }'
+# Resolve which AVD this script should boot. Honor an explicit
+# ANDROID_EMULATOR_AVD when it actually exists; otherwise prefer the
+# project's `vex_stable` AVD (Linux dev box) and finally fall back to
+# the first AVD listed by `emulator -list-avds` so a Mac with only
+# Android Studio's default Pixel device still gets a working
+# auto-boot. Caches the result on first call.
+resolve_target_avd() {
+    if [[ -n "${VEX_RESOLVED_AVD:-}" ]]; then
+        echo "$VEX_RESOLVED_AVD"
+        return 0
+    fi
+    local explicit="${ANDROID_EMULATOR_AVD:-}"
+    local list
+    list="$(emulator -list-avds 2>/dev/null || true)"
+    local resolved=""
+    if [[ -n "$explicit" ]] && awk -v target="$explicit" '$0==target { found=1 } END { exit(found ? 0 : 1) }' <<<"$list"; then
+        resolved="$explicit"
+    elif awk '$0=="vex_stable" { found=1 } END { exit(found ? 0 : 1) }' <<<"$list"; then
+        resolved="vex_stable"
+    else
+        resolved="$(awk 'NR==1 { print $0; exit }' <<<"$list")"
+    fi
+    if [[ -z "$resolved" ]]; then
+        return 1
+    fi
+    export VEX_RESOLVED_AVD="$resolved"
+    echo "$resolved"
 }
 
 target_emulator_running() {
+    local avd
+    avd="$(resolve_target_avd 2>/dev/null || true)"
+    [[ -z "$avd" ]] && return 1
     local serial running_name
-    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
     while IFS= read -r serial; do
         [[ -z "$serial" ]] && continue
         running_name="$(adb -s "$serial" emu avd name 2>/dev/null | awk 'NR==1 { print $0 }' | tr -d '\r')"
@@ -85,18 +128,32 @@ target_emulator_running() {
     return 1
 }
 
+# Boot the project emulator alongside any already-attached physical
+# device. The previous wiring would silently no-op when the
+# hard-coded `vex_stable` AVD didn't exist on the host (i.e. every
+# Mac), so a contributor running `android:multi` saw the script skip
+# straight to "install on whatever's plugged in" instead of getting
+# both targets up.
 start_emulator_if_requested() {
-    local emu_pid
-    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
+    local emu_pid avd
     if [[ "${ANDROID_AUTO_START_EMULATOR:-1}" != "1" ]]; then
         return 0
     fi
-    if ! emulator_avd_exists || target_emulator_running; then
+    if ! avd="$(resolve_target_avd)"; then
+        echo "No Android AVD found. Skipping emulator auto-start; create one in Android Studio Device Manager to enable it." >&2
+        return 0
+    fi
+    if target_emulator_running; then
+        echo "Emulator '${avd}' already running; reusing it."
         return 0
     fi
 
     echo "Starting emulator '${avd}'..."
-    QT_QPA_PLATFORM="xcb" bash "$SCRIPT_DIR/start-android-emulator.sh" -- -avd "$avd" -no-snapshot-load -no-snapshot-save -no-boot-anim -gpu host >/tmp/vex-mobile-emulator.log 2>&1 &
+    if [[ -n "$EMULATOR_QT_PLATFORM" ]]; then
+        QT_QPA_PLATFORM="$EMULATOR_QT_PLATFORM" bash "$SCRIPT_DIR/start-android-emulator.sh" -- -avd "$avd" -no-snapshot-load -no-snapshot-save -no-boot-anim -gpu host >/tmp/vex-mobile-emulator.log 2>&1 &
+    else
+        bash "$SCRIPT_DIR/start-android-emulator.sh" -- -avd "$avd" -no-snapshot-load -no-snapshot-save -no-boot-anim -gpu host >/tmp/vex-mobile-emulator.log 2>&1 &
+    fi
     emu_pid=$!
     for _ in $(seq 1 120); do
         if target_emulator_running; then
@@ -143,6 +200,33 @@ echo "Using reactNativeArchitectures=${ORG_GRADLE_PROJECT_reactNativeArchitectur
 echo "Starting multi-device logs..."
 bash "$LOG_SCRIPT" &
 LOG_PID=$!
+
+# Wait for the emulator to finish booting (sys.boot_completed=1)
+# before we try to install on it. The gradle build below usually
+# masks this race, but on cold boots it can still beat the device to
+# `pm install`, surfacing as a confusing "device offline" error.
+wait_for_target_emulator_boot() {
+    local avd serial
+    avd="$(resolve_target_avd 2>/dev/null || true)"
+    [[ -z "$avd" ]] && return 0
+    while IFS= read -r serial; do
+        [[ -z "$serial" ]] && continue
+        local running_name
+        running_name="$(adb -s "$serial" emu avd name 2>/dev/null | awk 'NR==1 { print $0 }' | tr -d '\r')"
+        [[ "$running_name" != "$avd" ]] && continue
+        echo "Waiting for emulator '${avd}' (${serial}) to finish booting..."
+        for _ in $(seq 1 90); do
+            if [[ "$(adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+                return 0
+            fi
+            sleep 2
+        done
+        echo "Emulator did not finish booting in time; continuing anyway." >&2
+        return 0
+    done < <(adb devices | awk '/^emulator-/ && $2 == "device" { print $1 }')
+}
+
+wait_for_target_emulator_boot
 
 echo "Building debug APK..."
 pnpm run android:clean-autolinking
