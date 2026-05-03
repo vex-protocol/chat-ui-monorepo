@@ -1211,6 +1211,32 @@ class VexService {
             $avatarHashWritable.set(Date.now());
             return { ok: true };
         } catch (err: unknown) {
+            const message = errorMessage(err);
+            const looksLikeReactNativeBlobError =
+                message.includes("ArrayBuffer") &&
+                message.includes("ArrayBufferView") &&
+                message.includes("Blob");
+            if (looksLikeReactNativeBlobError) {
+                // React Native/Hermes can reject Blob(ArrayBufferView) construction.
+                // libvex has a built-in JSON/base64 upload fallback that is used
+                // when FormData is unavailable, so temporarily disable FormData
+                // for this call and retry through that code path.
+                const globalWithFormData = globalThis as {
+                    FormData?: unknown;
+                };
+                const originalFormData = globalWithFormData.FormData;
+                try {
+                    globalWithFormData.FormData = undefined;
+                    const client = this.requireClient();
+                    await client.me.setAvatar(data);
+                    $avatarHashWritable.set(Date.now());
+                    return { ok: true };
+                } catch (retryErr: unknown) {
+                    return { error: errorMessage(retryErr), ok: false };
+                } finally {
+                    globalWithFormData.FormData = originalFormData;
+                }
+            }
             return { error: errorMessage(err), ok: false };
         }
     }

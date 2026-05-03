@@ -1,6 +1,6 @@
 import type { AppStackParamList } from "./types";
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 
 import { $authStatus, $channels, $familiars, $servers } from "@vex-chat/store";
@@ -10,17 +10,22 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ServerSidebar } from "../components/ServerSidebar";
+import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { AddServerScreen } from "../screens/AddServerScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
 import { ConversationScreen } from "../screens/ConversationScreen";
+import { DeviceDetailsScreen } from "../screens/DeviceDetailsScreen";
+import { DeviceRequestsScreen } from "../screens/DeviceRequestsScreen";
 import { DMListScreen } from "../screens/DMListScreen";
 import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { PendingApprovalsScreen } from "../screens/PendingApprovalsScreen";
 import { ServerSettingsScreen } from "../screens/ServerSettingsScreen";
+import { SessionDetailsScreen } from "../screens/SessionDetailsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
+import { SettingsSectionScreen } from "../screens/SettingsSectionScreen";
 import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";
@@ -29,11 +34,15 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 const SIDEBAR_WIDTH = 304;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
+    "DeviceDetails",
+    "DeviceRequests",
     "Devices",
     "Invite",
     "JoinGroup",
     "ServerSettings",
+    "SessionDetails",
     "Settings",
+    "SettingsSection",
 ] as const;
 const CHAT_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "Channel",
@@ -53,6 +62,7 @@ export function AppTabs() {
         useState<keyof AppStackParamList>(initialRoute);
     const [activeChannelId, setActiveChannelId] = useState<null | string>(null);
     const [activeDmUserId, setActiveDmUserId] = useState<null | string>(null);
+    const rightSidebarOpen = useStore($rightSidebarOpen);
     const topLeftShowsBack = TOP_LEFT_BACK_ROUTES.includes(currentRoute);
     const isChatRoute = CHAT_ROUTES.includes(currentRoute);
     const sidebarX = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
@@ -66,6 +76,8 @@ export function AppTabs() {
     });
 
     const openSidebar = () => {
+        $rightSidebarOpen.set(false);
+        $leftSidebarOpen.set(true);
         setSidebarOpen(true);
         Animated.spring(sidebarX, {
             damping: 18,
@@ -77,6 +89,7 @@ export function AppTabs() {
     };
 
     const closeSidebar = () => {
+        $leftSidebarOpen.set(false);
         Animated.timing(sidebarX, {
             duration: 150,
             toValue: -SIDEBAR_WIDTH,
@@ -94,6 +107,12 @@ export function AppTabs() {
         }
         openSidebar();
     };
+
+    useEffect(() => {
+        if (rightSidebarOpen && sidebarOpen) {
+            closeSidebar();
+        }
+    }, [rightSidebarOpen, sidebarOpen]);
     const handleTopLeftPress = () => {
         if (topLeftShowsBack) {
             if (sidebarOpen) {
@@ -445,9 +464,29 @@ function ContentStack({
                 name="Settings"
             />
             <Stack.Screen
+                component={SettingsSectionScreen}
+                listeners={withFocus("SettingsSection")}
+                name="SettingsSection"
+            />
+            <Stack.Screen
                 component={PendingApprovalsScreen}
                 listeners={withFocus("Devices")}
                 name="Devices"
+            />
+            <Stack.Screen
+                component={DeviceRequestsScreen}
+                listeners={withFocus("DeviceRequests")}
+                name="DeviceRequests"
+            />
+            <Stack.Screen
+                component={DeviceDetailsScreen}
+                listeners={withFocus("DeviceDetails")}
+                name="DeviceDetails"
+            />
+            <Stack.Screen
+                component={SessionDetailsScreen}
+                listeners={withFocus("SessionDetails")}
+                name="SessionDetails"
             />
         </Stack.Navigator>
     );

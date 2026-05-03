@@ -10,13 +10,19 @@ export type AppStackParamList = {
     Channel: { channelID: string; channelName: string; serverID: string };
     ChannelList: { serverID: string; serverName?: string };
     Conversation: { userID: string; username: string };
+    DeviceDetails: { deviceID: string; deviceName?: string };
+    DeviceRequests: undefined;
     Devices: undefined;
     DMList: undefined;
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
     ServerSettings: { serverID: string; serverName?: string };
+    SessionDetails: undefined;
     Settings: undefined;
+    SettingsSection: {
+        section: "about" | "account" | "data" | "developer" | "notifications";
+    };
 };
 
 // ── Screen prop helpers ─────────────────────────────────────────────────────
