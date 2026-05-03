@@ -1150,6 +1150,22 @@ class VexService {
         $channelUnreadCountsWritable.set({});
     }
 
+    /**
+     * Clears the WebSocket watchdog's "last frame" timestamp.
+     *
+     * Called by the foreground-service module after a revive (when the
+     * OS killed the FGS and we re-create it). Without this, the next
+     * `refreshSessionAfterForeground` could see a stale-but-recent
+     * timestamp from the dead socket and incorrectly skip the
+     * reconnect path. Forcing the watchdog into "no observed frames
+     * yet" state means {@link isWebsocketLikelyHealthy} returns false
+     * until the new socket genuinely receives a frame, which is the
+     * conservative correct answer.
+     */
+    resetWebsocketWatchdog(): void {
+        this.wsWatchdogLastFrameAt = 0;
+    }
+
     async runBackgroundNetworkFetch(): Promise<BackgroundNetworkFetchResult> {
         const client = this.client;
         if (!client) {

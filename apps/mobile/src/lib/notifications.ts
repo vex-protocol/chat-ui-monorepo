@@ -43,12 +43,19 @@ const GENERIC_BODY = "New message";
 // NotificationManagerService and competes for the JS thread; firing
 // dozens in parallel is what an Android ANR looks like in slow motion.
 //
-// Cap = ceiling on visible banners per drain (anything beyond this is
-// silently dropped from the queue — the user already has unread state
-// in-app to discover them).
+// Drain cap = ceiling on visible banners per drain (anything beyond
+// this is silently dropped from the queue — the user already has
+// unread state in-app to discover them).
+// Queue cap = hard ceiling on the queue's length itself, drop-oldest
+// when exceeded. Belt-and-suspenders on top of the drain cap: if the
+// drain ever stalls (a hung binder call, a runaway producer), the
+// queue still can't grow without bound and starve memory. The chosen
+// value is large enough that a normal wake-from-sleep backlog never
+// touches it.
 // Yield = ms to release the event loop between scheduling calls so
 // the JS thread can service Fabric sync calls / pings / UI work.
 const NOTIFICATION_DRAIN_CAP = 6;
+const NOTIFICATION_QUEUE_CAP = 50;
 const NOTIFICATION_DRAIN_YIELD_MS = 25;
 
 let channelReady = false;
@@ -108,6 +115,13 @@ export function setupNotificationHandlers(): () => void {
  */
 export async function showMessageNotification(mail: Message): Promise<void> {
     notificationQueue.push(mail);
+    // Drop oldest when over the hard ceiling. We prefer to surface the
+    // most recent messages to the user; older queued ones are stale by
+    // the time we'd dispatch them anyway, and the unread state in-app
+    // is the source of truth for "what did I miss."
+    while (notificationQueue.length > NOTIFICATION_QUEUE_CAP) {
+        notificationQueue.shift();
+    }
     await drainNotificationQueue();
 }
 
