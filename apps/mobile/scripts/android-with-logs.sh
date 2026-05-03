@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=ensure-java-home.sh
+source "$SCRIPT_DIR/ensure-java-home.sh"
+# shellcheck source=ensure-android-sdk.sh
+source "$SCRIPT_DIR/ensure-android-sdk.sh"
+
 # Runs Android app launch + multi-device log tail together.
 # Usage:
 #   pnpm -F mobile android:with-logs
@@ -12,6 +18,7 @@ APP_PACKAGE="${APP_PACKAGE:-chat.vex.mobile}"
 APK_PATH="./android/app/build/outputs/apk/debug/app-debug.apk"
 START_METRO="${START_METRO:-1}"
 METRO_FORCE_RESTART="${METRO_FORCE_RESTART:-1}"
+GRACEFUL_STOP=0
 
 if [ ! -x "$LOG_SCRIPT" ]; then
     chmod +x "$LOG_SCRIPT"
@@ -21,6 +28,91 @@ if ! command -v adb >/dev/null 2>&1; then
     echo "adb not found in PATH."
     exit 1
 fi
+
+if ! command -v emulator >/dev/null 2>&1; then
+    echo "emulator not found in PATH."
+    exit 1
+fi
+
+detect_architectures_from_connected_devices() {
+    local abi
+    local -a serials=()
+    local -a archs=()
+
+    while IFS= read -r serial; do
+        [[ -n "$serial" ]] && serials+=("$serial")
+    done < <(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')
+
+    if [[ ${#serials[@]} -eq 0 ]]; then
+        echo "x86_64"
+        return 0
+    fi
+
+    for serial in "${serials[@]}"; do
+        abi="$(adb -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r')"
+        case "$abi" in
+            arm64-v8a|armeabi-v7a|x86|x86_64)
+                if [[ " ${archs[*]} " != *" ${abi} "* ]]; then
+                    archs+=("$abi")
+                fi
+                ;;
+        esac
+    done
+
+    if [[ ${#archs[@]} -eq 0 ]]; then
+        echo "x86_64"
+        return 0
+    fi
+
+    (IFS=,; echo "${archs[*]}")
+}
+
+emulator_avd_exists() {
+    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
+    emulator -list-avds | awk -v target="$avd" 'BEGIN { found=0 } $0==target { found=1 } END { exit(found ? 0 : 1) }'
+}
+
+target_emulator_running() {
+    local serial running_name
+    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
+    while IFS= read -r serial; do
+        [[ -z "$serial" ]] && continue
+        running_name="$(adb -s "$serial" emu avd name 2>/dev/null | awk 'NR==1 { print $0 }' | tr -d '\r')"
+        if [[ "$running_name" == "$avd" ]]; then
+            return 0
+        fi
+    done < <(adb devices | awk '/^emulator-/ && $2 == "device" { print $1 }')
+    return 1
+}
+
+start_emulator_if_requested() {
+    local emu_pid
+    local avd="${ANDROID_EMULATOR_AVD:-vex_stable}"
+    if [[ "${ANDROID_AUTO_START_EMULATOR:-1}" != "1" ]]; then
+        return 0
+    fi
+    if ! emulator_avd_exists || target_emulator_running; then
+        return 0
+    fi
+
+    echo "Starting emulator '${avd}'..."
+    QT_QPA_PLATFORM="xcb" bash "$SCRIPT_DIR/start-android-emulator.sh" -- -avd "$avd" -no-snapshot-load -no-snapshot-save -no-boot-anim -gpu host >/tmp/vex-mobile-emulator.log 2>&1 &
+    emu_pid=$!
+    for _ in $(seq 1 120); do
+        if target_emulator_running; then
+            return 0
+        fi
+        if ! kill -0 "$emu_pid" >/dev/null 2>&1; then
+            echo "Emulator process exited before becoming ready." >&2
+            echo "Check /tmp/vex-mobile-emulator.log for details." >&2
+            exit 1
+        fi
+        sleep 2
+    done
+    echo "Emulator did not come online in time." >&2
+    echo "Check /tmp/vex-mobile-emulator.log for details." >&2
+    exit 1
+}
 
 cleanup() {
     trap - EXIT INT TERM
@@ -33,7 +125,20 @@ cleanup() {
         kill "$METRO_PID" >/dev/null 2>&1 || true
     fi
 }
-trap cleanup EXIT INT TERM
+on_interrupt() {
+    GRACEFUL_STOP=1
+    cleanup
+    exit 0
+}
+trap cleanup EXIT
+trap on_interrupt INT TERM
+
+start_emulator_if_requested
+
+if [[ -z "${ORG_GRADLE_PROJECT_reactNativeArchitectures:-}" ]]; then
+    export ORG_GRADLE_PROJECT_reactNativeArchitectures="$(detect_architectures_from_connected_devices)"
+fi
+echo "Using reactNativeArchitectures=${ORG_GRADLE_PROJECT_reactNativeArchitectures}"
 
 echo "Starting multi-device logs..."
 bash "$LOG_SCRIPT" &

@@ -2,7 +2,6 @@ import type { AppScreenProps } from "../navigation/types";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
     ScrollView,
     StyleSheet,
     Text,
@@ -30,6 +29,10 @@ export function PendingApprovalsScreen({
         Record<string, boolean>
     >({});
     const [deviceError, setDeviceError] = useState("");
+    const [pendingRemoval, setPendingRemoval] = useState<null | {
+        deviceID: string;
+        deviceName: string;
+    }>(null);
     const [devices, setDevices] = useState<
         Awaited<ReturnType<typeof vexService.listMyDevices>>
     >([]);
@@ -181,20 +184,7 @@ export function PendingApprovalsScreen({
     }
 
     function handleRemoveDevice(deviceID: string, deviceName: string): void {
-        Alert.alert(
-            `Remove ${deviceName}?`,
-            "This device will be signed out and must be re-approved or re-authenticated.",
-            [
-                { style: "cancel", text: "Cancel" },
-                {
-                    onPress: () => {
-                        void removeDevice(deviceID);
-                    },
-                    style: "destructive",
-                    text: "Remove",
-                },
-            ],
-        );
+        setPendingRemoval({ deviceID, deviceName });
     }
 
     async function removeDevice(deviceID: string): Promise<void> {
@@ -206,6 +196,7 @@ export function PendingApprovalsScreen({
                 setDeviceError(result.error ?? "Failed to remove device.");
                 return;
             }
+            setPendingRemoval(null);
             await refreshSessionAndDevices();
         } finally {
             setDeviceBusyByID((prev) => ({ ...prev, [deviceID]: false }));
@@ -417,6 +408,51 @@ export function PendingApprovalsScreen({
                         </View>
                     ) : null}
 
+                    {pendingRemoval ? (
+                        <View style={styles.confirmCard}>
+                            <Text style={styles.confirmTitle}>
+                                Remove {pendingRemoval.deviceName}?
+                            </Text>
+                            <Text style={styles.confirmBody}>
+                                This device will be signed out and must be
+                                re-approved or re-authenticated.
+                            </Text>
+                            <View style={styles.confirmActions}>
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setPendingRemoval(null);
+                                    }}
+                                    style={styles.cancelBtn}
+                                >
+                                    <Text style={styles.cancelBtnText}>
+                                        Cancel
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    disabled={
+                                        deviceBusyByID[
+                                            pendingRemoval.deviceID
+                                        ] === true
+                                    }
+                                    onPress={() => {
+                                        void removeDevice(
+                                            pendingRemoval.deviceID,
+                                        );
+                                    }}
+                                    style={styles.confirmRemoveBtn}
+                                >
+                                    <Text style={styles.confirmRemoveBtnText}>
+                                        {deviceBusyByID[
+                                            pendingRemoval.deviceID
+                                        ] === true
+                                            ? "Removing..."
+                                            : "Remove"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    ) : null}
+
                     {devices.map((device) => {
                         const isCurrent = device.deviceID === currentDeviceID;
                         const canRemove = devices.length > 1;
@@ -499,6 +535,20 @@ const styles = StyleSheet.create({
         color: "#4ADE80",
         fontWeight: "600",
     },
+    cancelBtn: {
+        alignItems: "center",
+        borderColor: "rgba(255,255,255,0.25)",
+        borderRadius: 10,
+        borderWidth: 1,
+        minWidth: 82,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    cancelBtnText: {
+        ...typography.button,
+        color: "rgba(255,255,255,0.84)",
+        fontWeight: "600",
+    },
     cell: {
         alignItems: "center",
         backgroundColor: "rgba(229, 57, 53, 0.08)",
@@ -519,6 +569,45 @@ const styles = StyleSheet.create({
         gap: 10,
         justifyContent: "center",
         paddingVertical: 6,
+    },
+    confirmActions: {
+        flexDirection: "row",
+        gap: 10,
+        justifyContent: "flex-end",
+    },
+    confirmBody: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.72)",
+        fontSize: 12,
+    },
+    confirmCard: {
+        backgroundColor: "rgba(229, 57, 53, 0.08)",
+        borderColor: "rgba(229, 57, 53, 0.35)",
+        borderRadius: 12,
+        borderWidth: 1,
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+    },
+    confirmRemoveBtn: {
+        alignItems: "center",
+        backgroundColor: "rgba(229, 57, 53, 0.2)",
+        borderColor: "rgba(229, 57, 53, 0.55)",
+        borderRadius: 10,
+        borderWidth: 1,
+        minWidth: 82,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    confirmRemoveBtnText: {
+        ...typography.button,
+        color: "#F9B4B2",
+        fontWeight: "600",
+    },
+    confirmTitle: {
+        ...typography.body,
+        color: "#FFD0CF",
+        fontWeight: "600",
     },
     container: {
         backgroundColor: colors.bg,
