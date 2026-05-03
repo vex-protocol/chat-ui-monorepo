@@ -8,6 +8,7 @@ export type { VexLink } from "./deeplink.ts";
 export {
     $authStatus,
     $avatarHash,
+    $avatarVersions,
     $devices,
     $familiars,
     $keyReplaced,

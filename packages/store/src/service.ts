@@ -24,6 +24,7 @@ import { Client } from "@vex-chat/libvex";
 import {
     $authStatusWritable,
     $avatarHashWritable,
+    $avatarVersionsWritable,
     $devicesWritable,
     $familiarsWritable,
     $keyReplacedWritable,
@@ -1205,10 +1206,17 @@ class VexService {
     }
 
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
+        const bumpVersionForCurrentUser = (): void => {
+            $avatarHashWritable.set(Date.now());
+            const me = $userWritable.get();
+            if (me?.userID) {
+                $avatarVersionsWritable.setKey(me.userID, Date.now());
+            }
+        };
         try {
             const client = this.requireClient();
             await client.me.setAvatar(data);
-            $avatarHashWritable.set(Date.now());
+            bumpVersionForCurrentUser();
             return { ok: true };
         } catch (err: unknown) {
             const message = errorMessage(err);
@@ -1229,7 +1237,7 @@ class VexService {
                     globalWithFormData.FormData = undefined;
                     const client = this.requireClient();
                     await client.me.setAvatar(data);
-                    $avatarHashWritable.set(Date.now());
+                    bumpVersionForCurrentUser();
                     return { ok: true };
                 } catch (retryErr: unknown) {
                     return { error: errorMessage(retryErr), ok: false };
@@ -1709,6 +1717,7 @@ class VexService {
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
         $pendingApprovalStageWritable.set("idle");
+        $avatarVersionsWritable.set({});
         this.lastDeviceAuthRefreshAttemptAt = 0;
         $familiarsWritable.set({});
         $devicesWritable.set({});

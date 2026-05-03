@@ -12,9 +12,11 @@ import {
     View,
 } from "react-native";
 
-import { avatarHue, formatTime } from "@vex-chat/store";
+import { formatTime } from "@vex-chat/store";
 
 import { colors, typography } from "../theme";
+
+import { Avatar } from "./Avatar";
 
 interface MessageBubbleRNProps {
     authorName: string;
@@ -170,18 +172,11 @@ export function MessageBubbleRN({
                     ]}
                 >
                     {showIdentity ? (
-                        <View
-                            style={[
-                                styles.avatar,
-                                {
-                                    backgroundColor: `hsl(${avatarHue(message.authorID)}, 45%, 40%)`,
-                                },
-                            ]}
-                        >
-                            <Text style={styles.avatarText}>
-                                {authorName.charAt(0).toUpperCase()}
-                            </Text>
-                        </View>
+                        <Avatar
+                            displayName={authorName}
+                            size={32}
+                            userID={message.authorID}
+                        />
                     ) : (
                         <View style={styles.avatarSpacer} />
                     )}
@@ -231,21 +226,8 @@ const styles = StyleSheet.create({
     authorSelf: {
         color: colors.accentMuted,
     },
-    avatar: {
-        alignItems: "center",
-        borderRadius: 16,
-        height: 32,
-        justifyContent: "center",
-        marginTop: 2,
-        width: 32,
-    },
     avatarSpacer: {
         width: 32,
-    },
-    avatarText: {
-        color: "#fff",
-        fontSize: 13,
-        fontWeight: "700",
     },
     container: {
         flexDirection: "row",

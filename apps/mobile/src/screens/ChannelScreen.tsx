@@ -32,6 +32,7 @@ import {
 import { useStore } from "@nanostores/react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
@@ -260,11 +261,11 @@ export function ChannelScreen({
         return (
             <TouchableOpacity disabled style={styles.memberRow}>
                 <View style={styles.memberAvatarWrap}>
-                    <View style={styles.memberAvatar}>
-                        <Text style={styles.memberAvatarText}>
-                            {item.username.slice(0, 1).toUpperCase()}
-                        </Text>
-                    </View>
+                    <Avatar
+                        displayName={item.username}
+                        size={36}
+                        userID={item.userID}
+                    />
                     <View
                         style={[
                             styles.memberPresenceDot,
@@ -381,19 +382,6 @@ const styles = StyleSheet.create({
     },
     list: {
         paddingVertical: 8,
-    },
-    memberAvatar: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.16)",
-        borderRadius: 16,
-        height: 32,
-        justifyContent: "center",
-        width: 32,
-    },
-    memberAvatarText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "700",
     },
     memberAvatarWrap: {
         position: "relative",

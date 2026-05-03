@@ -20,11 +20,12 @@ import {
     View,
 } from "react-native";
 
-import { $dmUnreadCounts, avatarHue } from "@vex-chat/store";
+import { $dmUnreadCounts } from "@vex-chat/store";
 import { $familiars, $messages, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
+import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { colors, typography } from "../theme";
 
@@ -180,18 +181,11 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 style={styles.friendChip}
             >
                 <View style={styles.friendAvatarWrap}>
-                    <View
-                        style={[
-                            styles.avatarSm,
-                            {
-                                backgroundColor: `hsl(${avatarHue(user.userID)}, 45%, 40%)`,
-                            },
-                        ]}
-                    >
-                        <Text style={styles.avatarSmText}>
-                            {user.username.slice(0, 1).toUpperCase()}
-                        </Text>
-                    </View>
+                    <Avatar
+                        displayName={user.username}
+                        size={28}
+                        userID={user.userID}
+                    />
                     <View
                         style={[
                             styles.friendPresenceDot,
@@ -234,18 +228,11 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 }}
                 style={[styles.row, unread > 0 && styles.rowUnread]}
             >
-                <View
-                    style={[
-                        styles.avatar,
-                        {
-                            backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)`,
-                        },
-                    ]}
-                >
-                    <Text style={styles.avatarText}>
-                        {item.username.slice(0, 1).toUpperCase()}
-                    </Text>
-                </View>
+                <Avatar
+                    displayName={item.username}
+                    size={40}
+                    userID={item.userID}
+                />
                 <View style={styles.rowContent}>
                     <Text style={styles.username}>{item.username}</Text>
                     {last ? (
@@ -277,18 +264,11 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
                 }}
                 style={styles.resultRow}
             >
-                <View
-                    style={[
-                        styles.avatarSm,
-                        {
-                            backgroundColor: `hsl(${avatarHue(item.userID)}, 45%, 40%)`,
-                        },
-                    ]}
-                >
-                    <Text style={styles.avatarSmText}>
-                        {item.username.slice(0, 1).toUpperCase()}
-                    </Text>
-                </View>
+                <Avatar
+                    displayName={item.username}
+                    size={28}
+                    userID={item.userID}
+                />
                 <Text style={styles.resultName}>{item.username}</Text>
             </TouchableOpacity>
         );
@@ -405,30 +385,6 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
 }
 
 const styles = StyleSheet.create({
-    avatar: {
-        alignItems: "center",
-        borderRadius: 24,
-        height: 48,
-        justifyContent: "center",
-        width: 48,
-    },
-    avatarSm: {
-        alignItems: "center",
-        borderRadius: 16,
-        height: 32,
-        justifyContent: "center",
-        width: 32,
-    },
-    avatarSmText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "700",
-    },
-    avatarText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "700",
-    },
     blackoutLayer: {
         ...StyleSheet.absoluteFill,
         backgroundColor: "#000000",

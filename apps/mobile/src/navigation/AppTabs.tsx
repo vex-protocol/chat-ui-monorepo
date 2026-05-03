@@ -10,8 +10,10 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ServerSidebar } from "../components/ServerSidebar";
+import { haptic } from "../lib/haptics";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { AddServerScreen } from "../screens/AddServerScreen";
+import { AvatarCropScreen } from "../screens/AvatarCropScreen";
 import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
 import { ConversationScreen } from "../screens/ConversationScreen";
@@ -35,6 +37,7 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
 const SIDEBAR_WIDTH = 304;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
+    "AvatarCrop",
     "DeviceDetails",
     "DeviceManager",
     "DeviceRequests",
@@ -64,6 +67,33 @@ export function AppTabs() {
         useState<keyof AppStackParamList>(initialRoute);
     const [activeChannelId, setActiveChannelId] = useState<null | string>(null);
     const [activeDmUserId, setActiveDmUserId] = useState<null | string>(null);
+    // Per-server "most recently visited channel" map. Tapping a server
+    // icon snaps to its last-opened channel (falling back to the first
+    // channel, or the channel list if the server has none).
+    //
+    // We keep this as a plain object in component state — short-lived
+    // and per-session is fine, since the ServerSidebar is mounted for
+    // the entire authenticated app lifetime.
+    const [lastChannelByServer, setLastChannelByServer] = useState<
+        Record<string, string>
+    >({});
+    // Which server's channels the *channel pane* is currently
+    // displaying. This diverges from `activeServerId` (the routed
+    // server) while the user is "peeking" at another server's channels
+    // without committing to navigate there. Null = DM pane.
+    //
+    // Tap rules:
+    //   - tap a server whose channels are *not* currently in the pane
+    //     → swap the pane to that server's channels (no nav, drawer
+    //     stays open).
+    //   - tap the server whose channels are *already* in the pane
+    //     → navigate to that server's last/first channel + close
+    //     drawer.
+    //
+    // The pane re-syncs to `activeServerId` every time the drawer
+    // opens, so reopening always starts from "show the server I'm
+    // currently in".
+    const [paneServerId, setPaneServerId] = useState<null | string>(null);
     const rightSidebarOpen = useStore($rightSidebarOpen);
     const topLeftShowsBack = TOP_LEFT_BACK_ROUTES.includes(currentRoute);
     const isChatRoute = CHAT_ROUTES.includes(currentRoute);
@@ -81,6 +111,11 @@ export function AppTabs() {
         $rightSidebarOpen.set(false);
         $leftSidebarOpen.set(true);
         setSidebarOpen(true);
+        // Always resync the channel pane to the routed server when the
+        // drawer opens — the user's "current location" is the natural
+        // starting point. Subsequent server taps can diverge it (peek)
+        // until the drawer is closed and reopened.
+        setPaneServerId(activeServerId);
         Animated.spring(sidebarX, {
             damping: 18,
             mass: 0.8,
@@ -116,6 +151,7 @@ export function AppTabs() {
         }
     }, [rightSidebarOpen, sidebarOpen]);
     const handleTopLeftPress = () => {
+        haptic("tap");
         if (topLeftShowsBack) {
             if (sidebarOpen) {
                 closeSidebar();
@@ -181,7 +217,27 @@ export function AppTabs() {
                                 typeof params.channelID === "string"
                                     ? params.channelID
                                     : null;
+                            const serverIDFromChannel =
+                                params &&
+                                typeof params === "object" &&
+                                "serverID" in params &&
+                                typeof params.serverID === "string"
+                                    ? params.serverID
+                                    : null;
                             setActiveChannelId(channelID);
+                            // Remember this as the server's last-visited
+                            // channel so a subsequent server-icon tap snaps
+                            // back here instead of the first channel.
+                            if (serverIDFromChannel && channelID) {
+                                setLastChannelByServer((prev) =>
+                                    prev[serverIDFromChannel] === channelID
+                                        ? prev
+                                        : {
+                                              ...prev,
+                                              [serverIDFromChannel]: channelID,
+                                          },
+                                );
+                            }
                         } else {
                             setActiveChannelId(null);
                         }
@@ -304,14 +360,14 @@ export function AppTabs() {
                 <ServerSidebar
                     activeChannelId={activeChannelId}
                     activeDmUserId={activeDmUserId}
-                    activeServerId={activeServerId}
+                    activeServerId={paneServerId}
                     authStatus={authStatus}
                     channels={
-                        activeServerId ? (channels[activeServerId] ?? []) : []
+                        paneServerId ? (channels[paneServerId] ?? []) : []
                     }
                     currentServerName={
-                        activeServerId
-                            ? (servers[activeServerId]?.name ?? "Server")
+                        paneServerId
+                            ? (servers[paneServerId]?.name ?? "Server")
                             : ""
                     }
                     onAddServer={() => {
@@ -321,7 +377,7 @@ export function AppTabs() {
                         });
                     }}
                     onSelectChannel={(channel) => {
-                        if (!activeServerId) {
+                        if (!paneServerId) {
                             return;
                         }
                         closeSidebar();
@@ -330,7 +386,7 @@ export function AppTabs() {
                             params: {
                                 channelID: channel.channelID,
                                 channelName: channel.name,
-                                serverID: activeServerId,
+                                serverID: paneServerId,
                             },
                             screen: "Channel",
                         });
@@ -347,46 +403,64 @@ export function AppTabs() {
                         });
                     }}
                     onSelectHome={() => {
-                        // Second tap on the already-active home button closes
-                        // the sidebar and drops the user on the DM list (the
-                        // "base" of the DMs app), so the rail behaves like an
-                        // OS dock toggle.
-                        const alreadyHome =
-                            activeServerId === null &&
-                            activeDmUserId === null &&
-                            currentRoute === "DMList";
-                        setActiveServerId(null);
-                        setActiveDmUserId(null);
-                        navigationRef.navigate("App", {
-                            screen: "DMList",
-                        });
-                        if (alreadyHome) {
-                            closeSidebar();
+                        // Peek-then-commit:
+                        //   - if home is *not* currently shown in the
+                        //     pane, swap the pane to DMs *and*
+                        //     navigate the background view to DMList
+                        //     so closing the drawer (any way) lands
+                        //     the user on DMs.
+                        //   - if home *is* already in the pane (which
+                        //     means we already routed to DMList on a
+                        //     previous peek or via the rail), just
+                        //     close the drawer.
+                        if (paneServerId !== null) {
+                            setPaneServerId(null);
+                            setActiveServerId(null);
+                            setActiveDmUserId(null);
+                            navigationRef.navigate("App", {
+                                screen: "DMList",
+                            });
+                            return;
                         }
+                        closeSidebar();
                     }}
                     onSelectServer={(id) => {
-                        // Second tap on the currently-active server closes the
-                        // sidebar without disturbing the channel that's
-                        // already selected; first tap switches servers and
-                        // leaves the sidebar open so the user can pick a
-                        // channel.
-                        if (id === activeServerId) {
+                        // Peek-then-commit, with eager background nav:
+                        //   - first tap on a server whose channels are
+                        //     not yet in the pane: swap the pane *and*
+                        //     navigate the background view to that
+                        //     server's last/first channel. Drawer
+                        //     stays open so the user can pick a
+                        //     specific channel; backdrop-tap or
+                        //     re-tapping the same server now just
+                        //     reveals the already-loaded view.
+                        //   - re-tap the server whose channels are in
+                        //     the pane: drawer closes (we're already
+                        //     on its view).
+                        if (id === paneServerId) {
                             closeSidebar();
                             return;
                         }
-                        setActiveServerId(id);
+                        setPaneServerId(id);
                         const serverChannels = channels[id] ?? [];
-                        const ch = serverChannels[0];
-                        if (ch) {
+                        const lastChannelID = lastChannelByServer[id];
+                        const lastChannel = lastChannelID
+                            ? serverChannels.find(
+                                  (c) => c.channelID === lastChannelID,
+                              )
+                            : undefined;
+                        const target = lastChannel ?? serverChannels[0];
+                        setActiveServerId(id);
+                        if (target) {
                             navigationRef.navigate("App", {
                                 params: {
-                                    channelID: ch.channelID,
-                                    channelName: ch.name,
+                                    channelID: target.channelID,
+                                    channelName: target.name,
                                     serverID: id,
                                 },
                                 screen: "Channel",
                             });
-                            setActiveChannelId(ch.channelID);
+                            setActiveChannelId(target.channelID);
                         } else {
                             navigationRef.navigate("App", {
                                 params: { serverID: id },
@@ -489,6 +563,12 @@ function ContentStack({
                 component={SettingsSectionScreen}
                 listeners={withFocus("SettingsSection")}
                 name="SettingsSection"
+            />
+            <Stack.Screen
+                component={AvatarCropScreen}
+                listeners={withFocus("AvatarCrop")}
+                name="AvatarCrop"
+                options={{ presentation: "modal" }}
             />
             <Stack.Screen
                 component={PendingApprovalsScreen}

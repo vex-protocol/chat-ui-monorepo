@@ -7,6 +7,7 @@ import {
     type ViewStyle,
 } from "react-native";
 
+import { haptic } from "../lib/haptics";
 import { colors, typography } from "../theme";
 
 import { CornerBracketBox } from "./CornerBracketBox";
@@ -41,7 +42,10 @@ export function VexButton({
             <TouchableOpacity
                 activeOpacity={0.7}
                 disabled={disabled || loading}
-                onPress={onPress}
+                onPress={() => {
+                    haptic(isPrimary ? "confirm" : "tap");
+                    onPress();
+                }}
                 style={[
                     styles.button,
                     isPrimary ? styles.primary : styles.outline,

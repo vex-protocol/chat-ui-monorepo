@@ -4,8 +4,11 @@ import type { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
+import { useStore } from "@nanostores/react";
+
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
+import { $devOptionsUnlocked } from "../lib/devMode";
 import { colors } from "../theme";
 
 interface SettingsRow {
@@ -16,6 +19,7 @@ interface SettingsRow {
 }
 
 export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
+    const devUnlocked = useStore($devOptionsUnlocked);
     const accountRows: ReadonlyArray<SettingsRow> = [
         {
             description: "Profile, identity, sign out",
@@ -44,16 +48,22 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                 navigation.navigate("SettingsSection", { section: "data" });
             },
         },
-        {
-            description: "Connection diagnostics",
-            icon: "code-slash-outline",
-            label: "Developer",
-            onPress: () => {
-                navigation.navigate("SettingsSection", {
-                    section: "developer",
-                });
-            },
-        },
+        // Developer surface stays hidden until the user unlocks it via
+        // the easter egg (7 taps on the version row in About).
+        ...(devUnlocked
+            ? [
+                  {
+                      description: "Connection diagnostics",
+                      icon: "code-slash-outline" as const,
+                      label: "Developer",
+                      onPress: () => {
+                          navigation.navigate("SettingsSection", {
+                              section: "developer",
+                          });
+                      },
+                  },
+              ]
+            : []),
         {
             description: "Version and server",
             icon: "information-circle-outline",
