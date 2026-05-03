@@ -395,7 +395,24 @@ function App() {
                     (previous === "background" || previous === "inactive") &&
                     nextState === "active";
                 if (resumed) {
-                    void onResume();
+                    // Defer the resume probe past the next paint so
+                    // the UI thread can finish the activity foreground
+                    // transition (unlock animation, layout) before we
+                    // start the heavy work (HTTP probe + possible
+                    // WebSocket reconnect + inbox sync). Two RAFs
+                    // guarantees we're after a committed frame; the
+                    // small setTimeout adds a touch more headroom for
+                    // slower devices. This is the difference between
+                    // "the user sees the chat list pop in" and "the
+                    // user sees an ANR dialog because the JS thread
+                    // was saturated during the unlock window."
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                void onResume();
+                            }, 50);
+                        });
+                    });
                 }
             },
         );
@@ -405,79 +422,77 @@ function App() {
         };
     }, [user]);
 
-    // Show local notifications for incoming messages by watching atom changes
-    const allDms = useStore($messages);
-    const allGroups = useStore($groupMessages);
-    const prevDmsRef = useRef(allDms);
-    const prevGroupsRef = useRef(allGroups);
-
+    // Show local notifications for incoming messages.
+    //
+    // We deliberately do NOT useStore() the message atoms here:
+    //   - This component renders no UI that depends on them.
+    //   - useStore() forces a re-render of the App root on every atom
+    //     update; during a wake-from-sleep backlog (foreground service
+    //     pulling queued mail) that's dozens of full-tree reconciles
+    //     in a few hundred ms, on the same JS thread Android wants
+    //     responsive for the activity foreground transition.
+    //
+    // Subscribing directly to the atoms keeps the side effect (queue
+    // a notification when a thread grows) without taxing React's
+    // render path. The notification queue inside `notifications.ts`
+    // serializes the resulting bridge calls so the burst can't
+    // saturate the JS thread either way.
     useEffect(() => {
         if (!user) {
             return;
         }
-        const prev = prevDmsRef.current;
-        prevDmsRef.current = allDms;
-        for (const [threadID, thread] of Object.entries(allDms)) {
-            const prevThread = prev[threadID] ?? [];
-            if (thread.length > prevThread.length) {
+        let prevDms = $messages.get();
+        let prevGroups = $groupMessages.get();
+        const queueIfNew = (newMsg: Message): void => {
+            if (
+                notifiedMailIDsRef.current.has(newMsg.mailID) ||
+                runtimeNotifiedMailIDs.has(newMsg.mailID)
+            ) {
+                return;
+            }
+            notifiedMailIDsRef.current.add(newMsg.mailID);
+            runtimeNotifiedMailIDs.add(newMsg.mailID);
+            if (
+                isHistoricalMessage(
+                    newMsg.timestamp,
+                    notificationHistoryCutoffMsRef.current,
+                )
+            ) {
+                return;
+            }
+            void showMessageNotification(newMsg);
+        };
+        const handleDelta = (
+            next: Record<string, Message[]>,
+            prev: Record<string, Message[]>,
+        ): void => {
+            for (const [threadID, thread] of Object.entries(next)) {
+                const prevThread = prev[threadID] ?? [];
+                if (thread.length <= prevThread.length) {
+                    continue;
+                }
                 const newMsg = thread[thread.length - 1];
                 if (!newMsg) {
                     continue;
                 }
-                if (
-                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
-                    runtimeNotifiedMailIDs.has(newMsg.mailID)
-                ) {
-                    continue;
-                }
-                notifiedMailIDsRef.current.add(newMsg.mailID);
-                runtimeNotifiedMailIDs.add(newMsg.mailID);
-                if (
-                    isHistoricalMessage(
-                        newMsg.timestamp,
-                        notificationHistoryCutoffMsRef.current,
-                    )
-                ) {
-                    continue;
-                }
-                void showMessageNotification(newMsg);
+                queueIfNew(newMsg);
             }
-        }
-    }, [allDms, user]);
-
-    useEffect(() => {
-        if (!user) {
-            return;
-        }
-        const prev = prevGroupsRef.current;
-        prevGroupsRef.current = allGroups;
-        for (const [channelID, thread] of Object.entries(allGroups)) {
-            const prevThread = prev[channelID] ?? [];
-            if (thread.length > prevThread.length) {
-                const newMsg = thread[thread.length - 1];
-                if (!newMsg) {
-                    continue;
-                }
-                if (
-                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
-                    runtimeNotifiedMailIDs.has(newMsg.mailID)
-                ) {
-                    continue;
-                }
-                notifiedMailIDsRef.current.add(newMsg.mailID);
-                runtimeNotifiedMailIDs.add(newMsg.mailID);
-                if (
-                    isHistoricalMessage(
-                        newMsg.timestamp,
-                        notificationHistoryCutoffMsRef.current,
-                    )
-                ) {
-                    continue;
-                }
-                void showMessageNotification(newMsg);
-            }
-        }
-    }, [allGroups, user]);
+        };
+        const unsubDms = $messages.subscribe((next) => {
+            const prev = prevDms;
+            prevDms = next;
+            handleDelta(next, prev);
+        });
+        const unsubGroups = $groupMessages.subscribe((next) => {
+            const prev = prevGroups;
+            prevGroups = next;
+            handleDelta(next, prev);
+        });
+        return () => {
+            unsubDms();
+            unsubGroups();
+        };
+    }, [user]);
 
     useEffect(() => {
         if (keyReplaced) {
