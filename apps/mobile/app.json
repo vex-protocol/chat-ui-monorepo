@@ -20,7 +20,13 @@
         "plugins": [
             "expo-secure-store",
             "expo-sqlite",
-            "expo-notifications",
+            [
+                "expo-notifications",
+                {
+                    "icon": "./assets/icon-prod.png",
+                    "color": "#0a0a0a"
+                }
+            ],
             "./plugins/gradle-memory"
         ]
     }
