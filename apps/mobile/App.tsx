@@ -27,6 +27,7 @@ import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { getServerOptions } from "./src/lib/config";
+import { hydrateDevOptionsUnlocked } from "./src/lib/devMode";
 import { clearCredentials, keychainKeyStore } from "./src/lib/keychain";
 import {
     requestNotificationPermission,
@@ -87,6 +88,10 @@ function App() {
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
+        // Hydrate the developer-options easter-egg flag from
+        // SecureStore. Fire-and-forget — the atom defaults to false
+        // until the persisted value lands.
+        void hydrateDevOptionsUnlocked();
         return () => {
             unsubNotif();
         };

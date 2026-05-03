@@ -7,6 +7,11 @@ export type AppScreenProps<T extends keyof AppStackParamList> =
 // ── App (content) stack ─────────────────────────────────────────────────────
 export type AppStackParamList = {
     AddServer: undefined;
+    AvatarCrop: {
+        sourceHeight: number;
+        sourceUri: string;
+        sourceWidth: number;
+    };
     Channel: { channelID: string; channelName: string; serverID: string };
     ChannelList: { serverID: string; serverName?: string };
     Conversation: { userID: string; username: string };

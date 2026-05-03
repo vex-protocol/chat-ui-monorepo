@@ -1,41 +1,51 @@
 import type { AppScreenProps } from "../navigation/types";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     Alert,
-    Image,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
+    Vibration,
     View,
 } from "react-native";
 
 import { $user, vexService } from "@vex-chat/store";
-import { $avatarHash, avatarHue } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 
+import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
-import { getServerOptions, getServerUrl } from "../lib/config";
+import { $avatarCropResult } from "../lib/avatarCropResult";
+import { getServerUrl } from "../lib/config";
+import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import { colors, typography } from "../theme";
+
+const DEV_UNLOCK_TAPS = 7;
+const DEV_UNLOCK_WINDOW_MS = 3000;
+const DEV_UNLOCK_HINT_AT = 4;
 
 export function SettingsSectionScreen({
     navigation,
     route,
 }: AppScreenProps<"SettingsSection">) {
     const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-    const avatarHash = useStore($avatarHash);
     const user = useStore($user);
     const section = route.params.section;
     const [avatarError, setAvatarError] = useState("");
     const [avatarLastAttemptBytes, setAvatarLastAttemptBytes] = useState<
         null | number
     >(null);
-    const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
     const [avatarNotice, setAvatarNotice] = useState("");
     const [avatarUploading, setAvatarUploading] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
@@ -48,14 +58,83 @@ export function SettingsSectionScreen({
     const [wsStateDebugEnabled, setWsStateDebugEnabled] = useState(() =>
         vexService.getWebsocketStateDebugEnabled(),
     );
-    const avatarUrl =
-        user?.userID != null
-            ? `${getServerOptions().unsafeHttp ? "http" : "https"}://${getServerUrl()}/avatar/${user.userID}?v=${avatarHash}`
-            : null;
-
+    // Cropper hand-off: when the cropper screen finishes, it writes a
+    // result here. We stash the request id we kicked off with so we
+    // only consume *our* result (not stale state from a previous
+    // cropper invocation that the user cancelled).
+    const cropResult = useStore($avatarCropResult);
+    const expectedCropRequestRef = useRef<null | number>(null);
+    // Easter-egg counter for unlocking the developer surface from
+    // About → Version. State sticks while the user is on this screen;
+    // navigating away resets it (component unmount drops the closure).
+    const devUnlocked = useStore($devOptionsUnlocked);
+    const [versionTaps, setVersionTaps] = useState(0);
+    const versionTapResetRef = useRef<null | ReturnType<typeof setTimeout>>(
+        null,
+    );
     useEffect(() => {
-        setAvatarLoadFailed(false);
-    }, [avatarUrl]);
+        return () => {
+            if (versionTapResetRef.current) {
+                clearTimeout(versionTapResetRef.current);
+            }
+        };
+    }, []);
+
+    function handleVersionTap(): void {
+        if (devUnlocked) {
+            return;
+        }
+        if (versionTapResetRef.current) {
+            clearTimeout(versionTapResetRef.current);
+        }
+        const next = versionTaps + 1;
+        if (next >= DEV_UNLOCK_TAPS) {
+            setVersionTaps(0);
+            Vibration.vibrate([0, 25, 60, 25, 60, 25]);
+            void setDevOptionsUnlocked(true);
+            Alert.alert(
+                "Developer options unlocked",
+                "Connection diagnostics are now available under Settings → Developer.",
+            );
+            return;
+        }
+        setVersionTaps(next);
+        Vibration.vibrate(8);
+        if (next === DEV_UNLOCK_HINT_AT) {
+            // Subtle nudge once the user is most of the way there.
+            Alert.alert(
+                "Almost there",
+                `${DEV_UNLOCK_TAPS - next} more tap${
+                    DEV_UNLOCK_TAPS - next === 1 ? "" : "s"
+                } to unlock developer options.`,
+            );
+        }
+        versionTapResetRef.current = setTimeout(() => {
+            setVersionTaps(0);
+        }, DEV_UNLOCK_WINDOW_MS);
+    }
+
+    function handleLockDeveloperOptions(): void {
+        Alert.alert(
+            "Lock developer options?",
+            "The diagnostics menu will be hidden again until you re-enter the easter egg in About.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void setDevOptionsUnlocked(false);
+                        // Bounce back to Settings; the developer
+                        // section will be hidden once we land there.
+                        if (navigation.canGoBack()) {
+                            navigation.goBack();
+                        }
+                    },
+                    style: "destructive",
+                    text: "Lock",
+                },
+            ],
+        );
+    }
 
     const title = useMemo(() => {
         switch (section) {
@@ -107,11 +186,6 @@ export function SettingsSectionScreen({
                 },
             ],
         );
-    }
-
-    function initials(id: string, displayName?: string): string {
-        if (displayName) return displayName.slice(0, 2).toUpperCase();
-        return id.slice(0, 2).toUpperCase();
     }
 
     function formatBytes(bytes: number): string {
@@ -174,49 +248,21 @@ export function SettingsSectionScreen({
         return { data: null, lastAttemptBytes };
     }
 
-    async function handlePickAvatar(): Promise<void> {
-        if (!user?.userID || avatarUploading) {
-            return;
-        }
-        const permission =
-            await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-            setAvatarError("Photo library permission is required.");
-            return;
-        }
+    /**
+     * Whether the picked asset is square (within 1px tolerance). The OS
+     * cropper occasionally hands back a slightly-off-by-one rectangle
+     * even when we ask for `aspect: [1, 1]`.
+     */
+    function isSquare(width: null | number, height: null | number): boolean {
+        if (width == null || height == null) return false;
+        return Math.abs(width - height) <= 1;
+    }
 
-        const pickerResult = await ImagePicker.launchImageLibraryAsync({
-            allowsEditing: true,
-            base64: true,
-            quality: 0.92,
-        });
-        if (pickerResult.canceled) {
-            return;
-        }
-        const asset = pickerResult.assets[0];
-        if (!asset?.uri) {
-            setAvatarError("No image selected.");
-            return;
-        }
-        if (asset.type != null && asset.type !== "image") {
-            setAvatarError("Please select an image.");
-            return;
-        }
-
-        setAvatarError("");
-        setAvatarNotice("");
-        setAvatarLastAttemptBytes(null);
-        setAvatarUploading(true);
-        try {
-            const originalBytes =
-                typeof asset.fileSize === "number" && asset.fileSize > 0
-                    ? asset.fileSize
-                    : asset.base64 != null
-                      ? readImageBytesFromBase64(asset.base64).byteLength
-                      : 0;
+    const uploadSquareUri = useCallback(
+        async (sourceUri: string, originalBytes: number): Promise<void> => {
             setAvatarLastAttemptBytes(originalBytes);
             const compressed = await compressAvatarToLimit(
-                asset.uri,
+                sourceUri,
                 MAX_AVATAR_BYTES,
             );
             setAvatarLastAttemptBytes(
@@ -237,27 +283,126 @@ export function SettingsSectionScreen({
                 );
                 return;
             }
-            if (data.byteLength < originalBytes) {
-                setAvatarNotice(
-                    `Optimized image from ${formatBytes(
-                        originalBytes,
-                    )} to ${formatBytes(data.byteLength)} (500x500 JPEG).`,
-                );
-            } else {
-                setAvatarNotice(
-                    `Processed as 500x500 JPEG (${formatBytes(data.byteLength)}).`,
-                );
-            }
+            const sizeNote =
+                originalBytes > 0 && data.byteLength < originalBytes
+                    ? `Optimized from ${formatBytes(originalBytes)} to ${formatBytes(data.byteLength)} (500x500 JPEG).`
+                    : `Processed as 500x500 JPEG (${formatBytes(data.byteLength)}).`;
             const result = await vexService.setAvatar(data);
             if (!result.ok) {
                 setAvatarError(result.error ?? "Avatar upload failed.");
                 return;
             }
-            if (avatarNotice === "") {
-                setAvatarNotice(
-                    `Avatar updated (${formatBytes(data.byteLength)}).`,
+            setAvatarNotice(sizeNote);
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- helpers and constants are stable
+        [],
+    );
+
+    // Picks up a cropped image emitted by `AvatarCropScreen` and
+    // continues the upload pipeline for it.
+    useEffect(() => {
+        if (!cropResult) return;
+        const expected = expectedCropRequestRef.current;
+        if (expected == null || cropResult.requestId !== expected) {
+            return;
+        }
+        // Consume the result (single-shot).
+        $avatarCropResult.set(null);
+        expectedCropRequestRef.current = null;
+        const cropUri = cropResult.uri;
+        setAvatarError("");
+        setAvatarNotice("");
+        setAvatarLastAttemptBytes(null);
+        setAvatarUploading(true);
+        void (async () => {
+            try {
+                await uploadSquareUri(cropUri, 0);
+            } catch (err: unknown) {
+                setAvatarError(
+                    err instanceof Error
+                        ? err.message
+                        : "Avatar upload failed.",
                 );
+            } finally {
+                setAvatarUploading(false);
             }
+        })();
+    }, [cropResult, uploadSquareUri]);
+
+    async function handlePickAvatar(): Promise<void> {
+        if (!user?.userID || avatarUploading) {
+            return;
+        }
+        const permission =
+            await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            setAvatarError("Photo library permission is required.");
+            return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+            allowsEditing: true,
+            // Tell the OS cropper we want a 1:1 result. iOS honors this
+            // strictly; Android's cropper uses it as the initial aspect
+            // but lets the user resize freely, so we still validate
+            // afterwards and route through our in-app cropper if the
+            // result isn't square.
+            aspect: [1, 1],
+            base64: true,
+            quality: 0.92,
+        });
+        if (pickerResult.canceled) {
+            return;
+        }
+        const asset = pickerResult.assets[0];
+        if (!asset?.uri) {
+            setAvatarError("No image selected.");
+            return;
+        }
+        if (asset.type != null && asset.type !== "image") {
+            setAvatarError("Please select an image.");
+            return;
+        }
+
+        setAvatarError("");
+        setAvatarNotice("");
+        setAvatarLastAttemptBytes(null);
+
+        const width = typeof asset.width === "number" ? asset.width : null;
+        const height = typeof asset.height === "number" ? asset.height : null;
+
+        // Non-square asset (the OS cropper was skipped or freeform-cropped).
+        // Send the user through our in-app cropper to pick a square region.
+        if (!isSquare(width, height) && width != null && height != null) {
+            const requestId = Math.floor(Math.random() * 1_000_000_000);
+            expectedCropRequestRef.current = requestId;
+            // Pre-clear any stale cropper result (different request id, but
+            // safer to start clean).
+            $avatarCropResult.set(null);
+            navigation.navigate("AvatarCrop", {
+                sourceHeight: height,
+                sourceUri: asset.uri,
+                sourceWidth: width,
+            });
+            // The useEffect above will pick the result up and finish the
+            // upload when the cropper screen returns.
+            // We can't compare `requestId` directly to the cropper's id
+            // since the cropper makes its own; we just gate on "is this
+            // the most recent crop request we issued?".
+            expectedCropRequestRef.current = null;
+            return;
+        }
+
+        // Already square — upload directly.
+        setAvatarUploading(true);
+        try {
+            const originalBytes =
+                typeof asset.fileSize === "number" && asset.fileSize > 0
+                    ? asset.fileSize
+                    : asset.base64 != null
+                      ? readImageBytesFromBase64(asset.base64).byteLength
+                      : 0;
+            await uploadSquareUri(asset.uri, originalBytes);
         } catch (err: unknown) {
             setAvatarError(
                 err instanceof Error ? err.message : "Avatar upload failed.",
@@ -281,7 +426,22 @@ export function SettingsSectionScreen({
                         <MenuRow
                             icon="pricetag-outline"
                             label="Version"
+                            onPress={handleVersionTap}
                             value="0.1.0"
+                            {...(devUnlocked
+                                ? {
+                                      description:
+                                          "Developer options are unlocked",
+                                  }
+                                : versionTaps > 0
+                                  ? {
+                                        description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
+                                            DEV_UNLOCK_TAPS - versionTaps === 1
+                                                ? ""
+                                                : "s"
+                                        } to unlock developer options`,
+                                    }
+                                  : {})}
                         />
                         <MenuRow
                             icon="server-outline"
@@ -296,35 +456,13 @@ export function SettingsSectionScreen({
                         <MenuSection title="Profile">
                             <MenuRow
                                 accessory={
-                                    avatarUrl != null && !avatarLoadFailed ? (
-                                        <Image
-                                            onError={() => {
-                                                setAvatarLoadFailed(true);
-                                            }}
-                                            source={{ uri: avatarUrl }}
-                                            style={styles.avatar}
+                                    user?.userID ? (
+                                        <Avatar
+                                            displayName={user.username}
+                                            size={40}
+                                            userID={user.userID}
                                         />
-                                    ) : (
-                                        <View
-                                            style={[
-                                                styles.avatarFallback,
-                                                {
-                                                    backgroundColor: `hsl(${avatarHue(user?.userID ?? "0")}, 45%, 40%)`,
-                                                },
-                                            ]}
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.avatarFallbackText
-                                                }
-                                            >
-                                                {initials(
-                                                    user?.userID ?? "??",
-                                                    user?.username,
-                                                )}
-                                            </Text>
-                                        </View>
-                                    )
+                                    ) : null
                                 }
                                 description={
                                     avatarUploading
@@ -396,58 +534,72 @@ export function SettingsSectionScreen({
                     </>
                 ) : null}
 
-                {section === "developer" ? (
-                    <MenuSection
-                        footer="Logs print to the device terminal/logcat. Useful when reporting issues."
-                        title="WebSocket Debug"
-                    >
-                        <MenuRow
-                            accessory={
-                                <Switch
-                                    onValueChange={(value) => {
-                                        setWsDebugEnabled(value);
-                                        vexService.setWebsocketDebug(value);
-                                    }}
-                                    value={wsDebugEnabled}
-                                />
-                            }
-                            description="Print inbound/outbound frames"
-                            icon="code-slash-outline"
-                            label="Debug logs"
-                        />
-                        <MenuRow
-                            accessory={
-                                <Switch
-                                    onValueChange={(value) => {
-                                        setWsFrameDebugEnabled(value);
-                                        vexService.setWebsocketFrameDebug(
-                                            value,
-                                        );
-                                    }}
-                                    value={wsFrameDebugEnabled}
-                                />
-                            }
-                            description="Log raw frame payloads"
-                            icon="document-text-outline"
-                            label="Frame payload logs"
-                        />
-                        <MenuRow
-                            accessory={
-                                <Switch
-                                    onValueChange={(value) => {
-                                        setWsStateDebugEnabled(value);
-                                        vexService.setWebsocketStateDebug(
-                                            value,
-                                        );
-                                    }}
-                                    value={wsStateDebugEnabled}
-                                />
-                            }
-                            description="Connect/disconnect/recover lifecycle"
-                            icon="pulse-outline"
-                            label="State transition logs"
-                        />
-                    </MenuSection>
+                {section === "developer" && devUnlocked ? (
+                    <>
+                        <MenuSection
+                            footer="Logs print to the device terminal/logcat. Useful when reporting issues."
+                            title="WebSocket Debug"
+                        >
+                            <MenuRow
+                                accessory={
+                                    <Switch
+                                        onValueChange={(value) => {
+                                            setWsDebugEnabled(value);
+                                            vexService.setWebsocketDebug(value);
+                                        }}
+                                        value={wsDebugEnabled}
+                                    />
+                                }
+                                description="Print inbound/outbound frames"
+                                icon="code-slash-outline"
+                                label="Debug logs"
+                            />
+                            <MenuRow
+                                accessory={
+                                    <Switch
+                                        onValueChange={(value) => {
+                                            setWsFrameDebugEnabled(value);
+                                            vexService.setWebsocketFrameDebug(
+                                                value,
+                                            );
+                                        }}
+                                        value={wsFrameDebugEnabled}
+                                    />
+                                }
+                                description="Log raw frame payloads"
+                                icon="document-text-outline"
+                                label="Frame payload logs"
+                            />
+                            <MenuRow
+                                accessory={
+                                    <Switch
+                                        onValueChange={(value) => {
+                                            setWsStateDebugEnabled(value);
+                                            vexService.setWebsocketStateDebug(
+                                                value,
+                                            );
+                                        }}
+                                        value={wsStateDebugEnabled}
+                                    />
+                                }
+                                description="Connect/disconnect/recover lifecycle"
+                                icon="pulse-outline"
+                                label="State transition logs"
+                            />
+                        </MenuSection>
+                        <MenuSection
+                            footer="Hides this menu again until you re-enter the easter egg in About."
+                            title="Visibility"
+                        >
+                            <MenuRow
+                                description="Hide developer options"
+                                icon="lock-closed-outline"
+                                label="Lock developer options"
+                                onPress={handleLockDeveloperOptions}
+                                tone="danger"
+                            />
+                        </MenuSection>
+                    </>
                 ) : null}
 
                 {section === "data" ? (
@@ -467,25 +619,6 @@ export function SettingsSectionScreen({
 }
 
 const styles = StyleSheet.create({
-    avatar: {
-        borderRadius: 18,
-        height: 36,
-        width: 36,
-    },
-    avatarFallback: {
-        alignItems: "center",
-        borderRadius: 18,
-        height: 36,
-        justifyContent: "center",
-        width: 36,
-    },
-    avatarFallbackText: {
-        ...typography.button,
-        color: "#FFFFFF",
-        fontSize: 12,
-        fontWeight: "700",
-        letterSpacing: 0.2,
-    },
     container: {
         backgroundColor: colors.bg,
         flex: 1,

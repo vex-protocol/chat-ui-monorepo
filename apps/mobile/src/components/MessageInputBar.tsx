@@ -8,6 +8,7 @@ import {
     View,
 } from "react-native";
 
+import { haptic } from "../lib/haptics";
 import { colors } from "../theme";
 
 interface MessageInputBarProps {
@@ -32,6 +33,7 @@ export function MessageInputBar({
     const keepFocusAfterSubmitRef = useRef(false);
     const handleSubmitEditing = () => {
         if (canSend) {
+            haptic("confirm");
             keepFocusAfterSubmitRef.current = true;
             onSend();
         }
@@ -76,7 +78,10 @@ export function MessageInputBar({
 
             <TouchableOpacity
                 disabled={!canSend}
-                onPress={onSend}
+                onPress={() => {
+                    haptic("confirm");
+                    onSend();
+                }}
                 style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
             >
                 <Text style={styles.sendText}>→</Text>

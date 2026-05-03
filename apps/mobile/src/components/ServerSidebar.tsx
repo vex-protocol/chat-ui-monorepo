@@ -14,14 +14,16 @@ import {
     $familiars,
     $messages,
     $totalDmUnread,
-    avatarHue,
+    $user,
 } from "@vex-chat/store";
 import { $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
+import { haptic } from "../lib/haptics";
 import { colors } from "../theme";
 
+import { Avatar } from "./Avatar";
 import { VexLogo } from "./VexLogo";
 
 interface ServerSidebarProps {
@@ -66,6 +68,7 @@ export function ServerSidebar({
     const familiars = useStore($familiars);
     const messages = useStore($messages);
     const dmUnreadCounts = useStore($dmUnreadCounts);
+    const me = useStore($user);
     const serverList = Object.values(servers);
     const dmList = Object.values(familiars).filter((user) => {
         const thread = messages[user.userID];
@@ -74,245 +77,300 @@ export function ServerSidebar({
     const totalUnread = useStore($totalDmUnread);
     const homeActive = activeServerId === null;
 
+    const authDotStyle = [
+        styles.profileAuthDot,
+        authStatus === "authenticated" && styles.authDotAuthenticated,
+        authStatus === "checking" && styles.authDotChecking,
+        authStatus === "offline" && styles.authDotOffline,
+        authStatus === "signed_out" && styles.authDotSignedOut,
+        authStatus === "unauthorized" && styles.authDotUnauthorized,
+    ];
+
+    const authStatusLabel: string = (() => {
+        switch (authStatus) {
+            case "authenticated":
+                return "Online";
+            case "checking":
+                return "Connecting...";
+            case "offline":
+                return "Offline";
+            case "signed_out":
+                return "Signed out";
+            case "unauthorized":
+                return "Unauthorized";
+            default:
+                return "";
+        }
+    })();
+
     return (
         <View style={styles.drawerContainer}>
-            <View
-                style={[
-                    styles.railContainer,
-                    {
-                        paddingBottom: safeAreaBottom + 10,
-                        paddingTop: safeAreaTop + 10,
-                    },
-                ]}
-            >
-                <View style={styles.topSection}>
-                    <View
-                        style={[
-                            styles.activePill,
-                            homeActive && styles.activePillVisible,
-                        ]}
-                    />
-                    <TouchableOpacity
-                        onPress={onSelectHome}
-                        style={styles.homeBtn}
-                    >
-                        <VexLogo showWordmark={false} size={22} />
-                        {totalUnread > 0 && (
-                            <View style={styles.homeBadge}>
-                                <Text style={styles.homeBadgeText}>
-                                    {totalUnread > 99 ? "99+" : totalUnread}
-                                </Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.divider} />
-
-                <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    style={styles.serverList}
+            <View style={styles.topRow}>
+                <View
+                    style={[
+                        styles.railContainer,
+                        { paddingTop: safeAreaTop + 10 },
+                    ]}
                 >
-                    {serverList.map((server) => {
-                        const active = server.serverID === activeServerId;
-                        return (
-                            <View
-                                key={server.serverID}
-                                style={styles.serverRow}
-                            >
-                                <View
-                                    style={[
-                                        styles.activePill,
-                                        active && styles.activePillVisible,
-                                    ]}
-                                />
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        onSelectServer(server.serverID);
-                                    }}
-                                    style={[
-                                        styles.serverBtn,
-                                        active && styles.serverBtnActive,
-                                    ]}
-                                >
-                                    <Text style={styles.serverInitial}>
-                                        {server.name.slice(0, 2).toUpperCase()}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        );
-                    })}
-
-                    <View style={styles.serverRow}>
-                        <View style={styles.activePill} />
-                        <TouchableOpacity
-                            onPress={onAddServer}
-                            style={styles.addBtn}
-                        >
-                            <Text style={styles.addText}>+</Text>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-
-                <View style={styles.settingsRow}>
-                    <View style={styles.activePill} />
-                    <TouchableOpacity
-                        onPress={onSettings}
-                        style={styles.settingsBtn}
-                    >
-                        <View style={styles.userIconHead} />
-                        <View style={styles.userIconBody} />
+                    <View style={styles.topSection}>
                         <View
                             style={[
-                                styles.authDot,
-                                authStatus === "authenticated" &&
-                                    styles.authDotAuthenticated,
-                                authStatus === "checking" &&
-                                    styles.authDotChecking,
-                                authStatus === "offline" &&
-                                    styles.authDotOffline,
-                                authStatus === "signed_out" &&
-                                    styles.authDotSignedOut,
-                                authStatus === "unauthorized" &&
-                                    styles.authDotUnauthorized,
+                                styles.activePill,
+                                homeActive && styles.activePillVisible,
                             ]}
                         />
-                    </TouchableOpacity>
-                </View>
-            </View>
+                        <TouchableOpacity
+                            onPress={() => {
+                                haptic("selection");
+                                onSelectHome();
+                            }}
+                            style={styles.homeBtn}
+                        >
+                            <VexLogo showWordmark={false} size={22} />
+                            {totalUnread > 0 && (
+                                <View style={styles.homeBadge}>
+                                    <Text style={styles.homeBadgeText}>
+                                        {totalUnread > 99 ? "99+" : totalUnread}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
-            <View
-                style={[
-                    styles.channelPane,
-                    {
-                        paddingBottom: safeAreaBottom + 10,
-                        paddingTop: safeAreaTop + 10,
-                    },
-                ]}
-            >
-                <Text numberOfLines={1} style={styles.channelPaneTitle}>
-                    {activeServerId ? currentServerName : "Direct Messages"}
-                </Text>
-                {!activeServerId ? (
-                    dmList.length === 0 ? (
+                    <View style={styles.divider} />
+
+                    <ScrollView
+                        showsVerticalScrollIndicator={false}
+                        style={styles.serverList}
+                    >
+                        {serverList.map((server) => {
+                            const active = server.serverID === activeServerId;
+                            return (
+                                <View
+                                    key={server.serverID}
+                                    style={styles.serverRow}
+                                >
+                                    <View
+                                        style={[
+                                            styles.activePill,
+                                            active && styles.activePillVisible,
+                                        ]}
+                                    />
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            haptic("selection");
+                                            onSelectServer(server.serverID);
+                                        }}
+                                        style={[
+                                            styles.serverBtn,
+                                            active && styles.serverBtnActive,
+                                        ]}
+                                    >
+                                        <Text style={styles.serverInitial}>
+                                            {server.name
+                                                .slice(0, 2)
+                                                .toUpperCase()}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })}
+
+                        <View style={styles.serverRow}>
+                            <View style={styles.activePill} />
+                            <TouchableOpacity
+                                onPress={() => {
+                                    haptic("tap");
+                                    onAddServer();
+                                }}
+                                style={styles.addBtn}
+                            >
+                                <Text style={styles.addText}>+</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </View>
+
+                <View
+                    style={[
+                        styles.channelPane,
+                        { paddingTop: safeAreaTop + 10 },
+                    ]}
+                >
+                    <Text numberOfLines={1} style={styles.channelPaneTitle}>
+                        {activeServerId ? currentServerName : "Direct Messages"}
+                    </Text>
+                    {!activeServerId ? (
+                        dmList.length === 0 ? (
+                            <Text style={styles.channelPaneEmpty}>
+                                No DM conversations yet
+                            </Text>
+                        ) : (
+                            <ScrollView
+                                showsVerticalScrollIndicator={false}
+                                style={styles.channelList}
+                            >
+                                {dmList.map((user) => {
+                                    const unread =
+                                        dmUnreadCounts[user.userID] ?? 0;
+                                    const active =
+                                        user.userID === activeDmUserId;
+                                    return (
+                                        <TouchableOpacity
+                                            key={user.userID}
+                                            onPress={() => {
+                                                haptic("selection");
+                                                onSelectDM(user);
+                                            }}
+                                            style={[
+                                                styles.channelItem,
+                                                active &&
+                                                    styles.channelItemActive,
+                                            ]}
+                                        >
+                                            <View style={styles.dmRow}>
+                                                <Avatar
+                                                    displayName={user.username}
+                                                    size={24}
+                                                    userID={user.userID}
+                                                />
+                                                <View style={styles.dmMeta}>
+                                                    <View
+                                                        style={styles.dmNameRow}
+                                                    >
+                                                        <Text
+                                                            ellipsizeMode="tail"
+                                                            numberOfLines={1}
+                                                            style={[
+                                                                styles.channelItemText,
+                                                                styles.dmName,
+                                                                active &&
+                                                                    styles.channelItemTextActive,
+                                                            ]}
+                                                        >
+                                                            {user.username}
+                                                        </Text>
+                                                        {unread > 0 ? (
+                                                            <View
+                                                                style={
+                                                                    styles.dmNewDot
+                                                                }
+                                                            />
+                                                        ) : null}
+                                                    </View>
+                                                </View>
+                                                {unread > 0 ? (
+                                                    <View
+                                                        style={styles.dmBadge}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.dmBadgeText
+                                                            }
+                                                        >
+                                                            {unread > 99
+                                                                ? "99+"
+                                                                : unread}
+                                                        </Text>
+                                                    </View>
+                                                ) : null}
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </ScrollView>
+                        )
+                    ) : channels.length === 0 ? (
                         <Text style={styles.channelPaneEmpty}>
-                            No DM conversations yet
+                            No channels yet
                         </Text>
                     ) : (
                         <ScrollView
                             showsVerticalScrollIndicator={false}
                             style={styles.channelList}
                         >
-                            {dmList.map((user) => {
-                                const unread = dmUnreadCounts[user.userID] ?? 0;
-                                const active = user.userID === activeDmUserId;
+                            {channels.map((channel) => {
+                                const active =
+                                    channel.channelID === activeChannelId;
                                 return (
                                     <TouchableOpacity
-                                        key={user.userID}
+                                        key={channel.channelID}
                                         onPress={() => {
-                                            onSelectDM(user);
+                                            haptic("selection");
+                                            onSelectChannel(channel);
                                         }}
                                         style={[
                                             styles.channelItem,
                                             active && styles.channelItemActive,
                                         ]}
                                     >
-                                        <View style={styles.dmRow}>
-                                            <View
-                                                style={[
-                                                    styles.dmAvatar,
-                                                    {
-                                                        backgroundColor: `hsl(${avatarHue(user.userID)}, 45%, 40%)`,
-                                                    },
-                                                ]}
-                                            >
-                                                <Text
-                                                    style={styles.dmAvatarText}
-                                                >
-                                                    {user.username
-                                                        .slice(0, 1)
-                                                        .toUpperCase()}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.dmMeta}>
-                                                <View style={styles.dmNameRow}>
-                                                    <Text
-                                                        ellipsizeMode="tail"
-                                                        numberOfLines={1}
-                                                        style={[
-                                                            styles.channelItemText,
-                                                            styles.dmName,
-                                                            active &&
-                                                                styles.channelItemTextActive,
-                                                        ]}
-                                                    >
-                                                        {user.username}
-                                                    </Text>
-                                                    {unread > 0 ? (
-                                                        <View
-                                                            style={
-                                                                styles.dmNewDot
-                                                            }
-                                                        />
-                                                    ) : null}
-                                                </View>
-                                            </View>
-                                            {unread > 0 ? (
-                                                <View style={styles.dmBadge}>
-                                                    <Text
-                                                        style={
-                                                            styles.dmBadgeText
-                                                        }
-                                                    >
-                                                        {unread > 99
-                                                            ? "99+"
-                                                            : unread}
-                                                    </Text>
-                                                </View>
-                                            ) : null}
-                                        </View>
+                                        <Text
+                                            numberOfLines={1}
+                                            style={[
+                                                styles.channelItemText,
+                                                active &&
+                                                    styles.channelItemTextActive,
+                                            ]}
+                                        >
+                                            # {channel.name}
+                                        </Text>
                                     </TouchableOpacity>
                                 );
                             })}
                         </ScrollView>
-                    )
-                ) : channels.length === 0 ? (
-                    <Text style={styles.channelPaneEmpty}>No channels yet</Text>
-                ) : (
-                    <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        style={styles.channelList}
-                    >
-                        {channels.map((channel) => {
-                            const active =
-                                channel.channelID === activeChannelId;
-                            return (
-                                <TouchableOpacity
-                                    key={channel.channelID}
-                                    onPress={() => {
-                                        onSelectChannel(channel);
-                                    }}
-                                    style={[
-                                        styles.channelItem,
-                                        active && styles.channelItemActive,
-                                    ]}
-                                >
-                                    <Text
-                                        numberOfLines={1}
-                                        style={[
-                                            styles.channelItemText,
-                                            active &&
-                                                styles.channelItemTextActive,
-                                        ]}
-                                    >
-                                        # {channel.name}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </ScrollView>
-                )}
+                    )}
+                </View>
             </View>
+
+            <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                    haptic("tap");
+                    onSettings();
+                }}
+                style={[
+                    styles.profileStrip,
+                    { paddingBottom: safeAreaBottom + 12 },
+                ]}
+            >
+                <View style={styles.profileAvatarWrap}>
+                    {me?.userID ? (
+                        <Avatar
+                            displayName={me.username}
+                            ring={{
+                                color: "rgba(231,0,0,0.45)",
+                                width: 1.5,
+                            }}
+                            size={42}
+                            userID={me.userID}
+                        />
+                    ) : (
+                        <View style={styles.profileAvatarPlaceholder} />
+                    )}
+                    <View style={authDotStyle} />
+                </View>
+                <View style={styles.profileText}>
+                    <Text
+                        ellipsizeMode="tail"
+                        numberOfLines={1}
+                        style={styles.profileUsername}
+                    >
+                        {me?.username ?? "Signed out"}
+                    </Text>
+                    <Text
+                        ellipsizeMode="tail"
+                        numberOfLines={1}
+                        style={styles.profileStatus}
+                    >
+                        {authStatusLabel}
+                    </Text>
+                </View>
+                <View style={styles.profileGearWrap}>
+                    <View style={styles.profileGearOuter}>
+                        <View style={styles.profileGearInner} />
+                    </View>
+                </View>
+            </TouchableOpacity>
         </View>
     );
 }
@@ -321,9 +379,9 @@ const styles = StyleSheet.create({
     activePill: {
         backgroundColor: colors.text,
         borderRadius: 2,
-        height: 20,
+        height: 28,
         opacity: 0,
-        width: 3,
+        width: 4,
     },
     activePillVisible: {
         opacity: 1,
@@ -332,27 +390,17 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "#171a22",
         borderColor: "rgba(255,255,255,0.1)",
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: 1,
-        height: 48,
+        height: 56,
         justifyContent: "center",
         marginVertical: 4,
-        width: 48,
+        width: 56,
     },
     addText: {
         color: colors.textSecondary,
-        fontSize: 24,
+        fontSize: 28,
         marginTop: -2,
-    },
-    authDot: {
-        borderColor: "#171a22",
-        borderRadius: 999,
-        borderWidth: 2,
-        bottom: 5,
-        height: 12,
-        position: "absolute",
-        right: 5,
-        width: 12,
     },
     authDotAuthenticated: {
         backgroundColor: "#30D158",
@@ -413,18 +461,6 @@ const styles = StyleSheet.create({
         marginVertical: 8,
         width: 40,
     },
-    dmAvatar: {
-        alignItems: "center",
-        borderRadius: 12,
-        height: 24,
-        justifyContent: "center",
-        width: 24,
-    },
-    dmAvatarText: {
-        color: "#fff",
-        fontSize: 11,
-        fontWeight: "700",
-    },
     dmBadge: {
         alignItems: "center",
         backgroundColor: colors.error,
@@ -471,21 +507,21 @@ const styles = StyleSheet.create({
         borderRightColor: "rgba(255,255,255,0.08)",
         borderRightWidth: 1,
         flex: 1,
-        flexDirection: "row",
+        flexDirection: "column",
     },
     homeBadge: {
         alignItems: "center",
         backgroundColor: colors.error,
         borderColor: colors.surface,
-        borderRadius: 9,
+        borderRadius: 10,
         borderWidth: 2,
-        bottom: -2,
-        height: 18,
+        bottom: -3,
+        height: 20,
         justifyContent: "center",
-        minWidth: 18,
-        paddingHorizontal: 4,
+        minWidth: 20,
+        paddingHorizontal: 5,
         position: "absolute",
-        right: -2,
+        right: -3,
     },
     homeBadgeText: {
         color: "#fff",
@@ -496,26 +532,96 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: "#171a22",
         borderColor: "rgba(255,255,255,0.1)",
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: 1,
-        height: 48,
+        height: 56,
         justifyContent: "center",
-        width: 48,
+        width: 56,
+    },
+    profileAuthDot: {
+        backgroundColor: "#6B7280",
+        borderColor: "#0b0d12",
+        borderRadius: 999,
+        borderWidth: 2,
+        bottom: -2,
+        height: 14,
+        position: "absolute",
+        right: -2,
+        width: 14,
+    },
+    profileAvatarPlaceholder: {
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderRadius: 21,
+        height: 42,
+        width: 42,
+    },
+    profileAvatarWrap: {
+        position: "relative",
+    },
+    profileGearInner: {
+        backgroundColor: "rgba(255,255,255,0.55)",
+        borderRadius: 6,
+        height: 6,
+        position: "absolute",
+        width: 6,
+    },
+    profileGearOuter: {
+        alignItems: "center",
+        borderColor: "rgba(255,255,255,0.55)",
+        borderRadius: 12,
+        borderWidth: 2,
+        height: 24,
+        justifyContent: "center",
+        width: 24,
+    },
+    profileGearWrap: {
+        alignItems: "center",
+        height: 24,
+        justifyContent: "center",
+        width: 24,
+    },
+    profileStatus: {
+        color: "rgba(255,255,255,0.55)",
+        fontSize: 11,
+        letterSpacing: 0.4,
+        marginTop: 1,
+        textTransform: "uppercase",
+    },
+    profileStrip: {
+        alignItems: "center",
+        backgroundColor: "#0e1118",
+        borderTopColor: "rgba(231,0,0,0.18)",
+        borderTopWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        paddingHorizontal: 16,
+        paddingTop: 12,
+    },
+    profileText: {
+        flex: 1,
+        minWidth: 0,
+    },
+    profileUsername: {
+        color: colors.text,
+        fontSize: 15,
+        fontWeight: "700",
+        letterSpacing: 0.2,
     },
     railContainer: {
         alignItems: "center",
-        width: 72,
+        paddingBottom: 10,
+        width: 80,
     },
     serverBtn: {
         alignItems: "center",
         backgroundColor: "#171a22",
         borderColor: "rgba(255,255,255,0.1)",
-        borderRadius: 16,
+        borderRadius: 18,
         borderWidth: 1,
-        height: 48,
+        height: 56,
         justifyContent: "center",
         marginVertical: 4,
-        width: 48,
+        width: 56,
     },
     serverBtnActive: {
         backgroundColor: "#1f2430",
@@ -523,8 +629,8 @@ const styles = StyleSheet.create({
     },
     serverInitial: {
         color: colors.text,
-        fontSize: 14,
-        fontWeight: "600",
+        fontSize: 16,
+        fontWeight: "700",
         letterSpacing: 0.5,
     },
     serverList: {
@@ -535,39 +641,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 8,
     },
-    settingsBtn: {
-        alignItems: "center",
-        backgroundColor: "#171a22",
-        borderColor: "rgba(255,255,255,0.1)",
-        borderRadius: 16,
-        borderWidth: 1,
-        height: 48,
-        justifyContent: "center",
-        marginTop: 6,
-        position: "relative",
-        width: 48,
-    },
-    settingsRow: {
-        alignItems: "center",
+    topRow: {
+        flex: 1,
         flexDirection: "row",
-        gap: 8,
     },
     topSection: {
         alignItems: "center",
         flexDirection: "row",
         gap: 8,
-    },
-    userIconBody: {
-        backgroundColor: colors.textSecondary,
-        borderRadius: 4,
-        height: 6,
-        marginTop: 2,
-        width: 14,
-    },
-    userIconHead: {
-        backgroundColor: colors.textSecondary,
-        borderRadius: 5,
-        height: 10,
-        width: 10,
     },
 });
