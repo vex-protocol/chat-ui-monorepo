@@ -31,6 +31,19 @@ module.exports = ({ config }) => {
         process.env.VEX_IOS_BUNDLE_IDENTIFIER ||
         (devMode ? "chat.vex.mobile.dev" : config.ios?.bundleIdentifier);
 
+    // Permissions required for the optional "Always-on connection"
+    // foreground-service mode (Settings → Connection). Even when the
+    // user never opts in, declaring these is harmless — Android only
+    // grants what the app actually requests at runtime.
+    const androidPermissions = Array.from(
+        new Set([
+            ...(config.android?.permissions ?? []),
+            "FOREGROUND_SERVICE",
+            "FOREGROUND_SERVICE_DATA_SYNC",
+            "WAKE_LOCK",
+        ]),
+    );
+
     return {
         ...config,
         version: pkg.version,
@@ -47,6 +60,7 @@ module.exports = ({ config }) => {
                 foregroundImage: iconPath,
             },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
+            permissions: androidPermissions,
         },
         updates: { enabled: false },
         runtimeVersion: devMode
@@ -56,6 +70,10 @@ module.exports = ({ config }) => {
             ...config.extra,
             eas: { projectId: EAS_PROJECT_ID },
         },
-        plugins: [...(config.plugins ?? []), "expo-background-task"],
+        plugins: [
+            ...(config.plugins ?? []),
+            "expo-background-task",
+            "./plugins/withForegroundService",
+        ],
     };
 };
