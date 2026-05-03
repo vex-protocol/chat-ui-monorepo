@@ -30,6 +30,7 @@ import { getServerOptions } from "./src/lib/config";
 import { hydrateDevOptionsUnlocked } from "./src/lib/devMode";
 import {
     $alwaysOnEnabled,
+    ensureAlwaysOnRunning,
     hydrateAlwaysOnPreference,
     isAlwaysOnSupported,
     startAlwaysOn,
@@ -51,7 +52,57 @@ import { colors, fontFamilies } from "./src/theme";
 
 const BACKGROUND_NETWORK_SYNC_TASK = "vex-background-network-sync";
 const BACKGROUND_NOTIFICATION_LIMIT = 8;
-const runtimeNotifiedMailIDs = new Set<string>();
+// Cap on the in-memory mailID dedup sets. Long-lived FGS sessions
+// would otherwise grow these without bound — every message ever
+// notified, retained for the life of the process. 1k is a generous
+// ceiling; it covers many days of normal use, and the only correctness
+// risk of evicting older IDs is "we might re-notify on a duplicate
+// from very far in the past," which the historical-cutoff timestamp
+// already filters out separately.
+const NOTIFIED_MAILID_DEDUP_CAP = 1000;
+
+/**
+ * Bounded `Set<string>` with FIFO eviction: when adding past the cap,
+ * the oldest inserted entry is dropped.
+ *
+ * `Set` already iterates in insertion order in V8/Hermes, so the
+ * "oldest" entry is `inner.values().next().value`. That's the only
+ * non-obvious thing about this implementation — the rest is a thin
+ * surface compatible with the parts of `Set<string>` we use here
+ * (`has`, `add`, `clear`).
+ */
+class BoundedStringSet {
+    private readonly cap: number;
+    private readonly inner = new Set<string>();
+
+    constructor(cap: number) {
+        this.cap = cap;
+    }
+
+    add(value: string): void {
+        if (this.inner.has(value)) {
+            return;
+        }
+        this.inner.add(value);
+        while (this.inner.size > this.cap) {
+            const oldest = this.inner.values().next().value;
+            if (oldest === undefined) {
+                break;
+            }
+            this.inner.delete(oldest);
+        }
+    }
+
+    clear(): void {
+        this.inner.clear();
+    }
+
+    has(value: string): boolean {
+        return this.inner.has(value);
+    }
+}
+
+const runtimeNotifiedMailIDs = new BoundedStringSet(NOTIFIED_MAILID_DEDUP_CAP);
 
 if (!TaskManager.isTaskDefined(BACKGROUND_NETWORK_SYNC_TASK)) {
     TaskManager.defineTask(BACKGROUND_NETWORK_SYNC_TASK, async () => {
@@ -89,7 +140,9 @@ function App() {
     const [pendingApprovalNotice, setPendingApprovalNotice] = useState<null | {
         count: number;
     }>(null);
-    const notifiedMailIDsRef = useRef<Set<string>>(new Set());
+    const notifiedMailIDsRef = useRef<BoundedStringSet>(
+        new BoundedStringSet(NOTIFIED_MAILID_DEDUP_CAP),
+    );
     const notificationHistoryCutoffMsRef = useRef(0);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
 
@@ -177,6 +230,81 @@ function App() {
         })();
     }, []);
 
+    // Resilience: retry `autoLogin` on AppState resume when we still
+    // don't have a logged-in user.
+    //
+    // The bootstrap effect above only runs once per process lifetime,
+    // so a transient failure at cold start (device offline, server
+    // briefly down, captive portal) leaves the user stuck on the auth
+    // screen until they manually try to sign in. Repeating the attempt
+    // every time the device comes back to foreground papers over the
+    // common "I came back from being offline" case automatically.
+    //
+    // Notes:
+    //   - Top-level AppState listener (not gated on `user`), because
+    //     the user-gated effects below short-circuit when `user` is
+    //     null and we need to act in exactly that case.
+    //   - Throttled to once per 30s so a flaky network can't turn
+    //     resume-storms into autoLogin-storms.
+    //   - `vexService.autoLogin` is internally idempotent (returns
+    //     immediately with ok:true if a session already exists), so
+    //     it's safe to call even if a competing path has just signed
+    //     us in.
+    useEffect(() => {
+        let lastAttemptAt = 0;
+        const RETRY_THROTTLE_MS = 30_000;
+        const subscription = AppState.addEventListener("change", (next) => {
+            if (next !== "active") {
+                return;
+            }
+            if (!bootstrappedRef.current) {
+                // Bootstrap hasn't even started yet (rare race); let
+                // it have the first attempt.
+                return;
+            }
+            if ($user.get()) {
+                return;
+            }
+            const now = Date.now();
+            if (now - lastAttemptAt < RETRY_THROTTLE_MS) {
+                return;
+            }
+            lastAttemptAt = now;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        void (async () => {
+                            try {
+                                const result = await vexService.autoLogin(
+                                    keychainKeyStore,
+                                    mobileConfig(),
+                                    getServerOptions(),
+                                );
+                                if (
+                                    !result.ok &&
+                                    result.error ===
+                                        "Session expired. Please sign in again."
+                                ) {
+                                    setAuthNotice(result.error);
+                                }
+                            } catch (err: unknown) {
+                                console.warn(
+                                    "[vex-auth] resume retry failed",
+                                    err instanceof Error
+                                        ? err.message
+                                        : String(err),
+                                );
+                            }
+                        })();
+                    }, 50);
+                });
+            });
+        });
+        return () => {
+            subscription.remove();
+        };
+    }, []);
+
     useEffect(() => {
         if (!authNotice) {
             return;
@@ -223,7 +351,9 @@ function App() {
     };
 
     useEffect(() => {
-        notifiedMailIDsRef.current = new Set();
+        notifiedMailIDsRef.current = new BoundedStringSet(
+            NOTIFIED_MAILID_DEDUP_CAP,
+        );
         runtimeNotifiedMailIDs.clear();
         notificationHistoryCutoffMsRef.current = Date.now();
     }, [user, user?.userID]);
@@ -395,7 +525,34 @@ function App() {
                     (previous === "background" || previous === "inactive") &&
                     nextState === "active";
                 if (resumed) {
-                    void onResume();
+                    // Defer the resume probe past the next paint so
+                    // the UI thread can finish the activity foreground
+                    // transition (unlock animation, layout) before we
+                    // start the heavy work (HTTP probe + possible
+                    // WebSocket reconnect + inbox sync). Two RAFs
+                    // guarantees we're after a committed frame; the
+                    // small setTimeout adds a touch more headroom for
+                    // slower devices. This is the difference between
+                    // "the user sees the chat list pop in" and "the
+                    // user sees an ANR dialog because the JS thread
+                    // was saturated during the unlock window."
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                // Re-assert the FGS first: if the OS
+                                // killed it silently while we were
+                                // backgrounded, this brings it back.
+                                // Cheap when it's already alive
+                                // (idempotent notifee call). Done
+                                // before onResume so the watchdog
+                                // reset (inside startAlwaysOn) lands
+                                // before refreshSessionAfterForeground
+                                // reads `isWebsocketLikelyHealthy`.
+                                void ensureAlwaysOnRunning();
+                                void onResume();
+                            }, 50);
+                        });
+                    });
                 }
             },
         );
@@ -405,79 +562,77 @@ function App() {
         };
     }, [user]);
 
-    // Show local notifications for incoming messages by watching atom changes
-    const allDms = useStore($messages);
-    const allGroups = useStore($groupMessages);
-    const prevDmsRef = useRef(allDms);
-    const prevGroupsRef = useRef(allGroups);
-
+    // Show local notifications for incoming messages.
+    //
+    // We deliberately do NOT useStore() the message atoms here:
+    //   - This component renders no UI that depends on them.
+    //   - useStore() forces a re-render of the App root on every atom
+    //     update; during a wake-from-sleep backlog (foreground service
+    //     pulling queued mail) that's dozens of full-tree reconciles
+    //     in a few hundred ms, on the same JS thread Android wants
+    //     responsive for the activity foreground transition.
+    //
+    // Subscribing directly to the atoms keeps the side effect (queue
+    // a notification when a thread grows) without taxing React's
+    // render path. The notification queue inside `notifications.ts`
+    // serializes the resulting bridge calls so the burst can't
+    // saturate the JS thread either way.
     useEffect(() => {
         if (!user) {
             return;
         }
-        const prev = prevDmsRef.current;
-        prevDmsRef.current = allDms;
-        for (const [threadID, thread] of Object.entries(allDms)) {
-            const prevThread = prev[threadID] ?? [];
-            if (thread.length > prevThread.length) {
+        let prevDms = $messages.get();
+        let prevGroups = $groupMessages.get();
+        const queueIfNew = (newMsg: Message): void => {
+            if (
+                notifiedMailIDsRef.current.has(newMsg.mailID) ||
+                runtimeNotifiedMailIDs.has(newMsg.mailID)
+            ) {
+                return;
+            }
+            notifiedMailIDsRef.current.add(newMsg.mailID);
+            runtimeNotifiedMailIDs.add(newMsg.mailID);
+            if (
+                isHistoricalMessage(
+                    newMsg.timestamp,
+                    notificationHistoryCutoffMsRef.current,
+                )
+            ) {
+                return;
+            }
+            void showMessageNotification(newMsg);
+        };
+        const handleDelta = (
+            next: Record<string, Message[]>,
+            prev: Record<string, Message[]>,
+        ): void => {
+            for (const [threadID, thread] of Object.entries(next)) {
+                const prevThread = prev[threadID] ?? [];
+                if (thread.length <= prevThread.length) {
+                    continue;
+                }
                 const newMsg = thread[thread.length - 1];
                 if (!newMsg) {
                     continue;
                 }
-                if (
-                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
-                    runtimeNotifiedMailIDs.has(newMsg.mailID)
-                ) {
-                    continue;
-                }
-                notifiedMailIDsRef.current.add(newMsg.mailID);
-                runtimeNotifiedMailIDs.add(newMsg.mailID);
-                if (
-                    isHistoricalMessage(
-                        newMsg.timestamp,
-                        notificationHistoryCutoffMsRef.current,
-                    )
-                ) {
-                    continue;
-                }
-                void showMessageNotification(newMsg);
+                queueIfNew(newMsg);
             }
-        }
-    }, [allDms, user]);
-
-    useEffect(() => {
-        if (!user) {
-            return;
-        }
-        const prev = prevGroupsRef.current;
-        prevGroupsRef.current = allGroups;
-        for (const [channelID, thread] of Object.entries(allGroups)) {
-            const prevThread = prev[channelID] ?? [];
-            if (thread.length > prevThread.length) {
-                const newMsg = thread[thread.length - 1];
-                if (!newMsg) {
-                    continue;
-                }
-                if (
-                    notifiedMailIDsRef.current.has(newMsg.mailID) ||
-                    runtimeNotifiedMailIDs.has(newMsg.mailID)
-                ) {
-                    continue;
-                }
-                notifiedMailIDsRef.current.add(newMsg.mailID);
-                runtimeNotifiedMailIDs.add(newMsg.mailID);
-                if (
-                    isHistoricalMessage(
-                        newMsg.timestamp,
-                        notificationHistoryCutoffMsRef.current,
-                    )
-                ) {
-                    continue;
-                }
-                void showMessageNotification(newMsg);
-            }
-        }
-    }, [allGroups, user]);
+        };
+        const unsubDms = $messages.subscribe((next) => {
+            const prev = prevDms;
+            prevDms = next;
+            handleDelta(next, prev);
+        });
+        const unsubGroups = $groupMessages.subscribe((next) => {
+            const prev = prevGroups;
+            prevGroups = next;
+            handleDelta(next, prev);
+        });
+        return () => {
+            unsubDms();
+            unsubGroups();
+        };
+    }, [user]);
 
     useEffect(() => {
         if (keyReplaced) {

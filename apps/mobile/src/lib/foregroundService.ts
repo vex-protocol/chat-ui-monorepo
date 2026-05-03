@@ -1,5 +1,7 @@
 import { Linking, Platform } from "react-native";
 
+import { vexService } from "@vex-chat/store";
+
 import notifee, { AndroidImportance } from "@notifee/react-native";
 import * as SecureStore from "expo-secure-store";
 import { atom } from "nanostores";
@@ -42,6 +44,40 @@ export const $alwaysOnEnabled = atom<boolean>(false);
 let registered = false;
 let hydrated = false;
 let serviceRunning = false;
+
+/**
+ * "If the user wants the FGS, make sure it's running."
+ *
+ * Called from the app's resume handler. The Android OS can silently
+ * reap a foreground service under memory pressure (especially on
+ * aggressive OEM kill-list builds), and the JS side has no event for
+ * that — `serviceRunning` stays `true` even after the native service
+ * is gone. Rather than try to detect the kill, we just (re-)assert
+ * intent every time the app comes back to foreground while the user
+ * has always-on enabled.
+ *
+ * `notifee.displayNotification` with the same `id` and
+ * `asForegroundService: true` is idempotent: when the service is
+ * already running it just refreshes the notification, when it isn't
+ * it spawns a fresh one. So this is safe to call repeatedly.
+ *
+ * Best-effort by design — failures are swallowed because we'd rather
+ * the user resume the app cleanly than crash on a transient notifee
+ * error during a wake window.
+ */
+export async function ensureAlwaysOnRunning(): Promise<void> {
+    if (!isAlwaysOnSupported()) {
+        return;
+    }
+    if (!$alwaysOnEnabled.get()) {
+        return;
+    }
+    try {
+        await startAlwaysOn();
+    } catch {
+        // Swallow — see jsdoc.
+    }
+}
 
 export async function hydrateAlwaysOnPreference(): Promise<void> {
     if (hydrated) {
@@ -97,6 +133,8 @@ export async function startAlwaysOn(): Promise<void> {
     }
     ensureRegistered();
 
+    const wasRunning = serviceRunning;
+
     const channelId = await notifee.createChannel({
         id: CHANNEL_ID,
         importance: AndroidImportance.LOW,
@@ -109,7 +147,23 @@ export async function startAlwaysOn(): Promise<void> {
             channelId,
             ongoing: true,
             pressAction: { id: "default" },
-            smallIcon: "ic_notification",
+            // `notification_icon` is the drawable resource name that
+            // the `expo-notifications` config plugin generates from
+            // the `icon` path declared in app.json. The constant is
+            // hard-coded inside the plugin (`NOTIFICATION_ICON`), so
+            // this string is the contract — if you ever switch off
+            // expo-notifications' icon generation you must drop a
+            // drawable with this exact name into android/.../res/.
+            //
+            // History: previously this was "ic_notification", which
+            // never existed in res/ because nothing was generating
+            // it. Android 14+ rejects FGS startup if smallIcon can't
+            // be resolved, which surfaces as
+            //   IllegalArgumentException: Invalid notification (no
+            //     valid small icon)
+            // and crashes the entire process from
+            // app.notifee.core.ForegroundService.onStartCommand.
+            smallIcon: "notification_icon",
         },
         body: "Connected",
         id: FGS_NOTIFICATION_ID,
@@ -118,6 +172,17 @@ export async function startAlwaysOn(): Promise<void> {
 
     serviceRunning = true;
     $alwaysOnEnabled.set(true);
+
+    // After a fresh (re-)start, the watchdog's last-frame timestamp
+    // belongs to the *previous* (now-dead) socket and would falsely
+    // report "healthy" on the next resume probe. Force it to zero so
+    // the upcoming `refreshSessionAfterForeground` correctly opts into
+    // a full reconnect until the new socket actually receives a frame.
+    // No-op when start() was a true cold-start; the watchdog was
+    // already 0 in that case.
+    if (wasRunning) {
+        vexService.resetWebsocketWatchdog();
+    }
 
     try {
         await SecureStore.setItemAsync(STORE_KEY, "1");

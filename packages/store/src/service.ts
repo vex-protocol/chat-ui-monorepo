@@ -221,6 +221,13 @@ const DEVICE_AUTH_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
 // detector didn't (older SDK, or some edge case where it didn't).
 const WS_WATCHDOG_CHECK_INTERVAL_MS = 30_000;
 const WS_WATCHDOG_STALE_THRESHOLD_MS = 45_000;
+// Tighter threshold for "is the socket *currently* delivering frames?"
+// used by `refreshSessionAfterForeground` to decide whether the
+// foreground-service kept the connection healthy across the resume.
+// Server pings land every 5s, so a frame within the last 12s is a
+// strong signal we don't need to tear the socket down. Anything older
+// is treated as stale → full reconnect.
+const WS_FRESH_FRAME_THRESHOLD_MS = 12_000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -891,14 +898,29 @@ class VexService {
         }
 
         try {
-            await withTimeout(
-                this.client.reconnectWebsocket(),
-                10_000,
-                "WebSocket reconnect timed out after app resume.",
-            );
-            // reconnectWebsocket() swaps the underlying socket object; re-bind
-            // debug hooks so inbound/outbound frame logging continues.
-            this.attachWebsocketDebug();
+            // If the foreground-service kept the WebSocket alive through
+            // the background → resume window, the watchdog will have a
+            // very recent inbound-frame timestamp. Tearing that socket
+            // down just to redo the Noise handshake + login is wasted
+            // CPU on the JS thread at exactly the moment Android wants
+            // the UI thread responsive (unlock animation, activity
+            // foreground transition). Skip the reconnect when we have
+            // strong evidence the socket is healthy; fall through to a
+            // lightweight inbox sync.
+            //
+            // If the watchdog is stale (FGS got killed by the OS, or
+            // we're not in always-on mode), do the full reconnect — the
+            // socket can't be trusted.
+            if (!this.isWebsocketLikelyHealthy()) {
+                await withTimeout(
+                    this.client.reconnectWebsocket(),
+                    10_000,
+                    "WebSocket reconnect timed out after app resume.",
+                );
+                // reconnectWebsocket() swaps the underlying socket object; re-bind
+                // debug hooks so inbound/outbound frame logging continues.
+                this.attachWebsocketDebug();
+            }
             if (hasSyncInboxNow(this.client)) {
                 await withTimeout(
                     this.client.syncInboxNow(),
@@ -1126,6 +1148,22 @@ class VexService {
     resetAllUnread(): void {
         $dmUnreadCountsWritable.set({});
         $channelUnreadCountsWritable.set({});
+    }
+
+    /**
+     * Clears the WebSocket watchdog's "last frame" timestamp.
+     *
+     * Called by the foreground-service module after a revive (when the
+     * OS killed the FGS and we re-create it). Without this, the next
+     * `refreshSessionAfterForeground` could see a stale-but-recent
+     * timestamp from the dead socket and incorrectly skip the
+     * reconnect path. Forcing the watchdog into "no observed frames
+     * yet" state means {@link isWebsocketLikelyHealthy} returns false
+     * until the new socket genuinely receives a frame, which is the
+     * conservative correct answer.
+     */
+    resetWebsocketWatchdog(): void {
+        this.wsWatchdogLastFrameAt = 0;
     }
 
     async runBackgroundNetworkFetch(): Promise<BackgroundNetworkFetchResult> {
@@ -1635,6 +1673,33 @@ class VexService {
 
     private isDeviceExistsError(err: unknown): boolean {
         return hasHttpStatus(err) && err.response.status === 470;
+    }
+
+    /**
+     * Best-effort "is the WebSocket currently usable?" check, based on
+     * how recently the watchdog has seen an inbound frame. A healthy
+     * socket sees a server ping every ~5s, so a frame within
+     * {@link WS_FRESH_FRAME_THRESHOLD_MS} is strong evidence the
+     * connection is live.
+     *
+     * Returns false in three cases that all *should* trigger a full
+     * reconnect:
+     *   - No client yet (nothing to check).
+     *   - Watchdog has never observed a frame on this socket.
+     *   - The last frame is older than the freshness threshold (FGS
+     *     got killed, OS suspended us deeper than expected, network
+     *     dropped silently).
+     *
+     * Used by {@link refreshSessionAfterForeground} to skip an
+     * unnecessary Noise+login cycle when the foreground-service kept
+     * the connection alive across the resume.
+     */
+    private isWebsocketLikelyHealthy(): boolean {
+        if (!this.client || this.wsWatchdogLastFrameAt === 0) {
+            return false;
+        }
+        const elapsed = Date.now() - this.wsWatchdogLastFrameAt;
+        return elapsed <= WS_FRESH_FRAME_THRESHOLD_MS;
     }
 
     private async loginWithDeviceKeyWithRetry(
