@@ -216,64 +216,33 @@ export function SettingsSectionScreen({
 
     async function compressAvatarToLimit(
         sourceUri: string,
-        sourceHeight: number | undefined,
-        sourceWidth: number | undefined,
         maxBytes: number,
     ): Promise<{ data: null | Uint8Array; lastAttemptBytes: null | number }> {
-        // Always transcode avatar uploads to lossy JPEG so output stays small
-        // and consistent across HEIC/PNG/WebP source formats.
-        const profiles: ReadonlyArray<{ maxDim: number; quality: number }> = [
-            { maxDim: 1280, quality: 0.74 },
-            { maxDim: 1080, quality: 0.65 },
-            { maxDim: 960, quality: 0.58 },
-            { maxDim: 840, quality: 0.52 },
-            { maxDim: 720, quality: 0.46 },
-            { maxDim: 640, quality: 0.4 },
-        ];
-        let currentUri = sourceUri;
-        let currentWidth = sourceWidth;
-        let currentHeight = sourceHeight;
+        const TARGET_DIMENSION = 500;
+        const QUALITY_STEPS: ReadonlyArray<number> = [0.34, 0.28, 0.22, 0.16];
         let lastAttemptBytes: null | number = null;
 
-        for (const profile of profiles) {
-            const actions: ImageManipulator.Action[] = [];
-            if (
-                typeof currentWidth === "number" &&
-                typeof currentHeight === "number" &&
-                currentWidth > 0 &&
-                currentHeight > 0
-            ) {
-                const largest = Math.max(currentWidth, currentHeight);
-                if (largest > profile.maxDim) {
-                    const scale = profile.maxDim / largest;
-                    actions.push({
-                        resize: {
-                            height: Math.max(
-                                256,
-                                Math.round(currentHeight * scale),
-                            ),
-                            width: Math.max(
-                                256,
-                                Math.round(currentWidth * scale),
-                            ),
-                        },
-                    });
-                }
-            }
-
+        for (const quality of QUALITY_STEPS) {
+            // Force a predictable avatar payload size:
+            // 1) hard resize to 500x500
+            // 2) always encode as lossy JPEG
             // eslint-disable-next-line @typescript-eslint/no-deprecated -- Expo's new contextual API is not yet available in this pinned runtime.
             const manipulated = await ImageManipulator.manipulateAsync(
-                currentUri,
-                actions,
+                sourceUri,
+                [
+                    {
+                        resize: {
+                            height: TARGET_DIMENSION,
+                            width: TARGET_DIMENSION,
+                        },
+                    },
+                ],
                 {
-                    compress: profile.quality,
+                    base64: true,
+                    compress: quality,
                     format: ImageManipulator.SaveFormat.JPEG,
                 },
             );
-            currentUri = manipulated.uri;
-            currentWidth = manipulated.width;
-            currentHeight = manipulated.height;
-
             if (!manipulated.base64) {
                 continue;
             }
@@ -320,43 +289,26 @@ export function SettingsSectionScreen({
         setAvatarLastAttemptBytes(null);
         setAvatarUploading(true);
         try {
-            let data =
-                asset.base64 != null
-                    ? readImageBytesFromBase64(asset.base64)
-                    : null;
-            if (data == null) {
-                // eslint-disable-next-line @typescript-eslint/no-deprecated -- Expo's new contextual API is not yet available in this pinned runtime.
-                const initial = await ImageManipulator.manipulateAsync(
-                    asset.uri,
-                    [],
-                    {
-                        base64: true,
-                        compress: 0.92,
-                        format: ImageManipulator.SaveFormat.JPEG,
-                    },
-                );
-                if (!initial.base64) {
-                    setAvatarError("Could not read image data.");
-                    return;
-                }
-                data = readImageBytesFromBase64(initial.base64);
-            }
             const originalBytes =
                 typeof asset.fileSize === "number" && asset.fileSize > 0
                     ? asset.fileSize
-                    : data.byteLength;
+                    : asset.base64 != null
+                      ? readImageBytesFromBase64(asset.base64).byteLength
+                      : 0;
             setAvatarLastAttemptBytes(originalBytes);
             const compressed = await compressAvatarToLimit(
                 asset.uri,
-                asset.height,
-                asset.width,
                 MAX_AVATAR_BYTES,
             );
             setAvatarLastAttemptBytes(
                 compressed.lastAttemptBytes ?? originalBytes,
             );
-            if (compressed.data != null) {
-                data = compressed.data;
+            const data = compressed.data;
+            if (data == null) {
+                setAvatarError(
+                    "Could not process this image. Please try a different photo.",
+                );
+                return;
             }
             if (data.byteLength > MAX_AVATAR_BYTES) {
                 setAvatarError(
@@ -370,11 +322,11 @@ export function SettingsSectionScreen({
                 setAvatarNotice(
                     `Optimized image from ${formatBytes(
                         originalBytes,
-                    )} to ${formatBytes(data.byteLength)} (JPEG).`,
+                    )} to ${formatBytes(data.byteLength)} (500x500 JPEG).`,
                 );
             } else {
                 setAvatarNotice(
-                    `Processed as JPEG (${formatBytes(data.byteLength)}).`,
+                    `Processed as 500x500 JPEG (${formatBytes(data.byteLength)}).`,
                 );
             }
             const result = await vexService.setAvatar(data);
