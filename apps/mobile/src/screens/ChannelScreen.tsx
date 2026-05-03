@@ -49,6 +49,9 @@ const MEMBERS_OPEN_DURATION_MS = 240;
 const MEMBERS_CLOSE_DURATION_MS = 180;
 const MEMBERS_OPEN_EASING = Easing.bezier(0.2, 0.0, 0.0, 1.0);
 const MEMBERS_CLOSE_EASING = Easing.bezier(0.4, 0.0, 0.2, 1.0);
+// Click-CLICK pair fires faster than the visual settle; matches
+// the left sidebar's machined-detent feel.
+const MEMBERS_SLOT_HAPTIC_INTERVAL_MS = 95;
 
 export function ChannelScreen({
     navigation,
@@ -176,7 +179,7 @@ export function ChannelScreen({
         haptic("slotIn");
         membersLandingHapticRef.current = haptic.scheduled(
             "slotOut",
-            MEMBERS_OPEN_DURATION_MS,
+            MEMBERS_SLOT_HAPTIC_INTERVAL_MS,
         );
         Animated.timing(membersDrawerAnim, {
             duration: MEMBERS_OPEN_DURATION_MS,
@@ -193,7 +196,7 @@ export function ChannelScreen({
         haptic("slotIn");
         membersLandingHapticRef.current = haptic.scheduled(
             "slotOut",
-            MEMBERS_CLOSE_DURATION_MS,
+            MEMBERS_SLOT_HAPTIC_INTERVAL_MS,
         );
         Animated.timing(membersDrawerAnim, {
             duration: MEMBERS_CLOSE_DURATION_MS,

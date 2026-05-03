@@ -43,57 +43,63 @@ interface PlatformPattern {
     ios: () => Promise<unknown>;
 }
 
+// Overall intensities skew quieter than the originals — the previous
+// pass landed too loud on iPhone 15+ (which has a more sensitive
+// Taptic Engine than older phones). Heavier cadences are reserved for
+// destructive / success / error semantics where the user explicitly
+// needs to feel "something important happened".
 const PATTERNS: Record<HapticKind, PlatformPattern> = {
     /** Confirming an intentional primary action (send, login, submit). */
     confirm: {
-        android: 18,
-        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+        android: 14,
+        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
     },
     /** Destructive confirmation. */
     destructive: {
-        android: [0, 18, 80, 22],
-        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy),
+        android: [0, 14, 60, 18],
+        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
     },
     /** Failed action — e.g. device verification mismatch. */
     error: {
-        android: [0, 30, 70, 30, 70, 30],
+        android: [0, 22, 60, 22, 60, 22],
         ios: () =>
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error),
     },
     /** Picking from a list (DM / channel / server). */
     selection: {
-        android: 10,
+        android: 8,
         ios: () => Haptics.selectionAsync(),
     },
     /**
      * The opening half of a "click ... CLICK" pair — the moment the
-     * sidebar (or any drawer/panel) starts moving. Lighter than
-     * `slotOut` so the *landing* feels like the heavier event.
+     * sidebar (or any drawer/panel) starts moving. The "Soft" iOS
+     * style is muted/cushioned, deliberately quieter than slotOut so
+     * the *landing* feels like the heavier event.
      */
     slotIn: {
-        android: 6,
-        ios: () => Haptics.selectionAsync(),
+        android: 4,
+        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
     },
     /**
-     * The closing half — a clean, hard "rigid" tick on iOS that feels
-     * like a machined part snapping into place when the sidebar
-     * finishes its slide. Pair with `slotIn` and a `scheduled(...)`
-     * call delayed by the animation duration.
+     * The closing half — a clean, sharp "rigid" tick on iOS that
+     * feels like a machined part snapping into place. Rigid is the
+     * sharpest impact style on iOS (more focused than Heavy, less
+     * thuddy) which gives the "CLICK" of a precision detent.
      */
     slotOut: {
-        android: 14,
+        android: 12,
         ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid),
     },
     /** Success cadence (auth complete, avatar uploaded). */
     success: {
-        android: [0, 18, 60, 22],
+        android: [0, 14, 50, 18],
         ios: () =>
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
     },
     /** Lightest available — generic nav/drawer ack. */
     tap: {
-        android: 6,
-        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+        android: 4,
+        ios: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft),
     },
 };
 

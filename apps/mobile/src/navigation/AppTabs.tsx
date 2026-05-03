@@ -42,6 +42,12 @@ const SIDEBAR_OPEN_DURATION_MS = 240;
 const SIDEBAR_CLOSE_DURATION_MS = 180;
 const SIDEBAR_OPEN_EASING = Easing.bezier(0.2, 0.0, 0.0, 1.0);
 const SIDEBAR_CLOSE_EASING = Easing.bezier(0.4, 0.0, 0.2, 1.0);
+// "click ... CLICK" pair interval. Decoupled from the animation
+// duration — the haptic should feel like a precision detent
+// snapping into place, which means the second tick wants to land
+// noticeably faster than the visual settle. ~95ms is right at the
+// edge of "two distinct events" vs. "one chunky thud".
+const SIDEBAR_SLOT_HAPTIC_INTERVAL_MS = 95;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
     "AvatarCrop",
@@ -66,7 +72,7 @@ export function AppTabs() {
     const [activeServerId, setActiveServerId] = useState<null | string>(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const channels = useStore($channels);
-    const _familiars = useStore($familiars);
+    const familiars = useStore($familiars);
     const servers = useStore($servers);
     const authStatus = useStore($authStatus);
     const initialRoute: keyof AppStackParamList = "DMList";
@@ -84,6 +90,12 @@ export function AppTabs() {
     const [lastChannelByServer, setLastChannelByServer] = useState<
         Record<string, string>
     >({});
+    // Most recently visited DM userID. Symmetric with `lastChannelByServer`
+    // but flat — DMs aren't grouped by anything, so a single slot is
+    // enough. Tapping the home rail icon (or the top-left back-to-DMs
+    // chevron) snaps to this DM if the user is still a known familiar,
+    // otherwise we fall back to the DM list hub.
+    const [lastDmUserId, setLastDmUserId] = useState<null | string>(null);
     // Which server's channels the *channel pane* is currently
     // displaying. This diverges from `activeServerId` (the routed
     // server) while the user is "peeking" at another server's channels
@@ -141,7 +153,7 @@ export function AppTabs() {
         haptic("slotIn");
         sidebarLandingHapticRef.current = haptic.scheduled(
             "slotOut",
-            SIDEBAR_OPEN_DURATION_MS,
+            SIDEBAR_SLOT_HAPTIC_INTERVAL_MS,
         );
         Animated.timing(sidebarX, {
             duration: SIDEBAR_OPEN_DURATION_MS,
@@ -157,7 +169,7 @@ export function AppTabs() {
         haptic("slotIn");
         sidebarLandingHapticRef.current = haptic.scheduled(
             "slotOut",
-            SIDEBAR_CLOSE_DURATION_MS,
+            SIDEBAR_SLOT_HAPTIC_INTERVAL_MS,
         );
         Animated.timing(sidebarX, {
             duration: SIDEBAR_CLOSE_DURATION_MS,
@@ -183,6 +195,30 @@ export function AppTabs() {
             closeSidebar();
         }
     }, [rightSidebarOpen, sidebarOpen]);
+
+    // Resolve "where home should land" — the last visited DM if we
+    // still know the familiar, otherwise the DM list hub. Returns the
+    // navigation action to dispatch *and* an optional userID to seed
+    // activeDmUserId so the rail's selection state matches before the
+    // route lands.
+    const navigateHome = () => {
+        const target = lastDmUserId ? familiars[lastDmUserId] : undefined;
+        if (target) {
+            setActiveDmUserId(target.userID);
+            navigationRef.navigate("App", {
+                params: {
+                    userID: target.userID,
+                    username: target.username,
+                },
+                screen: "Conversation",
+            });
+            return;
+        }
+        setActiveDmUserId(null);
+        navigationRef.navigate("App", {
+            screen: "DMList",
+        });
+    };
     const handleTopLeftPress = () => {
         if (topLeftShowsBack) {
             // Back-button context: closeSidebar() already does its own
@@ -193,6 +229,9 @@ export function AppTabs() {
                 closeSidebar();
             }
             if (currentRoute === "Conversation") {
+                // Back from a DM lands on the list hub so the user can
+                // pick a different conversation — this is the one
+                // place we deliberately *don't* honor lastDmUserId.
                 navigationRef.navigate("App", {
                     screen: "DMList",
                 });
@@ -202,9 +241,7 @@ export function AppTabs() {
                 navigationRef.goBack();
                 return;
             }
-            navigationRef.navigate("App", {
-                screen: "DMList",
-            });
+            navigateHome();
             return;
         }
         // openSidebar / closeSidebar already fire their own slot
@@ -288,6 +325,13 @@ export function AppTabs() {
                                     ? params.userID
                                     : null;
                             setActiveDmUserId(userID);
+                            // Remember this as the most recent DM so a
+                            // subsequent home-rail tap (or back chevron
+                            // from a server view) snaps back here
+                            // instead of dumping the user on DMList.
+                            if (userID) {
+                                setLastDmUserId(userID);
+                            }
                         } else {
                             setActiveDmUserId(null);
                         }
@@ -444,20 +488,18 @@ export function AppTabs() {
                         // Peek-then-commit:
                         //   - if home is *not* currently shown in the
                         //     pane, swap the pane to DMs *and*
-                        //     navigate the background view to DMList
-                        //     so closing the drawer (any way) lands
-                        //     the user on DMs.
+                        //     navigate the background view to the
+                        //     last-visited DM (or DMList if none) so
+                        //     closing the drawer lands the user on a
+                        //     useful place.
                         //   - if home *is* already in the pane (which
-                        //     means we already routed to DMList on a
-                        //     previous peek or via the rail), just
-                        //     close the drawer.
+                        //     means we already routed on a previous
+                        //     peek or via the rail), just close the
+                        //     drawer.
                         if (paneServerId !== null) {
                             setPaneServerId(null);
                             setActiveServerId(null);
-                            setActiveDmUserId(null);
-                            navigationRef.navigate("App", {
-                                screen: "DMList",
-                            });
+                            navigateHome();
                             return;
                         }
                         closeSidebar();
