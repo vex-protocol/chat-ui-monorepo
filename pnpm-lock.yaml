@@ -45,7 +45,7 @@ catalogs:
 
 overrides:
   '@vex-chat/crypto': 4.0.1
-  '@vex-chat/libvex': 6.1.4
+  '@vex-chat/libvex': 6.1.5
   '@vex-chat/types': 3.1.0
   react: 19.2.0
   react-dom: 19.2.0
@@ -148,8 +148,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
-        specifier: 6.1.4
-        version: 6.1.4(typescript@5.9.3)
+        specifier: 6.1.5
+        version: 6.1.5(typescript@5.9.3)
       eslint-plugin-svelte:
         specifier: ^3.17.0
         version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
@@ -263,8 +263,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
-        specifier: 6.1.4
-        version: 6.1.4(typescript@5.9.3)
+        specifier: 6.1.5
+        version: 6.1.5(typescript@5.9.3)
       babel-preset-expo:
         specifier: ^55.0.15
         version: 55.0.15(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@55.0.13)(react-refresh@0.14.2)
@@ -299,8 +299,8 @@ importers:
         specifier: '>=0.8'
         version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
       '@vex-chat/libvex':
-        specifier: 6.1.4
-        version: 6.1.4(typescript@5.9.3)
+        specifier: 6.1.5
+        version: 6.1.5(typescript@5.9.3)
       nanostores:
         specifier: 'catalog:'
         version: 1.2.0
@@ -2385,8 +2385,8 @@ packages:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@6.1.4':
-    resolution: {integrity: sha512-As1se1P09ZdZU6ZzktLy1Bj+nBRigAEESFd+bREGkhWNt5pXu0AKFrVzqtfB9HbM5ZrDAh9GNI5lp7ItcKzw3g==}
+  '@vex-chat/libvex@6.1.5':
+    resolution: {integrity: sha512-RtzaaTsGipb5EJAhzhbjEU04xLugnTC0O54g3M2IMghZRe0mHwjcgGQjFyHU5O+EXaim8sgwnvYlJjda3KqVAA==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
       better-sqlite3: '>=11.0.0'
@@ -9001,7 +9001,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@vex-chat/libvex@6.1.4(typescript@5.9.3)':
+  '@vex-chat/libvex@6.1.5(typescript@5.9.3)':
     dependencies:
       '@vex-chat/crypto': 4.0.1(@vex-chat/types@3.1.0)(typescript@5.9.3)
       '@vex-chat/types': 3.1.0
