@@ -16,6 +16,7 @@ import { ChannelListScreen } from "../screens/ChannelListScreen";
 import { ChannelScreen } from "../screens/ChannelScreen";
 import { ConversationScreen } from "../screens/ConversationScreen";
 import { DeviceDetailsScreen } from "../screens/DeviceDetailsScreen";
+import { DeviceManagerScreen } from "../screens/DeviceManagerScreen";
 import { DeviceRequestsScreen } from "../screens/DeviceRequestsScreen";
 import { DMListScreen } from "../screens/DMListScreen";
 import { InviteScreen } from "../screens/InviteScreen";
@@ -35,6 +36,7 @@ const SIDEBAR_WIDTH = 304;
 const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "AddServer",
     "DeviceDetails",
+    "DeviceManager",
     "DeviceRequests",
     "Devices",
     "Invite",
@@ -345,13 +347,33 @@ export function AppTabs() {
                         });
                     }}
                     onSelectHome={() => {
+                        // Second tap on the already-active home button closes
+                        // the sidebar and drops the user on the DM list (the
+                        // "base" of the DMs app), so the rail behaves like an
+                        // OS dock toggle.
+                        const alreadyHome =
+                            activeServerId === null &&
+                            activeDmUserId === null &&
+                            currentRoute === "DMList";
                         setActiveServerId(null);
                         setActiveDmUserId(null);
                         navigationRef.navigate("App", {
                             screen: "DMList",
                         });
+                        if (alreadyHome) {
+                            closeSidebar();
+                        }
                     }}
                     onSelectServer={(id) => {
+                        // Second tap on the currently-active server closes the
+                        // sidebar without disturbing the channel that's
+                        // already selected; first tap switches servers and
+                        // leaves the sidebar open so the user can pick a
+                        // channel.
+                        if (id === activeServerId) {
+                            closeSidebar();
+                            return;
+                        }
                         setActiveServerId(id);
                         const serverChannels = channels[id] ?? [];
                         const ch = serverChannels[0];
@@ -472,6 +494,11 @@ function ContentStack({
                 component={PendingApprovalsScreen}
                 listeners={withFocus("Devices")}
                 name="Devices"
+            />
+            <Stack.Screen
+                component={DeviceManagerScreen}
+                listeners={withFocus("DeviceManager")}
+                name="DeviceManager"
             />
             <Stack.Screen
                 component={DeviceRequestsScreen}

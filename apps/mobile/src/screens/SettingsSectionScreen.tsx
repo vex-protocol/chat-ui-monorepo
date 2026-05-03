@@ -5,11 +5,9 @@ import {
     Alert,
     Image,
     ScrollView,
-    Share,
     StyleSheet,
     Switch,
     Text,
-    TouchableOpacity,
     View,
 } from "react-native";
 
@@ -19,12 +17,10 @@ import { $avatarHash, avatarHue } from "@vex-chat/store";
 import { useStore } from "@nanostores/react";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
-import * as Notifications from "expo-notifications";
-import { AndroidImportance } from "expo-notifications";
 
 import { ChatHeader } from "../components/ChatHeader";
+import { MenuRow, MenuSection } from "../components/MenuRow";
 import { getServerOptions, getServerUrl } from "../lib/config";
-import { loadCredentials } from "../lib/keychain";
 import { colors, typography } from "../theme";
 
 export function SettingsSectionScreen({
@@ -42,7 +38,6 @@ export function SettingsSectionScreen({
     const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
     const [avatarNotice, setAvatarNotice] = useState("");
     const [avatarUploading, setAvatarUploading] = useState(false);
-    const [exportingIdentity, setExportingIdentity] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
@@ -72,28 +67,10 @@ export function SettingsSectionScreen({
                 return "Data";
             case "developer":
                 return "Developer";
-            case "notifications":
-                return "Notifications";
             default:
                 return "Settings";
         }
     }, [section]);
-
-    function handleExportIdentityKey(): void {
-        Alert.alert(
-            "Export identity key?",
-            "Store this securely. Anyone with this key can access your account on this server.",
-            [
-                { style: "cancel", text: "Cancel" },
-                {
-                    onPress: () => {
-                        void exportIdentityKey();
-                    },
-                    text: "Export",
-                },
-            ],
-        );
-    }
 
     function handleLogout(): void {
         Alert.alert(
@@ -130,64 +107,6 @@ export function SettingsSectionScreen({
                 },
             ],
         );
-    }
-
-    async function exportIdentityKey(): Promise<void> {
-        const username = user?.username;
-        if (!username) {
-            Alert.alert("Export failed", "No active account found.");
-            return;
-        }
-        setExportingIdentity(true);
-        try {
-            const creds = await loadCredentials(username);
-            if (!creds?.deviceKey) {
-                Alert.alert(
-                    "Export failed",
-                    "No identity key is saved for this account on this device.",
-                );
-                return;
-            }
-            const exportText = [
-                "# Vex identity key backup",
-                `server: ${getServerUrl()}`,
-                `username: ${creds.username}`,
-                `deviceID: ${creds.deviceID}`,
-                `identityKey: ${creds.deviceKey}`,
-            ].join("\n");
-
-            await Share.share({
-                message: exportText,
-                title: "Vex identity key backup",
-            });
-        } catch (err: unknown) {
-            Alert.alert(
-                "Export failed",
-                err instanceof Error ? err.message : "Unexpected export error.",
-            );
-        } finally {
-            setExportingIdentity(false);
-        }
-    }
-
-    function handleSendTestNotification(): void {
-        void (async () => {
-            await Notifications.setNotificationChannelAsync("vex-messages", {
-                importance: AndroidImportance.HIGH,
-                name: "Messages",
-            });
-            await Notifications.scheduleNotificationAsync({
-                content: {
-                    body: "This is a test notification from Vex.",
-                    data: {
-                        authorID: "test",
-                        username: "Test User",
-                    },
-                    title: "Test User",
-                },
-                trigger: { channelId: "vex-messages" },
-            });
-        })();
     }
 
     function initials(id: string, displayName?: string): string {
@@ -358,255 +277,189 @@ export function SettingsSectionScreen({
             />
             <ScrollView contentContainerStyle={styles.content}>
                 {section === "about" ? (
-                    <>
-                        <View style={styles.rowCard}>
-                            <Text style={styles.label}>Version</Text>
-                            <Text style={styles.value}>0.1.0</Text>
-                        </View>
-                        <View style={styles.rowCard}>
-                            <Text style={styles.label}>Server</Text>
-                            <Text style={styles.value}>{getServerUrl()}</Text>
-                        </View>
-                    </>
+                    <MenuSection title="App">
+                        <MenuRow
+                            icon="pricetag-outline"
+                            label="Version"
+                            value="0.1.0"
+                        />
+                        <MenuRow
+                            icon="server-outline"
+                            label="Server"
+                            value={getServerUrl()}
+                        />
+                    </MenuSection>
                 ) : null}
 
                 {section === "account" ? (
                     <>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>Avatar</Text>
-                                <Text style={styles.desc}>
-                                    Change your profile image
-                                </Text>
-                            </View>
-                            {avatarUrl != null && !avatarLoadFailed ? (
-                                <Image
-                                    onError={() => {
-                                        setAvatarLoadFailed(true);
-                                    }}
-                                    source={{ uri: avatarUrl }}
-                                    style={styles.avatar}
-                                />
-                            ) : (
-                                <View
-                                    style={[
-                                        styles.avatarFallback,
-                                        {
-                                            backgroundColor: `hsl(${avatarHue(user?.userID ?? "0")}, 45%, 40%)`,
-                                        },
-                                    ]}
-                                >
-                                    <Text style={styles.avatarFallbackText}>
-                                        {initials(
-                                            user?.userID ?? "??",
-                                            user?.username,
-                                        )}
-                                    </Text>
-                                </View>
-                            )}
-                            <TouchableOpacity
+                        <MenuSection title="Profile">
+                            <MenuRow
+                                accessory={
+                                    avatarUrl != null && !avatarLoadFailed ? (
+                                        <Image
+                                            onError={() => {
+                                                setAvatarLoadFailed(true);
+                                            }}
+                                            source={{ uri: avatarUrl }}
+                                            style={styles.avatar}
+                                        />
+                                    ) : (
+                                        <View
+                                            style={[
+                                                styles.avatarFallback,
+                                                {
+                                                    backgroundColor: `hsl(${avatarHue(user?.userID ?? "0")}, 45%, 40%)`,
+                                                },
+                                            ]}
+                                        >
+                                            <Text
+                                                style={
+                                                    styles.avatarFallbackText
+                                                }
+                                            >
+                                                {initials(
+                                                    user?.userID ?? "??",
+                                                    user?.username,
+                                                )}
+                                            </Text>
+                                        </View>
+                                    )
+                                }
+                                description={
+                                    avatarUploading
+                                        ? "Uploading..."
+                                        : "Tap to change profile image"
+                                }
                                 disabled={avatarUploading}
+                                icon="image-outline"
+                                label="Avatar"
                                 onPress={() => {
                                     void handlePickAvatar();
                                 }}
-                                style={styles.testBtn}
-                            >
-                                <Text style={styles.testBtnText}>
-                                    {avatarUploading
-                                        ? "Uploading..."
-                                        : "Change"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        {avatarError !== "" ? (
-                            <View style={styles.avatarStatusCardError}>
-                                <Text style={styles.avatarStatusTitle}>
-                                    Avatar upload issue
-                                </Text>
-                                <Text style={styles.errorText}>
-                                    {avatarError}
-                                </Text>
-                                {avatarLastAttemptBytes != null ? (
-                                    <Text style={styles.avatarStatusMeta}>
-                                        Current:{" "}
-                                        {formatBytes(avatarLastAttemptBytes)} •
-                                        Limit: {formatBytes(MAX_AVATAR_BYTES)}
+                                showChevron
+                            />
+                            {avatarError !== "" ? (
+                                <View style={styles.statusCardError}>
+                                    <Text style={styles.statusTitle}>
+                                        Avatar upload issue
                                     </Text>
-                                ) : null}
-                            </View>
-                        ) : null}
-                        {avatarError === "" && avatarNotice !== "" ? (
-                            <View style={styles.avatarStatusCardOk}>
-                                <Text style={styles.avatarStatusTitleOk}>
-                                    Avatar updated
-                                </Text>
-                                <Text style={styles.avatarStatusMetaOk}>
-                                    {avatarNotice}
-                                </Text>
-                            </View>
-                        ) : null}
-                        <View style={styles.rowCard}>
-                            <Text style={styles.label}>Username</Text>
-                            <Text style={styles.value}>
-                                {user?.username ?? "—"}
-                            </Text>
-                        </View>
-                        <View style={styles.rowCard}>
-                            <Text style={styles.label}>User ID</Text>
-                            <Text style={[styles.value, styles.mono]}>
-                                {user?.userID.slice(0, 16) ?? "—"}…
-                            </Text>
-                        </View>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>
-                                    Identity key backup
-                                </Text>
-                                <Text style={styles.desc}>
-                                    Export this account's identity key for
-                                    recovery
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                disabled={exportingIdentity}
-                                onPress={handleExportIdentityKey}
-                                style={styles.testBtn}
-                            >
-                                <Text style={styles.testBtnText}>
-                                    {exportingIdentity
-                                        ? "Exporting..."
-                                        : "Export"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>Session</Text>
-                                <Text style={styles.desc}>
-                                    Current auth and token details
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                onPress={() => {
-                                    navigation.navigate("SessionDetails");
-                                }}
-                                style={styles.testBtn}
-                            >
-                                <Text style={styles.testBtnText}>Open</Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>Sign out</Text>
-                                <Text style={styles.desc}>
-                                    Disconnect and return to the login screen
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                disabled={loggingOut}
-                                onPress={handleLogout}
-                                style={styles.testBtn}
-                            >
-                                <Text style={styles.testBtnText}>
-                                    {loggingOut ? "Signing out..." : "Sign out"}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                ) : null}
+                                    <Text style={styles.errorText}>
+                                        {avatarError}
+                                    </Text>
+                                    {avatarLastAttemptBytes != null ? (
+                                        <Text style={styles.statusMeta}>
+                                            Current:{" "}
+                                            {formatBytes(
+                                                avatarLastAttemptBytes,
+                                            )}{" "}
+                                            • Limit:{" "}
+                                            {formatBytes(MAX_AVATAR_BYTES)}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                            ) : null}
+                            {avatarError === "" && avatarNotice !== "" ? (
+                                <View style={styles.statusCardOk}>
+                                    <Text style={styles.statusTitleOk}>
+                                        Avatar updated
+                                    </Text>
+                                    <Text style={styles.statusMetaOk}>
+                                        {avatarNotice}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            <MenuRow
+                                icon="at-outline"
+                                label="Username"
+                                value={user?.username ?? "—"}
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="User ID"
+                                monoBlock={user?.userID ?? "—"}
+                            />
+                        </MenuSection>
 
-                {section === "notifications" ? (
-                    <View style={styles.rowCard}>
-                        <View style={styles.rowInfo}>
-                            <Text style={styles.label}>Test notification</Text>
-                            <Text style={styles.desc}>
-                                Send a local test notification
-                            </Text>
-                        </View>
-                        <TouchableOpacity
-                            onPress={handleSendTestNotification}
-                            style={styles.testBtn}
-                        >
-                            <Text style={styles.testBtnText}>Test</Text>
-                        </TouchableOpacity>
-                    </View>
+                        <MenuSection title="Account">
+                            <MenuRow
+                                description="Disconnect and return to login"
+                                disabled={loggingOut}
+                                icon="log-out-outline"
+                                label={
+                                    loggingOut ? "Signing out..." : "Sign out"
+                                }
+                                onPress={handleLogout}
+                                tone="danger"
+                            />
+                        </MenuSection>
+                    </>
                 ) : null}
 
                 {section === "developer" ? (
-                    <>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>
-                                    WebSocket debug logs
-                                </Text>
-                                <Text style={styles.desc}>
-                                    Print inbound/outbound frames to terminal
-                                </Text>
-                            </View>
-                            <Switch
-                                onValueChange={(value) => {
-                                    setWsDebugEnabled(value);
-                                    vexService.setWebsocketDebug(value);
-                                }}
-                                value={wsDebugEnabled}
-                            />
-                        </View>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>
-                                    WebSocket frame payload logs
-                                </Text>
-                                <Text style={styles.desc}>
-                                    Log raw inbound/outbound frame payloads
-                                </Text>
-                            </View>
-                            <Switch
-                                onValueChange={(value) => {
-                                    setWsFrameDebugEnabled(value);
-                                    vexService.setWebsocketFrameDebug(value);
-                                }}
-                                value={wsFrameDebugEnabled}
-                            />
-                        </View>
-                        <View style={styles.rowCard}>
-                            <View style={styles.rowInfo}>
-                                <Text style={styles.label}>
-                                    WebSocket state transition logs
-                                </Text>
-                                <Text style={styles.desc}>
-                                    Log connect/disconnect/recover lifecycle
-                                    events
-                                </Text>
-                            </View>
-                            <Switch
-                                onValueChange={(value) => {
-                                    setWsStateDebugEnabled(value);
-                                    vexService.setWebsocketStateDebug(value);
-                                }}
-                                value={wsStateDebugEnabled}
-                            />
-                        </View>
-                    </>
+                    <MenuSection
+                        footer="Logs print to the device terminal/logcat. Useful when reporting issues."
+                        title="WebSocket Debug"
+                    >
+                        <MenuRow
+                            accessory={
+                                <Switch
+                                    onValueChange={(value) => {
+                                        setWsDebugEnabled(value);
+                                        vexService.setWebsocketDebug(value);
+                                    }}
+                                    value={wsDebugEnabled}
+                                />
+                            }
+                            description="Print inbound/outbound frames"
+                            icon="code-slash-outline"
+                            label="Debug logs"
+                        />
+                        <MenuRow
+                            accessory={
+                                <Switch
+                                    onValueChange={(value) => {
+                                        setWsFrameDebugEnabled(value);
+                                        vexService.setWebsocketFrameDebug(
+                                            value,
+                                        );
+                                    }}
+                                    value={wsFrameDebugEnabled}
+                                />
+                            }
+                            description="Log raw frame payloads"
+                            icon="document-text-outline"
+                            label="Frame payload logs"
+                        />
+                        <MenuRow
+                            accessory={
+                                <Switch
+                                    onValueChange={(value) => {
+                                        setWsStateDebugEnabled(value);
+                                        vexService.setWebsocketStateDebug(
+                                            value,
+                                        );
+                                    }}
+                                    value={wsStateDebugEnabled}
+                                />
+                            }
+                            description="Connect/disconnect/recover lifecycle"
+                            icon="pulse-outline"
+                            label="State transition logs"
+                        />
+                    </MenuSection>
                 ) : null}
 
                 {section === "data" ? (
-                    <View style={styles.rowCard}>
-                        <View style={styles.rowInfo}>
-                            <Text style={styles.label}>
-                                Reset unread counters
-                            </Text>
-                            <Text style={styles.desc}>
-                                Clear all DM and channel unread badges on this
-                                device
-                            </Text>
-                        </View>
-                        <TouchableOpacity
+                    <MenuSection title="Local Data">
+                        <MenuRow
+                            description="Clear all unread badges"
+                            icon="refresh-outline"
+                            label="Reset unread counters"
                             onPress={handleResetUnreadCounts}
-                            style={styles.testBtn}
-                        >
-                            <Text style={styles.testBtnText}>Reset</Text>
-                        </TouchableOpacity>
-                    </View>
+                            tone="danger"
+                        />
+                    </MenuSection>
                 ) : null}
             </ScrollView>
         </View>
@@ -633,7 +486,22 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         letterSpacing: 0.2,
     },
-    avatarStatusCardError: {
+    container: {
+        backgroundColor: colors.bg,
+        flex: 1,
+    },
+    content: {
+        gap: 18,
+        paddingBottom: 24,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+    },
+    errorText: {
+        ...typography.body,
+        color: colors.error,
+        fontSize: 12,
+    },
+    statusCardError: {
         backgroundColor: "rgba(229, 57, 53, 0.12)",
         borderColor: "rgba(229, 57, 53, 0.48)",
         borderRadius: 10,
@@ -642,7 +510,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 10,
     },
-    avatarStatusCardOk: {
+    statusCardOk: {
         backgroundColor: "rgba(74, 222, 128, 0.12)",
         borderColor: "rgba(74, 222, 128, 0.4)",
         borderRadius: 10,
@@ -651,92 +519,26 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 10,
     },
-    avatarStatusMeta: {
+    statusMeta: {
         ...typography.body,
         color: "rgba(255,255,255,0.78)",
         fontSize: 12,
     },
-    avatarStatusMetaOk: {
+    statusMetaOk: {
         ...typography.body,
         color: "rgba(255,255,255,0.8)",
         fontSize: 12,
     },
-    avatarStatusTitle: {
+    statusTitle: {
         ...typography.button,
         color: "#FFD0CF",
         fontSize: 13,
         fontWeight: "700",
     },
-    avatarStatusTitleOk: {
+    statusTitleOk: {
         ...typography.button,
         color: "#A7F3BD",
         fontSize: 13,
         fontWeight: "700",
-    },
-    container: {
-        backgroundColor: colors.bg,
-        flex: 1,
-    },
-    content: {
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    desc: {
-        ...typography.body,
-        color: "rgba(255,255,255,0.52)",
-        fontSize: 12,
-    },
-    errorText: {
-        ...typography.body,
-        color: colors.error,
-        fontSize: 12,
-    },
-    label: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontSize: 14,
-        fontWeight: "600",
-    },
-    mono: {
-        fontFamily: typography.body.fontFamily,
-        fontSize: 12,
-        letterSpacing: 0.25,
-    },
-    rowCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.02)",
-        borderBottomWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
-        borderRadius: 10,
-        borderWidth: 1,
-        flexDirection: "row",
-        gap: 12,
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 11,
-    },
-    rowInfo: {
-        flex: 1,
-        gap: 2,
-    },
-    testBtn: {
-        alignItems: "center",
-        borderColor: "rgba(255,255,255,0.2)",
-        borderRadius: 10,
-        borderWidth: 1,
-        minWidth: 68,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-    },
-    testBtnText: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontWeight: "600",
-    },
-    value: {
-        ...typography.body,
-        color: "rgba(255,255,255,0.66)",
-        fontSize: 13,
     },
 });

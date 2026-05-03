@@ -1,28 +1,24 @@
 import type { AppScreenProps } from "../navigation/types";
+import type { Ionicons } from "@expo/vector-icons";
 
 import React from "react";
-import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from "react-native";
-
-import { Ionicons } from "@expo/vector-icons";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import { ChatHeader } from "../components/ChatHeader";
-import { colors, typography } from "../theme";
+import { MenuRow, MenuSection } from "../components/MenuRow";
+import { colors } from "../theme";
+
+interface SettingsRow {
+    description: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    onPress: () => void;
+}
 
 export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
-    const rows: ReadonlyArray<{
-        description: string;
-        icon: keyof typeof Ionicons.glyphMap;
-        label: string;
-        onPress: () => void;
-    }> = [
+    const accountRows: ReadonlyArray<SettingsRow> = [
         {
-            description: "Username, user ID, identity export",
+            description: "Profile, identity, sign out",
             icon: "person-circle-outline",
             label: "Account",
             onPress: () => {
@@ -30,33 +26,18 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
             },
         },
         {
-            description: "Current devices, plus device request tools",
+            description: "Manage your devices",
             icon: "phone-portrait-outline",
             label: "Devices",
             onPress: () => {
                 navigation.navigate("Devices");
             },
         },
+    ];
+
+    const systemRows: ReadonlyArray<SettingsRow> = [
         {
-            description: "Version and server details",
-            icon: "information-circle-outline",
-            label: "About",
-            onPress: () => {
-                navigation.navigate("SettingsSection", { section: "about" });
-            },
-        },
-        {
-            description: "Notification testing and behavior",
-            icon: "notifications-outline",
-            label: "Notifications",
-            onPress: () => {
-                navigation.navigate("SettingsSection", {
-                    section: "notifications",
-                });
-            },
-        },
-        {
-            description: "Unread reset tools",
+            description: "Unread badges and storage",
             icon: "folder-open-outline",
             label: "Data",
             onPress: () => {
@@ -64,7 +45,7 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
             },
         },
         {
-            description: "WebSocket and connection diagnostics",
+            description: "Connection diagnostics",
             icon: "code-slash-outline",
             label: "Developer",
             onPress: () => {
@@ -73,36 +54,42 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                 });
             },
         },
+        {
+            description: "Version and server",
+            icon: "information-circle-outline",
+            label: "About",
+            onPress: () => {
+                navigation.navigate("SettingsSection", { section: "about" });
+            },
+        },
     ];
 
     return (
         <View style={styles.container}>
             <ChatHeader title="Settings" />
             <ScrollView contentContainerStyle={styles.content}>
-                {rows.map((row) => (
-                    <TouchableOpacity
-                        key={row.label}
-                        onPress={row.onPress}
-                        style={styles.menuCard}
-                    >
-                        <View style={styles.iconBadge}>
-                            <Ionicons
-                                color={colors.textSecondary}
-                                name={row.icon}
-                                size={18}
-                            />
-                        </View>
-                        <View style={styles.rowInfo}>
-                            <Text style={styles.label}>{row.label}</Text>
-                            <Text style={styles.desc}>{row.description}</Text>
-                        </View>
-                        <Ionicons
-                            color="rgba(255,255,255,0.48)"
-                            name="chevron-forward"
-                            size={18}
+                <MenuSection title="Account">
+                    {accountRows.map((row) => (
+                        <MenuRow
+                            description={row.description}
+                            icon={row.icon}
+                            key={row.label}
+                            label={row.label}
+                            onPress={row.onPress}
                         />
-                    </TouchableOpacity>
-                ))}
+                    ))}
+                </MenuSection>
+                <MenuSection title="System">
+                    {systemRows.map((row) => (
+                        <MenuRow
+                            description={row.description}
+                            icon={row.icon}
+                            key={row.label}
+                            label={row.label}
+                            onPress={row.onPress}
+                        />
+                    ))}
+                </MenuSection>
             </ScrollView>
         </View>
     );
@@ -114,46 +101,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        gap: 10,
+        gap: 18,
+        paddingBottom: 24,
         paddingHorizontal: 14,
         paddingVertical: 12,
-    },
-    desc: {
-        ...typography.body,
-        color: "rgba(255,255,255,0.52)",
-        fontSize: 12,
-    },
-    iconBadge: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.06)",
-        borderColor: "rgba(255,255,255,0.18)",
-        borderRadius: 10,
-        borderWidth: 1,
-        height: 34,
-        justifyContent: "center",
-        width: 34,
-    },
-    label: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontSize: 14,
-        fontWeight: "600",
-    },
-    menuCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.02)",
-        borderBottomWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
-        borderRadius: 10,
-        borderWidth: 1,
-        flexDirection: "row",
-        gap: 12,
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 11,
-    },
-    rowInfo: {
-        flex: 1,
-        gap: 2,
     },
 });

@@ -2,6 +2,7 @@ import type { AppScreenProps } from "../navigation/types";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -16,6 +17,7 @@ import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { CornerBracketBox } from "../components/CornerBracketBox";
+import { MenuRow, MenuSection } from "../components/MenuRow";
 import { matchingCodeForSignKey } from "../lib/deviceApprovalCode";
 import { colors, typography } from "../theme";
 
@@ -126,26 +128,27 @@ export function DeviceRequestsScreen({
                 }}
                 title="Device Requests"
             />
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.rowCard}>
-                    <View style={styles.rowInfo}>
-                        <Text style={styles.label}>Pending requests</Text>
-                        <Text style={styles.desc}>
-                            Approve or reject sign-ins from new devices.
-                        </Text>
-                    </View>
-                    <TouchableOpacity
-                        disabled={loadingDeviceRequests}
-                        onPress={() => {
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl
+                        onRefresh={() => {
                             void refreshDeviceRequests();
                         }}
-                        style={styles.testBtn}
-                    >
-                        <Text style={styles.testBtnText}>
-                            {loadingDeviceRequests ? "Loading..." : "Refresh"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                        refreshing={loadingDeviceRequests}
+                        tintColor={colors.textSecondary}
+                    />
+                }
+            >
+                {deviceRequests.length === 0 && !loadingDeviceRequests ? (
+                    <MenuSection title="Inbox">
+                        <MenuRow
+                            description="Pull to refresh"
+                            icon="checkmark-done-outline"
+                            label="No pending requests"
+                        />
+                    </MenuSection>
+                ) : null}
 
                 {deviceRequestError !== "" ? (
                     <View style={styles.errorCard}>
@@ -155,88 +158,83 @@ export function DeviceRequestsScreen({
                     </View>
                 ) : null}
 
-                {deviceRequests.length === 0 && !loadingDeviceRequests ? (
-                    <View style={styles.rowCard}>
-                        <View style={styles.rowInfo}>
-                            <Text style={styles.label}>
-                                No pending requests
-                            </Text>
-                            <Text style={styles.desc}>
-                                New device sign-in requests will appear here.
-                            </Text>
-                        </View>
-                    </View>
-                ) : null}
-
-                {deviceRequests.map((request) => {
-                    const busy = deviceRequestBusy[request.requestID] === true;
-                    const codeChars = matchingCodeForSignKey(
-                        request.signKey ?? null,
-                    );
-                    return (
-                        <View
-                            key={request.requestID}
-                            style={styles.requestCard}
-                        >
-                            <View style={styles.requestHeader}>
-                                <Text style={styles.label}>
-                                    {request.deviceName}
-                                </Text>
-                                <Text style={styles.desc}>
-                                    Request {request.requestID.slice(0, 8)}...
-                                </Text>
-                            </View>
-                            <Text style={styles.matchHint}>
-                                Confirm this code matches what you see on the
-                                new device:
-                            </Text>
-                            <View style={styles.codeRow}>
-                                {codeChars.map((char, i) => (
-                                    <CornerBracketBox
-                                        color={colors.error}
-                                        key={i}
-                                        size={5}
-                                        thickness={1.5}
-                                    >
-                                        <View style={styles.cell}>
-                                            <Text style={styles.cellText}>
-                                                {char}
+                {deviceRequests.length > 0 ? (
+                    <MenuSection title="Pending requests">
+                        {deviceRequests.map((request) => {
+                            const busy =
+                                deviceRequestBusy[request.requestID] === true;
+                            const codeChars = matchingCodeForSignKey(
+                                request.signKey ?? null,
+                            );
+                            return (
+                                <View
+                                    key={request.requestID}
+                                    style={styles.requestCard}
+                                >
+                                    <View style={styles.requestHeader}>
+                                        <Text style={styles.label}>
+                                            {request.deviceName}
+                                        </Text>
+                                        <Text style={styles.desc}>
+                                            Request{" "}
+                                            {request.requestID.slice(0, 8)}…
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.matchHint}>
+                                        Confirm this code matches what you see
+                                        on the new device:
+                                    </Text>
+                                    <View style={styles.codeRow}>
+                                        {codeChars.map((char, i) => (
+                                            <CornerBracketBox
+                                                color={colors.error}
+                                                key={i}
+                                                size={5}
+                                                thickness={1.5}
+                                            >
+                                                <View style={styles.cell}>
+                                                    <Text
+                                                        style={styles.cellText}
+                                                    >
+                                                        {char}
+                                                    </Text>
+                                                </View>
+                                            </CornerBracketBox>
+                                        ))}
+                                    </View>
+                                    <View style={styles.inlineActions}>
+                                        <TouchableOpacity
+                                            disabled={busy}
+                                            onPress={() => {
+                                                void rejectDeviceRequest(
+                                                    request.requestID,
+                                                );
+                                            }}
+                                            style={styles.rejectBtn}
+                                        >
+                                            <Text style={styles.rejectBtnText}>
+                                                Reject
                                             </Text>
-                                        </View>
-                                    </CornerBracketBox>
-                                ))}
-                            </View>
-                            <View style={styles.inlineActions}>
-                                <TouchableOpacity
-                                    disabled={busy}
-                                    onPress={() => {
-                                        void rejectDeviceRequest(
-                                            request.requestID,
-                                        );
-                                    }}
-                                    style={styles.rejectBtn}
-                                >
-                                    <Text style={styles.rejectBtnText}>
-                                        Reject
-                                    </Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    disabled={busy}
-                                    onPress={() => {
-                                        void approveDeviceRequest(
-                                            request.requestID,
-                                        );
-                                    }}
-                                    style={styles.approveBtn}
-                                >
-                                    <Text style={styles.approveBtnText}>
-                                        {busy ? "..." : "Approve"}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    );
-                })}
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            disabled={busy}
+                                            onPress={() => {
+                                                void approveDeviceRequest(
+                                                    request.requestID,
+                                                );
+                                            }}
+                                            style={styles.approveBtn}
+                                        >
+                                            <Text style={styles.approveBtnText}>
+                                                {busy ? "..." : "Approve"}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </MenuSection>
+                ) : null}
             </ScrollView>
         </View>
     );
@@ -283,7 +281,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        gap: 10,
+        gap: 18,
+        paddingBottom: 24,
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
@@ -336,7 +335,6 @@ const styles = StyleSheet.create({
     },
     requestCard: {
         backgroundColor: "rgba(255,255,255,0.02)",
-        borderBottomWidth: 1,
         borderColor: "rgba(255,255,255,0.08)",
         borderRadius: 10,
         borderWidth: 1,
@@ -346,36 +344,5 @@ const styles = StyleSheet.create({
     },
     requestHeader: {
         gap: 2,
-    },
-    rowCard: {
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.02)",
-        borderBottomWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
-        borderRadius: 10,
-        borderWidth: 1,
-        flexDirection: "row",
-        gap: 12,
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 11,
-    },
-    rowInfo: {
-        flex: 1,
-        gap: 2,
-    },
-    testBtn: {
-        alignItems: "center",
-        borderColor: "rgba(255,255,255,0.2)",
-        borderRadius: 10,
-        borderWidth: 1,
-        minWidth: 68,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-    },
-    testBtnText: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontWeight: "600",
     },
 });

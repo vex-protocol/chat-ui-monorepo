@@ -11,6 +11,7 @@ export type AppStackParamList = {
     ChannelList: { serverID: string; serverName?: string };
     Conversation: { userID: string; username: string };
     DeviceDetails: { deviceID: string; deviceName?: string };
+    DeviceManager: undefined;
     DeviceRequests: undefined;
     Devices: undefined;
     DMList: undefined;
@@ -21,7 +22,7 @@ export type AppStackParamList = {
     SessionDetails: undefined;
     Settings: undefined;
     SettingsSection: {
-        section: "about" | "account" | "data" | "developer" | "notifications";
+        section: "about" | "account" | "data" | "developer";
     };
 };
 

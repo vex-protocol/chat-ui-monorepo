@@ -1,0 +1,324 @@
+import type { ReactNode } from "react";
+import type { StyleProp, ViewStyle } from "react-native";
+
+import React from "react";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+
+import { Ionicons } from "@expo/vector-icons";
+
+import { colors, fontFamilies, typography } from "../theme";
+
+export type MenuRowTone = "danger" | "default" | "success";
+
+interface MenuRowProps {
+    /**
+     * Custom node rendered in the right slot. When provided, the chevron
+     * is suppressed (use `showChevron` to force it back on).
+     */
+    accessory?: ReactNode;
+    description?: string;
+    disabled?: boolean;
+    icon: keyof typeof Ionicons.glyphMap;
+    /**
+     * Override the default badge background. Useful for stacked icon badges
+     * matching iOS-style settings rows (e.g. blue for "About").
+     */
+    iconBg?: string;
+    iconColor?: string;
+    label: string;
+    /**
+     * Render a single-line, horizontally scrollable monospaced strip below
+     * the label. Use for long identifiers (user IDs, device IDs, key
+     * fingerprints): the strip never wraps so the row stays one row tall,
+     * the text is `selectable` so users can long-press → copy, and they
+     * can swipe sideways inside the strip to reveal characters that don't
+     * fit on screen.
+     */
+    monoBlock?: string;
+    monoValue?: boolean;
+    onPress?: () => void;
+    /**
+     * Render a chevron on the right edge. Defaults to `true` whenever the row
+     * has an `onPress` handler and no `accessory` is supplied.
+     */
+    showChevron?: boolean;
+    style?: StyleProp<ViewStyle>;
+    tone?: MenuRowTone;
+    /**
+     * Inline value text displayed before any chevron. Used for simple
+     * informational rows (e.g. "Version 0.1.0").
+     */
+    value?: string;
+}
+
+interface MenuSectionProps {
+    children: ReactNode;
+    footer?: string;
+    title?: string;
+}
+
+const TONE = {
+    danger: {
+        icon: "#F9B4B2",
+        iconBg: "rgba(229,57,53,0.18)",
+        iconBorder: "rgba(229,57,53,0.45)",
+        label: "#F9B4B2",
+    },
+    default: {
+        icon: colors.textSecondary,
+        iconBg: "rgba(255,255,255,0.06)",
+        iconBorder: "rgba(255,255,255,0.18)",
+        label: colors.textSecondary,
+    },
+    success: {
+        icon: "#8DF5B0",
+        iconBg: "rgba(74,222,128,0.16)",
+        iconBorder: "rgba(74,222,128,0.4)",
+        label: colors.textSecondary,
+    },
+} as const;
+
+export function MenuRow({
+    accessory,
+    description,
+    disabled,
+    icon,
+    iconBg,
+    iconColor,
+    label,
+    monoBlock,
+    monoValue,
+    onPress,
+    showChevron,
+    style,
+    tone = "default",
+    value,
+}: MenuRowProps) {
+    const palette = TONE[tone];
+    const renderChevron =
+        showChevron ?? (onPress != null && accessory == null && value == null);
+
+    const head = (
+        <View style={styles.head}>
+            <View
+                style={[
+                    styles.iconBadge,
+                    {
+                        backgroundColor: iconBg ?? palette.iconBg,
+                        borderColor: palette.iconBorder,
+                    },
+                ]}
+            >
+                <Ionicons
+                    color={iconColor ?? palette.icon}
+                    name={icon}
+                    size={18}
+                />
+            </View>
+            <View style={styles.info}>
+                <Text
+                    numberOfLines={1}
+                    style={[styles.label, { color: palette.label }]}
+                >
+                    {label}
+                </Text>
+                {description != null ? (
+                    <Text
+                        ellipsizeMode="tail"
+                        numberOfLines={1}
+                        style={styles.description}
+                    >
+                        {description}
+                    </Text>
+                ) : null}
+            </View>
+            {value != null ? (
+                <Text
+                    numberOfLines={1}
+                    style={[styles.value, monoValue ? styles.mono : null]}
+                >
+                    {value}
+                </Text>
+            ) : null}
+            {accessory}
+            {renderChevron ? (
+                <Ionicons
+                    color="rgba(255,255,255,0.48)"
+                    name="chevron-forward"
+                    size={18}
+                />
+            ) : null}
+        </View>
+    );
+
+    const inner =
+        monoBlock != null ? (
+            <>
+                {head}
+                <ScrollView
+                    contentContainerStyle={styles.monoBlockContent}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.monoBlockBox}
+                >
+                    <Text selectable style={styles.monoBlockText}>
+                        {monoBlock}
+                    </Text>
+                </ScrollView>
+            </>
+        ) : (
+            head
+        );
+
+    const containerStyle = [
+        monoBlock != null ? styles.rowVertical : styles.row,
+        disabled === true ? styles.rowDisabled : null,
+        style,
+    ];
+
+    if (onPress != null) {
+        return (
+            <TouchableOpacity
+                activeOpacity={0.7}
+                disabled={disabled}
+                onPress={onPress}
+                style={containerStyle}
+            >
+                {inner}
+            </TouchableOpacity>
+        );
+    }
+
+    return <View style={containerStyle}>{inner}</View>;
+}
+
+export function MenuSection({ children, footer, title }: MenuSectionProps) {
+    return (
+        <View style={styles.section}>
+            {title != null ? (
+                <Text style={styles.sectionTitle}>{title}</Text>
+            ) : null}
+            <View style={styles.sectionRows}>{children}</View>
+            {footer != null ? (
+                <Text style={styles.sectionFooter}>{footer}</Text>
+            ) : null}
+        </View>
+    );
+}
+
+const styles = StyleSheet.create({
+    description: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.52)",
+        fontSize: 12,
+    },
+    head: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 12,
+        minHeight: 36,
+        width: "100%",
+    },
+    iconBadge: {
+        alignItems: "center",
+        borderRadius: 10,
+        borderWidth: 1,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    info: {
+        flex: 1,
+        gap: 2,
+        minWidth: 0,
+    },
+    label: {
+        ...typography.button,
+        fontSize: 14,
+        fontWeight: "600",
+    },
+    mono: {
+        fontFamily: fontFamilies.mono,
+        fontSize: 12,
+        letterSpacing: 0.25,
+    },
+    monoBlockBox: {
+        alignSelf: "stretch",
+        backgroundColor: "rgba(0,0,0,0.32)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        borderWidth: 1,
+        marginLeft: 46,
+    },
+    monoBlockContent: {
+        alignItems: "center",
+        flexDirection: "row",
+        minWidth: "100%",
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+    },
+    monoBlockText: {
+        color: "rgba(245,245,245,0.92)",
+        flexShrink: 0,
+        fontFamily: fontFamilies.mono,
+        fontSize: 12,
+        letterSpacing: 0.4,
+        lineHeight: 18,
+    },
+    row: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderRadius: 10,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        minHeight: 56,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    rowDisabled: {
+        opacity: 0.5,
+    },
+    rowVertical: {
+        backgroundColor: "rgba(255,255,255,0.02)",
+        borderColor: "rgba(255,255,255,0.08)",
+        borderRadius: 10,
+        borderWidth: 1,
+        flexDirection: "column",
+        gap: 10,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    section: {
+        gap: 8,
+    },
+    sectionFooter: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.5)",
+        fontSize: 12,
+        paddingHorizontal: 4,
+    },
+    sectionRows: {
+        gap: 8,
+    },
+    sectionTitle: {
+        ...typography.label,
+        color: "rgba(255,255,255,0.52)",
+        paddingHorizontal: 4,
+        textTransform: "uppercase",
+    },
+    value: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.66)",
+        fontSize: 13,
+        maxWidth: 180,
+        textAlign: "right",
+    },
+});

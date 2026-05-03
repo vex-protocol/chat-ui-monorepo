@@ -2,16 +2,17 @@ import type { AppScreenProps } from "../navigation/types";
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from "react-native";
 
 import { vexService } from "@vex-chat/store";
 
 import { ChatHeader } from "../components/ChatHeader";
+import { MenuRow, MenuSection } from "../components/MenuRow";
 import { colors, typography } from "../theme";
 
 type DeviceRecord = Awaited<
@@ -64,6 +65,15 @@ export function DeviceDetailsScreen({
 
     const isCurrent = device?.deviceID === currentDeviceID;
     const canRemove = Boolean(device) && !isCurrent && deviceCount > 1;
+    const lastLoginLabel = device?.lastLogin
+        ? new Date(device.lastLogin).toLocaleString()
+        : "Unknown";
+    const deviceIDLabel = device?.deviceID ?? route.params.deviceID;
+    const removeHelper = isCurrent
+        ? "Cannot remove the device currently in use"
+        : !isCurrent && deviceCount <= 1
+          ? "Cannot remove your last remaining device"
+          : "Sign this device out everywhere";
 
     async function handleRemove(): Promise<void> {
         if (!device || !canRemove || busy) {
@@ -93,79 +103,59 @@ export function DeviceDetailsScreen({
                 }}
                 title={title}
             />
-            <ScrollView contentContainerStyle={styles.content}>
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Details</Text>
-                    <View style={styles.rowCard}>
-                        <Text style={styles.label}>Name</Text>
-                        <Text style={styles.value}>
-                            {device?.name ??
-                                route.params.deviceName ??
-                                "Unknown"}
-                        </Text>
-                    </View>
-                    <View style={styles.rowCard}>
-                        <Text style={styles.label}>Device ID</Text>
-                        <Text style={[styles.value, styles.mono]}>
-                            {device?.deviceID ?? route.params.deviceID}
-                        </Text>
-                    </View>
-                    <View style={styles.rowCard}>
-                        <Text style={styles.label}>Last login</Text>
-                        <Text style={styles.value}>
-                            {device?.lastLogin
-                                ? new Date(device.lastLogin).toLocaleString()
-                                : "Unknown"}
-                        </Text>
-                    </View>
-                    <View style={styles.rowCard}>
-                        <Text style={styles.label}>Current device</Text>
-                        <Text style={styles.value}>
-                            {isCurrent ? "Yes" : "No"}
-                        </Text>
-                    </View>
-                </View>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    <RefreshControl
+                        onRefresh={() => {
+                            void refresh();
+                        }}
+                        refreshing={loading}
+                        tintColor={colors.textSecondary}
+                    />
+                }
+            >
+                <MenuSection title="Details">
+                    <MenuRow
+                        icon="hardware-chip-outline"
+                        label="Name"
+                        value={
+                            device?.name ?? route.params.deviceName ?? "Unknown"
+                        }
+                    />
+                    <MenuRow
+                        icon="finger-print-outline"
+                        label="Device ID"
+                        monoBlock={deviceIDLabel}
+                    />
+                    <MenuRow
+                        icon="time-outline"
+                        label="Last login"
+                        value={lastLoginLabel}
+                    />
+                    <MenuRow
+                        icon={
+                            isCurrent
+                                ? "phone-portrait"
+                                : "phone-portrait-outline"
+                        }
+                        label="Current device"
+                        value={isCurrent ? "Yes" : "No"}
+                    />
+                </MenuSection>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Actions</Text>
-                    {isCurrent ? (
-                        <Text style={styles.helperText}>
-                            You cannot remove the device currently in use.
-                        </Text>
-                    ) : null}
-                    {!isCurrent && deviceCount <= 1 ? (
-                        <Text style={styles.helperText}>
-                            You cannot remove your last remaining device.
-                        </Text>
-                    ) : null}
-                    <TouchableOpacity
+                <MenuSection title="Actions">
+                    <MenuRow
+                        description={removeHelper}
                         disabled={!canRemove || busy || loading}
+                        icon="trash-outline"
+                        label={busy ? "Removing..." : "Remove device"}
                         onPress={() => {
                             void handleRemove();
                         }}
-                        style={[
-                            styles.removeBtn,
-                            (!canRemove || busy || loading) &&
-                                styles.removeBtnDisabled,
-                        ]}
-                    >
-                        <Text style={styles.removeBtnText}>
-                            {busy ? "Removing..." : "Remove device"}
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <TouchableOpacity
-                    disabled={loading}
-                    onPress={() => {
-                        void refresh();
-                    }}
-                    style={styles.refreshBtn}
-                >
-                    <Text style={styles.refreshBtnText}>
-                        {loading ? "Loading..." : "Refresh details"}
-                    </Text>
-                </TouchableOpacity>
+                        tone="danger"
+                    />
+                </MenuSection>
 
                 {error !== "" ? (
                     <View style={styles.errorCard}>
@@ -183,7 +173,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     content: {
-        gap: 14,
+        gap: 18,
+        paddingBottom: 24,
         paddingHorizontal: 14,
         paddingVertical: 12,
     },
@@ -198,75 +189,5 @@ const styles = StyleSheet.create({
     errorText: {
         ...typography.body,
         color: colors.error,
-    },
-    helperText: {
-        ...typography.body,
-        color: "rgba(255,255,255,0.62)",
-        fontSize: 12,
-    },
-    label: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontSize: 14,
-        fontWeight: "600",
-    },
-    mono: {
-        fontFamily: typography.body.fontFamily,
-        fontSize: 12,
-        letterSpacing: 0.25,
-    },
-    refreshBtn: {
-        alignItems: "center",
-        borderColor: "rgba(255,255,255,0.2)",
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-    },
-    refreshBtnText: {
-        ...typography.button,
-        color: colors.textSecondary,
-        fontWeight: "600",
-    },
-    removeBtn: {
-        alignItems: "center",
-        backgroundColor: "rgba(229, 57, 53, 0.2)",
-        borderColor: "rgba(229, 57, 53, 0.55)",
-        borderRadius: 10,
-        borderWidth: 1,
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-    },
-    removeBtnDisabled: {
-        opacity: 0.5,
-    },
-    removeBtnText: {
-        ...typography.button,
-        color: "#F9B4B2",
-        fontWeight: "600",
-    },
-    rowCard: {
-        backgroundColor: "rgba(255,255,255,0.02)",
-        borderBottomWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
-        borderRadius: 10,
-        borderWidth: 1,
-        gap: 4,
-        paddingHorizontal: 12,
-        paddingVertical: 11,
-    },
-    section: {
-        gap: 8,
-    },
-    sectionTitle: {
-        ...typography.label,
-        color: "rgba(255,255,255,0.52)",
-        paddingHorizontal: 2,
-        textTransform: "uppercase",
-    },
-    value: {
-        ...typography.body,
-        color: "rgba(255,255,255,0.66)",
-        fontSize: 13,
     },
 });
