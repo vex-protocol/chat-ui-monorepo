@@ -1,4 +1,7 @@
-const { withAndroidManifest, withDangerousMod } = require("expo/config-plugins");
+const {
+    withAndroidManifest,
+    withDangerousMod,
+} = require("expo/config-plugins");
 const fs = require("fs");
 const path = require("path");
 
@@ -48,7 +51,8 @@ const path = require("path");
 // follow-up that lives in the source PNG, not here.
 
 const DRAWABLE_NAME = "notification_icon";
-const NOTIFICATION_ICON_META = "expo.modules.notifications.default_notification_icon";
+const NOTIFICATION_ICON_META =
+    "expo.modules.notifications.default_notification_icon";
 
 // 24dp viewport is the Android-recommended canvas for status-bar
 // drawables. The path is a stylized "V" stroke from upper-left
