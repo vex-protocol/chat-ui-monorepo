@@ -59,6 +59,31 @@
         );
 
         if (!result.ok) {
+            if (result.pendingDeviceApproval) {
+                const published =
+                    await vexService.publishDeferredDeviceApprovalAndStartWatching(
+                        keyStore,
+                    );
+                if (!published.ok) {
+                    errors = {
+                        form:
+                            published.error ??
+                            result.error ??
+                            "Could not start device approval.",
+                    };
+                    playError();
+                    loading = false;
+                    return;
+                }
+                errors = {
+                    form:
+                        result.error ??
+                        "Check your other signed-in device to approve this one.",
+                };
+                playError();
+                loading = false;
+                return;
+            }
             errors = { form: result.error ?? "Registration failed" };
             playError();
             loading = false;
