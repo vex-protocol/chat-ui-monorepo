@@ -231,10 +231,11 @@ function App() {
                     mobileConfig(),
                     getServerOptions(),
                 );
-                if (
-                    !result.ok &&
-                    result.error === "Session expired. Please sign in again."
-                ) {
+                if (!result.ok && result.requireReauth && result.error) {
+                    // Stale credentials were just cleared by the auth flow
+                    // (401 expired token, or 404 device/user removed
+                    // server-side). Surface the toast so the user has
+                    // context for why they're back at the sign-in screen.
                     setAuthNotice(result.error);
                 }
                 if (!result.ok && result.error) {
@@ -303,8 +304,8 @@ function App() {
                                 );
                                 if (
                                     !result.ok &&
-                                    result.error ===
-                                        "Session expired. Please sign in again."
+                                    result.requireReauth &&
+                                    result.error
                                 ) {
                                     setAuthNotice(result.error);
                                 }

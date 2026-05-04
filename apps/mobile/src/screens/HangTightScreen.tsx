@@ -195,11 +195,17 @@ export function HangTightScreen({
                     getServerOptions(),
                 );
                 if (cancelled) return;
-                if (!result.ok && !result.error) {
-                    // No active credentials. If there ARE other saved
-                    // accounts on this device, route to the picker so the
-                    // user can pick one. Otherwise show the new-account
-                    // form so first-runs aren't gated behind an empty list.
+                // No active credentials, or the auth flow just cleared
+                // them because the server reported they no longer
+                // authenticate (`requireReauth`: 401 expired session,
+                // 404 device/user deleted server-side). In both cases
+                // there is nothing to retry against — route straight
+                // to the account picker (or the new-account form when
+                // no other saved accounts exist). App.tsx already owns
+                // the user-visible toast for the requireReauth case.
+                const noActiveCreds =
+                    !result.ok && (!result.error || result.requireReauth);
+                if (noActiveCreds) {
                     const accounts = await listKnownAccounts();
                     if (cancelled) return;
                     if (accounts.length > 0) {
@@ -378,8 +384,18 @@ export function HangTightScreen({
         setPhase("boot");
         void vexService
             .autoLogin(keychainKeyStore, mobileConfig(), getServerOptions())
-            .then((result) => {
-                if (!result.ok && !result.error) {
+            .then(async (result) => {
+                // Mirror the bootstrap path: a successful "no creds" or a
+                // requireReauth result both belong on the picker/form, not
+                // back in the error phase that dropped us here.
+                const noActiveCreds =
+                    !result.ok && (!result.error || result.requireReauth);
+                if (noActiveCreds) {
+                    const accounts = await listKnownAccounts();
+                    if (accounts.length > 0) {
+                        navigation.replace("AccountSelector");
+                        return;
+                    }
                     setPhase("form");
                     return;
                 }

@@ -78,6 +78,18 @@ export interface AuthResult {
      * don't include it in the pending response.
      */
     pendingUserID?: string;
+    /**
+     * Set when the server reported that our stored credentials no longer
+     * authenticate (401 from `/auth/device*` for an expired session, or
+     * 404 when the device record / its owning user has been deleted
+     * server-side). The auth flow has already cleared the offending
+     * keychain entry and reset auth state; the caller's job is just to
+     * route the user back into the sign-in flow rather than surface a
+     * retry-able error. App.tsx uses this to drive the "Session expired"
+     * toast; HangTightScreen uses it to skip its own error phase and go
+     * straight to the account picker / handle form.
+     */
+    requireReauth?: boolean;
 }
 
 export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
@@ -380,10 +392,13 @@ class VexService {
                 );
                 if (authErr) {
                     await this.close();
-                    if (isUnauthorizedError(authErr)) {
+                    if (isStaleCredentialError(authErr)) {
                         debugAuth(
-                            "autoLogin:unauthorized:clearingCredentials",
+                            "autoLogin:stale-credentials:clearingCredentials",
                             {
+                                status: hasHttpStatus(authErr)
+                                    ? authErr.response.status
+                                    : null,
                                 username: creds.username,
                             },
                         );
@@ -395,6 +410,7 @@ class VexService {
                         return {
                             error: "Session expired. Please sign in again.",
                             ok: false,
+                            requireReauth: true,
                         };
                     }
                     return { error: authErr.message, ok: false };
@@ -425,10 +441,15 @@ class VexService {
                         );
                         if (authErr) {
                             await this.close();
-                            if (isUnauthorizedError(authErr)) {
+                            if (isStaleCredentialError(authErr)) {
                                 debugAuth(
-                                    "autoLogin:decrypt-mismatch:recover:unauthorized:clearingCredentials",
-                                    { username: creds.username },
+                                    "autoLogin:decrypt-mismatch:recover:stale-credentials:clearingCredentials",
+                                    {
+                                        status: hasHttpStatus(authErr)
+                                            ? authErr.response.status
+                                            : null,
+                                        username: creds.username,
+                                    },
                                 );
                                 await this.clearStoredCredentials(
                                     keyStore,
@@ -438,6 +459,7 @@ class VexService {
                                 return {
                                     error: "Session expired. Please sign in again.",
                                     ok: false,
+                                    requireReauth: true,
                                 };
                             }
                             return { error: authErr.message, ok: false };
@@ -472,10 +494,13 @@ class VexService {
                 } catch {
                     /* ignore close errors */
                 }
-                if (isUnauthorizedError(err)) {
+                if (isStaleCredentialError(err)) {
                     debugAuth(
-                        "autoLogin:catch:unauthorized:clearingCredentials",
+                        "autoLogin:catch:stale-credentials:clearingCredentials",
                         {
+                            status: hasHttpStatus(err)
+                                ? err.response.status
+                                : null,
                             username: creds.username,
                         },
                     );
@@ -484,6 +509,7 @@ class VexService {
                     return {
                         error: "Session expired. Please sign in again.",
                         ok: false,
+                        requireReauth: true,
                     };
                 }
                 if (isNetworkError(err)) {
@@ -976,6 +1002,21 @@ class VexService {
                 ok: !authErr,
             });
             if (authErr) {
+                if (isStaleCredentialError(authErr)) {
+                    debugAuth("login:stale-credentials:clearingCredentials", {
+                        status: hasHttpStatus(authErr)
+                            ? authErr.response.status
+                            : null,
+                        username: creds.username,
+                    });
+                    await this.clearStoredCredentials(keyStore, creds.username);
+                    this.setAuthStatus("unauthorized");
+                    return {
+                        error: "Session expired. Please sign in again.",
+                        ok: false,
+                        requireReauth: true,
+                    };
+                }
                 return { error: authErr.message, ok: false };
             }
 
@@ -991,7 +1032,7 @@ class VexService {
             await this.populateState();
             return { ok: true };
         } catch (err: unknown) {
-            if (isUnauthorizedError(err)) {
+            if (isStaleCredentialError(err)) {
                 this.setAuthStatus("unauthorized");
             } else if (isNetworkError(err)) {
                 this.setAuthStatus("offline");
@@ -1111,7 +1152,12 @@ class VexService {
                 this.setAuthStatus("authenticated");
                 return "authenticated";
             }
-            if (isUnauthorizedError(err)) {
+            // 404 here means the user record (or device record, depending on
+            // the server build) backing our token has been deleted while we
+            // were holding a still-valid JWT. Treat it as unauthorized so the
+            // caller's recovery path (refresh → fail → clear creds + bounce
+            // to sign-in) fires the same way it does for an expired token.
+            if (isStaleCredentialError(err)) {
                 this.setAuthStatus("unauthorized");
                 return "unauthorized";
             }
@@ -1187,7 +1233,7 @@ class VexService {
                 this.setAuthStatus("authenticated");
                 return "authenticated";
             }
-            if (isUnauthorizedError(err)) {
+            if (isStaleCredentialError(err)) {
                 this.setAuthStatus("unauthorized");
                 return "unauthorized";
             }
@@ -2606,6 +2652,16 @@ function isNotAuthenticatedError(err: unknown): boolean {
     return /not authenticated|no token|login first/i.test(err.message);
 }
 
+function isNotFoundError(err: unknown): boolean {
+    if (hasHttpStatus(err)) {
+        return err.response.status === 404;
+    }
+    if (err instanceof Error) {
+        return /status code 404/i.test(err.message);
+    }
+    return false;
+}
+
 function isRateLimitedError(err: unknown): boolean {
     if (hasHttpStatus(err)) {
         return err.response.status === 429;
@@ -2624,6 +2680,25 @@ function isReactNativeRuntime(): boolean {
         "product" in navigator &&
         (navigator as { product?: string }).product === "ReactNative"
     );
+}
+
+/**
+ * "These credentials no longer authenticate."
+ *
+ * Both 401 and 404 from the device-auth endpoints (`/auth/device`,
+ * `/auth/device/verify`, and `whoami`) mean the same thing for the
+ * caller: the stored deviceID/deviceKey on this client refers to
+ * something the server will no longer let us in with. 401 is the
+ * classic "token rejected" path (token expired, signature failed),
+ * 404 is the "your device or its owning user has been removed
+ * server-side" path. Either way the recovery is identical — drop the
+ * stale keychain entry and bounce the user to the sign-in flow.
+ *
+ * Bundling them under one predicate keeps the auth flows in this
+ * file from forgetting one of the two whenever they handle the other.
+ */
+function isStaleCredentialError(err: unknown): boolean {
+    return isUnauthorizedError(err) || isNotFoundError(err);
 }
 
 function isUnauthorizedError(err: unknown): boolean {
