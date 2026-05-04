@@ -9,7 +9,28 @@ export interface NotificationPayload {
     /** Set for group messages — the channelID. */
     group: null | string;
     mailID: string;
+    /**
+     * Where the message came from — same style for DMs and servers:
+     * 「Direct Messages」 or 「Server」 · #channel (or "Group chat" if unknown).
+     */
+    subtitle: string;
+    /** Display name of the sender (notification title on most platforms). */
     title: string;
+}
+
+/** DM context line, parallel to {@link formatGroupNotificationSubtitle}. */
+export function formatDmNotificationSubtitle(): string {
+    return "「Direct Messages」";
+}
+
+/** Stylized server + channel line for group notification subtitles. */
+export function formatGroupNotificationSubtitle(
+    serverName: string,
+    channelName: string,
+): string {
+    const raw = channelName.trim();
+    const ch = raw.startsWith("#") ? raw : `#${raw}`;
+    return `「${serverName}」 · ${ch}`;
 }
 
 /**
@@ -40,15 +61,19 @@ export function shouldNotify(
     const authorName =
         resolveAuthorName?.(msg.authorID) ?? msg.authorID.slice(0, 8);
 
-    let title: string;
-    if (msg.group) {
-        const info = resolveChannelInfo?.(msg.group);
-        title = info
-            ? `${authorName} (#${info.channelName}, ${info.serverName})`
-            : `${authorName} (#channel)`;
-    } else {
-        title = authorName;
-    }
+    const title = authorName;
+
+    const subtitle = msg.group
+        ? (() => {
+              const info = resolveChannelInfo?.(msg.group);
+              return info
+                  ? formatGroupNotificationSubtitle(
+                        info.serverName,
+                        info.channelName,
+                    )
+                  : "Group chat";
+          })()
+        : formatDmNotificationSubtitle();
 
     const body =
         msg.message.length > 100
@@ -61,6 +86,7 @@ export function shouldNotify(
         conversationKey,
         group: msg.group,
         mailID: msg.mailID,
+        subtitle,
         title,
     };
 }

@@ -235,6 +235,10 @@ interface ClientWithUserDeviceListLike {
 }
 
 interface DevicesWithApprovalLike {
+    abortPendingRegistration?: (args: {
+        challenge: string;
+        requestID: string;
+    }) => Promise<unknown>;
     approveRequest?: (requestID: string) => Promise<unknown>;
     delete: (deviceID: string) => Promise<void>;
     getRequest?: (requestID: string) => Promise<DeviceApprovalRequest | null>;
@@ -243,6 +247,10 @@ interface DevicesWithApprovalLike {
         challenge: string;
         requestID: string;
     }) => Promise<DeviceApprovalRequest | null>;
+    publishPendingRegistration?: (args: {
+        challenge: string;
+        requestID: string;
+    }) => Promise<unknown>;
     register: () => Promise<unknown>;
     rejectRequest?: (requestID: string) => Promise<unknown>;
     retrieve: (
@@ -301,6 +309,18 @@ class VexService {
     private autoLoginInFlight: null | Promise<AuthResult> = null;
     private client: Client | null = null;
     private connectionRecoveryInFlight = false;
+    /**
+     * Populated when `register()` hits "username taken" and the server
+     * created a deferred enrollment (no owner push until
+     * {@link publishDeferredDeviceApprovalAndStartWatching}).
+     */
+    private deferredDeviceApproval: null | {
+        challenge: string;
+        deviceKey: string;
+        keyStore: KeyStore;
+        requestID: string;
+        username: string;
+    } = null;
     private readonly deviceRequestQueueListeners = new Set<() => void>();
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
@@ -326,6 +346,37 @@ class VexService {
     private wsWatchdogSocket: null | WebSocketDebugLike = null;
 
     // ── Auth flows ──────────────────────────────────────────────────────
+
+    /**
+     * Deletes a deferred enrollment on the server before any owner
+     * notification (user said the account wasn't theirs).
+     */
+    async abortDeferredDeviceApproval(): Promise<void> {
+        const d = this.deferredDeviceApproval;
+        if (!d) {
+            return;
+        }
+        const client = this.client;
+        if (!client) {
+            this.deferredDeviceApproval = null;
+            return;
+        }
+        const abort = (client as unknown as ClientWithDeviceApprovals).devices
+            .abortPendingRegistration;
+        if (typeof abort !== "function") {
+            this.deferredDeviceApproval = null;
+            return;
+        }
+        try {
+            await abort({
+                challenge: d.challenge,
+                requestID: d.requestID,
+            });
+        } catch {
+            /* row may already be gone */
+        }
+        this.deferredDeviceApproval = null;
+    }
 
     async approveDeviceRequest(requestID: string): Promise<OperationResult> {
         try {
@@ -636,8 +687,6 @@ class VexService {
         $pendingApprovalStageWritable.set("idle");
     }
 
-    // ── Server CRUD ─────────────────────────────────────────────────────
-
     async close(): Promise<void> {
         if (this.client) {
             this.detachWebsocketDebug();
@@ -652,6 +701,8 @@ class VexService {
             }
         }
     }
+
+    // ── Server CRUD ─────────────────────────────────────────────────────
 
     consumeRateLimitNotice(): boolean {
         if (!this.pendingRateLimitNotice) {
@@ -768,8 +819,6 @@ class VexService {
         }
     }
 
-    // ── Channel operations ──────────────────────────────────────────────
-
     /**
      * Finish a passkey-registration ceremony. Persists the new
      * authenticator on spire and returns the public passkey shape
@@ -788,6 +837,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Channel operations ──────────────────────────────────────────────
 
     /**
      * Finish a passkey authentication ceremony. Stage two of the
@@ -856,8 +907,6 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
-    // ── Messaging ───────────────────────────────────────────────────────
-
     /** Effective local retention cap (defaults to 30 when signed out). */
     getLocalMessageRetentionDays(): number {
         const c = this.client as unknown as {
@@ -869,6 +918,8 @@ class VexService {
         }
         return $localMessageRetentionDaysWritable.get();
     }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -1092,12 +1143,12 @@ class VexService {
         }
     }
 
-    // ── User operations ─────────────────────────────────────────────────
-
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
+
+    // ── User operations ─────────────────────────────────────────────────
 
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
@@ -1186,6 +1237,55 @@ class VexService {
             this.setAuthStatus("offline");
             return "offline";
         }
+    }
+
+    /**
+     * Notifies the account owner's other devices and starts polling for
+     * approval. Call after the user confirms "this account is mine" on the
+     * gate screen (or immediately from UIs that have no such gate).
+     */
+    async publishDeferredDeviceApprovalAndStartWatching(
+        keyStore: KeyStore,
+    ): Promise<{ error?: string; ok: boolean }> {
+        const d = this.deferredDeviceApproval;
+        if (!d) {
+            return {
+                error: "No pending device enrollment to confirm.",
+                ok: false,
+            };
+        }
+        if (d.keyStore !== keyStore) {
+            return { error: "Key store mismatch.", ok: false };
+        }
+        const client = this.client;
+        if (!client) {
+            return { error: "Client not ready.", ok: false };
+        }
+        const withDevices = client as unknown as ClientWithDeviceApprovals;
+        const publish = withDevices.devices.publishPendingRegistration;
+        if (typeof publish !== "function") {
+            return {
+                error: "Update the Vex client to confirm this device.",
+                ok: false,
+            };
+        }
+        try {
+            await publish({
+                challenge: d.challenge,
+                requestID: d.requestID,
+            });
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+        this.startPendingApprovalWatcher({
+            challenge: d.challenge,
+            deviceKey: d.deviceKey,
+            keyStore: d.keyStore,
+            requestID: d.requestID,
+            username: d.username,
+        });
+        this.deferredDeviceApproval = null;
+        return { ok: true };
     }
 
     async refreshSessionAfterForeground(): Promise<ResumeNetworkStatus> {
@@ -1313,6 +1413,7 @@ class VexService {
         this.setAuthStatus("checking");
         debugAuth("register:start", { host: options.host, username });
         try {
+            this.deferredDeviceApproval = null;
             const privateKey = Client.generateSecretKey();
             debugAuth("register:initClient:begin", { host: options.host });
             await withTimeout(
@@ -1364,19 +1465,30 @@ class VexService {
                     regErrName: regErr?.name ?? null,
                 });
                 if (pending) {
-                    // Background-watch the pending request so when the existing
-                    // device approves it we can save creds, complete login, and
-                    // flip the navigator into the App stack automatically.
-                    // Without this the AuthenticateScreen would call autoLogin
-                    // with no creds saved (register() returns before saving)
-                    // and "approved" would never advance the user.
-                    this.startPendingApprovalWatcher({
-                        challenge: pending.challenge,
-                        deviceKey: privateKey,
-                        keyStore,
-                        requestID: pending.requestID,
-                        username: registrationUsername,
-                    });
+                    // Server created the enrollment row but (for libvex 6.x+
+                    // servers) does not notify other devices until the user
+                    // confirms on this screen — see
+                    // `publishDeferredDeviceApprovalAndStartWatching`.
+                    if (
+                        typeof pending.challenge === "string" &&
+                        pending.challenge.length > 0
+                    ) {
+                        this.deferredDeviceApproval = {
+                            challenge: pending.challenge,
+                            deviceKey: privateKey,
+                            keyStore,
+                            requestID: pending.requestID,
+                            username: registrationUsername,
+                        };
+                    } else {
+                        this.startPendingApprovalWatcher({
+                            challenge: pending.challenge,
+                            deviceKey: privateKey,
+                            keyStore,
+                            requestID: pending.requestID,
+                            username: registrationUsername,
+                        });
+                    }
                     let pendingSignKey: string | undefined;
                     try {
                         pendingSignKey = client.getKeys().public;
@@ -1424,6 +1536,7 @@ class VexService {
                 "Signup stalled while loading initial account data.",
             );
             debugAuth("register:populateState:ok", undefined);
+            this.deferredDeviceApproval = null;
             return { ok: true };
         } catch (err: unknown) {
             debugAuth("register:catch", {
@@ -2204,6 +2317,7 @@ class VexService {
 
     private resetAll(): void {
         this.stopPendingApprovalWatcher();
+        this.deferredDeviceApproval = null;
         this.detachWebsocketDebug();
         this.stopWebsocketWatchdog();
         this.client = null;

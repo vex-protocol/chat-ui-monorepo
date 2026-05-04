@@ -1,6 +1,5 @@
 import type { IdentityBackup } from "../lib/identityBackup";
 import type { AuthScreenProps } from "../navigation/types";
-import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
 import React, { useCallback, useState } from "react";
 import {
@@ -34,6 +33,10 @@ import {
     setUserIDForUsername,
 } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
+import {
+    restoreIdentityKeyBackup,
+    sanitizeHostForBackup,
+} from "../lib/restoreIdentityKeyBackup";
 import { hydrateLocalMessageRetention } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
 
@@ -46,10 +49,6 @@ interface AccountRowProps {
 }
 
 type Props = AuthScreenProps<"AccountSelector">;
-
-interface TransientSlot {
-    creds: null | StoredCredentials;
-}
 
 /**
  * OS-style account picker. Lists every account whose credentials are still
@@ -171,8 +170,8 @@ export function AccountSelectorScreen({ navigation }: Props) {
             // cluster that minted it. If the user's currently configured
             // server doesn't match the backup, refuse rather than misleading
             // them with a "device revoked" error.
-            const currentHost = sanitizeHost(getServerUrl());
-            const backupHost = sanitizeHost(backup.server);
+            const currentHost = sanitizeHostForBackup(getServerUrl());
+            const backupHost = sanitizeHostForBackup(backup.server);
             if (currentHost !== backupHost) {
                 setErrorText(
                     `This backup is for ${backup.server}, but you are connected to ${getServerUrl()}. Switch servers and try again.`,
@@ -216,7 +215,7 @@ export function AccountSelectorScreen({ navigation }: Props) {
 
             setSigningInUsername(backup.username);
             try {
-                const result = await restoreFromBackup(backup);
+                const result = await restoreIdentityKeyBackup(backup);
                 if (!result.ok) {
                     setErrorText(result.error);
                     await refresh();
@@ -491,102 +490,6 @@ function AccountRow({
             </CornerBracketBox>
         </Pressable>
     );
-}
-
-/**
- * Drive a libvex login attempt against the cluster using credentials parsed
- * from a backup file, *without* writing the backup creds to the real
- * keychain until the cluster confirms they're still valid.
- *
- * Why a transient KeyStore? `vexService.autoLogin()` reads creds from
- * whatever KeyStore it's handed and persists tokens back to it on success.
- * Using a one-shot in-memory store lets us validate against the server and
- * only commit to the real `keychainKeyStore` after the server has accepted
- * the device. If validation fails — most importantly when the user has
- * removed this device from their account on a different phone (server
- * returns 401) — the real keychain stays untouched: we leave no trace of
- * the failed restore.
- *
- * Why `autoLogin` and not `login`? `autoLogin` has an at-rest decrypt-
- * mismatch recovery path that purges stale key material when the backup's
- * deviceKey doesn't match what was previously used to encrypt the SQLite
- * DB for this username on this device. `login` does not, and would throw
- * mid-validation in the "restoring on top of an existing slot with a
- * different deviceKey" scenario.
- */
-async function restoreFromBackup(
-    backup: IdentityBackup,
-): Promise<{ error: string; ok: false } | { ok: true }> {
-    const transient: TransientSlot = {
-        creds: {
-            deviceID: backup.deviceID,
-            deviceKey: backup.deviceKey,
-            token: "",
-            username: backup.username,
-        },
-    };
-    const transientStore: KeyStore = {
-        async clear(_username: string): Promise<void> {
-            transient.creds = null;
-        },
-        async load(username?: string): Promise<null | StoredCredentials> {
-            if (transient.creds === null) return null;
-            if (username && username !== transient.creds.username) return null;
-            return transient.creds;
-        },
-        async save(c: StoredCredentials): Promise<void> {
-            transient.creds = c;
-        },
-    };
-
-    await hydrateLocalMessageRetention();
-    const result = await vexService.autoLogin(
-        transientStore,
-        mobileConfig(),
-        getServerOptions(),
-    );
-    if (!result.ok) {
-        const reason = result.error ?? "Could not verify the backup.";
-        // Heuristic for the "the cluster has revoked this device" case —
-        // surface it verbatim plus an explainer, since the most common
-        // cause is "I removed this device from my account from another
-        // phone, then tried to restore." A revoked device cannot be
-        // recovered just by importing the backup; the user has to enroll
-        // fresh through device approval.
-        const looksRevoked = /unauthor|revok|expired|not found|invalid/i.test(
-            reason,
-        );
-        return {
-            error: looksRevoked
-                ? `${reason} The device may have been removed from this account from another device — restore is not possible until you re-enroll through device approval.`
-                : reason,
-            ok: false,
-        };
-    }
-
-    // Validation passed — persist to the real keychain. This sets the slot
-    // and updates the active-user pointer so the next launch auto-logs in
-    // as this account.
-    await keychainKeyStore.save({
-        deviceID: backup.deviceID,
-        deviceKey: backup.deviceKey,
-        token: "",
-        username: backup.username,
-    });
-    return { ok: true };
-}
-
-/**
- * Normalize a server URL/host pair so we can compare a backup's recorded
- * server against the currently configured one without protocol or trailing-
- * slash skew. Mirrors the sanitize logic in `keychain.ts` so both halves of
- * the system agree on what counts as "the same cluster".
- */
-function sanitizeHost(host: string): string {
-    return host
-        .replace(/^https?:\/\//, "")
-        .replace(/\/+$/, "")
-        .toLowerCase();
 }
 
 function shortDeviceID(deviceID: string): string {

@@ -54,7 +54,11 @@ export {
 } from "./message-utils.ts";
 export type { FileAttachment, MessageChunk } from "./message-utils.ts";
 
-export { shouldNotify } from "./notifications.ts";
+export {
+    formatDmNotificationSubtitle,
+    formatGroupNotificationSubtitle,
+    shouldNotify,
+} from "./notifications.ts";
 export type { NotificationPayload } from "./notifications.ts";
 
 export { vexService } from "./service.ts";

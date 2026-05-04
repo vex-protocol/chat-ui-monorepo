@@ -1,8 +1,21 @@
 import type { Message } from "@vex-chat/libvex";
 
-import { shouldNotify } from "@vex-chat/store";
-import { $channels, $familiars } from "@vex-chat/store";
+import { Platform } from "react-native";
 
+import { shouldNotify } from "@vex-chat/store";
+import {
+    $avatarVersions,
+    $channels,
+    $familiars,
+    $servers,
+} from "@vex-chat/store";
+
+import notifee, {
+    AndroidCategory,
+    AndroidStyle,
+    EventType,
+    AndroidImportance as NotifeeAndroidImportance,
+} from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 
@@ -10,7 +23,10 @@ import {
     navigateToChannel,
     navigateToConversation,
     navigateToDeviceRequests,
+    navigationRef,
 } from "../navigation/navigationRef";
+
+import { buildAvatarUrl } from "./avatarUrl";
 
 const CHANNEL_ID = "vex-messages";
 // Separate channel so users can mute messages but keep account-security
@@ -20,28 +36,25 @@ const CHANNEL_ID = "vex-messages";
 // default sound regardless of the messages channel preference.
 const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
-// We deliberately never hand the OS the decrypted message body or the sender's
-// name. Both platforms persist notification content far past the visible
-// banner, in surfaces that survive E2EE:
+// Message banners show sender display name, a short message preview, optional
+// group context (subtitle), and a sender avatar (iOS: Expo attachment;
+// Android: Notifee largeIcon + MessagingStyle person icon). Be aware the OS
+// may persist visible notification text and images in notification history,
+// backups, and platform logging — a tradeoff for readable alerts.
 //
-//   - Android: NotificationManagerService writes every posted/updated/cancelled
-//     notification (title + content text) to logcat. logcat is readable by any
-//     process holding READ_LOGS, captured verbatim in bug reports, and on
-//     userdebug builds it lands in dmesg-adjacent kernel-side ring buffers.
+// iOS always shows the app icon on the compact banner; the sender attachment
+// appears in the expanded notification / notification list. Replacing the
+// banner icon with the sender requires Apple Communication Notifications
+// (special entitlement + server push patterns). Android requires a
+// monochrome smallIcon in the status bar; the sender avatar is shown as
+// largeIcon / MessagingStyle person art where the OS allows.
 //
-//   - iOS: APNS payloads and posted notifications are persisted in the
-//     UserNotifications store and surfaced through the unified logging system.
-//     Forensic extraction tools (Cellebrite, GrayKey) routinely pull
-//     notification content off seized devices via sysdiagnose / the
-//     CoreDuet/Biome stores. This is the path that has been used to recover
-//     Signal messages from locked iPhones.
+// Android message taps use Notifee (`displayNotification`); routing data is
+// also queued from `onBackgroundEvent` in index.js until NavigationContainer
+// is ready (`flushPendingNotificationRoutes`).
 //
-// The visible banner therefore carries only a fixed string. Routing data
-// (authorID, channelID, etc.) rides in the `data` field, which the OS does not
-// log to either of those surfaces and which we read back in
-// `handleNotificationPress` to route the tap.
-const GENERIC_TITLE = "Vex";
-const GENERIC_BODY = "New message";
+// Routing still uses opaque IDs in `data` for `handleNotificationPress`; human
+// strings are not required there.
 
 // Device-approval banners are also content-free for the same reason:
 // the approval flow proves which device wants in via the matching
@@ -83,6 +96,10 @@ let notificationDrainInFlight = false;
 // again for the same ID; we'd rather drop the duplicate than spam.
 const notifiedApprovalRequestIDs = new Set<string>();
 
+type PendingRouteTap = { data: Record<string, unknown>; dedupeKey?: string };
+
+const pendingRouteTapQueue: PendingRouteTap[] = [];
+
 // Show banner + play sound when a notification arrives while the app is open.
 Notifications.setNotificationHandler({
     handleNotification: () =>
@@ -123,6 +140,48 @@ export async function dismissDeviceApprovalNotification(
     }
 }
 
+/**
+ * Queued from `notifee.onBackgroundEvent` in `index.js` (Android) when the user
+ * taps a message notification while the JS engine is not yet interactive.
+ */
+export function enqueueNotificationRouteFromAndroidBackground(data: {
+    [key: string]: number | object | string;
+}): void {
+    const kind = data["kind"];
+    if (kind !== "dm" && kind !== "group") {
+        return;
+    }
+    const normalized = normalizeAndroidMessageRouteData(data);
+    const dedupeKey =
+        typeof data["mailID"] === "string" ? data["mailID"] : undefined;
+    if (dedupeKey) {
+        const idx = pendingRouteTapQueue.findIndex(
+            (p) => p.dedupeKey === dedupeKey,
+        );
+        if (idx >= 0) {
+            pendingRouteTapQueue.splice(idx, 1);
+        }
+    }
+    if (dedupeKey !== undefined) {
+        pendingRouteTapQueue.push({ data: normalized, dedupeKey });
+    } else {
+        pendingRouteTapQueue.push({ data: normalized });
+    }
+}
+
+/**
+ * Called from `NavigationContainer` `onReady` so cold-start / background taps
+ * that arrived before the navigator mounted are replayed once.
+ */
+export function flushPendingNotificationRoutes(): void {
+    while (navigationRef.isReady() && pendingRouteTapQueue.length > 0) {
+        const next = pendingRouteTapQueue.shift();
+        if (next) {
+            handleNotificationPress(next.data);
+        }
+    }
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
     const settings = await Notifications.requestPermissionsAsync({
         ios: { allowAlert: true, allowBadge: true, allowSound: true },
@@ -134,21 +193,59 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function setupNotificationHandlers(): () => void {
-    // Single listener covers foreground, background, and cold-start taps.
     const subscription = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-            handleNotificationPress(response.notification.request.content.data);
+            routeNotificationTap(
+                response.notification.request.content.data as Record<
+                    string,
+                    unknown
+                >,
+            );
         },
     );
 
-    // If the app was launched by tapping a notification, replay it.
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse) {
-        handleNotificationPress(lastResponse.notification.request.content.data);
+        routeNotificationTap(
+            lastResponse.notification.request.content.data as Record<
+                string,
+                unknown
+            >,
+        );
     }
+
+    let unsubNotifee: (() => void) | undefined;
+    if (Platform.OS === "android") {
+        unsubNotifee = notifee.onForegroundEvent(({ detail, type }) => {
+            if (type !== EventType.PRESS) {
+                return;
+            }
+            const data = detail.notification?.data;
+            if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
+                return;
+            }
+            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+        });
+
+        void notifee.getInitialNotification().then((initial) => {
+            if (!initial) {
+                return;
+            }
+            const data = initial.notification.data;
+            if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
+                return;
+            }
+            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+        });
+    }
+
+    queueMicrotask(() => {
+        flushPendingNotificationRoutes();
+    });
 
     return () => {
         subscription.remove();
+        unsubNotifee?.();
     };
 }
 
@@ -273,10 +370,20 @@ async function drainNotificationQueue(): Promise<void> {
 
 async function ensureChannel(): Promise<void> {
     if (channelReady) return;
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-        importance: AndroidImportance.HIGH,
-        name: "Messages",
-    });
+    if (Platform.OS === "android") {
+        await notifee.createChannel({
+            id: CHANNEL_ID,
+            importance: NotifeeAndroidImportance.HIGH,
+            name: "Messages",
+            sound: "default",
+            vibration: true,
+        });
+    } else {
+        await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+            importance: AndroidImportance.HIGH,
+            name: "Messages",
+        });
+    }
     channelReady = true;
 }
 
@@ -340,39 +447,168 @@ function handleNotificationPress(
     navigateToConversation(authorID, username);
 }
 
+/** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */
+function iosAvatarAttachmentType(url: string): string {
+    const path = (url.split("?")[0] ?? url).toLowerCase();
+    if (path.endsWith(".png")) {
+        return "public.png";
+    }
+    if (path.endsWith(".gif")) {
+        return "public.gif";
+    }
+    if (path.endsWith(".webp")) {
+        return "public.webp";
+    }
+    return "public.jpeg";
+}
+
+function normalizeAndroidMessageRouteData(raw: {
+    [key: string]: number | object | string;
+}): Record<string, unknown> {
+    const kind = stringifyRouteField(raw["kind"]);
+    const authorID = stringifyRouteField(raw["authorID"]);
+    const out: Record<string, unknown> = { authorID, kind };
+    if (raw["mailID"] != null) {
+        out["mailID"] = stringifyRouteField(raw["mailID"]);
+    }
+    if (kind === "group") {
+        out["channelID"] = stringifyRouteField(raw["channelID"]);
+        out["serverID"] = stringifyRouteField(raw["serverID"]);
+    }
+    return out;
+}
+
+function resolveAuthorNameMobile(userID: string): string | undefined {
+    return $familiars.get()[userID]?.username;
+}
+
+function resolveChannelInfoMobile(
+    channelID: string,
+): undefined | { channelName: string; serverName: string } {
+    const serverID = findServerForChannel(channelID);
+    if (!serverID) {
+        return undefined;
+    }
+    const serverChannels = $channels.get()[serverID] ?? [];
+    const channel = serverChannels.find((c) => c.channelID === channelID);
+    const server = $servers.get()[serverID];
+    const channelName = channel?.name ?? "channel";
+    const serverName = server?.name ?? serverID.slice(0, 8);
+    return { channelName, serverName };
+}
+
+function routeNotificationTap(data: Record<string, unknown> | undefined): void {
+    if (!data || typeof data !== "object") {
+        return;
+    }
+    if (navigationRef.isReady()) {
+        handleNotificationPress(data);
+        return;
+    }
+    const dedupeKey =
+        typeof data["mailID"] === "string" ? data["mailID"] : undefined;
+    if (dedupeKey) {
+        const dup = pendingRouteTapQueue.findIndex(
+            (p) => p.dedupeKey === dedupeKey,
+        );
+        if (dup >= 0) {
+            pendingRouteTapQueue.splice(dup, 1);
+        }
+    }
+    if (dedupeKey !== undefined) {
+        pendingRouteTapQueue.push({ data, dedupeKey });
+    } else {
+        pendingRouteTapQueue.push({ data });
+    }
+}
+
 async function scheduleOneMessageNotification(mail: Message): Promise<void> {
-    // We pass `shouldNotify` no resolver callbacks: it's still useful for the
-    // "should we notify at all?" gating (suppresses self-messages and the
-    // logged-out case), but the title/body it builds would only be discarded.
-    // Skipping the resolvers also avoids what was previously a `lookupUser`
-    // network roundtrip per incoming notifiable message — itself a metadata
-    // leak ("user X just got a message from Y") that we have no need to emit
-    // now that the banner doesn't display the name.
-    const payload = shouldNotify(mail);
+    const payload = shouldNotify(
+        mail,
+        (uid) => resolveAuthorNameMobile(uid),
+        mail.group ? (cid) => resolveChannelInfoMobile(cid) : undefined,
+    );
     if (!payload) return;
 
-    // For group messages we still need the owning serverID so the tap handler
-    // can navigate to the right server context. The channel-name string is
-    // *not* read here — it's resolved at tap time, not stored in `data`.
     const serverID = mail.group ? findServerForChannel(mail.group) : undefined;
 
     await ensureChannel();
 
-    // Routing data is intentionally limited to opaque IDs. The OS persists
-    // userInfo/extras alongside the visible content (see comment at top of
-    // file), so we never put human-readable strings — display names, channel
-    // names, message bodies — anywhere the OS can see. The tap handler
-    // resolves the IDs back to names from in-memory state.
+    const avatarUrl = buildAvatarUrl(
+        payload.authorID,
+        $avatarVersions.get()[payload.authorID],
+    );
+
+    const routeData: Record<string, string> = {
+        authorID: payload.authorID,
+        kind: payload.group ? "group" : "dm",
+        mailID: payload.mailID,
+    };
+    if (payload.group && serverID) {
+        routeData["channelID"] = payload.group;
+        routeData["serverID"] = serverID;
+    }
+
+    if (Platform.OS === "android") {
+        await notifee.displayNotification({
+            android: {
+                category: AndroidCategory.MESSAGE,
+                channelId: CHANNEL_ID,
+                pressAction: { id: "default" },
+                smallIcon: "notification_icon",
+                ...(avatarUrl != null
+                    ? { circularLargeIcon: true, largeIcon: avatarUrl }
+                    : {}),
+                style: {
+                    group: true,
+                    messages: [
+                        {
+                            person: {
+                                ...(avatarUrl != null
+                                    ? { icon: avatarUrl }
+                                    : {}),
+                                id: payload.authorID,
+                                name: payload.title,
+                            },
+                            text: payload.body,
+                            timestamp: Date.now(),
+                        },
+                    ],
+                    person: { id: "self", name: "You" },
+                    title: payload.subtitle,
+                    type: AndroidStyle.MESSAGING,
+                },
+            },
+            body: `${payload.title}: ${payload.body}`,
+            data: routeData,
+            id: payload.mailID,
+            title: payload.subtitle,
+        });
+        return;
+    }
+
+    const iosAvatar =
+        avatarUrl != null
+            ? [
+                  {
+                      identifier: "vex-sender-avatar",
+                      type: iosAvatarAttachmentType(avatarUrl),
+                      url: avatarUrl,
+                  },
+              ]
+            : null;
+
     await Notifications.scheduleNotificationAsync({
         content: {
-            body: GENERIC_BODY,
+            body: `${payload.title}: ${payload.body}`,
             data: {
                 authorID: payload.authorID,
                 channelID: payload.group ?? undefined,
                 kind: payload.group ? "group" : "dm",
                 serverID,
             },
-            title: GENERIC_TITLE,
+            title: payload.subtitle,
+            ...(iosAvatar != null ? { attachments: iosAvatar } : {}),
         },
         trigger: { channelId: CHANNEL_ID },
     });
@@ -380,4 +616,17 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stringifyRouteField(value: unknown): string {
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (typeof value === "boolean") {
+        return String(value);
+    }
+    return "";
 }
