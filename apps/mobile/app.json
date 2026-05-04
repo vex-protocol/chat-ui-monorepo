@@ -28,7 +28,11 @@
                     "color": "#0a0a0a"
                 }
             ],
-            "./plugins/gradle-memory"
+            "./plugins/gradle-memory",
+            [
+                "./plugins/withAndroidAssetStatements",
+                { "hosts": ["api.vex.wtf"] }
+            ]
         ]
     }
 }
