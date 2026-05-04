@@ -29,6 +29,7 @@
                 }
             ],
             "./plugins/gradle-memory",
+            "./plugins/withNotifeeMavenRepo",
             [
                 "./plugins/withAndroidAssetStatements",
                 { "hosts": ["api.vex.wtf"] }
