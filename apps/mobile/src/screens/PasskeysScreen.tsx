@@ -1,5 +1,5 @@
 import type { AppScreenProps } from "../navigation/types";
-import type { PasskeySummary } from "@vex-chat/store";
+import type { Passkey } from "@vex-chat/libvex";
 
 import React, { useCallback, useEffect, useState } from "react";
 import {
@@ -36,7 +36,7 @@ interface AddState {
 const DEFAULT_PASSKEY_NAME_HINT = "iPhone, Yubikey, etc.";
 
 export function PasskeysScreen({ navigation }: AppScreenProps<"Passkeys">) {
-    const [passkeys, setPasskeys] = useState<PasskeySummary[]>([]);
+    const [passkeys, setPasskeys] = useState<Passkey[]>([]);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<null | string>(null);
     const [addState, setAddState] = useState<AddState>({
@@ -135,7 +135,7 @@ export function PasskeysScreen({ navigation }: AppScreenProps<"Passkeys">) {
         }
     }
 
-    function handleDelete(passkey: PasskeySummary): void {
+    function handleDelete(passkey: Passkey): void {
         haptic("destructive");
         Alert.alert(
             `Remove "${passkey.name}"?`,
