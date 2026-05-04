@@ -7,6 +7,7 @@ import {
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -18,18 +19,26 @@ import { $signedOutIntent, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
+import { Avatar } from "../components/Avatar";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
 import { getServerOptions } from "../lib/config";
-import { keychainKeyStore, loadCredentials } from "../lib/keychain";
+import { keychainKeyStore, listKnownAccounts } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
 interface PendingApprovalSnapshot {
     pendingRequestID: string;
     pendingSignKey?: string;
+    /**
+     * Existing user's ID when the server told us so. Lets the
+     * "Is this you?" screen fetch their public avatar from the
+     * unauthenticated `/avatar/:userID` endpoint. Optional because
+     * older servers don't include it.
+     */
+    pendingUserID?: string;
     username: string;
 }
 
@@ -159,13 +168,15 @@ export function HangTightScreen({
 
             // After an explicit sign-out we must NOT autoLogin from the
             // kept keychain credentials — that produced an immediate-resign
-            // loop. Bounce to WelcomeBack (or Welcome if no creds) and let
-            // the user choose to continue or switch accounts.
+            // loop. Bounce to the account picker (or Welcome if no saved
+            // accounts at all) and let the user choose where to go.
             if ($signedOutIntent.get()) {
                 try {
-                    const creds = await loadCredentials();
+                    const accounts = await listKnownAccounts();
                     if (cancelled) return;
-                    navigation.replace(creds ? "WelcomeBack" : "Welcome");
+                    navigation.replace(
+                        accounts.length > 0 ? "AccountSelector" : "Welcome",
+                    );
                 } catch {
                     if (!cancelled) {
                         navigation.replace("Welcome");
@@ -185,6 +196,16 @@ export function HangTightScreen({
                 );
                 if (cancelled) return;
                 if (!result.ok && !result.error) {
+                    // No active credentials. If there ARE other saved
+                    // accounts on this device, route to the picker so the
+                    // user can pick one. Otherwise show the new-account
+                    // form so first-runs aren't gated behind an empty list.
+                    const accounts = await listKnownAccounts();
+                    if (cancelled) return;
+                    if (accounts.length > 0) {
+                        navigation.replace("AccountSelector");
+                        return;
+                    }
                     setPhase("form");
                 } else if (!result.ok) {
                     setBootError(
@@ -299,6 +320,9 @@ export function HangTightScreen({
                         ...(result.pendingSignKey !== undefined
                             ? { pendingSignKey: result.pendingSignKey }
                             : {}),
+                        ...(result.pendingUserID !== undefined
+                            ? { pendingUserID: result.pendingUserID }
+                            : {}),
                         username: candidate,
                     });
                     setPhase("confirmExisting");
@@ -407,137 +431,154 @@ export function HangTightScreen({
                     behavior={Platform.OS === "ios" ? "padding" : undefined}
                     style={styles.formWrap}
                 >
-                    <Animated.View
-                        style={[
-                            styles.formContent,
-                            {
-                                opacity: formOpacity,
-                                transform: [
-                                    { translateY: formY },
-                                    { translateX: shakeX },
-                                ],
-                            },
-                        ]}
+                    <ScrollView
+                        bounces={false}
+                        contentContainerStyle={styles.formScrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
                     >
                         <Animated.View
                             style={[
-                                styles.logoBlock,
-                                { transform: [{ scale: pulse }] },
+                                styles.formContent,
+                                {
+                                    opacity: formOpacity,
+                                    transform: [
+                                        { translateY: formY },
+                                        { translateX: shakeX },
+                                    ],
+                                },
                             ]}
                         >
-                            <VexLogo showWordmark size={40} />
-                        </Animated.View>
-
-                        <Text style={styles.eyebrow}>SIGN IN</Text>
-                        <Text style={styles.heading}>Welcome.</Text>
-                        <Text style={styles.subheading}>
-                            Enter your handle to sign in or create an account.
-                        </Text>
-
-                        <View style={styles.inputArea}>
                             <Animated.View
-                                pointerEvents="none"
                                 style={[
-                                    styles.inputGlow,
-                                    {
-                                        opacity: inputGlowOpacity,
-                                        transform: [{ scale: inputGlowScale }],
-                                    },
+                                    styles.logoBlock,
+                                    { transform: [{ scale: pulse }] },
                                 ]}
-                            />
-                            <CornerBracketBox
-                                color={cornerColor}
-                                size={10}
-                                thickness={1.5}
                             >
-                                <View style={styles.inputRow}>
-                                    <Text style={styles.atSign}>@</Text>
-                                    <TextInput
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        editable={!busy}
-                                        maxLength={19}
-                                        onBlur={() => {
-                                            setFocused(false);
-                                        }}
-                                        onChangeText={(text) => {
-                                            // Usernames are case-
-                                            // insensitive at the
-                                            // protocol level; lowercase
-                                            // as the user types so
-                                            // they see exactly what
-                                            // their handle will be
-                                            // (and so the regex below
-                                            // never has to consider
-                                            // uppercase).
-                                            setUsername(
-                                                text
-                                                    .toLowerCase()
-                                                    .replace(/[^a-z0-9_]/g, ""),
-                                            );
-                                            if (bootError) setBootError("");
-                                        }}
-                                        onFocus={() => {
-                                            setFocused(true);
-                                            Vibration.vibrate(8);
-                                        }}
-                                        onSubmitEditing={handleSubmit}
-                                        placeholder="handle"
-                                        placeholderTextColor={colors.mutedDark}
-                                        returnKeyType="go"
-                                        selectionColor={colors.accent}
-                                        style={styles.input}
-                                        value={username}
-                                    />
-                                    {showHint ? (
-                                        <Text
-                                            style={[
-                                                styles.checkMark,
-                                                handleValid
-                                                    ? styles.checkOk
-                                                    : styles.checkPending,
-                                            ]}
-                                        >
-                                            {handleValid ? "✓" : "·"}
-                                        </Text>
-                                    ) : null}
-                                </View>
-                            </CornerBracketBox>
-                        </View>
+                                <VexLogo showWordmark size={40} />
+                            </Animated.View>
 
-                        <Text style={styles.hint}>
-                            3-19 letters, digits, or underscores
-                        </Text>
-
-                        {bootError ? (
-                            <View style={styles.errorBox}>
-                                <Text style={styles.errorText}>
-                                    {bootError}
-                                </Text>
-                            </View>
-                        ) : null}
-
-                        <Animated.View
-                            style={{ transform: [{ scale: buttonScale }] }}
-                        >
-                            <VexButton
-                                disabled={busy || username.trim().length === 0}
-                                glow
-                                loading={busy}
-                                onPress={handleSubmit}
-                                style={styles.signInBtn}
-                                title={busy ? "Signing in..." : "Sign in"}
-                                variant="primary"
-                            />
-                        </Animated.View>
-
-                        {!busy ? (
-                            <Text style={styles.bottomHint}>
-                                We'll create an account if this handle is new,
-                                or sign you in if it's yours.
+                            <Text style={styles.eyebrow}>SIGN IN</Text>
+                            <Text style={styles.heading}>Welcome.</Text>
+                            <Text style={styles.subheading}>
+                                Enter your handle to sign in or create an
+                                account.
                             </Text>
-                        ) : null}
-                    </Animated.View>
+
+                            <View style={styles.inputArea}>
+                                <Animated.View
+                                    pointerEvents="none"
+                                    style={[
+                                        styles.inputGlow,
+                                        {
+                                            opacity: inputGlowOpacity,
+                                            transform: [
+                                                { scale: inputGlowScale },
+                                            ],
+                                        },
+                                    ]}
+                                />
+                                <CornerBracketBox
+                                    color={cornerColor}
+                                    size={10}
+                                    thickness={1.5}
+                                >
+                                    <View style={styles.inputRow}>
+                                        <Text style={styles.atSign}>@</Text>
+                                        <TextInput
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            editable={!busy}
+                                            maxLength={19}
+                                            onBlur={() => {
+                                                setFocused(false);
+                                            }}
+                                            onChangeText={(text) => {
+                                                // Usernames are case-
+                                                // insensitive at the
+                                                // protocol level; lowercase
+                                                // as the user types so
+                                                // they see exactly what
+                                                // their handle will be
+                                                // (and so the regex below
+                                                // never has to consider
+                                                // uppercase).
+                                                setUsername(
+                                                    text
+                                                        .toLowerCase()
+                                                        .replace(
+                                                            /[^a-z0-9_]/g,
+                                                            "",
+                                                        ),
+                                                );
+                                                if (bootError) setBootError("");
+                                            }}
+                                            onFocus={() => {
+                                                setFocused(true);
+                                                Vibration.vibrate(8);
+                                            }}
+                                            onSubmitEditing={handleSubmit}
+                                            placeholder="handle"
+                                            placeholderTextColor={
+                                                colors.mutedDark
+                                            }
+                                            returnKeyType="go"
+                                            selectionColor={colors.accent}
+                                            style={styles.input}
+                                            value={username}
+                                        />
+                                        {showHint ? (
+                                            <Text
+                                                style={[
+                                                    styles.checkMark,
+                                                    handleValid
+                                                        ? styles.checkOk
+                                                        : styles.checkPending,
+                                                ]}
+                                            >
+                                                {handleValid ? "✓" : "·"}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                </CornerBracketBox>
+                            </View>
+
+                            <Text style={styles.hint}>
+                                3-19 letters, digits, or underscores
+                            </Text>
+
+                            {bootError ? (
+                                <View style={styles.errorBox}>
+                                    <Text style={styles.errorText}>
+                                        {bootError}
+                                    </Text>
+                                </View>
+                            ) : null}
+
+                            <Animated.View
+                                style={{ transform: [{ scale: buttonScale }] }}
+                            >
+                                <VexButton
+                                    disabled={
+                                        busy || username.trim().length === 0
+                                    }
+                                    glow
+                                    loading={busy}
+                                    onPress={handleSubmit}
+                                    style={styles.signInBtn}
+                                    title={busy ? "Signing in..." : "Sign in"}
+                                    variant="primary"
+                                />
+                            </Animated.View>
+
+                            {!busy ? (
+                                <Text style={styles.bottomHint}>
+                                    We'll create an account if this handle is
+                                    new, or sign you in if it's yours.
+                                </Text>
+                            ) : null}
+                        </Animated.View>
+                    </ScrollView>
                 </KeyboardAvoidingView>
             </ScreenLayout>
         );
@@ -554,72 +595,98 @@ export function HangTightScreen({
                     behavior={Platform.OS === "ios" ? "padding" : undefined}
                     style={styles.formWrap}
                 >
-                    <Animated.View
-                        style={[
-                            styles.formContent,
-                            {
-                                opacity: formOpacity,
-                                transform: [{ translateY: formY }],
-                            },
-                        ]}
+                    <ScrollView
+                        bounces={false}
+                        contentContainerStyle={styles.formScrollContent}
+                        keyboardShouldPersistTaps="handled"
+                        showsVerticalScrollIndicator={false}
                     >
                         <Animated.View
                             style={[
-                                styles.logoBlock,
-                                { transform: [{ scale: pulse }] },
+                                styles.formContent,
+                                {
+                                    opacity: formOpacity,
+                                    transform: [{ translateY: formY }],
+                                },
                             ]}
                         >
-                            <VexLogo showWordmark size={40} />
-                        </Animated.View>
-
-                        <Text style={styles.eyebrow}>EXISTING ACCOUNT</Text>
-                        <Text style={styles.heading}>Is this you?</Text>
-                        <Text style={styles.subheading}>
-                            That handle is already registered. If it's yours,
-                            we'll ask one of your other signed-in devices to
-                            approve this one.
-                        </Text>
-
-                        <View style={styles.confirmHandleArea}>
-                            <CornerBracketBox
-                                color={colors.accent}
-                                size={10}
-                                thickness={1.5}
+                            <Animated.View
+                                style={[
+                                    styles.logoBlock,
+                                    { transform: [{ scale: pulse }] },
+                                ]}
                             >
-                                <View style={styles.confirmHandleRow}>
-                                    <Text style={styles.atSign}>@</Text>
-                                    <Text
-                                        ellipsizeMode="tail"
-                                        numberOfLines={1}
-                                        style={styles.confirmHandleText}
-                                    >
-                                        {pendingApproval.username}
-                                    </Text>
-                                </View>
-                            </CornerBracketBox>
-                        </View>
+                                <VexLogo showWordmark size={40} />
+                            </Animated.View>
 
-                        <View style={styles.confirmButtonStack}>
-                            <VexButton
-                                glow
-                                onPress={handleConfirmExisting}
-                                style={styles.confirmPrimary}
-                                title="Yes, that's me"
-                                variant="primary"
-                            />
-                            <VexButton
-                                onPress={handleDenyExisting}
-                                style={styles.confirmSecondary}
-                                title="No, use a different handle"
-                                variant="outline"
-                            />
-                        </View>
+                            <Text style={styles.eyebrow}>EXISTING ACCOUNT</Text>
+                            <Text style={styles.heading}>Is this you?</Text>
+                            <Text style={styles.subheading}>
+                                That handle is already registered. If it's
+                                yours, we'll ask one of your other signed-in
+                                devices to approve this one.
+                            </Text>
 
-                        <Text style={styles.bottomHint}>
-                            If this isn't you, the request will quietly expire
-                            on the existing device.
-                        </Text>
-                    </Animated.View>
+                            <View style={styles.confirmAvatarWrap}>
+                                <Avatar
+                                    displayName={pendingApproval.username}
+                                    // Older servers don't return the
+                                    // existing user's ID with the
+                                    // pending response — in that case
+                                    // we fall through to the
+                                    // initial/hue tile derived from the
+                                    // username they just typed.
+                                    fallbackOnly={
+                                        pendingApproval.pendingUserID ===
+                                        undefined
+                                    }
+                                    ring={{ color: colors.accent, width: 2 }}
+                                    size={96}
+                                    userID={pendingApproval.pendingUserID ?? ""}
+                                />
+                            </View>
+
+                            <View style={styles.confirmHandleArea}>
+                                <CornerBracketBox
+                                    color={colors.accent}
+                                    size={10}
+                                    thickness={1.5}
+                                >
+                                    <View style={styles.confirmHandleRow}>
+                                        <Text style={styles.atSign}>@</Text>
+                                        <Text
+                                            ellipsizeMode="tail"
+                                            numberOfLines={1}
+                                            style={styles.confirmHandleText}
+                                        >
+                                            {pendingApproval.username}
+                                        </Text>
+                                    </View>
+                                </CornerBracketBox>
+                            </View>
+
+                            <View style={styles.confirmButtonStack}>
+                                <VexButton
+                                    glow
+                                    onPress={handleConfirmExisting}
+                                    style={styles.confirmPrimary}
+                                    title="Yes, that's me"
+                                    variant="primary"
+                                />
+                                <VexButton
+                                    onPress={handleDenyExisting}
+                                    style={styles.confirmSecondary}
+                                    title="No, use a different handle"
+                                    variant="outline"
+                                />
+                            </View>
+
+                            <Text style={styles.bottomHint}>
+                                If this isn't you, the request will quietly
+                                expire on the existing device.
+                            </Text>
+                        </Animated.View>
+                    </ScrollView>
                 </KeyboardAvoidingView>
             </ScreenLayout>
         );
@@ -702,12 +769,16 @@ const styles = StyleSheet.create({
     checkPending: {
         color: colors.mutedDark,
     },
+    confirmAvatarWrap: {
+        alignItems: "center",
+        marginTop: 22,
+    },
     confirmButtonStack: {
         gap: 12,
         marginTop: 24,
     },
     confirmHandleArea: {
-        marginTop: 22,
+        marginTop: 16,
     },
     confirmHandleRow: {
         alignItems: "center",
@@ -762,9 +833,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         width: "100%",
     },
+    // ScrollView contentContainer that hosts the form. flexGrow:1 +
+    // justifyContent:"center" preserves the "centered floating card"
+    // feel on tall screens, while still letting the form scroll into
+    // view when the keyboard or a small device shrinks the viewport
+    // below the form's intrinsic height.
+    formScrollContent: {
+        flexGrow: 1,
+        justifyContent: "center",
+        paddingVertical: 24,
+    },
     formWrap: {
         flex: 1,
-        justifyContent: "center",
         zIndex: 1,
     },
     glowBottom: {

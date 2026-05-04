@@ -37,12 +37,12 @@ export type AuthScreenProps<T extends keyof AuthStackParamList> =
 
 // ── Auth stack ──────────────────────────────────────────────────────────────
 export type AuthStackParamList = {
+    AccountSelector: undefined;
     Authenticate:
         | undefined
         | { requestID?: string; signKey?: string; username?: string };
     HangTight: undefined | { force?: boolean };
     Welcome: undefined;
-    WelcomeBack: undefined;
 };
 
 // ── DMsStack (legacy, used in DMsStack.tsx) ─────────────────────────────────

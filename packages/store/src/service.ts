@@ -65,6 +65,14 @@ export interface AuthResult {
      * the request payload's `signKey`).
      */
     pendingSignKey?: string;
+    /**
+     * Existing user's ID when registration hit a "username already
+     * taken" branch. Lets the UI fetch the public avatar from the
+     * unauthenticated `/avatar/:userID` endpoint to power an
+     * "is this you?" confirmation. Optional because older servers
+     * don't include it in the pending response.
+     */
+    pendingUserID?: string;
 }
 
 export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
@@ -1110,6 +1118,9 @@ class VexService {
                         ...(pendingSignKey !== undefined
                             ? { pendingSignKey }
                             : {}),
+                        ...(pending.userID !== null
+                            ? { pendingUserID: pending.userID }
+                            : {}),
                     };
                 }
                 return {
@@ -1571,8 +1582,12 @@ class VexService {
     private extractPendingApprovalDetails(err: unknown): null | {
         challenge: null | string;
         requestID: string;
+        userID: null | string;
     } {
-        // libvex >=6.1.4 throws a typed error carrying both fields.
+        // libvex >=6.1.4 throws a typed error carrying both fields;
+        // newer libvex/server pairings additionally carry the existing
+        // user's ID so we can show their avatar in the "is this you?"
+        // confirmation.
         if (
             err !== null &&
             typeof err === "object" &&
@@ -1581,10 +1596,15 @@ class VexService {
         ) {
             const requestID = (err as { requestID: string }).requestID;
             const maybeChallenge = (err as { challenge?: unknown }).challenge;
+            const maybeUserID = (err as { userID?: unknown }).userID;
             return {
                 challenge:
                     typeof maybeChallenge === "string" ? maybeChallenge : null,
                 requestID,
+                userID:
+                    typeof maybeUserID === "string" && maybeUserID.length > 0
+                        ? maybeUserID
+                        : null,
             };
         }
         const message =
@@ -1596,7 +1616,7 @@ class VexService {
                 : "";
         const match = /requestID=([0-9a-fA-F-]+)/.exec(message);
         if (match?.[1]) {
-            return { challenge: null, requestID: match[1] };
+            return { challenge: null, requestID: match[1], userID: null };
         }
         return null;
     }
