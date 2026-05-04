@@ -21,6 +21,8 @@ import type {
 
 import { Client } from "@vex-chat/libvex";
 
+import { validate as uuidValidate } from "uuid";
+
 import {
     $authStatusWritable,
     $avatarHashWritable,
@@ -830,7 +832,16 @@ class VexService {
     async lookupUser(query: string): Promise<null | User> {
         try {
             const client = this.requireClient();
-            const [user] = await client.users.retrieve(query);
+            // Lowercase non-UUID lookups so cache keys / negative-
+            // cache hits inside libvex are consistent regardless of
+            // how the caller typed the handle. UUID identifiers are
+            // pass-through; libvex's `fetchUser` makes the same
+            // distinction internally.
+            const trimmed = query.trim();
+            const normalizedQuery = uuidValidate(trimmed)
+                ? trimmed
+                : trimmed.toLowerCase();
+            const [user] = await client.users.retrieve(normalizedQuery);
             return user;
         } catch {
             return null;
@@ -1023,9 +1034,14 @@ class VexService {
             debugAuth("register:http:begin", {
                 endpoint: `${options.host}/register`,
             });
+            // Usernames are case-insensitive at the protocol level —
+            // the server canonicalizes to lowercase at registration.
+            // Pre-normalizing here keeps the local view (UI state,
+            // logging, error messages) consistent with what will
+            // eventually round-trip back as `me.user().username`.
             const registrationUsername =
                 username.trim().length > 0
-                    ? username.trim()
+                    ? username.trim().toLowerCase()
                     : generateAutoProvisionUsername();
             const [user, regErr] = await withTimeout(
                 client.register(registrationUsername),

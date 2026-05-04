@@ -29,7 +29,12 @@
         e.preventDefault();
         errors = {};
 
-        const usernameError = validateUsername(username);
+        // Usernames are case-insensitive at the protocol level —
+        // the server canonicalizes to lowercase, so do the same here
+        // before validation and before sending so what the user sees
+        // in errors / future logins matches what's persisted.
+        const normalizedUsername = username.trim().toLowerCase();
+        const usernameError = validateUsername(normalizedUsername);
         if (usernameError) {
             errors = { username: usernameError };
             return;
@@ -46,7 +51,7 @@
         loading = true;
 
         const result = await vexService.register(
-            username,
+            normalizedUsername,
             password,
             desktopConfig(),
             getServerOptions(),

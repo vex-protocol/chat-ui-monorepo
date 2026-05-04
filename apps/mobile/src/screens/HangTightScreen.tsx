@@ -415,11 +415,19 @@ export function HangTightScreen({
                                             setFocused(false);
                                         }}
                                         onChangeText={(text) => {
+                                            // Usernames are case-
+                                            // insensitive at the
+                                            // protocol level; lowercase
+                                            // as the user types so
+                                            // they see exactly what
+                                            // their handle will be
+                                            // (and so the regex below
+                                            // never has to consider
+                                            // uppercase).
                                             setUsername(
-                                                text.replace(
-                                                    /[^A-Za-z0-9_]/g,
-                                                    "",
-                                                ),
+                                                text
+                                                    .toLowerCase()
+                                                    .replace(/[^a-z0-9_]/g, ""),
                                             );
                                             if (bootError) setBootError("");
                                         }}
