@@ -1,5 +1,7 @@
 import type { ServerOptions } from "@vex-chat/store";
 
+import { $localMessageRetentionDays } from "@vex-chat/store";
+
 // Production server URL lives in code as a typed constant — never read from
 // .env. A missing or empty override can only resolve to prod, making it
 // impossible to ship a dev URL by forgetting to set something.
@@ -16,6 +18,7 @@ export function getServerOptions(): ServerOptions {
     const unsafeByScheme = override?.trim().startsWith("http://") ?? false;
     return {
         host,
+        localMessageRetentionDays: $localMessageRetentionDays.get(),
         unsafeHttp: unsafeByScheme || DEV_HOST_RE.test(host),
     };
 }

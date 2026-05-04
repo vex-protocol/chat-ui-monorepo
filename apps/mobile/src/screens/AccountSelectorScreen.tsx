@@ -34,6 +34,7 @@ import {
     setUserIDForUsername,
 } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
+import { hydrateLocalMessageRetention } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
 
 interface AccountRowProps {
@@ -104,6 +105,7 @@ export function AccountSelectorScreen({ navigation }: Props) {
                 // and, on success, flips `$user` non-null which causes the
                 // RootNavigator to swap from AuthStack to the App stack
                 // automatically — no navigation required.
+                await hydrateLocalMessageRetention();
                 const result = await vexService.autoLogin(
                     keychainKeyStore,
                     mobileConfig(),
@@ -537,6 +539,7 @@ async function restoreFromBackup(
         },
     };
 
+    await hydrateLocalMessageRetention();
     const result = await vexService.autoLogin(
         transientStore,
         mobileConfig(),
