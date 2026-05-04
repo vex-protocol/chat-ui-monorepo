@@ -8,40 +8,51 @@ to make the ceremony actually succeed on iOS and Android.
 The library that drives the platform ceremony is
 [`react-native-passkey`](https://www.npmjs.com/package/react-native-passkey).
 
+## Choosing the relying-party host
+
+Apple and Google fetch the well-known association files from the
+**RP host** — the value you put in `SPIRE_PASSKEY_RP_ID` and in the
+`webcredentials:` entry in `app.json`. **It must be a host that
+serves traffic.** You have three reasonable choices:
+
+| RP host                             | Where the well-known files live                 | Future browser client at `app.<root>`?  |
+| ----------------------------------- | ----------------------------------------------- | --------------------------------------- |
+| **API host** (e.g. `api.vex.wtf`)   | Spire serves them directly (see below)          | ❌ wrong subdomain — would need RP swap |
+| **Apex** (e.g. `vex.wtf`)           | Whatever serves the apex (static site, Workers) | ✅ apex covers `app.<root>`             |
+| **Apex via proxy** (e.g. `vex.wtf`) | Apex CDN proxies `/.well-known/*` to spire      | ✅ apex covers `app.<root>`             |
+
+For a **mobile-only** deployment the API-host route is simplest:
+spire owns both the WebAuthn ceremony and the well-known files, and
+there is nothing to deploy on the apex. The trade-off is that
+re-rooting later (to add a browser client at `app.<root>`)
+invalidates any passkeys enrolled at the API host, so plan ahead.
+
+The rest of this doc uses `api.vex.wtf` as the RP host (the
+production setup). Substitute your own host wherever you see it.
+
 ## TL;DR
 
-1. iOS — `app.json` already declares
-   `"associatedDomains": ["webcredentials:vex.wtf"]`. After changing
-   the relying-party host, update both that entry _and_ your
-   server's `apple-app-site-association`.
-2. Android — host `assetlinks.json` on the same host and set
-   `compileSdkVersion ≥ 34`. Expo's prebuild does the latter when
-   `targetSdkVersion` is current; the JSON file is on you.
-3. spire — the server must be configured with `SPIRE_PASSKEY_RP_ID`
-   (the eTLD+1 of the host the user agent sees) and
-   `SPIRE_PASSKEY_ORIGINS` (a comma-separated list of accepted
+1. iOS — `app.json` declares
+   `"associatedDomains": ["webcredentials:api.vex.wtf"]`. Whenever
+   you change the RP host, update both that entry _and_ the
+   `apple-app-site-association` Apple is fetching from it.
+2. Android — host `assetlinks.json` on the same host (or have spire
+   serve it) and let Expo's prebuild keep `compileSdkVersion`
+   current.
+3. spire — set `SPIRE_PASSKEY_RP_ID=api.vex.wtf` and
+   `SPIRE_PASSKEY_ORIGINS` to the comma-separated list of expected
    origins, including the `android:apk-key-hash:…` and
-   `ios:bundle-id:…` flavors emitted by mobile platforms).
+   `ios:bundle-id:…` flavors emitted by mobile platforms.
 
 If any one of those three legs is missing, the system credential
 manager will fail the ceremony with a "Domain mismatch" error well
 before our app code runs. The wrapper in `src/lib/passkey.ts`
 normalizes that to a `PasskeyError` with the platform's message.
 
-> If your spire deployment serves traffic for the RP host directly
-> (i.e. `https://<RP_ID>/` is the same nginx in front of spire),
-> spire 1.3.8+ can serve both well-known files for you out of the
-> box — see ["Serving the well-known files from spire"](#serving-the-well-known-files-from-spire) below.
-
 ## iOS — Apple App Site Association
 
-You need to host
-
-```
-https://vex.wtf/.well-known/apple-app-site-association
-```
-
-containing your team and bundle id with a `webcredentials` entry:
+Apple fetches `https://api.vex.wtf/.well-known/apple-app-site-association`
+and verifies the bundle id is listed under `webcredentials.apps`:
 
 ```json
 {
@@ -65,12 +76,7 @@ syncs the `associatedDomains` entry into the generated
 
 ## Android — Digital Asset Links
 
-You need to host
-
-```
-https://vex.wtf/.well-known/assetlinks.json
-```
-
+Google fetches `https://api.vex.wtf/.well-known/assetlinks.json`
 with the package name and SHA-256 signing-cert fingerprint(s):
 
 ```json
@@ -104,18 +110,20 @@ add an entry for each — the same JSON file can carry both.
 Set these env vars on the server before starting it:
 
 ```
-SPIRE_PASSKEY_RP_ID=vex.wtf
+SPIRE_PASSKEY_RP_ID=api.vex.wtf
 SPIRE_PASSKEY_RP_NAME=Vex
-SPIRE_PASSKEY_ORIGINS=https://vex.wtf,android:apk-key-hash:<base64url-of-sha256>,ios:bundle-id:chat.vex.mobile
+SPIRE_PASSKEY_ORIGINS=android:apk-key-hash:<base64url-of-sha256>,ios:bundle-id:chat.vex.mobile
 ```
 
 The `ORIGINS` list is what `simplewebauthn` uses to validate the
 `origin` field inside the assertion's `clientDataJSON`. Different
 mobile platforms sign different "origin" strings:
 
-- iOS and macOS Safari: the actual website origin (`https://vex.wtf`).
 - iOS native (the path our wrapper takes): `ios:bundle-id:chat.vex.mobile`.
 - Android Credential Manager: `android:apk-key-hash:<base64url(SHA-256(cert))>`.
+- Web (only relevant if you ship a browser client): the actual
+  origin, e.g. `https://api.vex.wtf` or wherever the page loads
+  from.
 
 Compute the Android base64url hash with
 
@@ -126,12 +134,9 @@ keytool -list -v -alias <alias> -keystore <keystore.jks> | \
 
 ## Serving the well-known files from spire
 
-If your public hostname (the value you set as `SPIRE_PASSKEY_RP_ID`)
-already routes to the spire container — i.e. there is no separate
-static site occupying `https://<RP_ID>/` — you can skip hosting the
-two JSON files yourself. Setting these three env vars makes spire
-serve both files at their canonical paths over the existing nginx
-in front of it:
+If `SPIRE_PASSKEY_RP_ID` is the same host that fronts spire — e.g.
+`api.vex.wtf` — set these three env vars and spire serves both
+files itself; no separate static site needed:
 
 ```
 SPIRE_PASSKEY_IOS_APP_IDS=ABCDE12345.chat.vex.mobile
@@ -147,22 +152,27 @@ fetches by Apple / Google CDNs are never 429'd.
 After setting them and restarting spire:
 
 ```sh
-curl -i https://<RP_ID>/.well-known/apple-app-site-association
-curl -i https://<RP_ID>/.well-known/assetlinks.json
+curl -i https://api.vex.wtf/.well-known/apple-app-site-association
+curl -i https://api.vex.wtf/.well-known/assetlinks.json
 ```
 
 Both must return `200` with `Content-Type: application/json`. If
-either returns `404`, the corresponding env var is missing or the
-public proxy isn't routing `/.well-known/*` to spire.
+either returns `404`, the corresponding env var is missing or
+nginx isn't routing `/.well-known/*` to spire.
 
-If your RP host is a separate static site (e.g. a marketing page
-on Cloudflare Pages and an `api.<rp>` host for spire), you still
-need to host the files on the static site — Apple and Google
-fetch them from the RP host, not from any subdomain.
+If you instead picked an apex RP (e.g. `vex.wtf`) and the apex is
+a different deployment from spire, you have two options:
+
+1. **Proxy at the CDN** — point `vex.wtf/.well-known/*` at
+   `api.vex.wtf/.well-known/*` (Cloudflare Page Rule, Worker,
+   nginx `proxy_pass`, etc.). Spire keeps generating the JSON.
+2. **Self-host on the apex** — commit the two JSON files into
+   whatever serves the apex and don't set the spire env vars at
+   all.
 
 ## Local development
 
-For testing without owning `vex.wtf` you can:
+For testing without owning the RP host you can:
 
 - Run spire with `SPIRE_PASSKEY_RP_ID=localhost` and
   `SPIRE_PASSKEY_ORIGINS=http://localhost:5173` (browser dev only).
