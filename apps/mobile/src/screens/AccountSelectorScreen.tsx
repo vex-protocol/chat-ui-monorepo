@@ -1,4 +1,6 @@
+import type { IdentityBackup } from "../lib/identityBackup";
 import type { AuthScreenProps } from "../navigation/types";
+import type { KeyStore, StoredCredentials } from "@vex-chat/libvex";
 
 import React, { useCallback, useState } from "react";
 import {
@@ -19,14 +21,16 @@ import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
-import { getServerOptions } from "../lib/config";
+import { getServerOptions, getServerUrl } from "../lib/config";
 import { haptic } from "../lib/haptics";
+import { pickIdentityBackup } from "../lib/identityBackup";
 import {
     clearCredentials,
     keychainKeyStore,
     type KnownAccount,
     listKnownAccounts,
     setActiveUsername,
+    setUserIDForUsername,
 } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
@@ -40,6 +44,10 @@ interface AccountRowProps {
 }
 
 type Props = AuthScreenProps<"AccountSelector">;
+
+interface TransientSlot {
+    creds: null | StoredCredentials;
+}
 
 /**
  * OS-style account picker. Lists every account whose credentials are still
@@ -154,6 +162,95 @@ export function AccountSelectorScreen({ navigation }: Props) {
         navigation.navigate("HangTight", { force: true });
     }, [navigation]);
 
+    const handleRestore = useCallback(async () => {
+        if (signingInUsername !== null) {
+            return;
+        }
+        haptic("tap");
+        setErrorText(null);
+        const parsed = await pickIdentityBackup();
+        if (!parsed.ok) {
+            if ("canceled" in parsed && parsed.canceled) {
+                return;
+            }
+            if ("error" in parsed) {
+                setErrorText(parsed.error);
+            }
+            return;
+        }
+        const backup = parsed.backup;
+
+        // Server-host gate: the deviceKey only authenticates against the
+        // cluster that minted it. If the user's currently configured server
+        // doesn't match the backup, refuse rather than misleading them with
+        // a "device revoked" error.
+        const currentHost = sanitizeHost(getServerUrl());
+        const backupHost = sanitizeHost(backup.server);
+        if (currentHost !== backupHost) {
+            setErrorText(
+                `This backup is for ${backup.server}, but you are connected to ${getServerUrl()}. Switch servers and try again.`,
+            );
+            return;
+        }
+
+        // If a slot already exists for this username on this device, ask
+        // before clobbering it. Without this prompt, a stale backup could
+        // silently destroy the user's working keys.
+        const overwriting = accounts.some(
+            (a) => a.username === backup.username,
+        );
+        if (overwriting) {
+            const confirmed = await new Promise<boolean>((resolve) => {
+                Alert.alert(
+                    `Replace @${backup.username}?`,
+                    "An account with this username is already on this device. Restoring will replace its device key with the one from the backup file.",
+                    [
+                        {
+                            onPress: () => {
+                                resolve(false);
+                            },
+                            style: "cancel",
+                            text: "Cancel",
+                        },
+                        {
+                            onPress: () => {
+                                resolve(true);
+                            },
+                            style: "destructive",
+                            text: "Replace",
+                        },
+                    ],
+                );
+            });
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        setSigningInUsername(backup.username);
+        try {
+            const result = await restoreFromBackup(backup);
+            if (!result.ok) {
+                setErrorText(result.error);
+                await refresh();
+                return;
+            }
+            // Success — vexService.login set $user, RootNavigator will swap
+            // to the App stack on its next render. Persist the userID for
+            // the picker the next time the user signs out.
+            await setUserIDForUsername(backup.username, backup.userID);
+        } catch (err: unknown) {
+            setErrorText(
+                err instanceof Error
+                    ? err.message
+                    : "Restore failed unexpectedly.",
+            );
+            await refresh();
+        } finally {
+            setSigningInUsername(null);
+        }
+    }, [accounts, refresh, signingInUsername]);
+
     if (!hydrated) {
         return (
             <ScreenLayout>
@@ -163,8 +260,10 @@ export function AccountSelectorScreen({ navigation }: Props) {
     }
 
     if (accounts.length === 0) {
-        // No saved accounts — bounce to the welcome flow. This handles the
-        // first-run case as well as a user who removed every account.
+        // No saved accounts — first-run, or user removed every account.
+        // Offer both the new-account path AND restore-from-backup so users
+        // who lost their device can get back in without going through a
+        // device-approval cycle.
         return (
             <ScreenLayout style={styles.layout}>
                 <View style={styles.container}>
@@ -175,12 +274,27 @@ export function AccountSelectorScreen({ navigation }: Props) {
                             No accounts on this device yet.
                         </Text>
                     </View>
+                    {errorText ? (
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorText}>{errorText}</Text>
+                        </View>
+                    ) : null}
                     <VexButton
+                        disabled={signingInUsername !== null}
                         glow
                         onPress={handleAddAccount}
                         style={styles.addButton}
                         title="Get started"
                         variant="primary"
+                    />
+                    <VexButton
+                        disabled={signingInUsername !== null}
+                        onPress={() => {
+                            void handleRestore();
+                        }}
+                        style={styles.addButton}
+                        title="Restore from backup"
+                        variant="outline"
                     />
                 </View>
             </ScreenLayout>
@@ -233,6 +347,15 @@ export function AccountSelectorScreen({ navigation }: Props) {
                     onPress={handleAddAccount}
                     style={styles.addButton}
                     title="Add another account"
+                    variant="outline"
+                />
+                <VexButton
+                    disabled={signingInUsername !== null}
+                    onPress={() => {
+                        void handleRestore();
+                    }}
+                    style={styles.addButton}
+                    title="Restore from backup"
                     variant="outline"
                 />
             </View>
@@ -297,6 +420,101 @@ function AccountRow({
             </CornerBracketBox>
         </Pressable>
     );
+}
+
+/**
+ * Drive a libvex login attempt against the cluster using credentials parsed
+ * from a backup file, *without* writing the backup creds to the real
+ * keychain until the cluster confirms they're still valid.
+ *
+ * Why a transient KeyStore? `vexService.autoLogin()` reads creds from
+ * whatever KeyStore it's handed and persists tokens back to it on success.
+ * Using a one-shot in-memory store lets us validate against the server and
+ * only commit to the real `keychainKeyStore` after the server has accepted
+ * the device. If validation fails — most importantly when the user has
+ * removed this device from their account on a different phone (server
+ * returns 401) — the real keychain stays untouched: we leave no trace of
+ * the failed restore.
+ *
+ * Why `autoLogin` and not `login`? `autoLogin` has an at-rest decrypt-
+ * mismatch recovery path that purges stale key material when the backup's
+ * deviceKey doesn't match what was previously used to encrypt the SQLite
+ * DB for this username on this device. `login` does not, and would throw
+ * mid-validation in the "restoring on top of an existing slot with a
+ * different deviceKey" scenario.
+ */
+async function restoreFromBackup(
+    backup: IdentityBackup,
+): Promise<{ error: string; ok: false } | { ok: true }> {
+    const transient: TransientSlot = {
+        creds: {
+            deviceID: backup.deviceID,
+            deviceKey: backup.deviceKey,
+            token: "",
+            username: backup.username,
+        },
+    };
+    const transientStore: KeyStore = {
+        async clear(_username: string): Promise<void> {
+            transient.creds = null;
+        },
+        async load(username?: string): Promise<null | StoredCredentials> {
+            if (transient.creds === null) return null;
+            if (username && username !== transient.creds.username) return null;
+            return transient.creds;
+        },
+        async save(c: StoredCredentials): Promise<void> {
+            transient.creds = c;
+        },
+    };
+
+    const result = await vexService.autoLogin(
+        transientStore,
+        mobileConfig(),
+        getServerOptions(),
+    );
+    if (!result.ok) {
+        const reason = result.error ?? "Could not verify the backup.";
+        // Heuristic for the "the cluster has revoked this device" case —
+        // surface it verbatim plus an explainer, since the most common
+        // cause is "I removed this device from my account from another
+        // phone, then tried to restore." A revoked device cannot be
+        // recovered just by importing the backup; the user has to enroll
+        // fresh through device approval.
+        const looksRevoked = /unauthor|revok|expired|not found|invalid/i.test(
+            reason,
+        );
+        return {
+            error: looksRevoked
+                ? `${reason} The device may have been removed from this account from another device — restore is not possible until you re-enroll through device approval.`
+                : reason,
+            ok: false,
+        };
+    }
+
+    // Validation passed — persist to the real keychain. This sets the slot
+    // and updates the active-user pointer so the next launch auto-logs in
+    // as this account.
+    await keychainKeyStore.save({
+        deviceID: backup.deviceID,
+        deviceKey: backup.deviceKey,
+        token: "",
+        username: backup.username,
+    });
+    return { ok: true };
+}
+
+/**
+ * Normalize a server URL/host pair so we can compare a backup's recorded
+ * server against the currently configured one without protocol or trailing-
+ * slash skew. Mirrors the sanitize logic in `keychain.ts` so both halves of
+ * the system agree on what counts as "the same cluster".
+ */
+function sanitizeHost(host: string): string {
+    return host
+        .replace(/^https?:\/\//, "")
+        .replace(/\/+$/, "")
+        .toLowerCase();
 }
 
 function shortDeviceID(deviceID: string): string {

@@ -1,7 +1,7 @@
 import type { AppScreenProps } from "../navigation/types";
 
 import React, { useState } from "react";
-import { Alert, ScrollView, Share, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 
 import { $user } from "@vex-chat/store";
 
@@ -10,6 +10,7 @@ import { useStore } from "@nanostores/react";
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
 import { getServerUrl } from "../lib/config";
+import { exportIdentityBackupFile } from "../lib/identityBackup";
 import { loadCredentials } from "../lib/keychain";
 import { colors } from "../theme";
 
@@ -21,15 +22,15 @@ export function PendingApprovalsScreen({
 
     function handleExportIdentityKey(): void {
         Alert.alert(
-            "Export identity key?",
-            "Store this securely. Anyone with this key can access your account on this server.",
+            "Save identity backup?",
+            "A JSON file will be saved to a location you choose. Anyone with this file can sign in as you on this server until you remove the device. Treat it like a password.",
             [
                 { style: "cancel", text: "Cancel" },
                 {
                     onPress: () => {
                         void exportIdentityKey();
                     },
-                    text: "Export",
+                    text: "Continue",
                 },
             ],
         );
@@ -37,7 +38,8 @@ export function PendingApprovalsScreen({
 
     async function exportIdentityKey(): Promise<void> {
         const username = user?.username;
-        if (!username) {
+        const userID = user?.userID;
+        if (!username || !userID) {
             Alert.alert("Export failed", "No active account found.");
             return;
         }
@@ -51,18 +53,16 @@ export function PendingApprovalsScreen({
                 );
                 return;
             }
-            const exportText = [
-                "# Vex identity key backup",
-                `server: ${getServerUrl()}`,
-                `username: ${creds.username}`,
-                `deviceID: ${creds.deviceID}`,
-                `identityKey: ${creds.deviceKey}`,
-            ].join("\n");
-
-            await Share.share({
-                message: exportText,
-                title: "Vex identity key backup",
+            const result = await exportIdentityBackupFile({
+                deviceID: creds.deviceID,
+                deviceKey: creds.deviceKey,
+                server: getServerUrl(),
+                userID,
+                username: creds.username,
             });
+            if (!result.ok && result.error) {
+                Alert.alert("Export failed", result.error);
+            }
         } catch (err: unknown) {
             Alert.alert(
                 "Export failed",
@@ -103,13 +103,13 @@ export function PendingApprovalsScreen({
 
                 <MenuSection title="Security">
                     <MenuRow
-                        description="Export identity key for recovery"
+                        description="Save a backup file for restoring on another device"
                         disabled={exportingIdentity}
                         icon="key-outline"
                         label={
                             exportingIdentity
-                                ? "Exporting..."
-                                : "Identity key backup"
+                                ? "Preparing backup…"
+                                : "Save identity backup"
                         }
                         onPress={handleExportIdentityKey}
                     />
