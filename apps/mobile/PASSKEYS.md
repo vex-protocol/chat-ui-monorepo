@@ -28,6 +28,11 @@ manager will fail the ceremony with a "Domain mismatch" error well
 before our app code runs. The wrapper in `src/lib/passkey.ts`
 normalizes that to a `PasskeyError` with the platform's message.
 
+> If your spire deployment serves traffic for the RP host directly
+> (i.e. `https://<RP_ID>/` is the same nginx in front of spire),
+> spire 1.3.8+ can serve both well-known files for you out of the
+> box — see ["Serving the well-known files from spire"](#serving-the-well-known-files-from-spire) below.
+
 ## iOS — Apple App Site Association
 
 You need to host
@@ -118,6 +123,42 @@ Compute the Android base64url hash with
 keytool -list -v -alias <alias> -keystore <keystore.jks> | \
     awk '/SHA256:/ {print $2}' | tr -d : | xxd -r -p | base64 | tr '+/' '-_' | tr -d '='
 ```
+
+## Serving the well-known files from spire
+
+If your public hostname (the value you set as `SPIRE_PASSKEY_RP_ID`)
+already routes to the spire container — i.e. there is no separate
+static site occupying `https://<RP_ID>/` — you can skip hosting the
+two JSON files yourself. Setting these three env vars makes spire
+serve both files at their canonical paths over the existing nginx
+in front of it:
+
+```
+SPIRE_PASSKEY_IOS_APP_IDS=ABCDE12345.chat.vex.mobile
+SPIRE_PASSKEY_ANDROID_PACKAGE=chat.vex.mobile
+SPIRE_PASSKEY_ANDROID_FINGERPRINTS=AA:BB:...:CC,DD:EE:...:FF
+```
+
+`IOS_APP_IDS` and `ANDROID_*` 404 independently when unset, so you
+can configure one platform now and the other later. The routes are
+mounted ahead of spire's per-IP rate limiter so periodic platform
+fetches by Apple / Google CDNs are never 429'd.
+
+After setting them and restarting spire:
+
+```sh
+curl -i https://<RP_ID>/.well-known/apple-app-site-association
+curl -i https://<RP_ID>/.well-known/assetlinks.json
+```
+
+Both must return `200` with `Content-Type: application/json`. If
+either returns `404`, the corresponding env var is missing or the
+public proxy isn't routing `/.well-known/*` to spire.
+
+If your RP host is a separate static site (e.g. a marketing page
+on Cloudflare Pages and an `api.<rp>` host for spire), you still
+need to host the files on the static site — Apple and Google
+fetch them from the RP host, not from any subdomain.
 
 ## Local development
 
