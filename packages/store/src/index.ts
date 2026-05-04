@@ -59,6 +59,7 @@ export type {
     CreateServerResult,
     DeviceApprovalRequest,
     OperationResult,
+    PasskeySignInBegin,
     ResumeNetworkStatus,
     ServerOptions,
     SessionInfo,

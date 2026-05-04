@@ -38,6 +38,15 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
                 navigation.navigate("Devices");
             },
         },
+        {
+            description:
+                "Recover and manage your account if you lose every device",
+            icon: "key-outline",
+            label: "Passkeys",
+            onPress: () => {
+                navigation.navigate("Passkeys");
+            },
+        },
     ];
 
     const systemRows: ReadonlyArray<SettingsRow> = [

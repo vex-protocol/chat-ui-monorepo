@@ -13,11 +13,16 @@ import type {
     Invite,
     KeyStore,
     Message,
+    Passkey,
     Permission,
     Server,
     Storage,
     User,
 } from "@vex-chat/libvex";
+import type {
+    PublicKeyCredentialCreationOptionsJSON,
+    PublicKeyCredentialRequestOptionsJSON,
+} from "@vex-chat/types";
 
 import { Client } from "@vex-chat/libvex";
 
@@ -115,6 +120,19 @@ export interface OperationResult {
     ok: boolean;
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Result of {@link VexService.beginPasskeySignIn}. Hands back the
+ * options the host needs to drive the platform WebAuthn ceremony,
+ * plus the `requestID` that ties the assertion in
+ * {@link VexService.finishPasskeySignIn} back to the same begin call.
+ */
+export interface PasskeySignInBegin {
+    options: PublicKeyCredentialRequestOptionsJSON;
+    requestID: string;
+}
+
 export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 
 /** Server connection options — identical across all auth flows. */
@@ -131,8 +149,6 @@ export interface ServerOptions {
         | "warn";
     unsafeHttp?: boolean;
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
 
 export interface SessionInfo {
     authStatus:
@@ -488,6 +504,59 @@ class VexService {
     }
 
     /**
+     * Begin a passkey-registration ceremony for the currently
+     * signed-in user. Returns the WebAuthn options the host should
+     * pass to the platform ceremony. Pair with
+     * {@link finishPasskeyRegistration} once the user has approved
+     * on their authenticator.
+     */
+    async beginPasskeyRegistration(name: string): Promise<{
+        options: PublicKeyCredentialCreationOptionsJSON;
+        requestID: string;
+    }> {
+        const client = this.requireClient();
+        const begin = await client.passkeys.beginRegistration(name);
+        return {
+            options: begin.options as PublicKeyCredentialCreationOptionsJSON,
+            requestID: begin.requestID,
+        };
+    }
+
+    /**
+     * Begin a passkey authentication ceremony. Stage one of the
+     * recovery flow: the host drives the platform WebAuthn ceremony
+     * with the returned options, then hands the assertion back via
+     * {@link finishPasskeySignIn}.
+     *
+     * Boots a fresh, unauthenticated client against the supplied
+     * server (no device login, no storage). The username doesn't
+     * have to match anything on this device — the user is asserting
+     * "I'm @username, here's a passkey that proves it".
+     */
+    async beginPasskeySignIn(
+        username: string,
+        config: BootstrapConfig,
+        options: ServerOptions,
+    ): Promise<PasskeySignInBegin> {
+        const trimmed = username.trim();
+        if (trimmed.length === 0) {
+            throw new Error("Enter the username for your account.");
+        }
+        // Fresh client with a throwaway key — we never call
+        // loginWithDeviceKey on it. The HTTP transport is what we
+        // need; the device key just gives the constructor something
+        // to seal storage with.
+        const privateKey = Client.generateSecretKey();
+        await this.initClient(privateKey, trimmed, config, options, true);
+        const client = this.requireClient();
+        const begin = await client.passkeys.beginAuthentication(trimmed);
+        return {
+            options: begin.options as PublicKeyCredentialRequestOptionsJSON,
+            requestID: begin.requestID,
+        };
+    }
+
+    /**
      * Zero-input bootstrap flow used on app startup:
      * 1) attempt device-key auto-login from local credentials
      * 2) if no credentials exist, auto-provision a fresh key cluster/device
@@ -631,6 +700,22 @@ class VexService {
         return true;
     }
 
+    /**
+     * Remove a passkey from the currently signed-in account. Works
+     * with either a device session OR a passkey session — spire's
+     * delete route accepts both, and the UI surfaces this from both
+     * Settings and the recovery screen.
+     */
+    async deletePasskey(passkeyID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.passkeys.delete(passkeyID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
     async deleteServer(serverID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -648,6 +733,64 @@ class VexService {
     }
 
     // ── Channel operations ──────────────────────────────────────────────
+
+    /**
+     * Finish a passkey-registration ceremony. Persists the new
+     * authenticator on spire and returns the public passkey shape
+     * for the Settings list.
+     */
+    async finishPasskeyRegistration(args: {
+        name: string;
+        requestID: string;
+        response: Record<string, unknown>;
+    }): Promise<{ error?: string; ok: boolean; passkey?: Passkey }> {
+        try {
+            const client = this.requireClient();
+            const passkey = await client.passkeys.finishRegistration(args);
+            return { ok: true, passkey };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /**
+     * Finish a passkey authentication ceremony. Stage two of the
+     * recovery flow. On success the libvex Client is in
+     * "passkey-only" mode — it can call the `passkeys.*` admin
+     * routes (list/delete devices, approve/reject pending
+     * enrollment) but messaging is unavailable until a device key
+     * takes over. The caller is expected to drive the user through
+     * the recovery screen and either:
+     *   - approve a pending enrollment for a fresh device, then
+     *     swap to a normal device session via `login()`/`autoLogin()`
+     *   - or just clean up old devices and sign back out.
+     */
+    async finishPasskeySignIn(args: {
+        requestID: string;
+        response: Record<string, unknown>;
+    }): Promise<{
+        error?: string;
+        ok: boolean;
+        userID?: string;
+        username?: string;
+    }> {
+        try {
+            const client = this.requireClient();
+            const result = await client.passkeys.finishAuthentication(args);
+            // We deliberately don't flip $userWritable / authStatus
+            // to "authenticated" here — the user is *not* in a full
+            // messaging session, just a short-lived recovery one.
+            // The recovery screen reads `getPasskeyUser()` to know
+            // who's authenticated.
+            return {
+                ok: true,
+                userID: result.user.userID,
+                username: result.user.username,
+            };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
 
     async getChannelMembers(channelID: string): Promise<User[]> {
         const client = this.requireClient();
@@ -767,6 +910,15 @@ class VexService {
         );
         $devicesWritable.setKey(userID, sorted);
         return sorted;
+    }
+
+    /**
+     * List all passkeys belonging to the current account. Works in
+     * either a device session or a passkey-recovery session.
+     */
+    async listPasskeys(): Promise<Passkey[]> {
+        const client = this.requireClient();
+        return client.passkeys.list();
     }
 
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequest[]> {
@@ -889,6 +1041,59 @@ class VexService {
         return () => {
             this.deviceRequestQueueListeners.delete(listener);
         };
+    }
+
+    /**
+     * Approve a pending device-enrollment request using the
+     * passkey-only session. Mirrors {@link approveDeviceRequest}
+     * but bypasses the device-JWT requirement; the caller must have
+     * just completed {@link finishPasskeySignIn}.
+     */
+    async passkeyApproveDeviceRequest(
+        requestID: string,
+    ): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.passkeys.approveDeviceRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /** Delete a device using the passkey-only session. */
+    async passkeyDeleteDevice(deviceID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.passkeys.deleteDevice(deviceID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /** List all of the account's devices using the passkey-only session. */
+    async passkeyListDevices(): Promise<Device[]> {
+        const client = this.requireClient();
+        const devices = await client.passkeys.listDevices();
+        return [...devices].sort(
+            (a, b) =>
+                new Date(b.lastLogin).getTime() -
+                new Date(a.lastLogin).getTime(),
+        );
+    }
+
+    /** Reject a pending device-enrollment request using the passkey-only session. */
+    async passkeyRejectDeviceRequest(
+        requestID: string,
+    ): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.passkeys.rejectDeviceRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
     }
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
@@ -2265,8 +2470,76 @@ function describeWsFrame(data: Uint8Array): {
 
 // ── VexService ──────────────────────────────────────────────────────────────
 
+/**
+ * Extract a human-readable message from an error.
+ *
+ * For axios HTTP errors, surface the server-sent body instead of
+ * the generic "Request failed with status code N". libvex configures
+ * its axios instance with `responseType: "arraybuffer"` so the body
+ * arrives as raw bytes regardless of `Content-Type`; spire's error
+ * envelopes are JSON in practice, in one of two shapes:
+ *
+ *   1. Flat:    { "error": "<message>" }
+ *   2. Wrapped: { "error": { "message": "<message>", "requestId": "..." } }
+ *
+ * Both come from spire's central error pipeline (`errors.ts`). We
+ * try (1) first, fall back to (2), and finally fall back to the raw
+ * decoded text or the underlying error's `.message` so that nothing
+ * goes silently lost.
+ *
+ * Without this, server-side validation failures reach the UI as
+ * "Request failed with status code 400" with no detail, which makes
+ * passkey / device / message errors effectively undebuggable.
+ */
 function errorMessage(err: unknown): string {
+    const fromBody = extractServerErrorBody(err);
+    if (fromBody !== null) {
+        return fromBody;
+    }
     return err instanceof Error ? err.message : String(err);
+}
+
+function extractServerErrorBody(err: unknown): null | string {
+    if (err == null || typeof err !== "object") return null;
+    const errObj = err as { response?: unknown };
+    const response = errObj.response;
+    if (response == null || typeof response !== "object") return null;
+    const data = (response as { data?: unknown }).data;
+    if (data == null) return null;
+
+    let bodyText: null | string = null;
+    if (data instanceof ArrayBuffer) {
+        bodyText = new TextDecoder().decode(data);
+    } else if (
+        data instanceof Uint8Array ||
+        (typeof data === "object" &&
+            "byteLength" in data &&
+            typeof (data as { byteLength: unknown }).byteLength === "number" &&
+            "buffer" in data)
+    ) {
+        bodyText = new TextDecoder().decode(data as Uint8Array);
+    } else if (typeof data === "string") {
+        bodyText = data;
+    } else if (typeof data === "object") {
+        return readErrorField(data) ?? null;
+    }
+
+    if (bodyText === null) return null;
+
+    try {
+        const parsed: unknown = JSON.parse(bodyText);
+        const fromJson = readErrorField(parsed);
+        if (fromJson !== null) return fromJson;
+    } catch {
+        // Body wasn't JSON; fall through and return the raw text if
+        // it looks usable.
+    }
+
+    const trimmed = bodyText.trim();
+    if (trimmed.length > 0 && trimmed.length < 500) {
+        return trimmed;
+    }
+    return null;
 }
 
 function generateAutoProvisionUsername(): string {
@@ -2382,6 +2655,21 @@ function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
 function jwtExpToEpochMs(exp: number): number {
     // JWT exp is conventionally seconds since epoch; tolerate ms values too.
     return exp > 1_000_000_000_000 ? exp : exp * 1000;
+}
+
+function readErrorField(body: unknown): null | string {
+    if (body == null || typeof body !== "object") return null;
+    const errorField = (body as { error?: unknown }).error;
+    if (typeof errorField === "string" && errorField.length > 0) {
+        return errorField;
+    }
+    if (errorField != null && typeof errorField === "object") {
+        const message = (errorField as { message?: unknown }).message;
+        if (typeof message === "string" && message.length > 0) {
+            return message;
+        }
+    }
+    return null;
 }
 
 function shouldDebugAuth(): boolean {

@@ -11,6 +11,13 @@ AGENTS.md
 apps/mobile/ios/
 apps/mobile/android/
 
+# EAS-managed signing material — NEVER commit. `eas credentials`
+# downloads keystores and a credentials.json with cleartext passwords.
+apps/mobile/credentials.json
+apps/mobile/credentials/
+**/keystore.jks
+**/upload-keystore.jks
+
 # Per-app env overrides — only .env.example is committed
 .env
 .env.local

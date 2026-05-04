@@ -23,6 +23,7 @@ export type AppStackParamList = {
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
+    Passkeys: undefined;
     ServerSettings: { serverID: string; serverName?: string };
     SessionDetails: undefined;
     Settings: undefined;
