@@ -44,6 +44,7 @@ import {
 import {
     clearNotifiedApprovalRequestIDs,
     dismissDeviceApprovalNotification,
+    flushPendingNotificationRoutes,
     requestNotificationPermission,
     setupNotificationHandlers,
     showDeviceApprovalNotification,
@@ -774,6 +775,9 @@ function App() {
                 </View>
             )}
             <NavigationContainer
+                onReady={() => {
+                    flushPendingNotificationRoutes();
+                }}
                 ref={navigationRef}
                 theme={{
                     colors: {

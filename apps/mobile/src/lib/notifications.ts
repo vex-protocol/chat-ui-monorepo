@@ -10,6 +10,12 @@ import {
     $servers,
 } from "@vex-chat/store";
 
+import notifee, {
+    AndroidCategory,
+    AndroidStyle,
+    EventType,
+    AndroidImportance as NotifeeAndroidImportance,
+} from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 
@@ -17,6 +23,7 @@ import {
     navigateToChannel,
     navigateToConversation,
     navigateToDeviceRequests,
+    navigationRef,
 } from "../navigation/navigationRef";
 
 import { buildAvatarUrl } from "./avatarUrl";
@@ -30,9 +37,14 @@ const CHANNEL_ID = "vex-messages";
 const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
 // Message banners show sender display name, a short message preview, optional
-// group context (subtitle), and on iOS a sender avatar attachment. Be aware
-// the OS may persist visible notification text and images in notification
-// history, backups, and platform logging — a tradeoff for readable alerts.
+// group context (subtitle), and a sender avatar (iOS: Expo attachment;
+// Android: Notifee largeIcon + MessagingStyle person icon). Be aware the OS
+// may persist visible notification text and images in notification history,
+// backups, and platform logging — a tradeoff for readable alerts.
+//
+// Android message taps use Notifee (`displayNotification`); routing data is
+// also queued from `onBackgroundEvent` in index.js until NavigationContainer
+// is ready (`flushPendingNotificationRoutes`).
 //
 // Routing still uses opaque IDs in `data` for `handleNotificationPress`; human
 // strings are not required there.
@@ -77,6 +89,10 @@ let notificationDrainInFlight = false;
 // again for the same ID; we'd rather drop the duplicate than spam.
 const notifiedApprovalRequestIDs = new Set<string>();
 
+type PendingRouteTap = { data: Record<string, unknown>; dedupeKey?: string };
+
+const pendingRouteTapQueue: PendingRouteTap[] = [];
+
 // Show banner + play sound when a notification arrives while the app is open.
 Notifications.setNotificationHandler({
     handleNotification: () =>
@@ -117,6 +133,48 @@ export async function dismissDeviceApprovalNotification(
     }
 }
 
+/**
+ * Queued from `notifee.onBackgroundEvent` in `index.js` (Android) when the user
+ * taps a message notification while the JS engine is not yet interactive.
+ */
+export function enqueueNotificationRouteFromAndroidBackground(data: {
+    [key: string]: number | object | string;
+}): void {
+    const kind = data["kind"];
+    if (kind !== "dm" && kind !== "group") {
+        return;
+    }
+    const normalized = normalizeAndroidMessageRouteData(data);
+    const dedupeKey =
+        typeof data["mailID"] === "string" ? data["mailID"] : undefined;
+    if (dedupeKey) {
+        const idx = pendingRouteTapQueue.findIndex(
+            (p) => p.dedupeKey === dedupeKey,
+        );
+        if (idx >= 0) {
+            pendingRouteTapQueue.splice(idx, 1);
+        }
+    }
+    if (dedupeKey !== undefined) {
+        pendingRouteTapQueue.push({ data: normalized, dedupeKey });
+    } else {
+        pendingRouteTapQueue.push({ data: normalized });
+    }
+}
+
+/**
+ * Called from `NavigationContainer` `onReady` so cold-start / background taps
+ * that arrived before the navigator mounted are replayed once.
+ */
+export function flushPendingNotificationRoutes(): void {
+    while (navigationRef.isReady() && pendingRouteTapQueue.length > 0) {
+        const next = pendingRouteTapQueue.shift();
+        if (next) {
+            handleNotificationPress(next.data);
+        }
+    }
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
     const settings = await Notifications.requestPermissionsAsync({
         ios: { allowAlert: true, allowBadge: true, allowSound: true },
@@ -128,21 +186,59 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function setupNotificationHandlers(): () => void {
-    // Single listener covers foreground, background, and cold-start taps.
     const subscription = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-            handleNotificationPress(response.notification.request.content.data);
+            routeNotificationTap(
+                response.notification.request.content.data as Record<
+                    string,
+                    unknown
+                >,
+            );
         },
     );
 
-    // If the app was launched by tapping a notification, replay it.
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse) {
-        handleNotificationPress(lastResponse.notification.request.content.data);
+        routeNotificationTap(
+            lastResponse.notification.request.content.data as Record<
+                string,
+                unknown
+            >,
+        );
     }
+
+    let unsubNotifee: (() => void) | undefined;
+    if (Platform.OS === "android") {
+        unsubNotifee = notifee.onForegroundEvent(({ detail, type }) => {
+            if (type !== EventType.PRESS) {
+                return;
+            }
+            const data = detail.notification?.data;
+            if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
+                return;
+            }
+            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+        });
+
+        void notifee.getInitialNotification().then((initial) => {
+            if (!initial) {
+                return;
+            }
+            const data = initial.notification.data;
+            if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
+                return;
+            }
+            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+        });
+    }
+
+    queueMicrotask(() => {
+        flushPendingNotificationRoutes();
+    });
 
     return () => {
         subscription.remove();
+        unsubNotifee?.();
     };
 }
 
@@ -267,10 +363,20 @@ async function drainNotificationQueue(): Promise<void> {
 
 async function ensureChannel(): Promise<void> {
     if (channelReady) return;
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-        importance: AndroidImportance.HIGH,
-        name: "Messages",
-    });
+    if (Platform.OS === "android") {
+        await notifee.createChannel({
+            id: CHANNEL_ID,
+            importance: NotifeeAndroidImportance.HIGH,
+            name: "Messages",
+            sound: "default",
+            vibration: true,
+        });
+    } else {
+        await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
+            importance: AndroidImportance.HIGH,
+            name: "Messages",
+        });
+    }
     channelReady = true;
 }
 
@@ -349,6 +455,22 @@ function iosAvatarAttachmentType(url: string): string {
     return "public.jpeg";
 }
 
+function normalizeAndroidMessageRouteData(raw: {
+    [key: string]: number | object | string;
+}): Record<string, unknown> {
+    const kind = stringifyRouteField(raw["kind"]);
+    const authorID = stringifyRouteField(raw["authorID"]);
+    const out: Record<string, unknown> = { authorID, kind };
+    if (raw["mailID"] != null) {
+        out["mailID"] = stringifyRouteField(raw["mailID"]);
+    }
+    if (kind === "group") {
+        out["channelID"] = stringifyRouteField(raw["channelID"]);
+        out["serverID"] = stringifyRouteField(raw["serverID"]);
+    }
+    return out;
+}
+
 function resolveAuthorNameMobile(userID: string): string | undefined {
     return $familiars.get()[userID]?.username;
 }
@@ -368,6 +490,31 @@ function resolveChannelInfoMobile(
     return { channelName, serverName };
 }
 
+function routeNotificationTap(data: Record<string, unknown> | undefined): void {
+    if (!data || typeof data !== "object") {
+        return;
+    }
+    if (navigationRef.isReady()) {
+        handleNotificationPress(data);
+        return;
+    }
+    const dedupeKey =
+        typeof data["mailID"] === "string" ? data["mailID"] : undefined;
+    if (dedupeKey) {
+        const dup = pendingRouteTapQueue.findIndex(
+            (p) => p.dedupeKey === dedupeKey,
+        );
+        if (dup >= 0) {
+            pendingRouteTapQueue.splice(dup, 1);
+        }
+    }
+    if (dedupeKey !== undefined) {
+        pendingRouteTapQueue.push({ data, dedupeKey });
+    } else {
+        pendingRouteTapQueue.push({ data });
+    }
+}
+
 async function scheduleOneMessageNotification(mail: Message): Promise<void> {
     const payload = shouldNotify(
         mail,
@@ -385,8 +532,58 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
         $avatarVersions.get()[payload.authorID],
     );
 
+    const routeData: Record<string, string> = {
+        authorID: payload.authorID,
+        kind: payload.group ? "group" : "dm",
+        mailID: payload.mailID,
+    };
+    if (payload.group && serverID) {
+        routeData["channelID"] = payload.group;
+        routeData["serverID"] = serverID;
+    }
+
+    if (Platform.OS === "android") {
+        await notifee.displayNotification({
+            android: {
+                category: AndroidCategory.MESSAGE,
+                channelId: CHANNEL_ID,
+                pressAction: { id: "default" },
+                smallIcon: "notification_icon",
+                ...(avatarUrl != null
+                    ? { circularLargeIcon: true, largeIcon: avatarUrl }
+                    : {}),
+                style: {
+                    messages: [
+                        {
+                            person: {
+                                ...(avatarUrl != null
+                                    ? { icon: avatarUrl }
+                                    : {}),
+                                id: payload.authorID,
+                                name: payload.title,
+                            },
+                            text: payload.body,
+                            timestamp: Date.now(),
+                        },
+                    ],
+                    person: { id: "self", name: "You" },
+                    type: AndroidStyle.MESSAGING,
+                    ...(payload.subtitle != null
+                        ? { group: true, title: payload.subtitle }
+                        : {}),
+                },
+            },
+            body: payload.body,
+            data: routeData,
+            id: payload.mailID,
+            ...(payload.subtitle != null ? { subtitle: payload.subtitle } : {}),
+            title: payload.title,
+        });
+        return;
+    }
+
     const iosAvatar =
-        Platform.OS === "ios" && avatarUrl != null
+        avatarUrl != null
             ? [
                   {
                       identifier: "vex-sender-avatar",
@@ -415,4 +612,17 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function stringifyRouteField(value: unknown): string {
+    if (typeof value === "string") {
+        return value;
+    }
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (typeof value === "boolean") {
+        return String(value);
+    }
+    return "";
 }
