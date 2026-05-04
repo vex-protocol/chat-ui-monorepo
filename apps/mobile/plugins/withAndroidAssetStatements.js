@@ -1,7 +1,4 @@
-const {
-    withAndroidManifest,
-    withStringsXml,
-} = require("expo/config-plugins");
+const { withAndroidManifest, withStringsXml } = require("expo/config-plugins");
 
 // Expo config plugin that wires up Android Digital Asset Links so
 // Google Credential Manager will accept this app as a valid relying
