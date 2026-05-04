@@ -15,6 +15,7 @@ import {
 import { vexService } from "@vex-chat/store";
 
 import { useFocusEffect } from "@react-navigation/native";
+import * as Clipboard from "expo-clipboard";
 
 import { Avatar } from "../components/Avatar";
 import { CornerBracketBox } from "../components/CornerBracketBox";
@@ -23,7 +24,7 @@ import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
 import { getServerOptions, getServerUrl } from "../lib/config";
 import { haptic } from "../lib/haptics";
-import { pickIdentityBackup } from "../lib/identityBackup";
+import { parseIdentityBackup, pickIdentityBackup } from "../lib/identityBackup";
 import {
     clearCredentials,
     keychainKeyStore,
@@ -162,7 +163,87 @@ export function AccountSelectorScreen({ navigation }: Props) {
         navigation.navigate("HangTight", { force: true });
     }, [navigation]);
 
-    const handleRestore = useCallback(async () => {
+    const applyParsedBackup = useCallback(
+        async (backup: IdentityBackup) => {
+            // Server-host gate: the deviceKey only authenticates against the
+            // cluster that minted it. If the user's currently configured
+            // server doesn't match the backup, refuse rather than misleading
+            // them with a "device revoked" error.
+            const currentHost = sanitizeHost(getServerUrl());
+            const backupHost = sanitizeHost(backup.server);
+            if (currentHost !== backupHost) {
+                setErrorText(
+                    `This backup is for ${backup.server}, but you are connected to ${getServerUrl()}. Switch servers and try again.`,
+                );
+                return;
+            }
+
+            // If a slot already exists for this username on this device, ask
+            // before clobbering it. Without this prompt, a stale backup
+            // could silently destroy the user's working keys.
+            const overwriting = accounts.some(
+                (a) => a.username === backup.username,
+            );
+            if (overwriting) {
+                const confirmed = await new Promise<boolean>((resolve) => {
+                    Alert.alert(
+                        `Replace @${backup.username}?`,
+                        "An account with this username is already on this device. Restoring will replace its device key with the one from the backup.",
+                        [
+                            {
+                                onPress: () => {
+                                    resolve(false);
+                                },
+                                style: "cancel",
+                                text: "Cancel",
+                            },
+                            {
+                                onPress: () => {
+                                    resolve(true);
+                                },
+                                style: "destructive",
+                                text: "Replace",
+                            },
+                        ],
+                    );
+                });
+                if (!confirmed) {
+                    return;
+                }
+            }
+
+            setSigningInUsername(backup.username);
+            try {
+                const result = await restoreFromBackup(backup);
+                if (!result.ok) {
+                    setErrorText(result.error);
+                    await refresh();
+                    return;
+                }
+                // Success — autoLogin set $user, RootNavigator will swap to
+                // the App stack on its next render. Persist the userID for
+                // the picker the next time the user signs out — but only
+                // when the backup actually carried one. Legacy text-format
+                // backups don't have a userID; the App.tsx `$user`
+                // subscription will backfill it on this very session.
+                if (backup.userID.length > 0) {
+                    await setUserIDForUsername(backup.username, backup.userID);
+                }
+            } catch (err: unknown) {
+                setErrorText(
+                    err instanceof Error
+                        ? err.message
+                        : "Restore failed unexpectedly.",
+                );
+                await refresh();
+            } finally {
+                setSigningInUsername(null);
+            }
+        },
+        [accounts, refresh],
+    );
+
+    const handleRestoreFromFile = useCallback(async () => {
         if (signingInUsername !== null) {
             return;
         }
@@ -178,78 +259,70 @@ export function AccountSelectorScreen({ navigation }: Props) {
             }
             return;
         }
-        const backup = parsed.backup;
+        await applyParsedBackup(parsed.backup);
+    }, [applyParsedBackup, signingInUsername]);
 
-        // Server-host gate: the deviceKey only authenticates against the
-        // cluster that minted it. If the user's currently configured server
-        // doesn't match the backup, refuse rather than misleading them with
-        // a "device revoked" error.
-        const currentHost = sanitizeHost(getServerUrl());
-        const backupHost = sanitizeHost(backup.server);
-        if (currentHost !== backupHost) {
-            setErrorText(
-                `This backup is for ${backup.server}, but you are connected to ${getServerUrl()}. Switch servers and try again.`,
-            );
+    const handleRestoreFromClipboard = useCallback(async () => {
+        if (signingInUsername !== null) {
             return;
         }
-
-        // If a slot already exists for this username on this device, ask
-        // before clobbering it. Without this prompt, a stale backup could
-        // silently destroy the user's working keys.
-        const overwriting = accounts.some(
-            (a) => a.username === backup.username,
-        );
-        if (overwriting) {
-            const confirmed = await new Promise<boolean>((resolve) => {
-                Alert.alert(
-                    `Replace @${backup.username}?`,
-                    "An account with this username is already on this device. Restoring will replace its device key with the one from the backup file.",
-                    [
-                        {
-                            onPress: () => {
-                                resolve(false);
-                            },
-                            style: "cancel",
-                            text: "Cancel",
-                        },
-                        {
-                            onPress: () => {
-                                resolve(true);
-                            },
-                            style: "destructive",
-                            text: "Replace",
-                        },
-                    ],
-                );
-            });
-            if (!confirmed) {
-                return;
-            }
-        }
-
-        setSigningInUsername(backup.username);
+        haptic("tap");
+        setErrorText(null);
+        let raw = "";
         try {
-            const result = await restoreFromBackup(backup);
-            if (!result.ok) {
-                setErrorText(result.error);
-                await refresh();
-                return;
-            }
-            // Success — vexService.login set $user, RootNavigator will swap
-            // to the App stack on its next render. Persist the userID for
-            // the picker the next time the user signs out.
-            await setUserIDForUsername(backup.username, backup.userID);
+            raw = await Clipboard.getStringAsync();
         } catch (err: unknown) {
             setErrorText(
                 err instanceof Error
-                    ? err.message
-                    : "Restore failed unexpectedly.",
+                    ? `Could not read the clipboard: ${err.message}`
+                    : "Could not read the clipboard.",
             );
-            await refresh();
-        } finally {
-            setSigningInUsername(null);
+            return;
         }
-    }, [accounts, refresh, signingInUsername]);
+        if (raw.trim().length === 0) {
+            setErrorText(
+                "The clipboard is empty. Copy your backup text first, then try again.",
+            );
+            return;
+        }
+        const parsed = parseIdentityBackup(raw);
+        if (!parsed.ok) {
+            if ("canceled" in parsed && parsed.canceled) {
+                return;
+            }
+            if ("error" in parsed) {
+                setErrorText(parsed.error);
+            }
+            return;
+        }
+        await applyParsedBackup(parsed.backup);
+    }, [applyParsedBackup, signingInUsername]);
+
+    const handleRestore = useCallback(() => {
+        if (signingInUsername !== null) {
+            return;
+        }
+        haptic("tap");
+        Alert.alert(
+            "Restore from backup",
+            "Pick a Vex identity backup file, or paste the text from a backup you saved earlier.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void handleRestoreFromClipboard();
+                    },
+                    text: "Paste from clipboard",
+                },
+                {
+                    onPress: () => {
+                        void handleRestoreFromFile();
+                    },
+                    text: "Pick a file",
+                },
+            ],
+        );
+    }, [handleRestoreFromClipboard, handleRestoreFromFile, signingInUsername]);
 
     if (!hydrated) {
         return (
@@ -289,9 +362,7 @@ export function AccountSelectorScreen({ navigation }: Props) {
                     />
                     <VexButton
                         disabled={signingInUsername !== null}
-                        onPress={() => {
-                            void handleRestore();
-                        }}
+                        onPress={handleRestore}
                         style={styles.addButton}
                         title="Restore from backup"
                         variant="outline"
@@ -351,9 +422,7 @@ export function AccountSelectorScreen({ navigation }: Props) {
                 />
                 <VexButton
                     disabled={signingInUsername !== null}
-                    onPress={() => {
-                        void handleRestore();
-                    }}
+                    onPress={handleRestore}
                     style={styles.addButton}
                     title="Restore from backup"
                     variant="outline"

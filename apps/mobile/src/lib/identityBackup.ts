@@ -42,6 +42,12 @@ export interface IdentityBackup {
     exportedAt: string;
     server: string;
     type: typeof BACKUP_FILE_TYPE;
+    /**
+     * Owner's userID. Optional for back-compat with the legacy text-format
+     * backups produced before we tracked userID in the export. Empty string
+     * means "unknown" — the caller should populate it from the server
+     * after a successful sign-in.
+     */
     userID: string;
     username: string;
     version: number;
@@ -130,12 +136,86 @@ export async function exportIdentityBackupFile(
 }
 
 /**
- * Validate a raw backup string. Exposed separately so we can also accept
- * pasted content as a fallback path on platforms where the document picker
- * is unavailable. Returns either the parsed backup or a human-readable
- * error describing why the input was rejected.
+ * Validate a raw backup string. Accepts:
+ *
+ *   1. The current JSON file format (see {@link IdentityBackup}).
+ *   2. The legacy text format that earlier app builds shared via
+ *      `Share.share({ message: ... })`. Users who saved that text into
+ *      Notes / Keep / Mail before the upgrade can paste it here:
+ *
+ *          # Vex identity key backup
+ *          server: vex.wtf
+ *          username: alice
+ *          deviceID: <uuid>
+ *          identityKey: <hex>
+ *
+ *      The legacy format does not include a `userID`; it'll be backfilled
+ *      automatically once the restored account signs in (App.tsx mirrors
+ *      `$user.userID` into the keychain on every login).
+ *
+ * Exposed separately from {@link pickIdentityBackup} so the same parser
+ * also drives a paste-from-clipboard restore path.
  */
 export function parseIdentityBackup(raw: string): RestoreParseResult {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) {
+        return { error: "The backup is empty.", ok: false };
+    }
+    // JSON path first — current format.
+    if (trimmed.startsWith("{")) {
+        return parseJsonBackup(trimmed);
+    }
+    // Anything else: assume legacy text. The header line is optional.
+    return parseTextBackup(trimmed);
+}
+
+/**
+ * Open the system file picker constrained to JSON files, read the picked
+ * file, and parse it as an identity backup. Cancellation is reported as
+ * `{ canceled: true }` so callers can distinguish it from a parse failure.
+ */
+export async function pickIdentityBackup(): Promise<RestoreParseResult> {
+    let result: DocumentPicker.DocumentPickerResult;
+    try {
+        result = await DocumentPicker.getDocumentAsync({
+            copyToCacheDirectory: true,
+            multiple: false,
+            type: ["application/json", "text/plain", "*/*"],
+        });
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not open the file picker: ${err.message}`
+                    : "Could not open the file picker.",
+            ok: false,
+        };
+    }
+    if (result.canceled) {
+        return { canceled: true, ok: false };
+    }
+    const asset = result.assets?.[0];
+    if (!asset?.uri) {
+        return { error: "No file was selected.", ok: false };
+    }
+    let raw: string;
+    try {
+        raw = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: FileSystem.EncodingType.UTF8,
+        });
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not read the file: ${err.message}`
+                    : "Could not read the file.",
+            ok: false,
+        };
+    }
+    return parseIdentityBackup(raw);
+}
+
+function parseJsonBackup(raw: string): RestoreParseResult {
     let parsed: unknown;
     try {
         parsed = JSON.parse(raw);
@@ -207,50 +287,66 @@ export function parseIdentityBackup(raw: string): RestoreParseResult {
     };
 }
 
-/**
- * Open the system file picker constrained to JSON files, read the picked
- * file, and parse it as an identity backup. Cancellation is reported as
- * `{ canceled: true }` so callers can distinguish it from a parse failure.
- */
-export async function pickIdentityBackup(): Promise<RestoreParseResult> {
-    let result: DocumentPicker.DocumentPickerResult;
-    try {
-        result = await DocumentPicker.getDocumentAsync({
-            copyToCacheDirectory: true,
-            multiple: false,
-            type: ["application/json", "text/plain", "*/*"],
-        });
-    } catch (err: unknown) {
+function parseTextBackup(raw: string): RestoreParseResult {
+    // Old format: one `key: value` per line, with an optional `# Vex
+    // identity key backup` header. Tolerant to extra whitespace, blank
+    // lines, and surrounding noise that might come from copying out of a
+    // notes app.
+    const fields: Record<string, string> = {};
+    for (const line of raw.split(/\r?\n/)) {
+        const cleaned = line.trim();
+        if (cleaned.length === 0 || cleaned.startsWith("#")) {
+            continue;
+        }
+        const colon = cleaned.indexOf(":");
+        if (colon <= 0) {
+            continue;
+        }
+        const key = cleaned.slice(0, colon).trim().toLowerCase();
+        const value = cleaned.slice(colon + 1).trim();
+        if (key.length > 0 && value.length > 0) {
+            fields[key] = value;
+        }
+    }
+
+    // The legacy export used `identityKey`; tolerate `deviceKey` too in
+    // case anyone hand-edited a copy.
+    const deviceKey = fields["identitykey"] ?? fields["devicekey"] ?? "";
+    const username = fields["username"] ?? "";
+    const deviceID = fields["deviceid"] ?? "";
+    const server = fields["server"] ?? "";
+    if (
+        deviceKey.length === 0 ||
+        username.length === 0 ||
+        deviceID.length === 0 ||
+        server.length === 0
+    ) {
         return {
-            error:
-                err instanceof Error
-                    ? `Could not open the file picker: ${err.message}`
-                    : "Could not open the file picker.",
+            error: "That doesn't look like a Vex identity backup. Expected lines like `server:`, `username:`, `deviceID:`, and `identityKey:`.",
             ok: false,
         };
     }
-    if (result.canceled) {
-        return { canceled: true, ok: false };
-    }
-    const asset = result.assets?.[0];
-    if (!asset?.uri) {
-        return { error: "No file was selected.", ok: false };
-    }
-    let raw: string;
-    try {
-        raw = await FileSystem.readAsStringAsync(asset.uri, {
-            encoding: FileSystem.EncodingType.UTF8,
-        });
-    } catch (err: unknown) {
+    if (!HEX_KEY_PATTERN.test(deviceKey)) {
         return {
-            error:
-                err instanceof Error
-                    ? `Could not read the file: ${err.message}`
-                    : "Could not read the file.",
+            error: "Backup contains an invalid device key.",
             ok: false,
         };
     }
-    return parseIdentityBackup(raw);
+    return {
+        backup: {
+            deviceID,
+            deviceKey,
+            exportedAt: "",
+            server,
+            type: BACKUP_FILE_TYPE,
+            // Legacy format omitted userID. It backfills after first
+            // successful sign-in via the $user subscription in App.tsx.
+            userID: fields["userid"] ?? "",
+            username: username.toLowerCase(),
+            version: BACKUP_FILE_VERSION,
+        },
+        ok: true,
+    };
 }
 
 const HEX_KEY_PATTERN = /^[0-9a-fA-F]{32,256}$/;
