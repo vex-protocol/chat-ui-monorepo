@@ -27,7 +27,13 @@ import { keychainKeyStore, loadCredentials } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
 import { colors, typography } from "../theme";
 
-type Phase = "boot" | "error" | "form";
+interface PendingApprovalSnapshot {
+    pendingRequestID: string;
+    pendingSignKey?: string;
+    username: string;
+}
+
+type Phase = "boot" | "confirmExisting" | "error" | "form";
 
 const HANDLE_PATTERN = /^[A-Za-z0-9_]{3,19}$/;
 
@@ -45,6 +51,8 @@ export function HangTightScreen({
     const [username, setUsername] = useState("");
     const [phase, setPhase] = useState<Phase>("boot");
     const [focused, setFocused] = useState(false);
+    const [pendingApproval, setPendingApproval] =
+        useState<null | PendingApprovalSnapshot>(null);
 
     // ── Boot spinner animations (kept for the initial loading phase) ────────
     const spin = useMemo(() => new Animated.Value(0), []);
@@ -92,7 +100,7 @@ export function HangTightScreen({
     }, [spin, pulse]);
 
     useEffect(() => {
-        if (phase !== "form") {
+        if (phase !== "form" && phase !== "confirmExisting") {
             return;
         }
         formOpacity.setValue(0);
@@ -113,6 +121,9 @@ export function HangTightScreen({
             }),
         ]).start();
 
+        if (phase !== "form") {
+            return;
+        }
         const loop = Animated.loop(
             Animated.sequence([
                 Animated.timing(inputGlow, {
@@ -274,16 +285,23 @@ export function HangTightScreen({
                     result.pendingDeviceApproval &&
                     result.pendingRequestID
                 ) {
-                    // Existing account picked up mid-signup — fall through
-                    // to the approval-poll screen. Vibrate to acknowledge.
-                    Vibration.vibrate([0, 20, 40, 20]);
-                    navigation.replace("Authenticate", {
-                        requestID: result.pendingRequestID,
+                    // Existing account picked up mid-signup. Don't jump
+                    // straight into the approval-poll screen — it's
+                    // confusing for users who didn't realize the handle
+                    // was already taken. Show an "is this you?" gate
+                    // first; only on confirm do we route to the
+                    // Authenticate screen. The watcher started by
+                    // vexService.register() keeps running in the
+                    // background; if the user denies, we cancel it.
+                    Vibration.vibrate(20);
+                    setPendingApproval({
+                        pendingRequestID: result.pendingRequestID,
                         ...(result.pendingSignKey !== undefined
-                            ? { signKey: result.pendingSignKey }
+                            ? { pendingSignKey: result.pendingSignKey }
                             : {}),
                         username: candidate,
                     });
+                    setPhase("confirmExisting");
                     return;
                 }
                 if (!result.ok) {
@@ -300,6 +318,34 @@ export function HangTightScreen({
             .finally(() => {
                 setBusy(false);
             });
+    };
+
+    const handleConfirmExisting = () => {
+        if (!pendingApproval) return;
+        Vibration.vibrate([0, 20, 40, 20]);
+        const params = {
+            requestID: pendingApproval.pendingRequestID,
+            ...(pendingApproval.pendingSignKey !== undefined
+                ? { signKey: pendingApproval.pendingSignKey }
+                : {}),
+            username: pendingApproval.username,
+        };
+        setPendingApproval(null);
+        navigation.replace("Authenticate", params);
+    };
+
+    const handleDenyExisting = () => {
+        Vibration.vibrate(15);
+        // Stop the local approval watcher so we don't continue polling
+        // a request the user has decided isn't theirs. The server-side
+        // record will simply expire on its TTL — we can't reject it
+        // from this unauthenticated client.
+        vexService.cancelPendingApproval();
+        setPendingApproval(null);
+        setBootError("");
+        setBusy(false);
+        setUsername("");
+        setPhase("form");
     };
 
     const handleRetry = () => {
@@ -488,10 +534,91 @@ export function HangTightScreen({
                         {!busy ? (
                             <Text style={styles.bottomHint}>
                                 We'll create an account if this handle is new,
-                                or request approval from one of your existing
-                                devices.
+                                or sign you in if it's yours.
                             </Text>
                         ) : null}
+                    </Animated.View>
+                </KeyboardAvoidingView>
+            </ScreenLayout>
+        );
+    }
+
+    if (phase === "confirmExisting" && pendingApproval) {
+        return (
+            <ScreenLayout style={styles.layout}>
+                <View pointerEvents="none" style={styles.blackoutLayer} />
+                <View pointerEvents="none" style={styles.glowTop} />
+                <View pointerEvents="none" style={styles.glowBottom} />
+
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                    style={styles.formWrap}
+                >
+                    <Animated.View
+                        style={[
+                            styles.formContent,
+                            {
+                                opacity: formOpacity,
+                                transform: [{ translateY: formY }],
+                            },
+                        ]}
+                    >
+                        <Animated.View
+                            style={[
+                                styles.logoBlock,
+                                { transform: [{ scale: pulse }] },
+                            ]}
+                        >
+                            <VexLogo showWordmark size={40} />
+                        </Animated.View>
+
+                        <Text style={styles.eyebrow}>EXISTING ACCOUNT</Text>
+                        <Text style={styles.heading}>Is this you?</Text>
+                        <Text style={styles.subheading}>
+                            That handle is already registered. If it's yours,
+                            we'll ask one of your other signed-in devices to
+                            approve this one.
+                        </Text>
+
+                        <View style={styles.confirmHandleArea}>
+                            <CornerBracketBox
+                                color={colors.accent}
+                                size={10}
+                                thickness={1.5}
+                            >
+                                <View style={styles.confirmHandleRow}>
+                                    <Text style={styles.atSign}>@</Text>
+                                    <Text
+                                        ellipsizeMode="tail"
+                                        numberOfLines={1}
+                                        style={styles.confirmHandleText}
+                                    >
+                                        {pendingApproval.username}
+                                    </Text>
+                                </View>
+                            </CornerBracketBox>
+                        </View>
+
+                        <View style={styles.confirmButtonStack}>
+                            <VexButton
+                                glow
+                                onPress={handleConfirmExisting}
+                                style={styles.confirmPrimary}
+                                title="Yes, that's me"
+                                variant="primary"
+                            />
+                            <VexButton
+                                onPress={handleDenyExisting}
+                                style={styles.confirmSecondary}
+                                title="No, use a different handle"
+                                variant="outline"
+                            />
+                        </View>
+
+                        <Text style={styles.bottomHint}>
+                            If this isn't you, the request will quietly expire
+                            on the existing device.
+                        </Text>
                     </Animated.View>
                 </KeyboardAvoidingView>
             </ScreenLayout>
@@ -574,6 +701,35 @@ const styles = StyleSheet.create({
     },
     checkPending: {
         color: colors.mutedDark,
+    },
+    confirmButtonStack: {
+        gap: 12,
+        marginTop: 24,
+    },
+    confirmHandleArea: {
+        marginTop: 22,
+    },
+    confirmHandleRow: {
+        alignItems: "center",
+        backgroundColor: colors.input,
+        borderColor: "rgba(255,255,255,0.06)",
+        borderWidth: 1,
+        flexDirection: "row",
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+    },
+    confirmHandleText: {
+        ...typography.bodyLarge,
+        color: colors.text,
+        flex: 1,
+        fontSize: 18,
+        letterSpacing: 0.5,
+    },
+    confirmPrimary: {
+        width: "100%",
+    },
+    confirmSecondary: {
+        width: "100%",
     },
     errorBox: {
         alignSelf: "stretch",

@@ -502,6 +502,29 @@ class VexService {
         return this.register(autoUsername, "", config, options, keyStore);
     }
 
+    /**
+     * Cancels a pending device-approval handshake that was started by
+     * `register()` after discovering the username was already taken.
+     *
+     * This is called when the user, on the "Is this you?" confirmation
+     * screen, picks "no — different name". We stop polling the server
+     * locally and reset the approval stage to "idle" so the auth UI
+     * doesn't show stale "waiting for approval" state.
+     *
+     * Note: the request itself still exists server-side until its TTL
+     * expires (a few minutes). We can't reject it from here because the
+     * new (unauthenticated) device doesn't own a token capable of
+     * touching the protected `/users/:id/devices/...` reject route. The
+     * existing device's owner will see the notification and can simply
+     * deny it themselves.
+     */
+    cancelPendingApproval(): void {
+        this.stopPendingApprovalWatcher();
+        $pendingApprovalStageWritable.set("idle");
+    }
+
+    // ── Server CRUD ─────────────────────────────────────────────────────
+
     async close(): Promise<void> {
         if (this.client) {
             this.detachWebsocketDebug();
@@ -516,8 +539,6 @@ class VexService {
             }
         }
     }
-
-    // ── Server CRUD ─────────────────────────────────────────────────────
 
     consumeRateLimitNotice(): boolean {
         if (!this.pendingRateLimitNotice) {
@@ -618,12 +639,12 @@ class VexService {
         }
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     async getChannelMembers(channelID: string): Promise<User[]> {
         const client = this.requireClient();
         return client.channels.userList(channelID);
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     async getDeviceRequest(
         requestID: string,
@@ -647,6 +668,8 @@ class VexService {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -689,8 +712,6 @@ class VexService {
             return null;
         }
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
@@ -853,14 +874,14 @@ class VexService {
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
 
+    // ── User operations ─────────────────────────────────────────────────
+
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
         return () => {
             this.deviceRequestQueueListeners.delete(listener);
         };
     }
-
-    // ── User operations ─────────────────────────────────────────────────
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
         try {
