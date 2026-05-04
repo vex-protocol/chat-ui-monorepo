@@ -21,6 +21,8 @@
  * Anyone holding the file can sign in as the owner on the target server
  * (until that server revokes the device). Treat it like a password.
  */
+import { Platform } from "react-native";
+
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
@@ -59,46 +61,28 @@ export type RestoreParseResult =
     | { error: string; ok: false };
 
 /**
- * Write the backup JSON to a temp file and present the OS share sheet so
- * the user can save it (Files app, iCloud Drive, AirDrop, Drive, etc.) or
- * send it via email/messaging.
+ * Write the backup JSON to the app's cache directory and present the OS
+ * share sheet ("Share via..." on Android, the standard share sheet on iOS).
  *
- * Falls back to a no-op error result on platforms where sharing isn't
- * available (web, etc.). The file in the cache directory persists past
- * the share dialog so the user can retry without re-exporting.
+ * On iOS this surfaces "Save to Files", AirDrop, Mail attachment, etc. On
+ * Android the share sheet only offers apps that handle `Intent.ACTION_SEND`
+ * — Drive, Mail, Bluetooth, messaging apps. **The system Files app is not
+ * one of those**, which is why "Save to Files" doesn't appear there. For
+ * the actual save-to-local-storage flow on Android, see
+ * {@link saveIdentityBackupToFolder} which uses the Storage Access
+ * Framework.
+ *
+ * The cache file persists past the share dialog so the user can retry
+ * without re-exporting; the OS evicts cache eventually.
  */
 export async function exportIdentityBackupFile(
     backup: Omit<IdentityBackup, "exportedAt" | "type" | "version">,
 ): Promise<ExportResult> {
-    const fileName = backupFileName(backup.username, backup.deviceID);
-    const fullBackup: IdentityBackup = {
-        ...backup,
-        exportedAt: new Date().toISOString(),
-        type: BACKUP_FILE_TYPE,
-        version: BACKUP_FILE_VERSION,
-    };
-    const json = `${JSON.stringify(fullBackup, null, 2)}\n`;
-
-    const dir = FileSystem.cacheDirectory;
-    if (!dir) {
+    const prepared = await prepareBackupCacheFile(backup);
+    if (!prepared.ok) {
         return {
-            error: "Filesystem unavailable on this platform.",
-            fileName,
-            ok: false,
-        };
-    }
-    const uri = `${dir}${fileName}`;
-    try {
-        await FileSystem.writeAsStringAsync(uri, json, {
-            encoding: FileSystem.EncodingType.UTF8,
-        });
-    } catch (err: unknown) {
-        return {
-            error:
-                err instanceof Error
-                    ? `Could not write backup file: ${err.message}`
-                    : "Could not write backup file.",
-            fileName,
+            error: prepared.error,
+            fileName: prepared.fileName,
             ok: false,
         };
     }
@@ -107,18 +91,17 @@ export async function exportIdentityBackupFile(
     if (!sharingAvailable) {
         return {
             error: "Sharing is not available on this device. The backup was saved to the app's cache.",
-            fileName,
+            fileName: prepared.fileName,
             ok: false,
         };
     }
 
     try {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(prepared.uri, {
             dialogTitle: "Save your Vex identity backup",
             mimeType: "application/json",
-            // Use a generic JSON MIME type so the OS offers maximum
-            // compatibility (Files, Drive, Mail, AirDrop). Some Android
-            // launchers ignore unknown MIME types entirely.
+            // Generic JSON MIME for maximum app compatibility. Some
+            // Android launchers ignore unknown MIME types entirely.
             UTI: "public.json",
         });
     } catch (err: unknown) {
@@ -127,12 +110,12 @@ export async function exportIdentityBackupFile(
                 err instanceof Error
                     ? err.message
                     : "Could not open the share sheet.",
-            fileName,
+            fileName: prepared.fileName,
             ok: false,
         };
     }
 
-    return { fileName, ok: true };
+    return { fileName: prepared.fileName, ok: true };
 }
 
 /**
@@ -213,6 +196,109 @@ export async function pickIdentityBackup(): Promise<RestoreParseResult> {
         };
     }
     return parseIdentityBackup(raw);
+}
+
+/**
+ * Android-only: prompt the user with the system Storage Access Framework
+ * directory picker and write the backup file into the chosen folder. This
+ * is the path that surfaces real user-visible storage destinations — the
+ * Files app, Downloads, the SD card, etc. — none of which `Sharing` can
+ * reach because they don't register for `Intent.ACTION_SEND`.
+ *
+ * Returns `{ canceled: true }` if the user dismissed the picker; that's
+ * not an error — the caller should silently fall back to its previous UI
+ * state.
+ *
+ * Calling this on iOS returns an error (the regular share sheet there
+ * already includes "Save to Files", so the SAF dance is unnecessary).
+ */
+export async function saveIdentityBackupToFolder(
+    backup: Omit<IdentityBackup, "exportedAt" | "type" | "version">,
+): Promise<
+    | ExportResult
+    | { canceled: true; fileName: string; ok: false }
+    | { error: string; fileName: string; ok: false }
+> {
+    const fileName = backupFileName(backup.username, backup.deviceID);
+    if (Platform.OS !== "android") {
+        return {
+            error: "Saving to a folder is only supported on Android. Use the share sheet instead.",
+            fileName,
+            ok: false,
+        };
+    }
+    const json = buildBackupJson(backup);
+
+    let permissions: Awaited<
+        ReturnType<
+            typeof FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync
+        >
+    >;
+    try {
+        permissions =
+            await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not open the folder picker: ${err.message}`
+                    : "Could not open the folder picker.",
+            fileName,
+            ok: false,
+        };
+    }
+    if (!permissions.granted) {
+        return { canceled: true, fileName, ok: false };
+    }
+
+    let createdUri: string;
+    try {
+        createdUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            permissions.directoryUri,
+            fileName,
+            "application/json",
+        );
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not create the file in that folder: ${err.message}`
+                    : "Could not create the file in that folder.",
+            fileName,
+            ok: false,
+        };
+    }
+
+    try {
+        await FileSystem.StorageAccessFramework.writeAsStringAsync(
+            createdUri,
+            json,
+            { encoding: FileSystem.EncodingType.UTF8 },
+        );
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not write the backup contents: ${err.message}`
+                    : "Could not write the backup contents.",
+            fileName,
+            ok: false,
+        };
+    }
+
+    return { fileName, ok: true };
+}
+
+function buildBackupJson(
+    backup: Omit<IdentityBackup, "exportedAt" | "type" | "version">,
+): string {
+    const fullBackup: IdentityBackup = {
+        ...backup,
+        exportedAt: new Date().toISOString(),
+        type: BACKUP_FILE_TYPE,
+        version: BACKUP_FILE_VERSION,
+    };
+    return `${JSON.stringify(fullBackup, null, 2)}\n`;
 }
 
 function parseJsonBackup(raw: string): RestoreParseResult {
@@ -347,6 +433,40 @@ function parseTextBackup(raw: string): RestoreParseResult {
         },
         ok: true,
     };
+}
+
+async function prepareBackupCacheFile(
+    backup: Omit<IdentityBackup, "exportedAt" | "type" | "version">,
+): Promise<
+    | { error: string; fileName: string; ok: false }
+    | { fileName: string; ok: true; uri: string }
+> {
+    const fileName = backupFileName(backup.username, backup.deviceID);
+    const dir = FileSystem.cacheDirectory;
+    if (!dir) {
+        return {
+            error: "Filesystem unavailable on this platform.",
+            fileName,
+            ok: false,
+        };
+    }
+    const uri = `${dir}${fileName}`;
+    const json = buildBackupJson(backup);
+    try {
+        await FileSystem.writeAsStringAsync(uri, json, {
+            encoding: FileSystem.EncodingType.UTF8,
+        });
+    } catch (err: unknown) {
+        return {
+            error:
+                err instanceof Error
+                    ? `Could not write backup file: ${err.message}`
+                    : "Could not write backup file.",
+            fileName,
+            ok: false,
+        };
+    }
+    return { fileName, ok: true, uri };
 }
 
 const HEX_KEY_PATTERN = /^[0-9a-fA-F]{32,256}$/;
