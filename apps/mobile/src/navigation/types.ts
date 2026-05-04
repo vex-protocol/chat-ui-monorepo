@@ -43,7 +43,6 @@ export type AuthStackParamList = {
         | undefined
         | { requestID?: string; signKey?: string; username?: string };
     HangTight: undefined | { force?: boolean };
-    PasskeyRecovery: undefined | { username?: string };
     Welcome: undefined;
 };
 

@@ -163,11 +163,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
         navigation.navigate("HangTight", { force: true });
     }, [navigation]);
 
-    const handlePasskeyRecovery = useCallback(() => {
-        haptic("tap");
-        navigation.navigate("PasskeyRecovery", {});
-    }, [navigation]);
-
     const applyParsedBackup = useCallback(
         async (backup: IdentityBackup) => {
             // Server-host gate: the deviceKey only authenticates against the
@@ -372,13 +367,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
                         title="Restore from backup"
                         variant="outline"
                     />
-                    <VexButton
-                        disabled={signingInUsername !== null}
-                        onPress={handlePasskeyRecovery}
-                        style={styles.addButton}
-                        title="Sign in with passkey"
-                        variant="outline"
-                    />
                 </View>
             </ScreenLayout>
         );
@@ -437,13 +425,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
                     onPress={handleRestore}
                     style={styles.addButton}
                     title="Restore from backup"
-                    variant="outline"
-                />
-                <VexButton
-                    disabled={signingInUsername !== null}
-                    onPress={handlePasskeyRecovery}
-                    style={styles.addButton}
-                    title="Sign in with passkey"
                     variant="outline"
                 />
             </View>
