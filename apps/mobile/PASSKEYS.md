@@ -41,8 +41,11 @@ production setup). Substitute your own host wherever you see it.
    current.
 3. spire — set `SPIRE_PASSKEY_RP_ID=api.vex.wtf` and
    `SPIRE_PASSKEY_ORIGINS` to the comma-separated list of expected
-   origins, including the `android:apk-key-hash:…` and
-   `ios:bundle-id:…` flavors emitted by mobile platforms.
+   origins (typically `https://api.vex.wtf` plus any
+   `ios:bundle-id:…` flavors). Native-Android
+   `android:apk-key-hash:<base64url>` entries are derived from
+   `SPIRE_PASSKEY_ANDROID_FINGERPRINTS` and merged in automatically;
+   you don't need to compute them by hand.
 
 If any one of those three legs is missing, the system credential
 manager will fail the ceremony with a "Domain mismatch" error well
@@ -112,25 +115,39 @@ Set these env vars on the server before starting it:
 ```
 SPIRE_PASSKEY_RP_ID=api.vex.wtf
 SPIRE_PASSKEY_RP_NAME=Vex
-SPIRE_PASSKEY_ORIGINS=android:apk-key-hash:<base64url-of-sha256>,ios:bundle-id:chat.vex.mobile
+SPIRE_PASSKEY_ORIGINS=https://api.vex.wtf,ios:bundle-id:chat.vex.mobile
 ```
 
 The `ORIGINS` list is what `simplewebauthn` uses to validate the
 `origin` field inside the assertion's `clientDataJSON`. Different
 mobile platforms sign different "origin" strings:
 
-- iOS native (the path our wrapper takes): `ios:bundle-id:chat.vex.mobile`.
-- Android Credential Manager: `android:apk-key-hash:<base64url(SHA-256(cert))>`.
+- iOS native (Apple Passkeys via Credential Manager):
+  `https://api.vex.wtf` (the RP host). Older flavors of the
+  authentication services framework instead emit
+  `ios:bundle-id:chat.vex.mobile`; list both if you target older OS
+  versions.
+- Android Credential Manager:
+  `android:apk-key-hash:<base64url(SHA-256(cert))>`. **Spire derives
+  these automatically** from `SPIRE_PASSKEY_ANDROID_FINGERPRINTS`
+  (see "Serving the well-known files from spire" below) and merges
+  them into the allowlist at request time, so the `ORIGINS` value
+  you set never needs to mention them.
 - Web (only relevant if you ship a browser client): the actual
   origin, e.g. `https://api.vex.wtf` or wherever the page loads
   from.
 
-Compute the Android base64url hash with
+If you ever need to verify the auto-derived value (e.g. when
+debugging an "RP failed" error from the mobile UI), the underlying
+math is:
 
 ```sh
 keytool -list -v -alias <alias> -keystore <keystore.jks> | \
     awk '/SHA256:/ {print $2}' | tr -d : | xxd -r -p | base64 | tr '+/' '-_' | tr -d '='
 ```
+
+— that should match one of the entries spire computes from your
+`SPIRE_PASSKEY_ANDROID_FINGERPRINTS`.
 
 ## Serving the well-known files from spire
 

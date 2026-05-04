@@ -2470,8 +2470,76 @@ function describeWsFrame(data: Uint8Array): {
 
 // ── VexService ──────────────────────────────────────────────────────────────
 
+/**
+ * Extract a human-readable message from an error.
+ *
+ * For axios HTTP errors, surface the server-sent body instead of
+ * the generic "Request failed with status code N". libvex configures
+ * its axios instance with `responseType: "arraybuffer"` so the body
+ * arrives as raw bytes regardless of `Content-Type`; spire's error
+ * envelopes are JSON in practice, in one of two shapes:
+ *
+ *   1. Flat:    { "error": "<message>" }
+ *   2. Wrapped: { "error": { "message": "<message>", "requestId": "..." } }
+ *
+ * Both come from spire's central error pipeline (`errors.ts`). We
+ * try (1) first, fall back to (2), and finally fall back to the raw
+ * decoded text or the underlying error's `.message` so that nothing
+ * goes silently lost.
+ *
+ * Without this, server-side validation failures reach the UI as
+ * "Request failed with status code 400" with no detail, which makes
+ * passkey / device / message errors effectively undebuggable.
+ */
 function errorMessage(err: unknown): string {
+    const fromBody = extractServerErrorBody(err);
+    if (fromBody !== null) {
+        return fromBody;
+    }
     return err instanceof Error ? err.message : String(err);
+}
+
+function extractServerErrorBody(err: unknown): null | string {
+    if (err == null || typeof err !== "object") return null;
+    const errObj = err as { response?: unknown };
+    const response = errObj.response;
+    if (response == null || typeof response !== "object") return null;
+    const data = (response as { data?: unknown }).data;
+    if (data == null) return null;
+
+    let bodyText: null | string = null;
+    if (data instanceof ArrayBuffer) {
+        bodyText = new TextDecoder().decode(data);
+    } else if (
+        data instanceof Uint8Array ||
+        (typeof data === "object" &&
+            "byteLength" in data &&
+            typeof (data as { byteLength: unknown }).byteLength === "number" &&
+            "buffer" in data)
+    ) {
+        bodyText = new TextDecoder().decode(data as Uint8Array);
+    } else if (typeof data === "string") {
+        bodyText = data;
+    } else if (typeof data === "object") {
+        return readErrorField(data) ?? null;
+    }
+
+    if (bodyText === null) return null;
+
+    try {
+        const parsed: unknown = JSON.parse(bodyText);
+        const fromJson = readErrorField(parsed);
+        if (fromJson !== null) return fromJson;
+    } catch {
+        // Body wasn't JSON; fall through and return the raw text if
+        // it looks usable.
+    }
+
+    const trimmed = bodyText.trim();
+    if (trimmed.length > 0 && trimmed.length < 500) {
+        return trimmed;
+    }
+    return null;
 }
 
 function generateAutoProvisionUsername(): string {
@@ -2587,6 +2655,21 @@ function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
 function jwtExpToEpochMs(exp: number): number {
     // JWT exp is conventionally seconds since epoch; tolerate ms values too.
     return exp > 1_000_000_000_000 ? exp : exp * 1000;
+}
+
+function readErrorField(body: unknown): null | string {
+    if (body == null || typeof body !== "object") return null;
+    const errorField = (body as { error?: unknown }).error;
+    if (typeof errorField === "string" && errorField.length > 0) {
+        return errorField;
+    }
+    if (errorField != null && typeof errorField === "object") {
+        const message = (errorField as { message?: unknown }).message;
+        if (typeof message === "string" && message.length > 0) {
+            return message;
+        }
+    }
+    return null;
 }
 
 function shouldDebugAuth(): boolean {
