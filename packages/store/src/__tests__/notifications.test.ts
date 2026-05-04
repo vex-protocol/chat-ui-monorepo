@@ -78,7 +78,7 @@ describe("shouldNotify", () => {
             expect(payload?.group).toBe("channel-42");
         });
 
-        test("group message title includes channel + server name when resolvable", () => {
+        test("group message uses author as title and stylized server/channel subtitle when resolvable", () => {
             const msg = makeMessage({
                 authorID: "alice",
                 group: "channel-42",
@@ -87,24 +87,27 @@ describe("shouldNotify", () => {
                 channelName: "general",
                 serverName: "DevHub",
             }));
-            expect(payload?.title).toBe("alice (#general, DevHub)");
+            expect(payload?.title).toBe("alice");
+            expect(payload?.subtitle).toBe("「DevHub」 · #general");
         });
 
-        test("group message falls back to generic channel title when unresolvable", () => {
+        test("group message falls back to generic subtitle when channel info unresolvable", () => {
             const msg = makeMessage({
                 authorID: "alice",
                 group: "channel-42",
             });
             const payload = shouldNotify(msg);
-            expect(payload?.title).toBe("alice (#channel)");
+            expect(payload?.title).toBe("alice");
+            expect(payload?.subtitle).toBe("Group chat");
         });
 
-        test("DM title is just the author name", () => {
+        test("DM title is just the author name and subtitle is null", () => {
             const msg = makeMessage({ authorID: "alice-uuid" });
             const payload = shouldNotify(msg, (uid) =>
                 uid === "alice-uuid" ? "Alice Smith" : undefined,
             );
             expect(payload?.title).toBe("Alice Smith");
+            expect(payload?.subtitle).toBeNull();
         });
 
         test("DM title falls back to truncated userID prefix when no resolver", () => {

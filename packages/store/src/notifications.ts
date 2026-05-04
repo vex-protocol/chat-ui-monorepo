@@ -9,7 +9,23 @@ export interface NotificationPayload {
     /** Set for group messages — the channelID. */
     group: null | string;
     mailID: string;
+    /**
+     * Group chats only — a short line for OS subtitle / second line
+     * (e.g. 「Server」 · #channel). Null for DMs.
+     */
+    subtitle: null | string;
+    /** Display name of the sender (notification title on most platforms). */
     title: string;
+}
+
+/** Stylized server + channel line for group notification subtitles. */
+export function formatGroupNotificationSubtitle(
+    serverName: string,
+    channelName: string,
+): string {
+    const raw = channelName.trim();
+    const ch = raw.startsWith("#") ? raw : `#${raw}`;
+    return `「${serverName}」 · ${ch}`;
 }
 
 /**
@@ -22,7 +38,7 @@ export interface NotificationPayload {
  *
  * @param msg                 - The incoming message
  * @param resolveAuthorName   - Optional lookup from userID to display name
- * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
+ * @param resolveChannelInfo  - Optional lookup from channelID to channel + server display names
  */
 export function shouldNotify(
     msg: Message,
@@ -40,14 +56,14 @@ export function shouldNotify(
     const authorName =
         resolveAuthorName?.(msg.authorID) ?? msg.authorID.slice(0, 8);
 
-    let title: string;
+    const title = authorName;
+
+    let subtitle: null | string = null;
     if (msg.group) {
         const info = resolveChannelInfo?.(msg.group);
-        title = info
-            ? `${authorName} (#${info.channelName}, ${info.serverName})`
-            : `${authorName} (#channel)`;
-    } else {
-        title = authorName;
+        subtitle = info
+            ? formatGroupNotificationSubtitle(info.serverName, info.channelName)
+            : "Group chat";
     }
 
     const body =
@@ -61,6 +77,7 @@ export function shouldNotify(
         conversationKey,
         group: msg.group,
         mailID: msg.mailID,
+        subtitle,
         title,
     };
 }

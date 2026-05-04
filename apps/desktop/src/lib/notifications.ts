@@ -57,7 +57,11 @@ export function setupNotifications(
         if (!focused) {
             const granted = await ensurePermission();
             if (granted) {
-                sendNotification({ body: payload.body, title: payload.title });
+                const body =
+                    payload.subtitle != null && payload.subtitle.length > 0
+                        ? `${payload.subtitle}\n\n${payload.body}`
+                        : payload.body;
+                sendNotification({ body, title: payload.title });
             }
         }
     };

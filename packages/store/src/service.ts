@@ -24,7 +24,7 @@ import type {
     PublicKeyCredentialRequestOptionsJSON,
 } from "@vex-chat/types";
 
-import { Client } from "@vex-chat/libvex";
+import { clampLocalMessageRetentionDays, Client } from "@vex-chat/libvex";
 
 import { validate as uuidValidate } from "uuid";
 
@@ -53,7 +53,6 @@ import {
 } from "./domains/servers.ts";
 import {
     $localMessageRetentionDaysWritable,
-    clampLocalMessageRetentionDays,
     setLocalMessageRetentionDaysPreference,
 } from "./domains/settings.ts";
 
@@ -860,12 +859,8 @@ class VexService {
 
     /** Effective local retention cap (defaults to 30 when signed out). */
     getLocalMessageRetentionDays(): number {
-        const c = this.client as unknown as {
-            getLocalMessageRetentionDays?: () => number;
-        };
-        const fromClient = c?.getLocalMessageRetentionDays?.();
-        if (typeof fromClient === "number" && Number.isFinite(fromClient)) {
-            return fromClient;
+        if (this.client) {
+            return this.client.getLocalMessageRetentionDays();
         }
         return $localMessageRetentionDaysWritable.get();
     }
@@ -1631,10 +1626,7 @@ class VexService {
     setLocalMessageRetentionDays(days: number): void {
         const clamped = clampLocalMessageRetentionDays(days);
         setLocalMessageRetentionDaysPreference(clamped);
-        const c = this.client as unknown as {
-            setLocalMessageRetentionDays?: (d: number) => void;
-        };
-        c?.setLocalMessageRetentionDays?.(clamped);
+        this.client?.setLocalMessageRetentionDays(clamped);
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────
@@ -1996,13 +1988,13 @@ class VexService {
         const storage = await config.createStorage(privateKey, username);
         debugAuth("initClient:storage:ok", { username });
 
-        const clientOptions = {
+        const clientOptions: ClientOptions = {
             ...options,
             deviceName: config.deviceName,
             localMessageRetentionDays: clampLocalMessageRetentionDays(
                 options.localMessageRetentionDays,
             ),
-        } as ClientOptions;
+        };
 
         this.client = await this.createClientWithRecovery(
             privateKey,

@@ -36,10 +36,13 @@ export {
 export {
     $localMessageRetentionDays,
     $localMessageRetentionDaysWritable,
-    clampLocalMessageRetentionDays,
-    MAX_LOCAL_MESSAGE_RETENTION_DAYS,
     setLocalMessageRetentionDaysPreference,
 } from "./domains/settings.ts";
+
+export {
+    clampLocalMessageRetentionDays,
+    MAX_LOCAL_MESSAGE_RETENTION_DAYS,
+} from "./local-message-retention.ts";
 
 // ── Utilities (pure functions, no state) ────────────────────────────────────
 
@@ -54,7 +57,10 @@ export {
 } from "./message-utils.ts";
 export type { FileAttachment, MessageChunk } from "./message-utils.ts";
 
-export { shouldNotify } from "./notifications.ts";
+export {
+    formatGroupNotificationSubtitle,
+    shouldNotify,
+} from "./notifications.ts";
 export type { NotificationPayload } from "./notifications.ts";
 
 export { vexService } from "./service.ts";

@@ -1,7 +1,14 @@
 import type { Message } from "@vex-chat/libvex";
 
+import { Platform } from "react-native";
+
 import { shouldNotify } from "@vex-chat/store";
-import { $channels, $familiars } from "@vex-chat/store";
+import {
+    $avatarVersions,
+    $channels,
+    $familiars,
+    $servers,
+} from "@vex-chat/store";
 
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
@@ -12,6 +19,8 @@ import {
     navigateToDeviceRequests,
 } from "../navigation/navigationRef";
 
+import { buildAvatarUrl } from "./avatarUrl";
+
 const CHANNEL_ID = "vex-messages";
 // Separate channel so users can mute messages but keep account-security
 // notifications loud (or vice versa) from system Settings → Notifications.
@@ -20,28 +29,13 @@ const CHANNEL_ID = "vex-messages";
 // default sound regardless of the messages channel preference.
 const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
-// We deliberately never hand the OS the decrypted message body or the sender's
-// name. Both platforms persist notification content far past the visible
-// banner, in surfaces that survive E2EE:
+// Message banners show sender display name, a short message preview, optional
+// group context (subtitle), and on iOS a sender avatar attachment. Be aware
+// the OS may persist visible notification text and images in notification
+// history, backups, and platform logging — a tradeoff for readable alerts.
 //
-//   - Android: NotificationManagerService writes every posted/updated/cancelled
-//     notification (title + content text) to logcat. logcat is readable by any
-//     process holding READ_LOGS, captured verbatim in bug reports, and on
-//     userdebug builds it lands in dmesg-adjacent kernel-side ring buffers.
-//
-//   - iOS: APNS payloads and posted notifications are persisted in the
-//     UserNotifications store and surfaced through the unified logging system.
-//     Forensic extraction tools (Cellebrite, GrayKey) routinely pull
-//     notification content off seized devices via sysdiagnose / the
-//     CoreDuet/Biome stores. This is the path that has been used to recover
-//     Signal messages from locked iPhones.
-//
-// The visible banner therefore carries only a fixed string. Routing data
-// (authorID, channelID, etc.) rides in the `data` field, which the OS does not
-// log to either of those surfaces and which we read back in
-// `handleNotificationPress` to route the tap.
-const GENERIC_TITLE = "Vex";
-const GENERIC_BODY = "New message";
+// Routing still uses opaque IDs in `data` for `handleNotificationPress`; human
+// strings are not required there.
 
 // Device-approval banners are also content-free for the same reason:
 // the approval flow proves which device wants in via the matching
@@ -340,39 +334,80 @@ function handleNotificationPress(
     navigateToConversation(authorID, username);
 }
 
+/** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */
+function iosAvatarAttachmentType(url: string): string {
+    const path = (url.split("?")[0] ?? url).toLowerCase();
+    if (path.endsWith(".png")) {
+        return "public.png";
+    }
+    if (path.endsWith(".gif")) {
+        return "public.gif";
+    }
+    if (path.endsWith(".webp")) {
+        return "public.webp";
+    }
+    return "public.jpeg";
+}
+
+function resolveAuthorNameMobile(userID: string): string | undefined {
+    return $familiars.get()[userID]?.username;
+}
+
+function resolveChannelInfoMobile(
+    channelID: string,
+): undefined | { channelName: string; serverName: string } {
+    const serverID = findServerForChannel(channelID);
+    if (!serverID) {
+        return undefined;
+    }
+    const serverChannels = $channels.get()[serverID] ?? [];
+    const channel = serverChannels.find((c) => c.channelID === channelID);
+    const server = $servers.get()[serverID];
+    const channelName = channel?.name ?? "channel";
+    const serverName = server?.name ?? serverID.slice(0, 8);
+    return { channelName, serverName };
+}
+
 async function scheduleOneMessageNotification(mail: Message): Promise<void> {
-    // We pass `shouldNotify` no resolver callbacks: it's still useful for the
-    // "should we notify at all?" gating (suppresses self-messages and the
-    // logged-out case), but the title/body it builds would only be discarded.
-    // Skipping the resolvers also avoids what was previously a `lookupUser`
-    // network roundtrip per incoming notifiable message — itself a metadata
-    // leak ("user X just got a message from Y") that we have no need to emit
-    // now that the banner doesn't display the name.
-    const payload = shouldNotify(mail);
+    const payload = shouldNotify(
+        mail,
+        (uid) => resolveAuthorNameMobile(uid),
+        mail.group ? (cid) => resolveChannelInfoMobile(cid) : undefined,
+    );
     if (!payload) return;
 
-    // For group messages we still need the owning serverID so the tap handler
-    // can navigate to the right server context. The channel-name string is
-    // *not* read here — it's resolved at tap time, not stored in `data`.
     const serverID = mail.group ? findServerForChannel(mail.group) : undefined;
 
     await ensureChannel();
 
-    // Routing data is intentionally limited to opaque IDs. The OS persists
-    // userInfo/extras alongside the visible content (see comment at top of
-    // file), so we never put human-readable strings — display names, channel
-    // names, message bodies — anywhere the OS can see. The tap handler
-    // resolves the IDs back to names from in-memory state.
+    const avatarUrl = buildAvatarUrl(
+        payload.authorID,
+        $avatarVersions.get()[payload.authorID],
+    );
+
+    const iosAvatar =
+        Platform.OS === "ios" && avatarUrl != null
+            ? [
+                  {
+                      identifier: "vex-sender-avatar",
+                      type: iosAvatarAttachmentType(avatarUrl),
+                      url: avatarUrl,
+                  },
+              ]
+            : null;
+
     await Notifications.scheduleNotificationAsync({
         content: {
-            body: GENERIC_BODY,
+            body: payload.body,
             data: {
                 authorID: payload.authorID,
                 channelID: payload.group ?? undefined,
                 kind: payload.group ? "group" : "dm",
                 serverID,
             },
-            title: GENERIC_TITLE,
+            title: payload.title,
+            ...(payload.subtitle != null ? { subtitle: payload.subtitle } : {}),
+            ...(iosAvatar != null ? { attachments: iosAvatar } : {}),
         },
         trigger: { channelId: CHANNEL_ID },
     });
