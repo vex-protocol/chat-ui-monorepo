@@ -48,6 +48,9 @@ catalogs:
     nanostores:
       specifier: ^1.2.0
       version: 1.2.0
+    react-native-passkey:
+      specifier: 3.3.3
+      version: 3.3.3
     svelte:
       specifier: ^5.45.2
       version: 5.55.1
@@ -273,6 +276,9 @@ importers:
       react-native-logs:
         specifier: ^5.6.0
         version: 5.6.0
+      react-native-passkey:
+        specifier: 'catalog:'
+        version: 3.3.3(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       react-native-safe-area-context:
         specifier: 5.6.2
         version: 5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
@@ -5212,6 +5218,12 @@ packages:
 
   react-native-logs@5.6.0:
     resolution: {integrity: sha512-+5A/AlepSGvaT2RE8YpoLOUNxfra8WBqUOM/GBjggCnfH5+RaCDThpKL6QnengAf+Limmoidm9YXPFzQ9cj3bQ==}
+
+  react-native-passkey@3.3.3:
+    resolution: {integrity: sha512-6pBKxjJ5lU6Mpw5sup7pwHqNDBnPd8sBXAKCN3pacAafldk0XU+fps8ZI7ut1iP6MxiNC/7LSwWq3/2Vn8tfbw==}
+    peerDependencies:
+      react: 19.2.0
+      react-native: '*'
 
   react-native-safe-area-context@5.6.2:
     resolution: {integrity: sha512-4XGqMNj5qjUTYywJqpdWZ9IG8jgkS3h06sfVjfw5yZQZfWnRFXczi0GnYyFyCc2EBps/qFmoCH8fez//WumdVg==}
@@ -12345,6 +12357,11 @@ snapshots:
       react-native: 0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0)
 
   react-native-logs@5.6.0: {}
+
+  react-native-passkey@3.3.3(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
+    dependencies:
+      react: 19.2.0
+      react-native: 0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0)
 
   react-native-safe-area-context@5.6.2(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0):
     dependencies:

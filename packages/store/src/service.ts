@@ -115,6 +115,65 @@ export interface OperationResult {
     ok: boolean;
 }
 
+/** Same shape as
+ * `simplewebauthn`'s `PublicKeyCredentialRequestOptionsJSON`. */
+export interface PasskeyAuthenticationRequestOptions {
+    allowCredentials?: { id: string; transports?: string[] }[];
+    challenge: string;
+    rpId?: string;
+    timeout?: number;
+    userVerification?: "discouraged" | "preferred" | "required";
+}
+
+/**
+ * Subset of `simplewebauthn`'s `PublicKeyCredentialCreationOptionsJSON`
+ * that the host needs to drive the registration ceremony. Inlined as
+ * a duck-type so this file doesn't have to import `@vex-chat/types`.
+ */
+export interface PasskeyRegistrationRequestOptions {
+    attestation?: string;
+    authenticatorSelection?: {
+        authenticatorAttachment?: "cross-platform" | "platform";
+        requireResidentKey?: boolean;
+        residentKey?: "discouraged" | "preferred" | "required";
+        userVerification?: "discouraged" | "preferred" | "required";
+    };
+    challenge: string;
+    excludeCredentials?: { id: string; transports?: string[] }[];
+    pubKeyCredParams: { alg: number; type: "public-key" }[];
+    rp: { id?: string; name: string };
+    timeout?: number;
+    user: { displayName: string; id: string; name: string };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Result of {@link VexService.beginPasskeySignIn}. Hands back the
+ * options the host needs to drive the platform WebAuthn ceremony,
+ * plus the `requestID` that ties the assertion in
+ * {@link VexService.finishPasskeySignIn} back to the same begin call.
+ */
+export interface PasskeySignInBegin {
+    options: PasskeyAuthenticationRequestOptions;
+    requestID: string;
+}
+
+/**
+ * Public-facing passkey shape (a subset of the spire/types
+ * `Passkey`). Inlined as a duck-type so this file doesn't depend on
+ * a libvex version that exports the new `Passkey` re-export — the
+ * surface only needs the fields the UI actually renders.
+ */
+export interface PasskeySummary {
+    createdAt: string;
+    lastUsedAt: null | string;
+    name: string;
+    passkeyID: string;
+    transports: string[];
+    userID: string;
+}
+
 export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 
 /** Server connection options — identical across all auth flows. */
@@ -131,8 +190,6 @@ export interface ServerOptions {
         | "warn";
     unsafeHttp?: boolean;
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
 
 export interface SessionInfo {
     authStatus:
@@ -184,6 +241,14 @@ interface ClientWithInternalHttp {
     http?: ClientHttpLike;
 }
 
+/**
+ * Duck-typed passkeys surface on the Client. We deliberately spell
+ * `passkeys` as optional because older published libvex versions
+ * don't have it at all — the methods below null-check before calling
+ * anything on it.
+ */
+type ClientWithPasskeys = Client & { passkeys?: PasskeysApiLike };
+
 interface ClientWithSocketLike {
     socket?: unknown;
 }
@@ -214,6 +279,32 @@ interface DevicesWithApprovalLike {
 
 interface HttpErrorLike {
     response: { status: number };
+}
+
+interface PasskeysApiLike {
+    approveDeviceRequest: (requestID: string) => Promise<unknown>;
+    beginAuthentication: (username: string) => Promise<{
+        options: PasskeyAuthenticationRequestOptions;
+        requestID: string;
+    }>;
+    beginRegistration: (name: string) => Promise<{
+        options: PasskeyRegistrationRequestOptions;
+        requestID: string;
+    }>;
+    delete: (passkeyID: string) => Promise<void>;
+    deleteDevice: (deviceID: string) => Promise<void>;
+    finishAuthentication: (args: {
+        requestID: string;
+        response: Record<string, unknown>;
+    }) => Promise<{ passkeyID: string; token: string; user: User }>;
+    finishRegistration: (args: {
+        name: string;
+        requestID: string;
+        response: Record<string, unknown>;
+    }) => Promise<PasskeySummary>;
+    list: () => Promise<PasskeySummary[]>;
+    listDevices: () => Promise<Device[]>;
+    rejectDeviceRequest: (requestID: string) => Promise<void>;
 }
 
 interface WebSocketDebugLike {
@@ -488,6 +579,62 @@ class VexService {
     }
 
     /**
+     * Begin a passkey-registration ceremony for the currently
+     * signed-in user. Returns the WebAuthn options the host should
+     * pass to the platform ceremony. Pair with
+     * {@link finishPasskeyRegistration} once the user has approved
+     * on their authenticator.
+     */
+    async beginPasskeyRegistration(name: string): Promise<{
+        options: PasskeyRegistrationRequestOptions;
+        requestID: string;
+    }> {
+        const passkeys = this.requirePasskeysApi();
+        if (!passkeys?.beginRegistration) {
+            throw new Error(
+                "This server doesn't support passkeys yet — please update spire.",
+            );
+        }
+        return passkeys.beginRegistration(name);
+    }
+
+    /**
+     * Begin a passkey authentication ceremony. Stage one of the
+     * recovery flow: the host drives the platform WebAuthn ceremony
+     * with the returned options, then hands the assertion back via
+     * {@link finishPasskeySignIn}.
+     *
+     * Boots a fresh, unauthenticated client against the supplied
+     * server (no device login, no storage). The username doesn't
+     * have to match anything on this device — the user is asserting
+     * "I'm @username, here's a passkey that proves it".
+     */
+    async beginPasskeySignIn(
+        username: string,
+        config: BootstrapConfig,
+        options: ServerOptions,
+    ): Promise<PasskeySignInBegin> {
+        const trimmed = username.trim();
+        if (trimmed.length === 0) {
+            throw new Error("Enter the username for your account.");
+        }
+        // Fresh client with a throwaway key — we never call
+        // loginWithDeviceKey on it. The HTTP transport is what we
+        // need; the device key just gives the constructor something
+        // to seal storage with.
+        const privateKey = Client.generateSecretKey();
+        await this.initClient(privateKey, trimmed, config, options, true);
+        const passkeys = this.requirePasskeysApi();
+        if (!passkeys?.beginAuthentication) {
+            throw new Error(
+                "This server doesn't support passkeys yet — please update spire.",
+            );
+        }
+        const begin = await passkeys.beginAuthentication(trimmed);
+        return begin;
+    }
+
+    /**
      * Zero-input bootstrap flow used on app startup:
      * 1) attempt device-key auto-login from local credentials
      * 2) if no credentials exist, auto-provision a fresh key cluster/device
@@ -631,6 +778,28 @@ class VexService {
         return true;
     }
 
+    /**
+     * Remove a passkey from the currently signed-in account. Works
+     * with either a device session OR a passkey session — spire's
+     * delete route accepts both, and the UI surfaces this from both
+     * Settings and the recovery screen.
+     */
+    async deletePasskey(passkeyID: string): Promise<OperationResult> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.delete) {
+                return {
+                    error: "This server doesn't support passkeys yet.",
+                    ok: false,
+                };
+            }
+            await passkeys.delete(passkeyID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
     async deleteServer(serverID: string): Promise<OperationResult> {
         try {
             const client = this.requireClient();
@@ -648,6 +817,76 @@ class VexService {
     }
 
     // ── Channel operations ──────────────────────────────────────────────
+
+    /**
+     * Finish a passkey-registration ceremony. Persists the new
+     * authenticator on spire and returns the public passkey shape
+     * for the Settings list.
+     */
+    async finishPasskeyRegistration(args: {
+        name: string;
+        requestID: string;
+        response: Record<string, unknown>;
+    }): Promise<{ error?: string; ok: boolean; passkey?: PasskeySummary }> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.finishRegistration) {
+                return {
+                    error: "This server doesn't support passkeys yet.",
+                    ok: false,
+                };
+            }
+            const passkey = await passkeys.finishRegistration(args);
+            return { ok: true, passkey };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /**
+     * Finish a passkey authentication ceremony. Stage two of the
+     * recovery flow. On success the libvex Client is in
+     * "passkey-only" mode — it can call the `passkeys.*` admin
+     * routes (list/delete devices, approve/reject pending
+     * enrollment) but messaging is unavailable until a device key
+     * takes over. The caller is expected to drive the user through
+     * the recovery screen and either:
+     *   - approve a pending enrollment for a fresh device, then
+     *     swap to a normal device session via `login()`/`autoLogin()`
+     *   - or just clean up old devices and sign back out.
+     */
+    async finishPasskeySignIn(args: {
+        requestID: string;
+        response: Record<string, unknown>;
+    }): Promise<{
+        error?: string;
+        ok: boolean;
+        userID?: string;
+        username?: string;
+    }> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.finishAuthentication) {
+                return {
+                    error: "This server doesn't support passkeys yet.",
+                    ok: false,
+                };
+            }
+            const result = await passkeys.finishAuthentication(args);
+            // We deliberately don't flip $userWritable / authStatus
+            // to "authenticated" here — the user is *not* in a full
+            // messaging session, just a short-lived recovery one.
+            // The recovery screen reads `getPasskeyUser()` to know
+            // who's authenticated.
+            return {
+                ok: true,
+                userID: result.user.userID,
+                username: result.user.username,
+            };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
 
     async getChannelMembers(channelID: string): Promise<User[]> {
         const client = this.requireClient();
@@ -767,6 +1006,18 @@ class VexService {
         );
         $devicesWritable.setKey(userID, sorted);
         return sorted;
+    }
+
+    /**
+     * List all passkeys belonging to the current account. Works in
+     * either a device session or a passkey-recovery session.
+     */
+    async listPasskeys(): Promise<PasskeySummary[]> {
+        const passkeys = this.requirePasskeysApi();
+        if (!passkeys?.list) {
+            return [];
+        }
+        return passkeys.list();
     }
 
     async listPendingDeviceRequests(): Promise<DeviceApprovalRequest[]> {
@@ -889,6 +1140,80 @@ class VexService {
         return () => {
             this.deviceRequestQueueListeners.delete(listener);
         };
+    }
+
+    /**
+     * Approve a pending device-enrollment request using the
+     * passkey-only session. Mirrors {@link approveDeviceRequest}
+     * but bypasses the device-JWT requirement; the caller must have
+     * just completed {@link finishPasskeySignIn}.
+     */
+    async passkeyApproveDeviceRequest(
+        requestID: string,
+    ): Promise<OperationResult> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.approveDeviceRequest) {
+                return {
+                    error: "This server doesn't support passkey-based recovery yet.",
+                    ok: false,
+                };
+            }
+            await passkeys.approveDeviceRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /** Delete a device using the passkey-only session. */
+    async passkeyDeleteDevice(deviceID: string): Promise<OperationResult> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.deleteDevice) {
+                return {
+                    error: "This server doesn't support passkey-based recovery yet.",
+                    ok: false,
+                };
+            }
+            await passkeys.deleteDevice(deviceID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    /** List all of the account's devices using the passkey-only session. */
+    async passkeyListDevices(): Promise<Device[]> {
+        const passkeys = this.requirePasskeysApi();
+        if (!passkeys?.listDevices) {
+            return [];
+        }
+        const devices = await passkeys.listDevices();
+        return [...devices].sort(
+            (a, b) =>
+                new Date(b.lastLogin).getTime() -
+                new Date(a.lastLogin).getTime(),
+        );
+    }
+
+    /** Reject a pending device-enrollment request using the passkey-only session. */
+    async passkeyRejectDeviceRequest(
+        requestID: string,
+    ): Promise<OperationResult> {
+        try {
+            const passkeys = this.requirePasskeysApi();
+            if (!passkeys?.rejectDeviceRequest) {
+                return {
+                    error: "This server doesn't support passkey-based recovery yet.",
+                    ok: false,
+                };
+            }
+            await passkeys.rejectDeviceRequest(requestID);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
     }
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
@@ -1911,6 +2236,18 @@ class VexService {
     private requireClient(): Client {
         if (!this.client) throw new Error("Not authenticated");
         return this.client;
+    }
+
+    /**
+     * Resolve the (duck-typed) passkeys surface on the active client,
+     * or null if the SDK build doesn't ship it. Centralizes the
+     * "is the libvex you're loading new enough?" guard so the
+     * callers can fall back to a friendly error message rather than
+     * crashing on `undefined.someMethod`.
+     */
+    private requirePasskeysApi(): null | PasskeysApiLike {
+        const client = this.requireClient() as ClientWithPasskeys;
+        return client.passkeys ?? null;
     }
 
     private resetAll(): void {

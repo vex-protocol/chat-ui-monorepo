@@ -9,6 +9,7 @@
         "ios": {
             "bundleIdentifier": "chat.vex.mobile",
             "supportsTablet": false,
+            "associatedDomains": ["webcredentials:vex.wtf"],
             "infoPlist": {
                 "NSFaceIDUsageDescription": "Authenticate to access your encryption keys"
             }

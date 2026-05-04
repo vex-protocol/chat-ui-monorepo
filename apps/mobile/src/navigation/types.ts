@@ -23,6 +23,7 @@ export type AppStackParamList = {
     Invite: { serverID: string; serverName?: string };
     JoinGroup: undefined;
     OnboardingEmpty: undefined;
+    Passkeys: undefined;
     ServerSettings: { serverID: string; serverName?: string };
     SessionDetails: undefined;
     Settings: undefined;
@@ -42,6 +43,7 @@ export type AuthStackParamList = {
         | undefined
         | { requestID?: string; signKey?: string; username?: string };
     HangTight: undefined | { force?: boolean };
+    PasskeyRecovery: undefined | { username?: string };
     Welcome: undefined;
 };
 
