@@ -10,12 +10,17 @@ export interface NotificationPayload {
     group: null | string;
     mailID: string;
     /**
-     * Group chats only — a short line for OS subtitle / second line
-     * (e.g. 「Server」 · #channel). Null for DMs.
+     * Where the message came from — same style for DMs and servers:
+     * 「Direct Messages」 or 「Server」 · #channel (or "Group chat" if unknown).
      */
-    subtitle: null | string;
+    subtitle: string;
     /** Display name of the sender (notification title on most platforms). */
     title: string;
+}
+
+/** DM context line, parallel to {@link formatGroupNotificationSubtitle}. */
+export function formatDmNotificationSubtitle(): string {
+    return "「Direct Messages」";
 }
 
 /** Stylized server + channel line for group notification subtitles. */
@@ -38,7 +43,7 @@ export function formatGroupNotificationSubtitle(
  *
  * @param msg                 - The incoming message
  * @param resolveAuthorName   - Optional lookup from userID to display name
- * @param resolveChannelInfo  - Optional lookup from channelID to channel + server display names
+ * @param resolveChannelName  - Optional lookup from channelID to "#channel, server" string
  */
 export function shouldNotify(
     msg: Message,
@@ -58,13 +63,17 @@ export function shouldNotify(
 
     const title = authorName;
 
-    let subtitle: null | string = null;
-    if (msg.group) {
-        const info = resolveChannelInfo?.(msg.group);
-        subtitle = info
-            ? formatGroupNotificationSubtitle(info.serverName, info.channelName)
-            : "Group chat";
-    }
+    const subtitle = msg.group
+        ? (() => {
+              const info = resolveChannelInfo?.(msg.group);
+              return info
+                  ? formatGroupNotificationSubtitle(
+                        info.serverName,
+                        info.channelName,
+                    )
+                  : "Group chat";
+          })()
+        : formatDmNotificationSubtitle();
 
     const body =
         msg.message.length > 100

@@ -42,6 +42,13 @@ const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 // may persist visible notification text and images in notification history,
 // backups, and platform logging — a tradeoff for readable alerts.
 //
+// iOS always shows the app icon on the compact banner; the sender attachment
+// appears in the expanded notification / notification list. Replacing the
+// banner icon with the sender requires Apple Communication Notifications
+// (special entitlement + server push patterns). Android requires a
+// monochrome smallIcon in the status bar; the sender avatar is shown as
+// largeIcon / MessagingStyle person art where the OS allows.
+//
 // Android message taps use Notifee (`displayNotification`); routing data is
 // also queued from `onBackgroundEvent` in index.js until NavigationContainer
 // is ready (`flushPendingNotificationRoutes`).
@@ -553,6 +560,7 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
                     ? { circularLargeIcon: true, largeIcon: avatarUrl }
                     : {}),
                 style: {
+                    group: true,
                     messages: [
                         {
                             person: {
@@ -567,17 +575,14 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
                         },
                     ],
                     person: { id: "self", name: "You" },
+                    title: payload.subtitle,
                     type: AndroidStyle.MESSAGING,
-                    ...(payload.subtitle != null
-                        ? { group: true, title: payload.subtitle }
-                        : {}),
                 },
             },
-            body: payload.body,
+            body: `${payload.title}: ${payload.body}`,
             data: routeData,
             id: payload.mailID,
-            ...(payload.subtitle != null ? { subtitle: payload.subtitle } : {}),
-            title: payload.title,
+            title: payload.subtitle,
         });
         return;
     }
@@ -595,15 +600,14 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
     await Notifications.scheduleNotificationAsync({
         content: {
-            body: payload.body,
+            body: `${payload.title}: ${payload.body}`,
             data: {
                 authorID: payload.authorID,
                 channelID: payload.group ?? undefined,
                 kind: payload.group ? "group" : "dm",
                 serverID,
             },
-            title: payload.title,
-            ...(payload.subtitle != null ? { subtitle: payload.subtitle } : {}),
+            title: payload.subtitle,
             ...(iosAvatar != null ? { attachments: iosAvatar } : {}),
         },
         trigger: { channelId: CHANNEL_ID },

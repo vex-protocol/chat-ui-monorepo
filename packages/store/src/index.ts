@@ -58,6 +58,7 @@ export {
 export type { FileAttachment, MessageChunk } from "./message-utils.ts";
 
 export {
+    formatDmNotificationSubtitle,
     formatGroupNotificationSubtitle,
     shouldNotify,
 } from "./notifications.ts";

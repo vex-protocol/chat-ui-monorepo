@@ -78,7 +78,7 @@ describe("shouldNotify", () => {
             expect(payload?.group).toBe("channel-42");
         });
 
-        test("group message uses author as title and stylized server/channel subtitle when resolvable", () => {
+        test("group message title is author; subtitle includes server and channel when resolvable", () => {
             const msg = makeMessage({
                 authorID: "alice",
                 group: "channel-42",
@@ -91,7 +91,7 @@ describe("shouldNotify", () => {
             expect(payload?.subtitle).toBe("「DevHub」 · #general");
         });
 
-        test("group message falls back to generic subtitle when channel info unresolvable", () => {
+        test("group message falls back to Group chat subtitle when unresolvable", () => {
             const msg = makeMessage({
                 authorID: "alice",
                 group: "channel-42",
@@ -101,19 +101,20 @@ describe("shouldNotify", () => {
             expect(payload?.subtitle).toBe("Group chat");
         });
 
-        test("DM title is just the author name and subtitle is null", () => {
+        test("DM title is the author name and subtitle is Direct Messages", () => {
             const msg = makeMessage({ authorID: "alice-uuid" });
             const payload = shouldNotify(msg, (uid) =>
                 uid === "alice-uuid" ? "Alice Smith" : undefined,
             );
             expect(payload?.title).toBe("Alice Smith");
-            expect(payload?.subtitle).toBeNull();
+            expect(payload?.subtitle).toBe("「Direct Messages」");
         });
 
         test("DM title falls back to truncated userID prefix when no resolver", () => {
             const msg = makeMessage({ authorID: "abcdef1234567890" });
             const payload = shouldNotify(msg);
             expect(payload?.title).toBe("abcdef12");
+            expect(payload?.subtitle).toBe("「Direct Messages」");
         });
 
         test("body passes through short messages unchanged", () => {
