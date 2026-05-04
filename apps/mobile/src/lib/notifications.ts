@@ -9,9 +9,16 @@ import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 import {
     navigateToChannel,
     navigateToConversation,
+    navigateToDeviceRequests,
 } from "../navigation/navigationRef";
 
 const CHANNEL_ID = "vex-messages";
+// Separate channel so users can mute messages but keep account-security
+// notifications loud (or vice versa) from system Settings → Notifications.
+// Device-approval requests are time-bounded (the request expires on a
+// short TTL) and security-relevant, so they get HIGH importance with a
+// default sound regardless of the messages channel preference.
+const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
 // We deliberately never hand the OS the decrypted message body or the sender's
 // name. Both platforms persist notification content far past the visible
@@ -36,6 +43,14 @@ const CHANNEL_ID = "vex-messages";
 const GENERIC_TITLE = "Vex";
 const GENERIC_BODY = "New message";
 
+// Device-approval banners are also content-free for the same reason:
+// the approval flow proves which device wants in via the matching
+// 4-character code displayed inside the app, not via anything the OS
+// might log. We just need the visible banner to nudge the user to
+// open the app and look at the approval screen.
+const DEVICE_APPROVAL_TITLE = "Vex";
+const DEVICE_APPROVAL_BODY = "New device sign-in request";
+
 // Resilience caps for the notification pipeline. When the
 // foreground-service has been pulling messages while the screen was
 // off and the device wakes, we may have a small burst of new mail to
@@ -59,8 +74,14 @@ const NOTIFICATION_QUEUE_CAP = 50;
 const NOTIFICATION_DRAIN_YIELD_MS = 25;
 
 let channelReady = false;
+let deviceApprovalChannelReady = false;
 const notificationQueue: Message[] = [];
 let notificationDrainInFlight = false;
+// Per-process dedupe so we never fire the same OS banner twice for the
+// same requestID. App.tsx already tracks "seen" request IDs at the toast
+// layer, but if the watcher re-runs (resume, refresh) it can call us
+// again for the same ID; we'd rather drop the duplicate than spam.
+const notifiedApprovalRequestIDs = new Set<string>();
 
 // Show banner + play sound when a notification arrives while the app is open.
 Notifications.setNotificationHandler({
@@ -72,6 +93,35 @@ Notifications.setNotificationHandler({
             shouldShowList: true,
         }),
 });
+
+/**
+ * Lets App.tsx forget previously-notified request IDs. Called on
+ * sign-out / user switch so a returning user doesn't carry the
+ * previous account's dedupe set into their session.
+ */
+export function clearNotifiedApprovalRequestIDs(): void {
+    notifiedApprovalRequestIDs.clear();
+}
+
+/**
+ * Dismisses the OS banner posted for `requestID`, if any. Called when
+ * the watcher observes that a previously-pending request has moved to
+ * approved / rejected / expired so the user doesn't keep seeing a
+ * banner for something they've already handled.
+ */
+export async function dismissDeviceApprovalNotification(
+    requestID: string,
+): Promise<void> {
+    notifiedApprovalRequestIDs.delete(requestID);
+    try {
+        await Notifications.dismissNotificationAsync(
+            deviceApprovalNotificationID(requestID),
+        );
+    } catch {
+        // Best-effort; the banner may have already been dismissed by
+        // the user, or never posted (e.g. iOS background).
+    }
+}
 
 export async function requestNotificationPermission(): Promise<boolean> {
     const settings = await Notifications.requestPermissionsAsync({
@@ -103,6 +153,57 @@ export function setupNotificationHandlers(): () => void {
 }
 
 /**
+ * Posts an OS-level banner for a fresh device-sign-in request that
+ * arrived over the WebSocket. Cheap when called repeatedly for the
+ * same `requestID` — we dedupe per process so a watcher refresh that
+ * re-observes the same pending request won't post a second banner.
+ *
+ * This complements the in-app `pendingApprovalNotice` toast: the toast
+ * is what the user sees if they're already in the app, the OS banner
+ * is what wakes them up when they're not. Tapping either lands on the
+ * same `DeviceRequests` screen where the matching 4-character code
+ * lives.
+ *
+ * On Android, this rides on the foreground service keeping the JS
+ * engine alive long enough to receive the WS event in the first
+ * place; on iOS the OS will only deliver this while the app is
+ * foreground (no background WebSocket), and the foreground notification
+ * handler above will surface it as a heads-up banner.
+ */
+export async function showDeviceApprovalNotification(
+    requestID: string,
+): Promise<void> {
+    if (notifiedApprovalRequestIDs.has(requestID)) {
+        return;
+    }
+    notifiedApprovalRequestIDs.add(requestID);
+    try {
+        await ensureDeviceApprovalChannel();
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                body: DEVICE_APPROVAL_BODY,
+                data: {
+                    kind: "deviceApproval",
+                    requestID,
+                },
+                title: DEVICE_APPROVAL_TITLE,
+            },
+            // Use the requestID itself as the OS-level identifier so we
+            // can dismiss the banner cleanly once the request resolves
+            // (approved / rejected / expired). Without this the banner
+            // would linger in the tray after the user has already
+            // dealt with it on the original device.
+            identifier: deviceApprovalNotificationID(requestID),
+            trigger: { channelId: DEVICE_APPROVAL_CHANNEL_ID },
+        });
+    } catch {
+        // Non-fatal — the in-app toast is still firing in parallel
+        // and will surface the request when the user opens the app.
+        notifiedApprovalRequestIDs.delete(requestID);
+    }
+}
+
+/**
  * Public entry point for "tell the user about this message."
  *
  * Implementation note: this looks like a single async function but
@@ -123,6 +224,14 @@ export async function showMessageNotification(mail: Message): Promise<void> {
         notificationQueue.shift();
     }
     await drainNotificationQueue();
+}
+
+function deviceApprovalNotificationID(requestID: string): string {
+    // Namespaced so it can never collide with a notification ID we
+    // generate elsewhere in the app (currently message banners are
+    // auto-IDed by expo-notifications, but a future change could add
+    // explicit IDs there too).
+    return `vex-device-approval:${requestID}`;
 }
 
 async function drainNotificationQueue(): Promise<void> {
@@ -171,6 +280,18 @@ async function ensureChannel(): Promise<void> {
     channelReady = true;
 }
 
+async function ensureDeviceApprovalChannel(): Promise<void> {
+    if (deviceApprovalChannelReady) return;
+    await Notifications.setNotificationChannelAsync(
+        DEVICE_APPROVAL_CHANNEL_ID,
+        {
+            importance: AndroidImportance.HIGH,
+            name: "Device requests",
+        },
+    );
+    deviceApprovalChannelReady = true;
+}
+
 function findServerForChannel(channelID: string): string | undefined {
     const channels = $channels.get();
     for (const [serverID, serverChannels] of Object.entries(channels)) {
@@ -188,6 +309,13 @@ function handleNotificationPress(
     const authorID = data?.["authorID"];
     const channelID = data?.["channelID"];
     const serverID = data?.["serverID"];
+    if (kind === "deviceApproval") {
+        // Land on the actual approve/deny applet — the matching code is
+        // displayed inside that screen, and that's the only thing the
+        // user has to do here.
+        navigateToDeviceRequests();
+        return;
+    }
     if (
         kind === "group" &&
         typeof channelID === "string" &&

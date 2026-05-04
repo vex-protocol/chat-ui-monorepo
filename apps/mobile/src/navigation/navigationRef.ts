@@ -24,6 +24,13 @@ export function navigateToConversation(userID: string, username: string): void {
     });
 }
 
+export function navigateToDeviceRequests(): void {
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate("App", {
+        screen: "DeviceRequests",
+    });
+}
+
 export function navigateToDevices(): void {
     if (!navigationRef.isReady()) return;
     navigationRef.navigate("App", {

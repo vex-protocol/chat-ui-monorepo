@@ -4,9 +4,9 @@ import React from "react";
 
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
+import { AccountSelectorScreen } from "../screens/AccountSelectorScreen";
 import { AuthenticateScreen } from "../screens/AuthenticateScreen";
 import { HangTightScreen } from "../screens/HangTightScreen";
-import { WelcomeBackScreen } from "../screens/WelcomeBackScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
 
 const Stack = createNativeStackNavigator<AuthStackParamList>();
@@ -19,7 +19,10 @@ export function AuthStack() {
         >
             <Stack.Screen component={WelcomeScreen} name="Welcome" />
             <Stack.Screen component={HangTightScreen} name="HangTight" />
-            <Stack.Screen component={WelcomeBackScreen} name="WelcomeBack" />
+            <Stack.Screen
+                component={AccountSelectorScreen}
+                name="AccountSelector"
+            />
             <Stack.Screen component={AuthenticateScreen} name="Authenticate" />
         </Stack.Navigator>
     );

@@ -21,6 +21,8 @@ import type {
 
 import { Client } from "@vex-chat/libvex";
 
+import { validate as uuidValidate } from "uuid";
+
 import {
     $authStatusWritable,
     $avatarHashWritable,
@@ -63,6 +65,14 @@ export interface AuthResult {
      * the request payload's `signKey`).
      */
     pendingSignKey?: string;
+    /**
+     * Existing user's ID when registration hit a "username already
+     * taken" branch. Lets the UI fetch the public avatar from the
+     * unauthenticated `/avatar/:userID` endpoint to power an
+     * "is this you?" confirmation. Optional because older servers
+     * don't include it in the pending response.
+     */
+    pendingUserID?: string;
 }
 
 export type BackgroundNetworkFetchResult = "failed" | "new_data" | "no_data";
@@ -500,6 +510,29 @@ class VexService {
         return this.register(autoUsername, "", config, options, keyStore);
     }
 
+    /**
+     * Cancels a pending device-approval handshake that was started by
+     * `register()` after discovering the username was already taken.
+     *
+     * This is called when the user, on the "Is this you?" confirmation
+     * screen, picks "no — different name". We stop polling the server
+     * locally and reset the approval stage to "idle" so the auth UI
+     * doesn't show stale "waiting for approval" state.
+     *
+     * Note: the request itself still exists server-side until its TTL
+     * expires (a few minutes). We can't reject it from here because the
+     * new (unauthenticated) device doesn't own a token capable of
+     * touching the protected `/users/:id/devices/...` reject route. The
+     * existing device's owner will see the notification and can simply
+     * deny it themselves.
+     */
+    cancelPendingApproval(): void {
+        this.stopPendingApprovalWatcher();
+        $pendingApprovalStageWritable.set("idle");
+    }
+
+    // ── Server CRUD ─────────────────────────────────────────────────────
+
     async close(): Promise<void> {
         if (this.client) {
             this.detachWebsocketDebug();
@@ -514,8 +547,6 @@ class VexService {
             }
         }
     }
-
-    // ── Server CRUD ─────────────────────────────────────────────────────
 
     consumeRateLimitNotice(): boolean {
         if (!this.pendingRateLimitNotice) {
@@ -616,12 +647,12 @@ class VexService {
         }
     }
 
+    // ── Channel operations ──────────────────────────────────────────────
+
     async getChannelMembers(channelID: string): Promise<User[]> {
         const client = this.requireClient();
         return client.channels.userList(channelID);
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     async getDeviceRequest(
         requestID: string,
@@ -645,6 +676,8 @@ class VexService {
         const client = this.requireClient();
         return client.invites.retrieve(serverID);
     }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -687,8 +720,6 @@ class VexService {
             return null;
         }
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     getWebsocketDebugEnabled(): boolean {
         return this.wsDebugEnabled;
@@ -830,7 +861,16 @@ class VexService {
     async lookupUser(query: string): Promise<null | User> {
         try {
             const client = this.requireClient();
-            const [user] = await client.users.retrieve(query);
+            // Lowercase non-UUID lookups so cache keys / negative-
+            // cache hits inside libvex are consistent regardless of
+            // how the caller typed the handle. UUID identifiers are
+            // pass-through; libvex's `fetchUser` makes the same
+            // distinction internally.
+            const trimmed = query.trim();
+            const normalizedQuery = uuidValidate(trimmed)
+                ? trimmed
+                : trimmed.toLowerCase();
+            const [user] = await client.users.retrieve(normalizedQuery);
             return user;
         } catch {
             return null;
@@ -842,14 +882,14 @@ class VexService {
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
 
+    // ── User operations ─────────────────────────────────────────────────
+
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
         return () => {
             this.deviceRequestQueueListeners.delete(listener);
         };
     }
-
-    // ── User operations ─────────────────────────────────────────────────
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
         try {
@@ -1023,9 +1063,14 @@ class VexService {
             debugAuth("register:http:begin", {
                 endpoint: `${options.host}/register`,
             });
+            // Usernames are case-insensitive at the protocol level —
+            // the server canonicalizes to lowercase at registration.
+            // Pre-normalizing here keeps the local view (UI state,
+            // logging, error messages) consistent with what will
+            // eventually round-trip back as `me.user().username`.
             const registrationUsername =
                 username.trim().length > 0
-                    ? username.trim()
+                    ? username.trim().toLowerCase()
                     : generateAutoProvisionUsername();
             const [user, regErr] = await withTimeout(
                 client.register(registrationUsername),
@@ -1072,6 +1117,9 @@ class VexService {
                         pendingRequestID: pending.requestID,
                         ...(pendingSignKey !== undefined
                             ? { pendingSignKey }
+                            : {}),
+                        ...(pending.userID !== null
+                            ? { pendingUserID: pending.userID }
                             : {}),
                     };
                 }
@@ -1534,8 +1582,12 @@ class VexService {
     private extractPendingApprovalDetails(err: unknown): null | {
         challenge: null | string;
         requestID: string;
+        userID: null | string;
     } {
-        // libvex >=6.1.4 throws a typed error carrying both fields.
+        // libvex >=6.1.4 throws a typed error carrying both fields;
+        // newer libvex/server pairings additionally carry the existing
+        // user's ID so we can show their avatar in the "is this you?"
+        // confirmation.
         if (
             err !== null &&
             typeof err === "object" &&
@@ -1544,10 +1596,15 @@ class VexService {
         ) {
             const requestID = (err as { requestID: string }).requestID;
             const maybeChallenge = (err as { challenge?: unknown }).challenge;
+            const maybeUserID = (err as { userID?: unknown }).userID;
             return {
                 challenge:
                     typeof maybeChallenge === "string" ? maybeChallenge : null,
                 requestID,
+                userID:
+                    typeof maybeUserID === "string" && maybeUserID.length > 0
+                        ? maybeUserID
+                        : null,
             };
         }
         const message =
@@ -1559,7 +1616,7 @@ class VexService {
                 : "";
         const match = /requestID=([0-9a-fA-F-]+)/.exec(message);
         if (match?.[1]) {
-            return { challenge: null, requestID: match[1] };
+            return { challenge: null, requestID: match[1], userID: null };
         }
         return null;
     }

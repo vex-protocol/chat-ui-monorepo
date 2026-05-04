@@ -40,7 +40,7 @@
     "pnpm": {
         "overrides": {
             "@vex-chat/crypto": "4.0.1",
-            "@vex-chat/libvex": "6.1.7",
+            "@vex-chat/libvex": "6.1.8",
             "@vex-chat/types": "3.1.0",
             "react": "19.2.0",
             "react-dom": "19.2.0",

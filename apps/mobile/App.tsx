@@ -36,15 +36,22 @@ import {
     startAlwaysOn,
     suspendAlwaysOn,
 } from "./src/lib/foregroundService";
-import { clearCredentials, keychainKeyStore } from "./src/lib/keychain";
 import {
+    clearCredentials,
+    keychainKeyStore,
+    setUserIDForUsername,
+} from "./src/lib/keychain";
+import {
+    clearNotifiedApprovalRequestIDs,
+    dismissDeviceApprovalNotification,
     requestNotificationPermission,
     setupNotificationHandlers,
+    showDeviceApprovalNotification,
     showMessageNotification,
 } from "./src/lib/notifications";
 import { mobileConfig } from "./src/lib/platform";
 import {
-    navigateToDevices,
+    navigateToDeviceRequests,
     navigationRef,
 } from "./src/navigation/navigationRef";
 import { RootNavigator } from "./src/navigation/RootNavigator";
@@ -162,6 +169,20 @@ function App() {
             unsubNotif();
         };
     }, []);
+
+    // Mirror the active user's userID into SecureStore so the offline
+    // account picker can render real avatars (the libvex StoredCredentials
+    // shape doesn't carry userID, so we maintain a parallel mapping per
+    // username here). Best-effort — failure just causes the picker to
+    // fall back to initial-letter tiles.
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        void setUserIDForUsername(user.username, user.userID).catch(() => {
+            /* swallow — non-fatal */
+        });
+    }, [user]);
 
     useEffect(() => {
         if (Platform.OS !== "android") {
@@ -361,6 +382,10 @@ function App() {
     useEffect(() => {
         seenPendingRequestIDsRef.current = new Set();
         setPendingApprovalNotice(null);
+        // Forget any OS-banner dedupe state from a previous session so
+        // a returning user (or post-sign-out re-login) gets a fresh
+        // banner for genuinely-new requests on this account.
+        clearNotifiedApprovalRequestIDs();
         if (!user?.userID) {
             return;
         }
@@ -377,22 +402,45 @@ function App() {
                 const nextIDs = new Set(
                     pending.map((request) => request.requestID),
                 );
-                const hasNewPending = pending.some(
+                // Compute the actual list of brand-new requestIDs (rather
+                // than just a boolean) so we can post one OS banner per
+                // new request without spamming for ones the user has
+                // already seen.
+                const newRequests = pending.filter(
                     (request) =>
                         !seenPendingRequestIDsRef.current.has(
                             request.requestID,
                         ),
                 );
+                // Any requestID we previously surfaced an OS banner
+                // for that's no longer pending — approved, rejected,
+                // or expired — should have its banner dismissed so the
+                // user doesn't keep seeing a stale notification for
+                // something they've already handled.
+                for (const previousID of seenPendingRequestIDsRef.current) {
+                    if (!nextIDs.has(previousID)) {
+                        void dismissDeviceApprovalNotification(previousID);
+                    }
+                }
                 seenPendingRequestIDsRef.current = nextIDs;
                 if (pending.length === 0) {
                     setPendingApprovalNotice(null);
                     return;
                 }
-                if (hasNewPending) {
+                if (newRequests.length > 0) {
                     // Soft tactile cue so the approver notices a fresh
                     // device request even if the toast is partly out of view.
                     Vibration.vibrate([0, 18, 60, 18]);
                     setPendingApprovalNotice({ count: pending.length });
+                    // Now that the Android FGS keeps the WS alive while
+                    // backgrounded, also post an OS-level banner so the
+                    // user is woken up to approve from outside the app.
+                    // The notification module dedupes per-process by
+                    // requestID, so a watcher refresh that re-observes
+                    // the same request can't double-fire.
+                    for (const request of newRequests) {
+                        void showDeviceApprovalNotification(request.requestID);
+                    }
                 }
             } catch {
                 // ignore request-list errors in toast logic
@@ -436,7 +484,6 @@ function App() {
                         if (refreshed !== "unauthorized") {
                             return;
                         }
-                        await clearCredentials();
                         await vexService.logout();
                         setAuthNotice("Session expired. Please sign in again.");
                         return;
@@ -458,7 +505,6 @@ function App() {
                     if (refreshed !== "unauthorized") {
                         return;
                     }
-                    await clearCredentials();
                     await vexService.logout();
                     setAuthNotice("Session expired. Please sign in again.");
                 } finally {
@@ -503,7 +549,6 @@ function App() {
                 if (!active || status !== "unauthorized") {
                     return;
                 }
-                await clearCredentials();
                 await vexService.logout();
                 setAuthNotice("Session expired. Please sign in again.");
             } catch (err: unknown) {
@@ -705,7 +750,11 @@ function App() {
                     <Pressable
                         onPress={() => {
                             setPendingApprovalNotice(null);
-                            navigateToDevices();
+                            // Land directly on the approval applet — the
+                            // intermediate "Devices" menu was added later
+                            // and is the wrong target now (one extra tap
+                            // before the user can actually approve/deny).
+                            navigateToDeviceRequests();
                         }}
                         style={styles.approvalNoticeCard}
                     >

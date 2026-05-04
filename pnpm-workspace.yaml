@@ -9,12 +9,16 @@ catalog:
     "@notifee/react-native": ^9.1.8
     "@types/node": ^24.10.1
     "@vex-chat/crypto": 4.0.0
-    "@vex-chat/libvex": 6.1.7
+    "@vex-chat/libvex": 6.1.8
     "@vex-chat/types": 3.1.0
     dompurify: ^3.2.6
     expo-background-fetch: ~55.0.15
     expo-background-task: ~55.0.17
+    expo-clipboard: ~55.0.13
+    expo-document-picker: ~55.0.13
+    expo-file-system: ~55.0.17
     expo-image-manipulator: ^55.0.15
+    expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
     kysely: ^0.28.15
     marked: ^15.0.12
