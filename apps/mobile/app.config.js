@@ -74,6 +74,14 @@ module.exports = ({ config }) => {
             ...(config.plugins ?? []),
             "expo-background-task",
             "./plugins/withForegroundService",
+            // Safety net for Notifee FGS small-icon resolution.
+            // expo-notifications' density-specific
+            // `notification_icon.png` files normally win on real
+            // devices, but if any density bucket is missing the FGS
+            // crashes the entire app. This plugin guarantees the
+            // catch-all `@drawable/notification_icon` always
+            // resolves to a valid white-on-transparent vector.
+            "./plugins/withNotificationIcon",
         ],
     };
 };

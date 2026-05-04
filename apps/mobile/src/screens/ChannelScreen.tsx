@@ -22,13 +22,7 @@ import {
     View,
 } from "react-native";
 
-import {
-    $groupMessages,
-    $permissions,
-    $servers,
-    $user,
-    vexService,
-} from "@vex-chat/store";
+import { $groupMessages, $servers, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,21 +53,10 @@ export function ChannelScreen({
 }: AppScreenProps<"Channel">) {
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
-    const permissions = useStore($permissions);
     // Scoped to just this server's slot so other server churn doesn't re-render us.
     const servers = useStore($servers, { keys: [serverID] });
     const user = useStore($user);
     const serverName = servers[serverID]?.name ?? "";
-    const canOpenServerSettings = useMemo(() => {
-        const myUserID = user?.userID;
-        if (!myUserID) return false;
-        const matchingPermissions = Object.values(permissions).filter(
-            (permission) =>
-                permission.resourceID === serverID &&
-                permission.userID === myUserID,
-        );
-        return matchingPermissions.length > 0;
-    }, [permissions, serverID, user?.userID]);
 
     // Store keeps messages oldest-first; inverted FlatList needs newest-first
     const messages = useMemo(() => {
@@ -325,16 +308,12 @@ export function ChannelScreen({
             style={styles.container}
         >
             <ChatHeader
-                onOverflow={
-                    canOpenServerSettings
-                        ? () => {
-                              navigation.navigate("ServerSettings", {
-                                  serverID,
-                                  serverName,
-                              });
-                          }
-                        : undefined
-                }
+                onOverflow={() => {
+                    navigation.navigate("ServerSettings", {
+                        serverID,
+                        serverName,
+                    });
+                }}
                 onUsers={() => {
                     toggleMembersDrawer();
                 }}

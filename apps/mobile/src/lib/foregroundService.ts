@@ -147,22 +147,28 @@ export async function startAlwaysOn(): Promise<void> {
             channelId,
             ongoing: true,
             pressAction: { id: "default" },
-            // `notification_icon` is the drawable resource name that
-            // the `expo-notifications` config plugin generates from
-            // the `icon` path declared in app.json. The constant is
-            // hard-coded inside the plugin (`NOTIFICATION_ICON`), so
-            // this string is the contract — if you ever switch off
-            // expo-notifications' icon generation you must drop a
-            // drawable with this exact name into android/.../res/.
+            // `notification_icon` is a vector drawable written into
+            // `android/.../res/drawable/notification_icon.xml` by
+            // our `plugins/withNotificationIcon.js` config plugin
+            // (registered in app.config.js). The plugin runs after
+            // `expo-notifications` and intentionally strips the
+            // raster PNGs that plugin would otherwise generate, so
+            // our white-silhouette vector is what actually resolves
+            // at runtime.
             //
-            // History: previously this was "ic_notification", which
-            // never existed in res/ because nothing was generating
-            // it. Android 14+ rejects FGS startup if smallIcon can't
-            // be resolved, which surfaces as
+            // Why bother having our own plugin instead of trusting
+            // expo-notifications: Android 13+ rejects FGS startup
+            // if smallIcon can't be resolved, surfacing as
             //   IllegalArgumentException: Invalid notification (no
             //     valid small icon)
-            // and crashes the entire process from
-            // app.notifee.core.ForegroundService.onStartCommand.
+            // from inside `app.notifee.core.ForegroundService.
+            // onStartCommand` — a native callback no JS try/catch
+            // can intercept. Any drift between app.json's icon
+            // config and the actual drawable on disk (stale
+            // prebuild, partial regeneration, etc.) crashes the app
+            // the moment the user toggles always-on. Owning the
+            // drawable in our own plugin makes that failure mode
+            // structurally impossible.
             smallIcon: "notification_icon",
         },
         body: "Connected",
