@@ -50,6 +50,7 @@ import {
     showMessageNotification,
 } from "./src/lib/notifications";
 import { mobileConfig } from "./src/lib/platform";
+import { hydrateLocalMessageRetention } from "./src/lib/retentionPreference";
 import {
     navigateToDeviceRequests,
     navigationRef,
@@ -225,6 +226,7 @@ function App() {
         bootstrappedRef.current = true;
         void (async () => {
             try {
+                await hydrateLocalMessageRetention();
                 await requestNotificationPermission();
                 const result = await vexService.autoLogin(
                     keychainKeyStore,
@@ -297,6 +299,7 @@ function App() {
                     setTimeout(() => {
                         void (async () => {
                             try {
+                                await hydrateLocalMessageRetention();
                                 const result = await vexService.autoLogin(
                                     keychainKeyStore,
                                     mobileConfig(),

@@ -27,6 +27,7 @@ import { VexLogo } from "../components/VexLogo";
 import { getServerOptions } from "../lib/config";
 import { keychainKeyStore, listKnownAccounts } from "../lib/keychain";
 import { mobileConfig } from "../lib/platform";
+import { hydrateLocalMessageRetention } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
 
 interface PendingApprovalSnapshot {
@@ -189,6 +190,7 @@ export function HangTightScreen({
             setBootError("");
             setPhase("boot");
             try {
+                await hydrateLocalMessageRetention();
                 const result = await vexService.autoLogin(
                     keychainKeyStore,
                     mobileConfig(),
@@ -382,8 +384,14 @@ export function HangTightScreen({
         setBusy(true);
         setBootError("");
         setPhase("boot");
-        void vexService
-            .autoLogin(keychainKeyStore, mobileConfig(), getServerOptions())
+        void (async () => {
+            await hydrateLocalMessageRetention();
+            return vexService.autoLogin(
+                keychainKeyStore,
+                mobileConfig(),
+                getServerOptions(),
+            );
+        })()
             .then(async (result) => {
                 // Mirror the bootstrap path: a successful "no creds" or a
                 // requireReauth result both belong on the picker/form, not

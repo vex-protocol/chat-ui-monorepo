@@ -17,7 +17,6 @@ export {
     $user,
 } from "./domains/identity.ts";
 export type { AuthStatus, PendingApprovalStage } from "./domains/identity.ts";
-
 export {
     $channelUnreadCounts,
     $dmUnreadCounts,
@@ -33,6 +32,14 @@ export {
     $permissions,
     $servers,
 } from "./domains/servers.ts";
+
+export {
+    $localMessageRetentionDays,
+    $localMessageRetentionDaysWritable,
+    clampLocalMessageRetentionDays,
+    MAX_LOCAL_MESSAGE_RETENTION_DAYS,
+    setLocalMessageRetentionDaysPreference,
+} from "./domains/settings.ts";
 
 // ── Utilities (pure functions, no state) ────────────────────────────────────
 

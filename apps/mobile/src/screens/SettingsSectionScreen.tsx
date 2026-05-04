@@ -17,8 +17,9 @@ import {
     View,
 } from "react-native";
 
-import { $user, vexService } from "@vex-chat/store";
+import { $localMessageRetentionDays, $user, vexService } from "@vex-chat/store";
 
+import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -36,7 +37,10 @@ import {
     stopAlwaysOn,
 } from "../lib/foregroundService";
 import { requestNotificationPermission } from "../lib/notifications";
+import { persistLocalMessageRetentionDays } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
+
+const LOCAL_RETENTION_CHOICES = [7, 14, 21, 30] as const;
 
 const DEV_UNLOCK_TAPS = 7;
 const DEV_UNLOCK_WINDOW_MS = 3000;
@@ -48,6 +52,7 @@ export function SettingsSectionScreen({
 }: AppScreenProps<"SettingsSection">) {
     const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
     const user = useStore($user);
+    const localRetentionDays = useStore($localMessageRetentionDays);
     const section = route.params.section;
     const [avatarError, setAvatarError] = useState("");
     const [avatarLastAttemptBytes, setAvatarLastAttemptBytes] = useState<
@@ -244,6 +249,13 @@ export function SettingsSectionScreen({
                 },
             ],
         );
+    }
+
+    async function handleSelectLocalRetention(
+        days: (typeof LOCAL_RETENTION_CHOICES)[number],
+    ): Promise<void> {
+        await persistLocalMessageRetentionDays(days);
+        vexService.setLocalMessageRetentionDays(days);
     }
 
     function formatBytes(bytes: number): string {
@@ -705,15 +717,46 @@ export function SettingsSectionScreen({
                 ) : null}
 
                 {section === "data" ? (
-                    <MenuSection title="Local Data">
-                        <MenuRow
-                            description="Clear all unread badges"
-                            icon="refresh-outline"
-                            label="Reset unread counters"
-                            onPress={handleResetUnreadCounts}
-                            tone="danger"
-                        />
-                    </MenuSection>
+                    <>
+                        <MenuSection
+                            footer="The server deletes undelivered mail after 30 days. Here you can keep fewer days on this device only. If another client sends a shorter retention hint, this device uses the shorter of your choice, that hint, and 30 days. A modified client could ignore hints."
+                            title="Local message history"
+                        >
+                            {LOCAL_RETENTION_CHOICES.map((d) => (
+                                <MenuRow
+                                    accessory={
+                                        d === localRetentionDays ? (
+                                            <Ionicons
+                                                color="rgba(255,255,255,0.85)"
+                                                name="checkmark"
+                                                size={22}
+                                            />
+                                        ) : undefined
+                                    }
+                                    description={
+                                        d === localRetentionDays
+                                            ? "Currently selected"
+                                            : `Keep decrypted messages up to ${String(d)} days`
+                                    }
+                                    icon="time-outline"
+                                    key={d}
+                                    label={`${String(d)} days`}
+                                    onPress={() => {
+                                        void handleSelectLocalRetention(d);
+                                    }}
+                                />
+                            ))}
+                        </MenuSection>
+                        <MenuSection title="Local Data">
+                            <MenuRow
+                                description="Clear all unread badges"
+                                icon="refresh-outline"
+                                label="Reset unread counters"
+                                onPress={handleResetUnreadCounts}
+                                tone="danger"
+                            />
+                        </MenuSection>
+                    </>
                 ) : null}
             </ScrollView>
         </View>

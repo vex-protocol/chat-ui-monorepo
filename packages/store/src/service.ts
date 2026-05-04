@@ -51,6 +51,11 @@ import {
     $permissionsWritable,
     $serversWritable,
 } from "./domains/servers.ts";
+import {
+    $localMessageRetentionDaysWritable,
+    clampLocalMessageRetentionDays,
+    setLocalMessageRetentionDaysPreference,
+} from "./domains/settings.ts";
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -151,6 +156,11 @@ export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 export interface ServerOptions {
     host: string;
     inMemoryDb?: boolean;
+    /**
+     * Local message retention in days (1–30). Values above 30 are clamped
+     * by the protocol client to match server-side mail TTL.
+     */
+    localMessageRetentionDays?: number;
     logLevel?:
         | "debug"
         | "error"
@@ -848,6 +858,18 @@ class VexService {
 
     // ── Messaging ───────────────────────────────────────────────────────
 
+    /** Effective local retention cap (defaults to 30 when signed out). */
+    getLocalMessageRetentionDays(): number {
+        const c = this.client as unknown as {
+            getLocalMessageRetentionDays?: () => number;
+        };
+        const fromClient = c?.getLocalMessageRetentionDays?.();
+        if (typeof fromClient === "number" && Number.isFinite(fromClient)) {
+            return fromClient;
+        }
+        return $localMessageRetentionDaysWritable.get();
+    }
+
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
             const client = this.requireClient();
@@ -1070,12 +1092,12 @@ class VexService {
         }
     }
 
+    // ── User operations ─────────────────────────────────────────────────
+
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
-
-    // ── User operations ─────────────────────────────────────────────────
 
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
@@ -1521,8 +1543,6 @@ class VexService {
         }
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     async sendGroupMessage(
         channelID: string,
         content: string,
@@ -1557,6 +1577,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
         const bumpVersionForCurrentUser = (): void => {
@@ -1600,6 +1622,19 @@ class VexService {
             }
             return { error: errorMessage(err), ok: false };
         }
+    }
+
+    /**
+     * Updates the local message retention preference (1–30 days) and
+     * applies it to the live client when connected.
+     */
+    setLocalMessageRetentionDays(days: number): void {
+        const clamped = clampLocalMessageRetentionDays(days);
+        setLocalMessageRetentionDaysPreference(clamped);
+        const c = this.client as unknown as {
+            setLocalMessageRetentionDays?: (d: number) => void;
+        };
+        c?.setLocalMessageRetentionDays?.(clamped);
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────
@@ -1961,10 +1996,13 @@ class VexService {
         const storage = await config.createStorage(privateKey, username);
         debugAuth("initClient:storage:ok", { username });
 
-        const clientOptions: ClientOptions = {
+        const clientOptions = {
             ...options,
             deviceName: config.deviceName,
-        };
+            localMessageRetentionDays: clampLocalMessageRetentionDays(
+                options.localMessageRetentionDays,
+            ),
+        } as ClientOptions;
 
         this.client = await this.createClientWithRecovery(
             privateKey,
