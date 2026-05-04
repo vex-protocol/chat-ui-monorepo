@@ -1,6 +1,8 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+import { Ionicons } from "@expo/vector-icons";
+
 import { colors, typography } from "../theme";
 
 const TOPBAR_LEFT_GUTTER = 52;
@@ -29,18 +31,18 @@ export function ChatHeader({
         <View style={styles.container}>
             <View style={styles.breadcrumb}>
                 {onBack && (
-                    <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                        <View style={styles.backIcon}>
-                            <View
-                                style={[styles.backIconBar, styles.backIconTop]}
-                            />
-                            <View
-                                style={[
-                                    styles.backIconBar,
-                                    styles.backIconBottom,
-                                ]}
-                            />
-                        </View>
+                    <TouchableOpacity
+                        accessibilityLabel="Go back"
+                        accessibilityRole="button"
+                        hitSlop={10}
+                        onPress={onBack}
+                        style={styles.backBtn}
+                    >
+                        <Ionicons
+                            color={colors.text}
+                            name="chevron-back"
+                            size={24}
+                        />
                     </TouchableOpacity>
                 )}
                 {onTitlePress ? (
@@ -126,37 +128,10 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         alignItems: "center",
-        height: 24,
+        height: 36,
         justifyContent: "center",
-        marginRight: 4,
-        width: 24,
-    },
-    backIcon: {
-        alignItems: "center",
-        height: 12,
-        justifyContent: "center",
-        width: 12,
-    },
-    backIconBar: {
-        backgroundColor: colors.text,
-        borderRadius: 999,
-        height: 2,
-        position: "absolute",
-        width: 10,
-    },
-    backIconBottom: {
-        transform: [
-            { rotate: "-45deg" },
-            { translateX: -1.4 },
-            { translateY: -2.6 },
-        ],
-    },
-    backIconTop: {
-        transform: [
-            { rotate: "45deg" },
-            { translateX: -1.4 },
-            { translateY: 2.6 },
-        ],
+        marginRight: 2,
+        width: 36,
     },
     breadcrumb: {
         alignItems: "center",

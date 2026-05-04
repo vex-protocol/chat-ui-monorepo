@@ -49,6 +49,11 @@ module.exports = ({ config }) => {
         version: pkg.version,
         name: devMode ? "Vex Beta" : config.name,
         icon: iconPath,
+        splash: {
+            backgroundColor: "#0a0a0a",
+            image: iconPath,
+            resizeMode: "contain",
+        },
         ios: {
             ...config.ios,
             bundleIdentifier: iosBundleIdentifier,
