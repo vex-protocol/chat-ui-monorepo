@@ -1,10 +1,6 @@
 packages:
     - apps/*
     - packages/*
-    # Local live-link to vex-protocol SDK packages (edit there, consume here).
-    - ../vex-protocol/packages/types
-    - ../vex-protocol/packages/crypto
-    - ../vex-protocol/packages/libvex
 
 blockExoticSubdeps: true
 
@@ -13,6 +9,7 @@ catalog:
     "@notifee/react-native": ^9.1.8
     "@types/node": ^24.10.1
     "@vex-chat/libvex": 6.3.2
+    "@vex-chat/types": 3.2.0
     dompurify: ^3.2.6
     expo-background-fetch: ~55.0.15
     expo-background-task: ~55.0.17
