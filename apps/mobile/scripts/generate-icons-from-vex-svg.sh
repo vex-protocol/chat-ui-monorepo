@@ -22,12 +22,15 @@ magick "$ASSETS_DIR/app-icon.svg" \
 
 cp "$ASSETS_DIR/icon-prod.png" "$ASSETS_DIR/icon-dev.png"
 
-magick "$ASSETS_DIR/icon-prod.png" \
-    -resize 78% \
+magick "$ASSETS_DIR/app-icon.svg" \
+    -background none \
+    -alpha on \
+    -strip \
+    -resize 90% \
     -gravity center \
-    -background "#0a0a0a" \
+    -background none \
     -extent 1024x1024 \
-    "$ASSETS_DIR/icon-prod-android.png"
+    PNG32:"$ASSETS_DIR/icon-prod-android.png"
 
 cp "$ASSETS_DIR/icon-prod-android.png" "$ASSETS_DIR/icon-dev-android.png"
 

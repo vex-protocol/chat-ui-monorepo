@@ -35,6 +35,7 @@ import {
     $devicesWritable,
     $familiarsWritable,
     $historyRecoveryStatusWritable,
+    $hydrationStatusWritable,
     $keyReplacedWritable,
     $pendingApprovalStageWritable,
     $signedOutIntentWritable,
@@ -498,7 +499,12 @@ class VexService {
                     return { error: authErr.message, ok: false };
                 }
 
+                const connectStart = Date.now();
                 await client.connect();
+                debugAuth("autoLogin:connect:ok", {
+                    durationMs: Date.now() - connectStart,
+                    username: creds.username,
+                });
                 $userWritable.set(client.me.user());
                 this.setAuthStatus("authenticated");
                 this.kickPopulateState();
@@ -2375,6 +2381,12 @@ class VexService {
         $keyReplacedWritable.set(false);
         $pendingApprovalStageWritable.set("idle");
         $historyRecoveryStatusWritable.set("idle");
+        $hydrationStatusWritable.set({
+            completedSteps: 0,
+            ready: false,
+            stage: "idle",
+            totalSteps: 0,
+        });
         $avatarVersionsWritable.set({});
         this.lastDeviceAuthRefreshAttemptAt = 0;
         $familiarsWritable.set({});
@@ -2400,6 +2412,35 @@ class VexService {
 
         const shouldStop = (): boolean =>
             this.populateStateAbort || this.client !== owner;
+        const shouldPublishHydrationProgress =
+            !$hydrationStatusWritable.get().ready;
+        let hydrationCompletedSteps = 0;
+        let hydrationTotalSteps = 0;
+        const publishHydrationProgress = (
+            stage:
+                | "loading_channels"
+                | "loading_familiars"
+                | "loading_group_history"
+                | "loading_sessions",
+        ): void => {
+            if (!shouldPublishHydrationProgress) {
+                return;
+            }
+            $hydrationStatusWritable.set({
+                completedSteps: hydrationCompletedSteps,
+                ready: false,
+                stage,
+                totalSteps: hydrationTotalSteps,
+            });
+        };
+        if (shouldPublishHydrationProgress) {
+            $hydrationStatusWritable.set({
+                completedSteps: 0,
+                ready: false,
+                stage: "loading_channels",
+                totalSteps: 1,
+            });
+        }
         const publishedChannelCount = (): number =>
             Object.values(channelsAcc).reduce(
                 (sum, channels) => sum + channels.length,
@@ -2483,36 +2524,6 @@ class VexService {
                 return;
             }
             channelsAcc[server.serverID] = channels;
-
-            let chIdx = 0;
-            for (const channel of channels) {
-                if (shouldStop()) {
-                    return;
-                }
-                try {
-                    const msgs = await withTimeout(
-                        owner.messages.retrieveGroup(channel.channelID),
-                        8_000,
-                        `populateState: group history timeout for ${channel.channelID}`,
-                    );
-                    if (msgs.length > 0) {
-                        groupMessagesAcc[channel.channelID] =
-                            deduplicateMessages(msgs);
-                    }
-                } catch (err: unknown) {
-                    if (isDecryptMismatchError(err)) {
-                        throw err;
-                    }
-                    debugAuth("populateState:group-history:failed", {
-                        channelID: channel.channelID,
-                        message: errorMessage(err),
-                    });
-                }
-                chIdx += 1;
-                if (chIdx % 3 === 0) {
-                    await waitMs(0);
-                }
-            }
         };
 
         const loadFamiliar = async (user: User): Promise<void> => {
@@ -2565,11 +2576,48 @@ class VexService {
             }
         };
 
-        const [servers, perms, familiars, sessions] = await Promise.all([
-            serverBootstrapPromise(),
-            owner.permissions.retrieve().catch(() => [] as Permission[]),
-            owner.users.familiars().catch(() => [] as User[]),
-            owner.sessions.retrieve().catch(() => []),
+        const familiarsPromise = withTimeout(
+            owner.users.familiars(),
+            12_000,
+            "populateState: familiars timeout",
+        ).catch((err: unknown) => {
+            debugAuth("populateState:familiars:failed", {
+                message: errorMessage(err),
+            });
+            return [] as User[];
+        });
+        const sessionsPromise = withTimeout(
+            owner.sessions.retrieve(),
+            12_000,
+            "populateState: sessions timeout",
+        ).catch((err: unknown) => {
+            debugAuth("populateState:sessions:failed", {
+                message: errorMessage(err),
+            });
+            return [];
+        });
+
+        const [servers, perms] = await Promise.all([
+            withTimeout(
+                serverBootstrapPromise(),
+                12_000,
+                "populateState: server list timeout",
+            ).catch((err: unknown) => {
+                debugAuth("populateState:server-list:failed", {
+                    message: errorMessage(err),
+                });
+                return [] as Server[];
+            }),
+            withTimeout(
+                owner.permissions.retrieve(),
+                12_000,
+                "populateState: permissions timeout",
+            ).catch((err: unknown) => {
+                debugAuth("populateState:permissions:failed", {
+                    message: errorMessage(err),
+                });
+                return [] as Permission[];
+            }),
         ]);
 
         if (shouldStop()) {
@@ -2601,6 +2649,20 @@ class VexService {
                 !shouldFilterServersByMembership ||
                 myServerPermissionIDs.has(server.serverID),
         );
+        const bootstrapChannelEstimate = visibleServers.reduce(
+            (sum, server) => {
+                const bootChannels =
+                    bootstrapChannelsByServer?.[server.serverID];
+                return sum + (bootChannels?.length ?? 0);
+            },
+            0,
+        );
+        hydrationTotalSteps = Math.max(
+            1,
+            1 + visibleServers.length + bootstrapChannelEstimate,
+        );
+        hydrationCompletedSteps = 1;
+        publishHydrationProgress("loading_channels");
         for (const server of visibleServers) {
             serversAcc[server.serverID] = server;
         }
@@ -2644,12 +2706,89 @@ class VexService {
                 currentServerID: server.serverID,
                 serverCount: Object.keys(channelsAcc).length,
             });
+            hydrationCompletedSteps += 1;
+            publishHydrationProgress("loading_channels");
             await waitMs(0);
         }
+
+        const groupChannels = Object.values(channelsAcc).flatMap(
+            (list) => list,
+        );
+        const groupHistoryCount = groupChannels.length;
+        if (groupHistoryCount > 0) {
+            // When we had to fetch channels per-server (no bootstrap endpoint),
+            // total channel count is unknown up front; fold it in once known.
+            const visibleChannelTotalFromBootstrap = visibleServers.reduce(
+                (sum, server) =>
+                    sum +
+                    (bootstrapChannelsByServer?.[server.serverID]?.length ?? 0),
+                0,
+            );
+            if (visibleChannelTotalFromBootstrap === 0) {
+                hydrationTotalSteps += groupHistoryCount;
+            }
+            publishHydrationProgress("loading_group_history");
+        }
+
+        let groupIdx = 0;
+        for (const channel of groupChannels) {
+            if (shouldStop()) {
+                return;
+            }
+            const startedAt = Date.now();
+            try {
+                const msgs = await withTimeout(
+                    owner.messages.retrieveGroup(channel.channelID),
+                    8_000,
+                    `populateState: group history timeout for ${channel.channelID}`,
+                );
+                if (msgs.length > 0) {
+                    groupMessagesAcc[channel.channelID] =
+                        deduplicateMessages(msgs);
+                }
+                const durationMs = Date.now() - startedAt;
+                if (durationMs > 1500) {
+                    debugAuth("populateState:group-history:slow", {
+                        channelID: channel.channelID,
+                        durationMs,
+                        messageCount: msgs.length,
+                    });
+                }
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    throw err;
+                }
+                debugAuth("populateState:group-history:failed", {
+                    channelID: channel.channelID,
+                    message: errorMessage(err),
+                });
+            }
+            hydrationCompletedSteps += 1;
+            publishHydrationProgress("loading_group_history");
+            groupIdx += 1;
+            if (groupIdx % 3 === 0) {
+                await waitMs(0);
+            }
+        }
+
+        const [familiars, sessions] = await Promise.all([
+            familiarsPromise,
+            sessionsPromise,
+        ]);
 
         const uniqueFamiliars = [
             ...new Map(familiars.map((user) => [user.userID, user])).values(),
         ];
+        const sessionUserIDs = [
+            ...new Set(
+                sessions
+                    .map((session) => session.userID)
+                    .filter((userID) => userID !== currentUserID),
+            ),
+        ];
+        hydrationTotalSteps += uniqueFamiliars.length + sessionUserIDs.length;
+        publishHydrationProgress("loading_familiars");
+
         for (const familiar of uniqueFamiliars) {
             if (shouldStop()) {
                 return;
@@ -2659,25 +2798,22 @@ class VexService {
                 `familiars:${familiar.userID.slice(0, 8)}`,
                 familiar.userID,
             );
+            hydrationCompletedSteps += 1;
+            publishHydrationProgress("loading_familiars");
             await waitMs(0);
         }
 
         // Fallback: if familiar lookup is incomplete for older accounts,
         // hydrate DM history by local session user IDs so local history is
         // still visible after login.
-        const sessionUserIDs = [
-            ...new Set(
-                sessions
-                    .map((session) => session.userID)
-                    .filter((userID) => userID !== currentUserID),
-            ),
-        ];
         let sessionIdx = 0;
         for (const userID of sessionUserIDs) {
             if (shouldStop()) {
                 return;
             }
             if (messagesAcc[userID]?.length) {
+                hydrationCompletedSteps += 1;
+                publishHydrationProgress("loading_sessions");
                 continue;
             }
             try {
@@ -2712,6 +2848,8 @@ class VexService {
                 `sessions:${userID.slice(0, 8)}`,
                 userID,
             );
+            hydrationCompletedSteps += 1;
+            publishHydrationProgress("loading_sessions");
             sessionIdx += 1;
             if (sessionIdx % 3 === 0) {
                 await waitMs(0);
@@ -2758,6 +2896,14 @@ class VexService {
             dmThreadCount: Object.keys(messagesAcc).length,
             familiarCount: Object.keys(familiarsAcc).length,
         });
+        if (shouldPublishHydrationProgress) {
+            $hydrationStatusWritable.set({
+                completedSteps: hydrationTotalSteps,
+                ready: true,
+                stage: "ready",
+                totalSteps: hydrationTotalSteps,
+            });
+        }
         $historyRecoveryStatusWritable.set("idle");
         debugAuth("populateState:complete", {
             channelCount: Object.keys(channelsAcc).length,
