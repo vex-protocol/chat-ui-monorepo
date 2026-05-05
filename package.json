@@ -39,10 +39,6 @@
     },
     "pnpm": {
         "overrides": {
-            "@vex-chat/crypto": "5.0.1",
-            "@vex-chat/libvex": "6.3.1",
-            "@vex-chat/spire": "1.7.1",
-            "@vex-chat/types": "3.2.0",
             "react": "19.2.0",
             "react-dom": "19.2.0",
             "kysely": "0.28.15",

@@ -20,8 +20,8 @@
         "vitest": "catalog:"
     },
     "dependencies": {
-        "@vex-chat/libvex": "catalog:",
-        "@vex-chat/types": "catalog:",
+        "@vex-chat/libvex": "link:../../../vex-protocol/packages/libvex",
+        "@vex-chat/types": "link:../../../vex-protocol/packages/types",
         "nanostores": "catalog:",
         "uuid": "catalog:"
     },

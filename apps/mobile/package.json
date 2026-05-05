@@ -62,7 +62,7 @@
         "@babel/core": "^7.25.2",
         "@types/react": "^19.2.0",
         "@vex-chat/eslint-config": "workspace:*",
-        "@vex-chat/libvex": "catalog:",
+        "@vex-chat/libvex": "link:../../../vex-protocol/packages/libvex",
         "babel-preset-expo": "^55.0.15",
         "eslint-plugin-react": "^7.37.5",
         "eslint-plugin-react-hooks": "^7.0.1",

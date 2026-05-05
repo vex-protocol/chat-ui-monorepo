@@ -1657,6 +1657,10 @@ class VexService {
             return { ok: true };
         } catch (err: unknown) {
             if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                // `messages.send` goes over WS; if that path says
+                // unauthenticated, force reconnect instead of trusting a
+                // potentially stale "healthy" watchdog timestamp from HTTP.
+                this.resetWebsocketWatchdog();
                 const recovered = await this.recoverConnection("send-dm");
                 if (recovered === "authenticated") {
                     try {
@@ -1692,6 +1696,9 @@ class VexService {
             return { ok: true };
         } catch (err: unknown) {
             if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                // Same rationale as DM sends: prefer a hard WS re-auth cycle
+                // after transport/auth failures on the socket path.
+                this.resetWebsocketWatchdog();
                 const recovered = await this.recoverConnection("send-group");
                 if (recovered === "authenticated") {
                     try {
@@ -2184,11 +2191,32 @@ class VexService {
         return elapsed <= WS_FRESH_FRAME_THRESHOLD_MS;
     }
 
-    private kickPopulateState(): void {
+    private kickPopulateState(attempt = 0): void {
         void this.populateState().catch((err: unknown) => {
             debugAuth("populateState:error", {
+                attempt,
                 message: errorMessage(err),
             });
+            if (isDecryptMismatchError(err)) {
+                void this.recoverFromLocalDecryptMismatch(attempt);
+                return;
+            }
+            if (isUnauthorizedError(err) || isNotAuthenticatedError(err)) {
+                this.setAuthStatus("unauthorized");
+                void this.recoverConnection("populate-state-auth");
+                return;
+            }
+            if (isNetworkError(err)) {
+                this.setAuthStatus("offline");
+                void this.recoverConnection("populate-state-network");
+            }
+            if (attempt >= 2 || this.populateStateAbort || !this.client) {
+                return;
+            }
+            const backoffMs = (attempt + 1) * 1500;
+            setTimeout(() => {
+                this.kickPopulateState(attempt + 1);
+            }, backoffMs);
         });
     }
 
@@ -2287,6 +2315,30 @@ class VexService {
         }
     }
 
+    private async recoverFromLocalDecryptMismatch(
+        attempt: number,
+    ): Promise<void> {
+        const client = this.client;
+        if (!client || this.populateStateAbort) {
+            return;
+        }
+        debugAuth("populateState:decrypt-mismatch:purge-history", { attempt });
+        try {
+            await client.messages.purge();
+        } catch (purgeErr: unknown) {
+            debugAuth("populateState:decrypt-mismatch:purge-failed", {
+                message: errorMessage(purgeErr),
+            });
+            return;
+        }
+        if (this.populateStateAbort || !this.client) {
+            return;
+        }
+        setTimeout(() => {
+            this.kickPopulateState(attempt + 1);
+        }, 200);
+    }
+
     private requireClient(): Client {
         if (!this.client) throw new Error("Not authenticated");
         return this.client;
@@ -2380,70 +2432,65 @@ class VexService {
             }
         };
 
-        try {
-            const [servers, perms, familiars] = await Promise.all([
-                owner.servers.retrieve(),
-                owner.permissions.retrieve().catch(() => [] as Permission[]),
-                owner.users.familiars().catch(() => [] as User[]),
-            ]);
+        const [servers, perms, familiars] = await Promise.all([
+            owner.servers.retrieve(),
+            owner.permissions.retrieve().catch(() => [] as Permission[]),
+            owner.users.familiars().catch(() => [] as User[]),
+        ]);
 
-            if (shouldStop()) {
-                return;
-            }
-
-            for (const perm of perms) {
-                permsAcc[perm.permissionID] = perm;
-            }
-
-            for (const server of servers) {
-                await loadServer(server);
-                await waitMs(0);
-            }
-
-            for (const familiar of familiars) {
-                if (shouldStop()) {
-                    return;
-                }
-                await loadFamiliar(familiar);
-                await waitMs(0);
-            }
-
-            if (shouldStop()) {
-                return;
-            }
-
-            const withList = owner as unknown as ClientWithUserDeviceListLike;
-            if (typeof withList.getUserDeviceList === "function") {
-                const devices =
-                    (await withList.getUserDeviceList(
-                        owner.me.user().userID,
-                    )) ?? [];
-                if (!shouldStop()) {
-                    $devicesWritable.setKey(owner.me.user().userID, devices);
-                }
-            }
-
-            if (shouldStop()) {
-                return;
-            }
-
-            $serversWritable.set(serversAcc);
-            $channelsWritable.set(channelsAcc);
-            $groupMessagesWritable.set(groupMessagesAcc);
-            $permissionsWritable.set(permsAcc);
-            $familiarsWritable.set(familiarsAcc);
-            // Merge with existing DM threads so we do not wipe in-memory
-            // conversations when SQLite is empty after retention prune, when
-            // `retrieve` fails, or when a peer is not yet in `familiars`.
-            const prevDm = $messagesWritable.get();
-            const mergedDm: Record<string, Message[]> = { ...prevDm };
-            for (const [userID, msgs] of Object.entries(messagesAcc)) {
-                mergedDm[userID] = msgs;
-            }
-            $messagesWritable.set(mergedDm);
-        } catch {
-            /* non-fatal — UI will show empty state */
+        if (shouldStop()) {
+            return;
         }
+
+        for (const perm of perms) {
+            permsAcc[perm.permissionID] = perm;
+        }
+
+        for (const server of servers) {
+            await loadServer(server);
+            await waitMs(0);
+        }
+
+        for (const familiar of familiars) {
+            if (shouldStop()) {
+                return;
+            }
+            await loadFamiliar(familiar);
+            await waitMs(0);
+        }
+
+        if (shouldStop()) {
+            return;
+        }
+
+        const withList = owner as unknown as ClientWithUserDeviceListLike;
+        if (typeof withList.getUserDeviceList === "function") {
+            const devices =
+                (await withList.getUserDeviceList(owner.me.user().userID)) ??
+                [];
+            if (!shouldStop()) {
+                $devicesWritable.setKey(owner.me.user().userID, devices);
+            }
+        }
+
+        if (shouldStop()) {
+            return;
+        }
+
+        $serversWritable.set(serversAcc);
+        $channelsWritable.set(channelsAcc);
+        $groupMessagesWritable.set(groupMessagesAcc);
+        $permissionsWritable.set(permsAcc);
+        $familiarsWritable.set(familiarsAcc);
+        // Merge with existing DM threads so we do not wipe in-memory
+        // conversations when SQLite is empty after retention prune, when
+        // `retrieve` fails, or when a peer is not yet in `familiars`.
+        const prevDm = $messagesWritable.get();
+        const mergedDm: Record<string, Message[]> = { ...prevDm };
+        for (const [userID, msgs] of Object.entries(messagesAcc)) {
+            mergedDm[userID] = msgs;
+        }
+        $messagesWritable.set(mergedDm);
     }
 
     private async saveCredentials(
