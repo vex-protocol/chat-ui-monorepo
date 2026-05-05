@@ -1,30 +1,30 @@
 export const meta = {
-    title: "Loading",
     argTypes: {
+        label: {
+            control: "text",
+        },
         size: {
             control: "select",
             options: ["sm", "md", "lg"],
         },
-        label: {
-            control: "text",
-        },
     },
+    title: "Loading",
 };
 export const Default = {
     args: {
-        size: "md",
         label: "Loading...",
+        size: "md",
     },
 };
 export const Small = {
     args: {
-        size: "sm",
         label: "Loading...",
+        size: "sm",
     },
 };
 export const Large = {
     args: {
-        size: "lg",
         label: "Loading...",
+        size: "lg",
     },
 };

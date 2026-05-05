@@ -2,28 +2,28 @@
 import * as React from "react";
 
 export interface SearchBarProps {
-  value?: string;
-  placeholder?: string;
-  className?: string;
-  onInput?: (value: string) => void;
+    className?: string;
+    onInput?: (value: string) => void;
+    placeholder?: string;
+    value?: string;
 }
 
 function SearchBar(props: SearchBarProps) {
-  props = { value: "", placeholder: "Search...", className: "", ...props };
-  return (
-    <div className={`search-bar ${props.className}`}>
-      <span className="search-bar__icon" aria-hidden="true">
-        🔍
-      </span>
-      <input
-        className="search-bar__input"
-        type="search"
-        value={props.value}
-        placeholder={props.placeholder}
-        onInput={(e) => props.onInput?.(e.target.value)}
-      />
-    </div>
-  );
+    props = { className: "", placeholder: "Search...", value: "", ...props };
+    return (
+        <div className={`search-bar ${props.className}`}>
+            <span aria-hidden="true" className="search-bar__icon">
+                🔍
+            </span>
+            <input
+                className="search-bar__input"
+                type="search"
+                onInput={(e) => props.onInput?.(e.target.value)}
+                placeholder={props.placeholder}
+                value={props.value}
+            />
+        </div>
+    );
 }
 
 export default SearchBar;

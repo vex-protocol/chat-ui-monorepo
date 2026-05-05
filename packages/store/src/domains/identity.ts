@@ -9,6 +9,8 @@ export type AuthStatus =
     | "signed_out"
     | "unauthorized";
 
+export type HistoryRecoveryStatus = "idle" | "recovering_local_history";
+
 // Sub-status for the multi-device enrollment flow on the *new* (requesting)
 // device. Lets the AuthenticateScreen show distinct UI states between
 // "still waiting for the existing device to approve", "approval landed —
@@ -42,6 +44,8 @@ export const $keyReplacedWritable = atom<boolean>(false);
 // straight back into autoLogin from the kept keychain credentials.
 export const $signedOutIntentWritable = atom<boolean>(false);
 export const $pendingApprovalStageWritable = atom<PendingApprovalStage>("idle");
+export const $historyRecoveryStatusWritable =
+    atom<HistoryRecoveryStatus>("idle");
 
 // ── Readable (public — components subscribe to these) ───────────────────────
 
@@ -55,4 +59,7 @@ export const $keyReplaced = readonlyType($keyReplacedWritable);
 export const $signedOutIntent = readonlyType($signedOutIntentWritable);
 export const $pendingApprovalStage = readonlyType(
     $pendingApprovalStageWritable,
+);
+export const $historyRecoveryStatus = readonlyType(
+    $historyRecoveryStatusWritable,
 );

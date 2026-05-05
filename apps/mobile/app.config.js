@@ -27,6 +27,9 @@ module.exports = ({ config }) => {
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
+    const androidAdaptiveForegroundPath = devMode
+        ? "./assets/icon-dev-android.png"
+        : "./assets/icon-prod-android.png";
     const iosBundleIdentifier =
         process.env.VEX_IOS_BUNDLE_IDENTIFIER ||
         (devMode ? "chat.vex.mobile.dev" : config.ios?.bundleIdentifier);
@@ -62,7 +65,7 @@ module.exports = ({ config }) => {
             ...config.android,
             adaptiveIcon: {
                 backgroundColor: "#0a0a0a",
-                foregroundImage: iconPath,
+                foregroundImage: androidAdaptiveForegroundPath,
             },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
             permissions: androidPermissions,

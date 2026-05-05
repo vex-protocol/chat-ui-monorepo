@@ -1,20 +1,20 @@
 import * as React from "react";
 
 export interface BadgeProps {
-  variant?: "online" | "offline" | "dnd" | "idle";
-  label?: string;
-  className?: string;
+    className?: string;
+    label?: string;
+    variant?: "dnd" | "idle" | "offline" | "online";
 }
 
 function Badge(props: BadgeProps) {
-  props = { variant: "offline", label: "", className: "", ...props };
-  return (
-    <span
-      className={`badge badge--${props.variant} ${props.className}`}
-      aria-label={props.label}
-      title={props.label}
-    />
-  );
+    props = { className: "", label: "", variant: "offline", ...props };
+    return (
+        <span
+            aria-label={props.label}
+            className={`badge badge--${props.variant} ${props.className}`}
+            title={props.label}
+        />
+    );
 }
 
 export default Badge;

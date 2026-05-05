@@ -23,7 +23,12 @@ import {
     View,
 } from "react-native";
 
-import { $signedOutIntent, $user, vexService } from "@vex-chat/store";
+import {
+    $historyRecoveryStatus,
+    $signedOutIntent,
+    $user,
+    vexService,
+} from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import * as Clipboard from "expo-clipboard";
@@ -74,7 +79,9 @@ export function HangTightScreen({
     // used when the user explicitly chooses "Sign in with a different
     // account" or "Create an account" from a non-bootstrap entry point.
     const forceForm = route.params?.force === true;
+    const fromAccountPicker = route.params?.fromAccountPicker === true;
     const _user = useStore($user);
+    const historyRecoveryStatus = useStore($historyRecoveryStatus);
     const [bootError, setBootError] = useState("");
     const [busy, setBusy] = useState(true);
     const [username, setUsername] = useState("");
@@ -192,7 +199,7 @@ export function HangTightScreen({
             // kept keychain credentials — that produced an immediate-resign
             // loop. Bounce to the account picker (or Welcome if no saved
             // accounts at all) and let the user choose where to go.
-            if ($signedOutIntent.get()) {
+            if ($signedOutIntent.get() && !fromAccountPicker) {
                 try {
                     const accounts = await listKnownAccounts();
                     if (cancelled) return;
@@ -265,7 +272,7 @@ export function HangTightScreen({
         // exhaustive-deps rule can't see that. Intentional empty deps —
         // we only want to run the bootstrap check once on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [fromAccountPicker]);
 
     const playInvalidShake = () => {
         Vibration.vibrate(40);
@@ -947,7 +954,9 @@ export function HangTightScreen({
                 <Text style={styles.bootSubtitle}>
                     {phase === "error"
                         ? "Something went sideways"
-                        : "We're getting your account ready"}
+                        : historyRecoveryStatus === "recovering_local_history"
+                          ? "Repairing local message history..."
+                          : "We're getting your account ready"}
                 </Text>
                 {phase === "error" && bootError ? (
                     <View style={styles.errorWrap}>

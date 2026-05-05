@@ -1,19 +1,19 @@
 <script context="module" lang="ts">
   export interface BadgeProps {
-    variant?: "online" | "offline" | "dnd" | "idle";
-    label?: string;
     className?: string;
+    label?: string;
+    variant?: "dnd" | "idle" | "offline" | "online";
   }
 </script>
 
 <script lang="ts">
+  export let label: BadgeProps["label"] = "";
   export let variant: BadgeProps["variant"] = "offline";
   export let className: BadgeProps["className"] = "";
-  export let label: BadgeProps["label"] = "";
 </script>
 
 <span
-  class={`badge badge--${variant} ${className}`}
   aria-label={label}
+  class={`badge badge--${variant} ${className}`}
   title={label}
 />

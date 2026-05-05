@@ -1,22 +1,22 @@
 <script context="module" lang="ts">
   export interface MemberListItemProps {
+    avatarSrc?: string;
+    className?: string;
+    status?: StatusDotStatus;
     userID: string;
     username?: string;
-    avatarSrc?: string;
-    status?: StatusDotStatus;
-    className?: string;
   }
 </script>
 
 <script lang="ts">
+  import type { StatusDotStatus } from "../StatusDot/StatusDot.svelte";
   import Avatar from "../Avatar/Avatar.svelte";
   import StatusDot from "../StatusDot/StatusDot.svelte";
-  import type { StatusDotStatus } from "../StatusDot/StatusDot.svelte";
 
   export let className: MemberListItemProps["className"] = "";
-  export let userID: MemberListItemProps["userID"];
-  export let avatarSrc: MemberListItemProps["avatarSrc"] = undefined;
   export let username: MemberListItemProps["username"] = "";
+  export let avatarSrc: MemberListItemProps["avatarSrc"] = undefined;
+  export let userID: MemberListItemProps["userID"] = "";
   export let status: MemberListItemProps["status"] = "offline";
   function stringifyStyles(stylesObj) {
     let styles = "";
@@ -32,15 +32,15 @@
 
 <div
   style={stringifyStyles({
-    display: "flex",
     alignItems: "center",
+    borderRadius: "4px",
+    display: "flex",
     gap: "8px",
     padding: "4px 8px",
-    borderRadius: "4px",
   })}
   class={`member-list-item ${className}`}
 >
-  <Avatar {userID} src={avatarSrc} size={24} displayName={username} /><StatusDot
+  <Avatar displayName={username} size={24} src={avatarSrc} {userID} /><StatusDot
     {status}
   /><span
     style={stringifyStyles({

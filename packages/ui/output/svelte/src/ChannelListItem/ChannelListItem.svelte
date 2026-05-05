@@ -1,10 +1,10 @@
 <script context="module" lang="ts">
   export interface ChannelListItemProps {
-    name?: string;
-    unreadCount?: number;
-    isActive?: boolean;
     className?: string;
+    isActive?: boolean;
+    name?: string;
     onClick?: () => void;
+    unreadCount?: number;
   }
 </script>
 

@@ -1,5 +1,4 @@
 export const meta = {
-    title: "Modal",
     argTypes: {
         isOpen: {
             control: "boolean",
@@ -8,6 +7,7 @@ export const meta = {
             control: "text",
         },
     },
+    title: "Modal",
 };
 export const Open = {
     args: {

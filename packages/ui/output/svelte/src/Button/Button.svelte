@@ -1,12 +1,12 @@
 <script context="module" lang="ts">
   export interface ButtonProps {
-    variant?: "primary" | "secondary" | "ghost";
-    size?: "sm" | "md" | "lg";
-    disabled?: boolean;
-    type?: "button" | "submit" | "reset";
-    className?: string;
-    onClick?: (event: MouseEvent) => void;
     children?: any;
+    className?: string;
+    disabled?: boolean;
+    onClick?: (event: MouseEvent) => void;
+    size?: "lg" | "md" | "sm";
+    type?: "button" | "reset" | "submit";
+    variant?: "ghost" | "primary" | "secondary";
   }
 </script>
 
@@ -15,15 +15,15 @@
   export let size: ButtonProps["size"] = "md";
   export let className: ButtonProps["className"] = "";
   export let disabled: ButtonProps["disabled"] = false;
-  export let type: ButtonProps["type"] = "button";
   export let onClick: ButtonProps["onClick"] = undefined;
+  export let type: ButtonProps["type"] = "button";
 </script>
 
 <button
   class={`btn btn--${variant} btn--${size} ${className}`}
   {disabled}
-  {type}
   on:click={(event) => {
     onClick?.(event);
-  }}><slot /></button
+  }}
+  {type}><slot /></button
 >

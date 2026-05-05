@@ -1,23 +1,23 @@
 import * as React from "react";
 
 export interface LoadingProps {
-  size?: "sm" | "md" | "lg";
-  label?: string;
-  className?: string;
+    className?: string;
+    label?: string;
+    size?: "lg" | "md" | "sm";
 }
 
 function Loading(props: LoadingProps) {
-  props = { size: "md", label: "Loading...", className: "", ...props };
-  return (
-    <div
-      role="status"
-      className={`loading loading--${props.size} ${props.className}`}
-      aria-label={props.label}
-    >
-      <span className="loading__spinner" />
-      <span className="loading__label">{props.label}</span>
-    </div>
-  );
+    props = { className: "", label: "Loading...", size: "md", ...props };
+    return (
+        <div
+            role="status"
+            aria-label={props.label}
+            className={`loading loading--${props.size} ${props.className}`}
+        >
+            <span className="loading__spinner" />
+            <span className="loading__label">{props.label}</span>
+        </div>
+    );
 }
 
 export default Loading;

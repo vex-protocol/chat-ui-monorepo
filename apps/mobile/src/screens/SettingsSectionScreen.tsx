@@ -223,9 +223,15 @@ export function SettingsSectionScreen({
                 {
                     onPress: () => {
                         setLoggingOut(true);
-                        void vexService.logout().catch(() => {
-                            /* ignore */
-                        });
+                        void (async () => {
+                            try {
+                                await vexService.logout();
+                            } catch {
+                                /* ignore */
+                            } finally {
+                                setLoggingOut(false);
+                            }
+                        })();
                     },
                     style: "destructive",
                     text: "Sign out",
