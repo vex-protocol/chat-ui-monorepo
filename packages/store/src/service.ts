@@ -34,6 +34,7 @@ import {
     $avatarVersionsWritable,
     $devicesWritable,
     $familiarsWritable,
+    $historyRecoveryStatusWritable,
     $keyReplacedWritable,
     $pendingApprovalStageWritable,
     $signedOutIntentWritable,
@@ -2322,6 +2323,7 @@ class VexService {
         if (!client || this.populateStateAbort) {
             return;
         }
+        $historyRecoveryStatusWritable.set("recovering_local_history");
         debugAuth("populateState:decrypt-mismatch:purge-history", { attempt });
         try {
             await client.messages.purge();
@@ -2329,9 +2331,11 @@ class VexService {
             debugAuth("populateState:decrypt-mismatch:purge-failed", {
                 message: errorMessage(purgeErr),
             });
+            $historyRecoveryStatusWritable.set("idle");
             return;
         }
         if (this.populateStateAbort || !this.client) {
+            $historyRecoveryStatusWritable.set("idle");
             return;
         }
         setTimeout(() => {
@@ -2357,6 +2361,7 @@ class VexService {
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
         $pendingApprovalStageWritable.set("idle");
+        $historyRecoveryStatusWritable.set("idle");
         $avatarVersionsWritable.set({});
         this.lastDeviceAuthRefreshAttemptAt = 0;
         $familiarsWritable.set({});
@@ -2388,7 +2393,22 @@ class VexService {
                 return;
             }
             serversAcc[server.serverID] = server;
-            const channels = await owner.channels.retrieve(server.serverID);
+            let channels: Channel[] = [];
+            try {
+                channels = await withTimeout(
+                    owner.channels.retrieve(server.serverID),
+                    8_000,
+                    `populateState: channels timeout for ${server.serverID}`,
+                );
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    throw err;
+                }
+                debugAuth("populateState:channels:failed", {
+                    message: errorMessage(err),
+                    serverID: server.serverID,
+                });
+            }
             if (shouldStop()) {
                 return;
             }
@@ -2400,15 +2420,23 @@ class VexService {
                     return;
                 }
                 try {
-                    const msgs = await owner.messages.retrieveGroup(
-                        channel.channelID,
+                    const msgs = await withTimeout(
+                        owner.messages.retrieveGroup(channel.channelID),
+                        8_000,
+                        `populateState: group history timeout for ${channel.channelID}`,
                     );
                     if (msgs.length > 0) {
                         groupMessagesAcc[channel.channelID] =
                             deduplicateMessages(msgs);
                     }
-                } catch {
-                    /* non-fatal */
+                } catch (err: unknown) {
+                    if (isDecryptMismatchError(err)) {
+                        throw err;
+                    }
+                    debugAuth("populateState:group-history:failed", {
+                        channelID: channel.channelID,
+                        message: errorMessage(err),
+                    });
                 }
                 chIdx += 1;
                 if (chIdx % 3 === 0) {
@@ -2423,19 +2451,30 @@ class VexService {
             }
             familiarsAcc[user.userID] = user;
             try {
-                const msgs = await owner.messages.retrieve(user.userID);
+                const msgs = await withTimeout(
+                    owner.messages.retrieve(user.userID),
+                    8_000,
+                    `populateState: dm history timeout for ${user.userID}`,
+                );
                 if (msgs.length > 0) {
                     messagesAcc[user.userID] = deduplicateMessages(msgs);
                 }
-            } catch {
-                /* non-fatal */
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    throw err;
+                }
+                debugAuth("populateState:dm-history:failed", {
+                    message: errorMessage(err),
+                    userID: user.userID,
+                });
             }
         };
 
-        const [servers, perms, familiars] = await Promise.all([
+        const [servers, perms, familiars, sessions] = await Promise.all([
             owner.servers.retrieve(),
             owner.permissions.retrieve().catch(() => [] as Permission[]),
             owner.users.familiars().catch(() => [] as User[]),
+            owner.sessions.retrieve().catch(() => []),
         ]);
 
         if (shouldStop()) {
@@ -2447,21 +2486,48 @@ class VexService {
         }
 
         const currentUserID = owner.me.user().userID;
+        const fetchedServerIDs = new Set(servers.map((s) => s.serverID));
         const myServerPermissionIDs = new Set(
             perms
                 .filter((perm) => perm.userID === currentUserID)
-                .map((perm) => perm.resourceID),
+                .map((perm) => perm.resourceID)
+                .filter((resourceID) => fetchedServerIDs.has(resourceID)),
         );
         const shouldFilterServersByMembership = myServerPermissionIDs.size > 0;
+        debugAuth("populateState:server-filter", {
+            currentUserID,
+            fetchedServerCount: servers.length,
+            serverPermissionCount: myServerPermissionIDs.size,
+            shouldFilterServersByMembership,
+        });
 
-        for (const server of servers) {
-            if (
-                shouldFilterServersByMembership &&
-                !myServerPermissionIDs.has(server.serverID)
-            ) {
-                continue;
+        const visibleServers = servers.filter(
+            (server) =>
+                !shouldFilterServersByMembership ||
+                myServerPermissionIDs.has(server.serverID),
+        );
+        for (const server of visibleServers) {
+            serversAcc[server.serverID] = server;
+        }
+        // Publish server list early so one slow history/channel request
+        // cannot leave the UI empty for account-specific bad rows.
+        $serversWritable.set(serversAcc);
+        debugAuth("populateState:servers:published-early", {
+            count: Object.keys(serversAcc).length,
+        });
+
+        for (const server of visibleServers) {
+            try {
+                await loadServer(server);
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    throw err;
+                }
+                debugAuth("populateState:server-load:failed", {
+                    message: errorMessage(err),
+                    serverID: server.serverID,
+                });
             }
-            await loadServer(server);
             await waitMs(0);
         }
 
@@ -2473,17 +2539,77 @@ class VexService {
             await waitMs(0);
         }
 
+        // Fallback: if familiar lookup is incomplete for older accounts,
+        // hydrate DM history by local session user IDs so local history is
+        // still visible after login.
+        const sessionUserIDs = [
+            ...new Set(
+                sessions
+                    .map((session) => session.userID)
+                    .filter((userID) => userID !== currentUserID),
+            ),
+        ];
+        let sessionIdx = 0;
+        for (const userID of sessionUserIDs) {
+            if (shouldStop()) {
+                return;
+            }
+            if (messagesAcc[userID]?.length) {
+                continue;
+            }
+            try {
+                const msgs = await withTimeout(
+                    owner.messages.retrieve(userID),
+                    8_000,
+                    `populateState: session dm history timeout for ${userID}`,
+                );
+                if (msgs.length > 0) {
+                    messagesAcc[userID] = deduplicateMessages(msgs);
+                }
+                if (!familiarsAcc[userID]) {
+                    const [user] = await withTimeout(
+                        owner.users.retrieve(userID),
+                        8_000,
+                        `populateState: familiar lookup timeout for ${userID}`,
+                    );
+                    if (user) {
+                        familiarsAcc[userID] = user;
+                    }
+                }
+            } catch (err: unknown) {
+                if (isDecryptMismatchError(err)) {
+                    throw err;
+                }
+                debugAuth("populateState:session-history:failed", {
+                    message: errorMessage(err),
+                    userID,
+                });
+            }
+            sessionIdx += 1;
+            if (sessionIdx % 3 === 0) {
+                await waitMs(0);
+            }
+        }
+
         if (shouldStop()) {
             return;
         }
 
         const withList = owner as unknown as ClientWithUserDeviceListLike;
         if (typeof withList.getUserDeviceList === "function") {
-            const devices =
-                (await withList.getUserDeviceList(owner.me.user().userID)) ??
-                [];
-            if (!shouldStop()) {
-                $devicesWritable.setKey(owner.me.user().userID, devices);
+            try {
+                const devices =
+                    (await withList.getUserDeviceList(
+                        owner.me.user().userID,
+                    )) ?? [];
+                if (!shouldStop()) {
+                    $devicesWritable.setKey(owner.me.user().userID, devices);
+                }
+            } catch (err: unknown) {
+                debugAuth("populateState:device-list:failed", {
+                    message: errorMessage(err),
+                    userID: owner.me.user().userID,
+                });
             }
         }
 
@@ -2505,6 +2631,12 @@ class VexService {
             mergedDm[userID] = msgs;
         }
         $messagesWritable.set(mergedDm);
+        $historyRecoveryStatusWritable.set("idle");
+        debugAuth("populateState:complete", {
+            channelCount: Object.keys(channelsAcc).length,
+            dmThreadCount: Object.keys(messagesAcc).length,
+            serverCount: Object.keys(serversAcc).length,
+        });
     }
 
     private async saveCredentials(

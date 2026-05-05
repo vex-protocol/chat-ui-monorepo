@@ -23,7 +23,12 @@ import {
     View,
 } from "react-native";
 
-import { $signedOutIntent, $user, vexService } from "@vex-chat/store";
+import {
+    $historyRecoveryStatus,
+    $signedOutIntent,
+    $user,
+    vexService,
+} from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import * as Clipboard from "expo-clipboard";
@@ -76,6 +81,7 @@ export function HangTightScreen({
     const forceForm = route.params?.force === true;
     const fromAccountPicker = route.params?.fromAccountPicker === true;
     const _user = useStore($user);
+    const historyRecoveryStatus = useStore($historyRecoveryStatus);
     const [bootError, setBootError] = useState("");
     const [busy, setBusy] = useState(true);
     const [username, setUsername] = useState("");
@@ -948,7 +954,9 @@ export function HangTightScreen({
                 <Text style={styles.bootSubtitle}>
                     {phase === "error"
                         ? "Something went sideways"
-                        : "We're getting your account ready"}
+                        : historyRecoveryStatus === "recovering_local_history"
+                          ? "Repairing local message history..."
+                          : "We're getting your account ready"}
                 </Text>
                 {phase === "error" && bootError ? (
                     <View style={styles.errorWrap}>
