@@ -12,6 +12,7 @@ export {
     $devices,
     $familiars,
     $historyRecoveryStatus,
+    $hydrationStatus,
     $keyReplaced,
     $pendingApprovalStage,
     $signedOutIntent,
@@ -20,6 +21,8 @@ export {
 export type {
     AuthStatus,
     HistoryRecoveryStatus,
+    HydrationStage,
+    HydrationStatus,
     PendingApprovalStage,
 } from "./domains/identity.ts";
 export {

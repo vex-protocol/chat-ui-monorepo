@@ -10,6 +10,20 @@ export type AuthStatus =
     | "unauthorized";
 
 export type HistoryRecoveryStatus = "idle" | "recovering_local_history";
+export type HydrationStage =
+    | "idle"
+    | "loading_channels"
+    | "loading_familiars"
+    | "loading_group_history"
+    | "loading_sessions"
+    | "ready";
+
+export interface HydrationStatus {
+    completedSteps: number;
+    ready: boolean;
+    stage: HydrationStage;
+    totalSteps: number;
+}
 
 // Sub-status for the multi-device enrollment flow on the *new* (requesting)
 // device. Lets the AuthenticateScreen show distinct UI states between
@@ -46,6 +60,12 @@ export const $signedOutIntentWritable = atom<boolean>(false);
 export const $pendingApprovalStageWritable = atom<PendingApprovalStage>("idle");
 export const $historyRecoveryStatusWritable =
     atom<HistoryRecoveryStatus>("idle");
+export const $hydrationStatusWritable = atom<HydrationStatus>({
+    completedSteps: 0,
+    ready: false,
+    stage: "idle",
+    totalSteps: 0,
+});
 
 // ── Readable (public — components subscribe to these) ───────────────────────
 
@@ -63,3 +83,4 @@ export const $pendingApprovalStage = readonlyType(
 export const $historyRecoveryStatus = readonlyType(
     $historyRecoveryStatusWritable,
 );
+export const $hydrationStatus = readonlyType($hydrationStatusWritable);
