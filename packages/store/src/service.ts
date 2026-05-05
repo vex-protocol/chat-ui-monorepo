@@ -2446,7 +2446,21 @@ class VexService {
             permsAcc[perm.permissionID] = perm;
         }
 
+        const currentUserID = owner.me.user().userID;
+        const myServerPermissionIDs = new Set(
+            perms
+                .filter((perm) => perm.userID === currentUserID)
+                .map((perm) => perm.resourceID),
+        );
+        const shouldFilterServersByMembership = myServerPermissionIDs.size > 0;
+
         for (const server of servers) {
+            if (
+                shouldFilterServersByMembership &&
+                !myServerPermissionIDs.has(server.serverID)
+            ) {
+                continue;
+            }
             await loadServer(server);
             await waitMs(0);
         }
