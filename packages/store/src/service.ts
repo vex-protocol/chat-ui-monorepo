@@ -2400,6 +2400,57 @@ class VexService {
 
         const shouldStop = (): boolean =>
             this.populateStateAbort || this.client !== owner;
+        const publishedChannelCount = (): number =>
+            Object.values(channelsAcc).reduce(
+                (sum, channels) => sum + channels.length,
+                0,
+            );
+        const publishedDmMessageCount = (): number =>
+            Object.values(messagesAcc).reduce(
+                (sum, msgs) => sum + msgs.length,
+                0,
+            );
+        const mergeHydratedThread = (
+            userID: string,
+            hydratedMsgs: Message[],
+        ): Message[] => {
+            const existing = $messagesWritable.get()[userID] ?? [];
+            // Keep history-first ordering while preserving any newer live WS
+            // arrivals already present in store.
+            return deduplicateMessages([...hydratedMsgs, ...existing]);
+        };
+        const mergeHydratedDmIntoStore = (): Record<string, Message[]> => {
+            const prevDm = $messagesWritable.get();
+            const mergedDm: Record<string, Message[]> = { ...prevDm };
+            for (const [userID, hydratedMsgs] of Object.entries(messagesAcc)) {
+                mergedDm[userID] = mergeHydratedThread(userID, hydratedMsgs);
+            }
+            return mergedDm;
+        };
+        const publishFamiliarsAndMessagesProgress = (
+            stage: string,
+            userID?: string,
+        ): void => {
+            if (userID && familiarsAcc[userID]) {
+                $familiarsWritable.setKey(userID, familiarsAcc[userID]);
+            } else {
+                $familiarsWritable.set({ ...familiarsAcc });
+            }
+            if (userID && messagesAcc[userID]) {
+                $messagesWritable.setKey(
+                    userID,
+                    mergeHydratedThread(userID, messagesAcc[userID]),
+                );
+            } else {
+                $messagesWritable.set(mergeHydratedDmIntoStore());
+            }
+            debugAuth("populateState:familiars-messages:published-progress", {
+                dmMessageCount: publishedDmMessageCount(),
+                dmThreadCount: Object.keys(messagesAcc).length,
+                familiarCount: Object.keys(familiarsAcc).length,
+                stage,
+            });
+        };
 
         let bootstrapChannelsByServer: null | Record<string, Channel[]> = null;
 
@@ -2556,6 +2607,19 @@ class VexService {
         // Publish server list early so one slow history/channel request
         // cannot leave the UI empty for account-specific bad rows.
         $serversWritable.set(serversAcc);
+        if (bootstrapChannelsByServer) {
+            for (const server of visibleServers) {
+                channelsAcc[server.serverID] =
+                    bootstrapChannelsByServer[server.serverID] ?? [];
+            }
+            // When the one-shot bootstrap endpoint is available, publish
+            // channels immediately so UI does not wait on DM/session hydration.
+            $channelsWritable.set({ ...channelsAcc });
+            debugAuth("populateState:channels:published-bootstrap-early", {
+                channelCount: publishedChannelCount(),
+                serverCount: Object.keys(channelsAcc).length,
+            });
+        }
         debugAuth("populateState:servers:published-early", {
             count: Object.keys(serversAcc).length,
         });
@@ -2572,14 +2636,29 @@ class VexService {
                     serverID: server.serverID,
                 });
             }
+            // Publish progressively: reconnects / later hydration failures
+            // should not strand the UI with servers visible but no channels.
+            $channelsWritable.set({ ...channelsAcc });
+            debugAuth("populateState:channels:published-progress", {
+                channelCount: publishedChannelCount(),
+                currentServerID: server.serverID,
+                serverCount: Object.keys(channelsAcc).length,
+            });
             await waitMs(0);
         }
 
-        for (const familiar of familiars) {
+        const uniqueFamiliars = [
+            ...new Map(familiars.map((user) => [user.userID, user])).values(),
+        ];
+        for (const familiar of uniqueFamiliars) {
             if (shouldStop()) {
                 return;
             }
             await loadFamiliar(familiar);
+            publishFamiliarsAndMessagesProgress(
+                `familiars:${familiar.userID.slice(0, 8)}`,
+                familiar.userID,
+            );
             await waitMs(0);
         }
 
@@ -2629,6 +2708,10 @@ class VexService {
                     userID,
                 });
             }
+            publishFamiliarsAndMessagesProgress(
+                `sessions:${userID.slice(0, 8)}`,
+                userID,
+            );
             sessionIdx += 1;
             if (sessionIdx % 3 === 0) {
                 await waitMs(0);
@@ -2669,15 +2752,17 @@ class VexService {
         // Merge with existing DM threads so we do not wipe in-memory
         // conversations when SQLite is empty after retention prune, when
         // `retrieve` fails, or when a peer is not yet in `familiars`.
-        const prevDm = $messagesWritable.get();
-        const mergedDm: Record<string, Message[]> = { ...prevDm };
-        for (const [userID, msgs] of Object.entries(messagesAcc)) {
-            mergedDm[userID] = msgs;
-        }
-        $messagesWritable.set(mergedDm);
+        $messagesWritable.set(mergeHydratedDmIntoStore());
+        debugAuth("populateState:familiars-messages:published-final", {
+            dmMessageCount: publishedDmMessageCount(),
+            dmThreadCount: Object.keys(messagesAcc).length,
+            familiarCount: Object.keys(familiarsAcc).length,
+        });
         $historyRecoveryStatusWritable.set("idle");
         debugAuth("populateState:complete", {
             channelCount: Object.keys(channelsAcc).length,
+            channelItemCount: publishedChannelCount(),
+            dmMessageCount: publishedDmMessageCount(),
             dmThreadCount: Object.keys(messagesAcc).length,
             serverCount: Object.keys(serversAcc).length,
         });
