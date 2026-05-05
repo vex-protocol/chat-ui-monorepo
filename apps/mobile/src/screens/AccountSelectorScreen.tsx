@@ -4,40 +4,37 @@ import type { AuthScreenProps } from "../navigation/types";
 import React, { useCallback, useState } from "react";
 import {
     Alert,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
+    type ViewStyle,
 } from "react-native";
 
-import { vexService } from "@vex-chat/store";
-
 import { useFocusEffect } from "@react-navigation/native";
+import { BlurView } from "expo-blur";
 import * as Clipboard from "expo-clipboard";
 
 import { Avatar } from "../components/Avatar";
-import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { VexLogo } from "../components/VexLogo";
-import { getServerOptions, getServerUrl } from "../lib/config";
+import { getServerUrl } from "../lib/config";
 import { haptic } from "../lib/haptics";
 import { parseIdentityBackup, pickIdentityBackup } from "../lib/identityBackup";
 import {
     clearCredentials,
-    keychainKeyStore,
     type KnownAccount,
     listKnownAccounts,
     setActiveUsername,
     setUserIDForUsername,
 } from "../lib/keychain";
-import { mobileConfig } from "../lib/platform";
 import {
     restoreIdentityKeyBackup,
     sanitizeHostForBackup,
 } from "../lib/restoreIdentityKeyBackup";
-import { hydrateLocalMessageRetention } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
 
 interface AccountRowProps {
@@ -51,16 +48,9 @@ interface AccountRowProps {
 type Props = AuthScreenProps<"AccountSelector">;
 
 /**
- * OS-style account picker. Lists every account whose credentials are still
- * stored on this device and lets the user pick one to auto-login as. Long-
- * pressing a row offers an explicit "Remove from this device" confirmation
- * — the only path that touches key material.
- *
- * The picker is the new landing point for any unauthenticated entry: when
- * the app boots without an active session, we show this screen instead of
- * the legacy single-account "Welcome back" card. The user can always tap
- * "Add another account" to register or sign in as someone new without
- * disturbing existing slots.
+ * Account picker: saved slots on this device. Choosing one routes through
+ * {@link HangTightScreen} (same boot path as cold start) so the “Hang tight”
+ * experience is consistent. Long-press removes key material for that slot.
  */
 export function AccountSelectorScreen({ navigation }: Props) {
     const [accounts, setAccounts] = useState<KnownAccount[]>([]);
@@ -76,9 +66,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
         setHydrated(true);
     }, []);
 
-    // Re-read on every focus — the user may have added or removed an account
-    // via the "Add another account" path and bounced back. `useFocusEffect`
-    // also runs once on mount, so it doubles as the initial-load trigger.
     useFocusEffect(
         useCallback(() => {
             void refresh();
@@ -94,43 +81,22 @@ export function AccountSelectorScreen({ navigation }: Props) {
             setErrorText(null);
             setSigningInUsername(account.username);
             try {
-                // Flip the active-user pointer *before* invoking autoLogin so
-                // the keystore returns the correct slot. We never delete the
-                // previously-active user's keys — they stay parked and
-                // available in the picker for next time.
                 await setActiveUsername(account.username);
-                // Drive the login from here rather than navigating to
-                // HangTight. autoLogin clears `$signedOutIntent` internally
-                // and, on success, flips `$user` non-null which causes the
-                // RootNavigator to swap from AuthStack to the App stack
-                // automatically — no navigation required.
-                await hydrateLocalMessageRetention();
-                const result = await vexService.autoLogin(
-                    keychainKeyStore,
-                    mobileConfig(),
-                    getServerOptions(),
-                );
-                if (!result.ok) {
-                    setErrorText(
-                        result.error ??
-                            "Could not sign in. The keys for this account may have been revoked from another device.",
-                    );
-                    // Re-read in case autoLogin's failure path scrubbed the
-                    // slot (it does so on confirmed-unauthorized responses).
-                    await refresh();
-                }
+                // Same bootstrap path as startup: HangTight runs retention
+                // hydrate + autoLogin (and shows the spinner UI).
+                navigation.replace("HangTight", { fromAccountPicker: true });
             } catch (err: unknown) {
                 setErrorText(
                     err instanceof Error
                         ? err.message
-                        : "Could not sign in to this account.",
+                        : "Could not activate this account.",
                 );
                 await refresh();
             } finally {
                 setSigningInUsername(null);
             }
         },
-        [refresh, signingInUsername],
+        [navigation, refresh, signingInUsername],
     );
 
     const handleRemove = useCallback(
@@ -166,10 +132,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
 
     const applyParsedBackup = useCallback(
         async (backup: IdentityBackup) => {
-            // Server-host gate: the deviceKey only authenticates against the
-            // cluster that minted it. If the user's currently configured
-            // server doesn't match the backup, refuse rather than misleading
-            // them with a "device revoked" error.
             const currentHost = sanitizeHostForBackup(getServerUrl());
             const backupHost = sanitizeHostForBackup(backup.server);
             if (currentHost !== backupHost) {
@@ -179,9 +141,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
                 return;
             }
 
-            // If a slot already exists for this username on this device, ask
-            // before clobbering it. Without this prompt, a stale backup
-            // could silently destroy the user's working keys.
             const overwriting = accounts.some(
                 (a) => a.username === backup.username,
             );
@@ -221,12 +180,6 @@ export function AccountSelectorScreen({ navigation }: Props) {
                     await refresh();
                     return;
                 }
-                // Success — autoLogin set $user, RootNavigator will swap to
-                // the App stack on its next render. Persist the userID for
-                // the picker the next time the user signs out — but only
-                // when the backup actually carried one. Legacy text-format
-                // backups don't have a userID; the App.tsx `$user`
-                // subscription will backfill it on this very session.
                 if (backup.userID.length > 0) {
                     await setUserIDForUsername(backup.username, backup.userID);
                 }
@@ -334,22 +287,23 @@ export function AccountSelectorScreen({ navigation }: Props) {
     }
 
     if (accounts.length === 0) {
-        // No saved accounts — first-run, or user removed every account.
-        // Offer both the new-account path AND restore-from-backup so users
-        // who lost their device can get back in without going through a
-        // device-approval cycle.
         return (
             <ScreenLayout style={styles.layout}>
-                <View style={styles.container}>
-                    <View style={styles.brand}>
-                        <VexLogo size={36} />
-                        <Text style={styles.heading}>Welcome to Vex</Text>
-                        <Text style={styles.subtitle}>
-                            No accounts on this device yet.
-                        </Text>
-                    </View>
+                <ScrollView
+                    contentContainerStyle={styles.zeroScroll}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <GlassSurface style={styles.heroGlass}>
+                        <View style={styles.heroInner}>
+                            <VexLogo size={40} />
+                            <Text style={styles.heading}>Welcome to Vex</Text>
+                            <Text style={styles.subtitle}>
+                                No accounts on this device yet.
+                            </Text>
+                        </View>
+                    </GlassSurface>
                     {errorText ? (
-                        <View style={styles.errorBox}>
+                        <View style={styles.errorGlass}>
                             <Text style={styles.errorText}>{errorText}</Text>
                         </View>
                     ) : null}
@@ -368,23 +322,25 @@ export function AccountSelectorScreen({ navigation }: Props) {
                         title="Restore from backup"
                         variant="outline"
                     />
-                </View>
+                </ScrollView>
             </ScreenLayout>
         );
     }
 
     return (
         <ScreenLayout style={styles.layout}>
-            <View style={styles.brand}>
-                <VexLogo size={28} />
-                <Text style={styles.heading}>Choose account</Text>
-                <Text style={styles.subtitle}>
-                    Tap to sign in. Long-press to remove.
-                </Text>
-            </View>
+            <GlassSurface style={styles.headerGlass}>
+                <View style={styles.headerInner}>
+                    <VexLogo size={30} />
+                    <Text style={styles.heading}>Choose account</Text>
+                    <Text style={styles.subtitle}>
+                        Tap to sign in · Long-press to remove from device
+                    </Text>
+                </View>
+            </GlassSurface>
 
             {errorText ? (
-                <View style={styles.errorBox}>
+                <View style={styles.errorGlass}>
                     <Text style={styles.errorText}>{errorText}</Text>
                 </View>
             ) : null}
@@ -413,22 +369,24 @@ export function AccountSelectorScreen({ navigation }: Props) {
                 ))}
             </ScrollView>
 
-            <View style={styles.footer}>
-                <VexButton
-                    disabled={signingInUsername !== null}
-                    onPress={handleAddAccount}
-                    style={styles.addButton}
-                    title="Add another account"
-                    variant="outline"
-                />
-                <VexButton
-                    disabled={signingInUsername !== null}
-                    onPress={handleRestore}
-                    style={styles.addButton}
-                    title="Restore from backup"
-                    variant="outline"
-                />
-            </View>
+            <GlassSurface style={styles.footerGlass}>
+                <View style={styles.footerInner}>
+                    <VexButton
+                        disabled={signingInUsername !== null}
+                        onPress={handleAddAccount}
+                        style={styles.addButton}
+                        title="Add another account"
+                        variant="outline"
+                    />
+                    <VexButton
+                        disabled={signingInUsername !== null}
+                        onPress={handleRestore}
+                        style={styles.addButton}
+                        title="Restore from backup"
+                        variant="outline"
+                    />
+                </View>
+            </GlassSurface>
         </ScreenLayout>
     );
 }
@@ -443,7 +401,7 @@ function AccountRow({
     const userID = account.userID;
     return (
         <Pressable
-            android_ripple={{ color: "rgba(231, 0, 0, 0.08)" }}
+            android_ripple={{ color: "rgba(231, 0, 0, 0.12)" }}
             delayLongPress={400}
             disabled={disabled}
             onLongPress={onLongPress}
@@ -454,11 +412,24 @@ function AccountRow({
                 disabled && styles.rowDisabled,
             ]}
         >
-            <CornerBracketBox
-                color={busy ? colors.accent : colors.border}
-                size={10}
-            >
-                <View style={styles.row}>
+            <View style={styles.glassOuter}>
+                <BlurView
+                    intensity={Platform.OS === "ios" ? 32 : 48}
+                    style={StyleSheet.absoluteFill}
+                    tint={
+                        busy
+                            ? "prominent"
+                            : Platform.OS === "ios"
+                              ? "systemThinMaterialDark"
+                              : "dark"
+                    }
+                />
+                <View
+                    style={[
+                        styles.rowInner,
+                        busy && { borderColor: "rgba(231, 0, 0, 0.45)" },
+                    ]}
+                >
                     {userID ? (
                         <Avatar
                             displayName={account.username}
@@ -482,13 +453,32 @@ function AccountRow({
                         </Text>
                         <Text numberOfLines={1} style={styles.deviceLine}>
                             {busy
-                                ? "Signing in…"
+                                ? "Opening…"
                                 : `device · ${shortDeviceID(account.deviceID)}`}
                         </Text>
                     </View>
                 </View>
-            </CornerBracketBox>
+            </View>
         </Pressable>
+    );
+}
+
+function GlassSurface({
+    children,
+    style,
+}: {
+    children: React.ReactNode;
+    style?: ViewStyle;
+}): React.ReactElement {
+    return (
+        <View style={[styles.glassOuter, style]}>
+            <BlurView
+                intensity={Platform.OS === "ios" ? 36 : 52}
+                style={StyleSheet.absoluteFill}
+                tint={Platform.OS === "ios" ? "systemThinMaterialDark" : "dark"}
+            />
+            <View style={styles.glassInner}>{children}</View>
+        </View>
     );
 }
 
@@ -501,32 +491,21 @@ const styles = StyleSheet.create({
     addButton: {
         width: "100%",
     },
-    brand: {
-        alignItems: "center",
-        gap: 10,
-        marginTop: 12,
-        paddingTop: 24,
-    },
-    container: {
-        alignItems: "center",
-        flex: 1,
-        gap: 24,
-        justifyContent: "center",
-    },
     deviceLine: {
         ...typography.body,
-        color: colors.muted,
+        color: "rgba(255,255,255,0.55)",
         fontSize: 12,
-        marginTop: 2,
+        marginTop: 3,
     },
     empty: { flex: 1 },
-    errorBox: {
-        backgroundColor: "rgba(229, 57, 53, 0.15)",
-        borderColor: colors.error,
-        borderWidth: 1,
-        marginHorizontal: 8,
-        marginTop: 16,
-        padding: 10,
+    errorGlass: {
+        backgroundColor: "rgba(229, 57, 53, 0.18)",
+        borderColor: "rgba(229, 57, 53, 0.55)",
+        borderRadius: 14,
+        borderWidth: StyleSheet.hairlineWidth,
+        marginBottom: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
     },
     errorText: {
         ...typography.body,
@@ -534,10 +513,10 @@ const styles = StyleSheet.create({
     },
     fallbackAvatar: {
         alignItems: "center",
-        backgroundColor: colors.accentDark,
-        borderColor: colors.accent,
+        backgroundColor: "rgba(231, 0, 0, 0.22)",
+        borderColor: "rgba(255,255,255,0.2)",
         borderRadius: 28,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         height: 56,
         justifyContent: "center",
         width: 56,
@@ -547,22 +526,54 @@ const styles = StyleSheet.create({
         color: colors.text,
         fontSize: 22,
     },
-    footer: {
-        alignItems: "center",
-        gap: 12,
-        paddingBottom: 16,
-        paddingTop: 8,
+    footerGlass: {
+        marginTop: 4,
+    },
+    footerInner: {
+        gap: 10,
+        paddingHorizontal: 4,
+        paddingVertical: 12,
+    },
+    glassInner: {
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+    },
+    glassOuter: {
+        borderColor: "rgba(255,255,255,0.12)",
+        borderRadius: 20,
+        borderWidth: StyleSheet.hairlineWidth,
+        overflow: "hidden",
+        position: "relative",
     },
     handle: {
         ...typography.button,
         color: colors.text,
         fontSize: 17,
+        letterSpacing: 0.2,
+    },
+    headerGlass: {
+        marginBottom: 8,
+    },
+    headerInner: {
+        alignItems: "center",
+        gap: 8,
+        paddingBottom: 4,
+        paddingTop: 8,
     },
     heading: {
         ...typography.heading,
         color: colors.text,
         fontSize: 22,
         textAlign: "center",
+    },
+    heroGlass: {
+        marginBottom: 20,
+        width: "100%",
+    },
+    heroInner: {
+        alignItems: "center",
+        gap: 12,
+        paddingVertical: 8,
     },
     layout: {
         backgroundColor: colors.bg,
@@ -571,31 +582,40 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     listContent: {
-        gap: 12,
-        paddingBottom: 24,
-        paddingTop: 24,
+        gap: 14,
+        paddingBottom: 8,
+        paddingTop: 8,
     },
-    row: {
+    rowDisabled: {
+        opacity: 0.38,
+    },
+    rowInner: {
         alignItems: "center",
-        backgroundColor: colors.surface,
+        borderColor: "rgba(255,255,255,0.06)",
+        borderRadius: 20,
+        borderWidth: StyleSheet.hairlineWidth,
         flexDirection: "row",
         gap: 16,
         paddingHorizontal: 18,
         paddingVertical: 16,
     },
-    rowDisabled: {
-        opacity: 0.4,
-    },
     rowPressable: {},
     rowPressed: {
-        opacity: 0.7,
+        opacity: 0.88,
+        transform: [{ scale: 0.985 }],
     },
     rowText: {
         flex: 1,
     },
     subtitle: {
         ...typography.body,
-        color: colors.muted,
+        color: "rgba(255,255,255,0.52)",
+        lineHeight: 20,
         textAlign: "center",
+    },
+    zeroScroll: {
+        flexGrow: 1,
+        justifyContent: "center",
+        paddingVertical: 24,
     },
 });

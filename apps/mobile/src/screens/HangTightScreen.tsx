@@ -74,6 +74,7 @@ export function HangTightScreen({
     // used when the user explicitly chooses "Sign in with a different
     // account" or "Create an account" from a non-bootstrap entry point.
     const forceForm = route.params?.force === true;
+    const fromAccountPicker = route.params?.fromAccountPicker === true;
     const _user = useStore($user);
     const [bootError, setBootError] = useState("");
     const [busy, setBusy] = useState(true);
@@ -192,7 +193,7 @@ export function HangTightScreen({
             // kept keychain credentials — that produced an immediate-resign
             // loop. Bounce to the account picker (or Welcome if no saved
             // accounts at all) and let the user choose where to go.
-            if ($signedOutIntent.get()) {
+            if ($signedOutIntent.get() && !fromAccountPicker) {
                 try {
                     const accounts = await listKnownAccounts();
                     if (cancelled) return;
@@ -265,7 +266,7 @@ export function HangTightScreen({
         // exhaustive-deps rule can't see that. Intentional empty deps —
         // we only want to run the bootstrap check once on mount.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [fromAccountPicker]);
 
     const playInvalidShake = () => {
         Vibration.vibrate(40);

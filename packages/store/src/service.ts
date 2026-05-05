@@ -326,8 +326,15 @@ class VexService {
     private readonly failedUserLookups = new Set<string>();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
+    private logoutInFlight: null | Promise<void> = null;
     private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
+    /**
+     * When true, {@link runPopulateStateBody} stops scheduling more history
+     * loads so {@link close} can shut SQLite without racing decrypt threads.
+     */
+    private populateStateAbort = false;
+    private populateStateInFlight: null | Promise<void> = null;
     private wsDebugEnabled = shouldDebugAuth();
     private wsDebugFrameLogsEnabled = shouldDebugAuth();
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
@@ -480,7 +487,7 @@ class VexService {
                 await client.connect();
                 $userWritable.set(client.me.user());
                 this.setAuthStatus("authenticated");
-                await this.populateState();
+                this.kickPopulateState();
                 return { ok: true };
             } catch (err: unknown) {
                 if (isDecryptMismatchError(err)) {
@@ -529,7 +536,7 @@ class VexService {
                         await recovered.connect();
                         $userWritable.set(recovered.me.user());
                         this.setAuthStatus("authenticated");
-                        await this.populateState();
+                        this.kickPopulateState();
                         debugAuth("autoLogin:decrypt-mismatch:recover:ok", {
                             username: creds.username,
                         });
@@ -689,6 +696,15 @@ class VexService {
 
     async close(): Promise<void> {
         if (this.client) {
+            // `populateState` walks every channel + DM and decrypts SQLite
+            // history — if we `database.close()` while that is still in
+            // flight, native drivers can hard-crash (especially on sign-out).
+            this.populateStateAbort = true;
+            if (this.populateStateInFlight) {
+                await this.populateStateInFlight;
+            }
+            this.populateStateAbort = false;
+
             this.detachWebsocketDebug();
             const c = this.client;
             this.unwireEvents();
@@ -1102,7 +1118,7 @@ class VexService {
             await client.connect();
             $userWritable.set(client.me.user());
             this.setAuthStatus("authenticated");
-            await this.populateState();
+            this.kickPopulateState();
             return { ok: true };
         } catch (err: unknown) {
             if (isStaleCredentialError(err)) {
@@ -1115,13 +1131,24 @@ class VexService {
     }
 
     async logout(): Promise<void> {
-        this.stopPendingApprovalWatcher();
-        await this.close();
-        this.resetAll();
-        this.setAuthStatus("signed_out");
-        // Mark sign-out as explicit so the auth UI does not auto-login from
-        // the keychain credentials we intentionally keep around.
-        $signedOutIntentWritable.set(true);
+        if (this.logoutInFlight) {
+            return this.logoutInFlight;
+        }
+        const run = async (): Promise<void> => {
+            this.stopPendingApprovalWatcher();
+            await this.close();
+            this.resetAll();
+            this.setAuthStatus("signed_out");
+            // Mark sign-out as explicit so the auth UI does not auto-login from
+            // the keychain credentials we intentionally keep around.
+            $signedOutIntentWritable.set(true);
+        };
+        this.logoutInFlight = run();
+        try {
+            await this.logoutInFlight;
+        } finally {
+            this.logoutInFlight = null;
+        }
     }
 
     async lookupUser(query: string): Promise<null | User> {
@@ -1530,12 +1557,8 @@ class VexService {
                 username: client.me.user().username,
             });
 
-            await withTimeout(
-                this.populateState(),
-                REGISTER_STEP_TIMEOUT_MS,
-                "Signup stalled while loading initial account data.",
-            );
-            debugAuth("register:populateState:ok", undefined);
+            this.kickPopulateState();
+            debugAuth("register:populateState:kick", undefined);
             this.deferredDeviceApproval = null;
             return { ok: true };
         } catch (err: unknown) {
@@ -2161,6 +2184,14 @@ class VexService {
         return elapsed <= WS_FRESH_FRAME_THRESHOLD_MS;
     }
 
+    private kickPopulateState(): void {
+        void this.populateState().catch((err: unknown) => {
+            debugAuth("populateState:error", {
+                message: errorMessage(err),
+            });
+        });
+    }
+
     private async loginWithDeviceKeyWithRetry(
         client: Client,
         deviceID?: string,
@@ -2196,91 +2227,29 @@ class VexService {
         debugAuth("rate-limited", { source });
     }
 
+    /**
+     * Hydrate servers/channels/DM history into nanostores. Runs in the
+     * background after connect so the JS thread can answer WS keepalives;
+     * call {@link kickPopulateState} from login paths instead of awaiting
+     * unless you truly need a barrier (e.g. resume refresh with timeout).
+     */
     private async populateState(): Promise<void> {
-        const client = this.requireClient();
-
-        const serversAcc: Record<string, Server> = {};
-        const channelsAcc: Record<string, Channel[]> = {};
-        const groupMessagesAcc: Record<string, Message[]> = {};
-        const permsAcc: Record<string, Permission> = {};
-        const familiarsAcc: Record<string, User> = {};
-        const messagesAcc: Record<string, Message[]> = {};
-
-        const loadServer = async (server: Server): Promise<void> => {
-            serversAcc[server.serverID] = server;
-            const channels = await client.channels.retrieve(server.serverID);
-            channelsAcc[server.serverID] = channels;
-
-            await Promise.all(
-                channels.map(async (channel) => {
-                    try {
-                        const msgs = await client.messages.retrieveGroup(
-                            channel.channelID,
-                        );
-                        if (msgs.length > 0) {
-                            groupMessagesAcc[channel.channelID] =
-                                deduplicateMessages(msgs);
-                        }
-                    } catch {
-                        /* non-fatal */
-                    }
-                }),
-            );
-        };
-
-        const loadFamiliar = async (user: User): Promise<void> => {
-            familiarsAcc[user.userID] = user;
-            try {
-                const msgs = await client.messages.retrieve(user.userID);
-                if (msgs.length > 0) {
-                    messagesAcc[user.userID] = deduplicateMessages(msgs);
-                }
-            } catch {
-                /* non-fatal */
-            }
-        };
-
+        if (this.populateStateInFlight) {
+            return this.populateStateInFlight;
+        }
+        const owner = this.client;
+        if (!owner) {
+            return;
+        }
+        this.populateStateAbort = false;
+        const p = this.runPopulateStateBody(owner);
+        this.populateStateInFlight = p;
         try {
-            const [servers, perms, familiars] = await Promise.all([
-                client.servers.retrieve(),
-                client.permissions.retrieve().catch(() => [] as Permission[]),
-                client.users.familiars().catch(() => [] as User[]),
-            ]);
-
-            for (const perm of perms) {
-                permsAcc[perm.permissionID] = perm;
+            await p;
+        } finally {
+            if (this.populateStateInFlight === p) {
+                this.populateStateInFlight = null;
             }
-
-            await Promise.all([
-                ...servers.map((s) => loadServer(s)),
-                ...familiars.map((u) => loadFamiliar(u)),
-            ]);
-
-            const withList = client as unknown as ClientWithUserDeviceListLike;
-            if (typeof withList.getUserDeviceList === "function") {
-                const devices =
-                    (await withList.getUserDeviceList(
-                        client.me.user().userID,
-                    )) ?? [];
-                $devicesWritable.setKey(client.me.user().userID, devices);
-            }
-
-            $serversWritable.set(serversAcc);
-            $channelsWritable.set(channelsAcc);
-            $groupMessagesWritable.set(groupMessagesAcc);
-            $permissionsWritable.set(permsAcc);
-            $familiarsWritable.set(familiarsAcc);
-            // Merge with existing DM threads so we do not wipe in-memory
-            // conversations when SQLite is empty after retention prune, when
-            // `retrieve` fails, or when a peer is not yet in `familiars`.
-            const prevDm = $messagesWritable.get();
-            const mergedDm: Record<string, Message[]> = { ...prevDm };
-            for (const [userID, msgs] of Object.entries(messagesAcc)) {
-                mergedDm[userID] = msgs;
-            }
-            $messagesWritable.set(mergedDm);
-        } catch {
-            /* non-fatal — UI will show empty state */
         }
     }
 
@@ -2328,6 +2297,8 @@ class VexService {
         this.deferredDeviceApproval = null;
         this.detachWebsocketDebug();
         this.stopWebsocketWatchdog();
+        this.populateStateAbort = false;
+        this.populateStateInFlight = null;
         this.client = null;
         this.failedUserLookups.clear();
         $authStatusWritable.set("signed_out");
@@ -2347,6 +2318,132 @@ class VexService {
         $channelsWritable.set({});
         $permissionsWritable.set({});
         $onlineListsWritable.set({});
+    }
+
+    private async runPopulateStateBody(owner: Client): Promise<void> {
+        const serversAcc: Record<string, Server> = {};
+        const channelsAcc: Record<string, Channel[]> = {};
+        const groupMessagesAcc: Record<string, Message[]> = {};
+        const permsAcc: Record<string, Permission> = {};
+        const familiarsAcc: Record<string, User> = {};
+        const messagesAcc: Record<string, Message[]> = {};
+
+        const shouldStop = (): boolean =>
+            this.populateStateAbort || this.client !== owner;
+
+        const loadServer = async (server: Server): Promise<void> => {
+            if (shouldStop()) {
+                return;
+            }
+            serversAcc[server.serverID] = server;
+            const channels = await owner.channels.retrieve(server.serverID);
+            if (shouldStop()) {
+                return;
+            }
+            channelsAcc[server.serverID] = channels;
+
+            let chIdx = 0;
+            for (const channel of channels) {
+                if (shouldStop()) {
+                    return;
+                }
+                try {
+                    const msgs = await owner.messages.retrieveGroup(
+                        channel.channelID,
+                    );
+                    if (msgs.length > 0) {
+                        groupMessagesAcc[channel.channelID] =
+                            deduplicateMessages(msgs);
+                    }
+                } catch {
+                    /* non-fatal */
+                }
+                chIdx += 1;
+                if (chIdx % 3 === 0) {
+                    await waitMs(0);
+                }
+            }
+        };
+
+        const loadFamiliar = async (user: User): Promise<void> => {
+            if (shouldStop()) {
+                return;
+            }
+            familiarsAcc[user.userID] = user;
+            try {
+                const msgs = await owner.messages.retrieve(user.userID);
+                if (msgs.length > 0) {
+                    messagesAcc[user.userID] = deduplicateMessages(msgs);
+                }
+            } catch {
+                /* non-fatal */
+            }
+        };
+
+        try {
+            const [servers, perms, familiars] = await Promise.all([
+                owner.servers.retrieve(),
+                owner.permissions.retrieve().catch(() => [] as Permission[]),
+                owner.users.familiars().catch(() => [] as User[]),
+            ]);
+
+            if (shouldStop()) {
+                return;
+            }
+
+            for (const perm of perms) {
+                permsAcc[perm.permissionID] = perm;
+            }
+
+            for (const server of servers) {
+                await loadServer(server);
+                await waitMs(0);
+            }
+
+            for (const familiar of familiars) {
+                if (shouldStop()) {
+                    return;
+                }
+                await loadFamiliar(familiar);
+                await waitMs(0);
+            }
+
+            if (shouldStop()) {
+                return;
+            }
+
+            const withList = owner as unknown as ClientWithUserDeviceListLike;
+            if (typeof withList.getUserDeviceList === "function") {
+                const devices =
+                    (await withList.getUserDeviceList(
+                        owner.me.user().userID,
+                    )) ?? [];
+                if (!shouldStop()) {
+                    $devicesWritable.setKey(owner.me.user().userID, devices);
+                }
+            }
+
+            if (shouldStop()) {
+                return;
+            }
+
+            $serversWritable.set(serversAcc);
+            $channelsWritable.set(channelsAcc);
+            $groupMessagesWritable.set(groupMessagesAcc);
+            $permissionsWritable.set(permsAcc);
+            $familiarsWritable.set(familiarsAcc);
+            // Merge with existing DM threads so we do not wipe in-memory
+            // conversations when SQLite is empty after retention prune, when
+            // `retrieve` fails, or when a peer is not yet in `familiars`.
+            const prevDm = $messagesWritable.get();
+            const mergedDm: Record<string, Message[]> = { ...prevDm };
+            for (const [userID, msgs] of Object.entries(messagesAcc)) {
+                mergedDm[userID] = msgs;
+            }
+            $messagesWritable.set(mergedDm);
+        } catch {
+            /* non-fatal — UI will show empty state */
+        }
     }
 
     private async saveCredentials(
@@ -2498,7 +2595,7 @@ class VexService {
                         await client.connect();
                         $userWritable.set(client.me.user());
                         this.setAuthStatus("authenticated");
-                        await this.populateState();
+                        this.kickPopulateState();
                         debugAuth("approvalWatcher:done", {
                             requestID,
                         });

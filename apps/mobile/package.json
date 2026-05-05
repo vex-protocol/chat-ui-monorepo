@@ -32,6 +32,7 @@
         "expo": "^55.0.13",
         "expo-background-fetch": "catalog:",
         "expo-background-task": "catalog:",
+        "expo-blur": "~55.0.14",
         "expo-clipboard": "catalog:",
         "expo-document-picker": "catalog:",
         "expo-file-system": "catalog:",

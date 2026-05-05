@@ -42,7 +42,7 @@ export type AuthStackParamList = {
     Authenticate:
         | undefined
         | { requestID?: string; signKey?: string; username?: string };
-    HangTight: undefined | { force?: boolean };
+    HangTight: undefined | { force?: boolean; fromAccountPicker?: boolean };
     Welcome: undefined;
 };
 
