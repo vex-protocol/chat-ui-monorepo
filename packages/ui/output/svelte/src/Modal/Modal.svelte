@@ -1,10 +1,10 @@
 <script context="module" lang="ts">
   export interface ModalProps {
-    isOpen?: boolean;
-    title?: string;
-    className?: string;
-    onClose?: () => void;
     children?: any;
+    className?: string;
+    isOpen?: boolean;
+    onClose?: () => void;
+    title?: string;
   }
 </script>
 
@@ -30,9 +30,9 @@
     >
       <div class="modal__header">
         <span class="modal__title">{title}</span><button
+          aria-label="Close"
           class="modal__close"
           type="button"
-          aria-label="Close"
           on:click={(event) => {
             onClose?.();
           }}

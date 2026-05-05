@@ -1,36 +1,36 @@
 export const meta = {
-    title: "Badge",
     argTypes: {
+        label: {
+            control: "text",
+        },
         variant: {
             control: "select",
             options: ["online", "offline", "dnd", "idle"],
         },
-        label: {
-            control: "text",
-        },
     },
+    title: "Badge",
 };
 export const Online = {
     args: {
-        variant: "online",
         label: "Online",
+        variant: "online",
     },
 };
 export const Offline = {
     args: {
-        variant: "offline",
         label: "Offline",
+        variant: "offline",
     },
 };
 export const DoNotDisturb = {
     args: {
-        variant: "dnd",
         label: "Do Not Disturb",
+        variant: "dnd",
     },
 };
 export const Idle = {
     args: {
-        variant: "idle",
         label: "Idle",
+        variant: "idle",
     },
 };

@@ -2,40 +2,40 @@
 import * as React from "react";
 
 export interface TextInputProps {
-  value?: string;
-  placeholder?: string;
-  type?: "text" | "password" | "email" | "search";
-  label?: string;
-  disabled?: boolean;
-  className?: string;
-  onInput?: (value: string) => void;
-  onChange?: (value: string) => void;
+    className?: string;
+    disabled?: boolean;
+    label?: string;
+    onChange?: (value: string) => void;
+    onInput?: (value: string) => void;
+    placeholder?: string;
+    type?: "email" | "password" | "search" | "text";
+    value?: string;
 }
 
 function TextInput(props: TextInputProps) {
-  props = {
-    value: "",
-    placeholder: "",
-    type: "text",
-    label: "",
-    disabled: false,
-    className: "",
-    ...props,
-  };
-  return (
-    <div className={`text-input ${props.className}`}>
-      <label className="text-input__label">{props.label}</label>
-      <input
-        className="text-input__field"
-        type={props.type}
-        value={props.value}
-        placeholder={props.placeholder}
-        disabled={props.disabled}
-        onInput={(e) => props.onInput?.(e.target.value)}
-        onChange={(e) => props.onChange?.(e.target.value)}
-      />
-    </div>
-  );
+    props = {
+        className: "",
+        disabled: false,
+        label: "",
+        placeholder: "",
+        type: "text",
+        value: "",
+        ...props,
+    };
+    return (
+        <div className={`text-input ${props.className}`}>
+            <label className="text-input__label">{props.label}</label>
+            <input
+                className="text-input__field"
+                disabled={props.disabled}
+                onChange={(e) => props.onChange?.(e.target.value)}
+                onInput={(e) => props.onInput?.(e.target.value)}
+                placeholder={props.placeholder}
+                type={props.type}
+                value={props.value}
+            />
+        </div>
+    );
 }
 
 export default TextInput;

@@ -1,10 +1,10 @@
 <script context="module" lang="ts">
   export interface MessageBubbleProps {
     author?: string;
-    content?: string;
-    timestamp?: string;
-    isOwn?: boolean;
     className?: string;
+    content?: string;
+    isOwn?: boolean;
+    timestamp?: string;
   }
 </script>
 

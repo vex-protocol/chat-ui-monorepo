@@ -11,6 +11,7 @@
         "ios:release:install": "bash ./scripts/install-ios-release.sh",
         "ios": "expo run:ios",
         "dev": "pnpm run android:multi",
+        "icons:regen": "bash ./scripts/generate-icons-from-vex-svg.sh",
         "dev:metro": "expo start --dev-client",
         "dev:local": "EXPO_PUBLIC_ENABLE_DEV_SERVER=1 EXPO_PUBLIC_SERVER_URL=localhost:16777 expo start --dev-client",
         "dev:lan": "EXPO_PUBLIC_ENABLE_DEV_SERVER=1 EXPO_PUBLIC_SERVER_URL=$(ipconfig getifaddr en0):16777 expo start --dev-client",

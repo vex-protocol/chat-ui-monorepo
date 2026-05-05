@@ -1,5 +1,4 @@
 export const meta = {
-    title: "SearchBar",
     argTypes: {
         placeholder: {
             control: "text",
@@ -8,6 +7,7 @@ export const meta = {
             control: "text",
         },
     },
+    title: "SearchBar",
 };
 export const Default = {
     args: {

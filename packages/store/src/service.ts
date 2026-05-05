@@ -223,6 +223,10 @@ interface ClientWithInternalHttp {
     http?: ClientHttpLike;
 }
 
+interface ClientWithServerChannelBootstrapLike {
+    servers?: ServersWithBootstrapLike;
+}
+
 interface ClientWithSocketLike {
     socket?: unknown;
 }
@@ -261,6 +265,15 @@ interface DevicesWithApprovalLike {
 
 interface HttpErrorLike {
     response: { status: number };
+}
+
+interface ServerChannelBootstrapLike {
+    channelsByServer: Record<string, Channel[]>;
+    servers: Server[];
+}
+
+interface ServersWithBootstrapLike {
+    retrieveWithChannels?: () => Promise<ServerChannelBootstrapLike>;
 }
 
 interface WebSocketDebugLike {
@@ -2388,6 +2401,8 @@ class VexService {
         const shouldStop = (): boolean =>
             this.populateStateAbort || this.client !== owner;
 
+        let bootstrapChannelsByServer: null | Record<string, Channel[]> = null;
+
         const loadServer = async (server: Server): Promise<void> => {
             if (shouldStop()) {
                 return;
@@ -2395,11 +2410,15 @@ class VexService {
             serversAcc[server.serverID] = server;
             let channels: Channel[] = [];
             try {
-                channels = await withTimeout(
-                    owner.channels.retrieve(server.serverID),
-                    8_000,
-                    `populateState: channels timeout for ${server.serverID}`,
-                );
+                if (bootstrapChannelsByServer) {
+                    channels = bootstrapChannelsByServer[server.serverID] ?? [];
+                } else {
+                    channels = await withTimeout(
+                        owner.channels.retrieve(server.serverID),
+                        8_000,
+                        `populateState: channels timeout for ${server.serverID}`,
+                    );
+                }
             } catch (err: unknown) {
                 if (isDecryptMismatchError(err)) {
                     throw err;
@@ -2470,8 +2489,33 @@ class VexService {
             }
         };
 
+        const withBootstrap =
+            owner as unknown as ClientWithServerChannelBootstrapLike;
+        const serverBootstrapPromise = async (): Promise<Server[]> => {
+            if (
+                typeof withBootstrap.servers?.retrieveWithChannels !==
+                "function"
+            ) {
+                return owner.servers.retrieve();
+            }
+            try {
+                const payload = await withTimeout(
+                    withBootstrap.servers.retrieveWithChannels(),
+                    8_000,
+                    "populateState: server bootstrap timeout",
+                );
+                bootstrapChannelsByServer = payload.channelsByServer;
+                return payload.servers;
+            } catch (err: unknown) {
+                debugAuth("populateState:server-bootstrap:failed", {
+                    message: errorMessage(err),
+                });
+                return owner.servers.retrieve();
+            }
+        };
+
         const [servers, perms, familiars, sessions] = await Promise.all([
-            owner.servers.retrieve(),
+            serverBootstrapPromise(),
             owner.permissions.retrieve().catch(() => [] as Permission[]),
             owner.users.familiars().catch(() => [] as User[]),
             owner.sessions.retrieve().catch(() => []),

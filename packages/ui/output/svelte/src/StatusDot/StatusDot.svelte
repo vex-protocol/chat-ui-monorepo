@@ -1,10 +1,10 @@
 <script context="module" lang="ts">
-  export type StatusDotStatus = "online" | "away" | "offline" | "dnd";
-
   export interface StatusDotProps {
-    status?: StatusDotStatus;
     className?: string;
+    status?: StatusDotStatus;
   }
+
+  export type StatusDotStatus = "away" | "dnd" | "offline" | "online";
 </script>
 
 <script lang="ts">
@@ -31,13 +31,13 @@
 
 <span
   style={stringifyStyles({
-    display: "inline-block",
-    width: "8px",
-    height: "8px",
-    borderRadius: "50%",
     backgroundColor: color(),
+    borderRadius: "50%",
+    display: "inline-block",
     flexShrink: "0",
+    height: "8px",
+    width: "8px",
   })}
-  class={`status-dot ${className}`}
   aria-label={status}
+  class={`status-dot ${className}`}
 />

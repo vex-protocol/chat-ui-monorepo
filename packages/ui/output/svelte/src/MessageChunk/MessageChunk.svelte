@@ -2,12 +2,12 @@
   export interface MessageChunkProps {
     authorID: string;
     authorName?: string;
-    avatarSrc?: string;
-    timestamp?: string;
-    messages?: string[];
-    isSelf?: boolean;
     avatarSize?: number;
+    avatarSrc?: string;
     className?: string;
+    isSelf?: boolean;
+    messages?: string[];
+    timestamp?: string;
   }
 </script>
 
@@ -15,10 +15,10 @@
   import Avatar from "../Avatar/Avatar.svelte";
 
   export let authorName: MessageChunkProps["authorName"] = undefined;
-  export let authorID: MessageChunkProps["authorID"];
+  export let authorID: MessageChunkProps["authorID"] = "";
   export let className: MessageChunkProps["className"] = "";
-  export let avatarSrc: MessageChunkProps["avatarSrc"] = undefined;
   export let avatarSize: MessageChunkProps["avatarSize"] = 36;
+  export let avatarSrc: MessageChunkProps["avatarSrc"] = undefined;
   export let isSelf: MessageChunkProps["isSelf"] = false;
   export let timestamp: MessageChunkProps["timestamp"] = "";
   export let messages: MessageChunkProps["messages"] = [];
@@ -47,10 +47,10 @@
   class={`message-chunk ${className}`}
 >
   <Avatar
-    userID={authorID}
-    src={avatarSrc}
-    size={avatarSize}
     displayName={authorName}
+    size={avatarSize}
+    src={avatarSrc}
+    userID={authorID}
   />
   <div
     style={stringifyStyles({
@@ -61,8 +61,8 @@
   >
     <div
       style={stringifyStyles({
-        display: "flex",
         alignItems: "baseline",
+        display: "flex",
         gap: "8px",
         marginBottom: "2px",
       })}
@@ -70,8 +70,8 @@
     >
       <span
         style={stringifyStyles({
-          fontWeight: "600",
           fontSize: "14px",
+          fontWeight: "600",
         })}
         class={`message-chunk__author ${
           isSelf ? "message-chunk__author--self" : ""

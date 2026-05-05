@@ -1,35 +1,35 @@
 export const meta = {
-    title: "ChannelListItem",
     argTypes: {
+        isActive: {
+            control: "boolean",
+        },
         name: {
             control: "text",
         },
         unreadCount: {
             control: "number",
         },
-        isActive: {
-            control: "boolean",
-        },
     },
+    title: "ChannelListItem",
 };
 export const Default = {
     args: {
+        isActive: false,
         name: "general",
         unreadCount: 0,
-        isActive: false,
     },
 };
 export const Active = {
     args: {
+        isActive: true,
         name: "general",
         unreadCount: 0,
-        isActive: true,
     },
 };
 export const WithUnread = {
     args: {
+        isActive: false,
         name: "announcements",
         unreadCount: 5,
-        isActive: false,
     },
 };

@@ -1,6 +1,11 @@
 export const meta = {
-    title: "Avatar",
     argTypes: {
+        alt: {
+            control: "text",
+        },
+        initials: {
+            control: "text",
+        },
         size: {
             control: "select",
             options: ["xs", "sm", "md", "lg"],
@@ -8,19 +13,14 @@ export const meta = {
         src: {
             control: "text",
         },
-        alt: {
-            control: "text",
-        },
-        initials: {
-            control: "text",
-        },
     },
+    title: "Avatar",
 };
 export const WithImage = {
     args: {
-        src: "https://i.pravatar.cc/64",
         alt: "User",
         size: "md",
+        src: "https://i.pravatar.cc/64",
     },
 };
 export const WithInitials = {

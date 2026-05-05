@@ -1,13 +1,13 @@
 export const meta = {
-    title: "MessageInput",
     argTypes: {
-        placeholder: {
-            control: "text",
-        },
         disabled: {
             control: "boolean",
         },
+        placeholder: {
+            control: "text",
+        },
     },
+    title: "MessageInput",
 };
 export const Default = {
     args: {
@@ -16,7 +16,7 @@ export const Default = {
 };
 export const Disabled = {
     args: {
-        placeholder: "Read only",
         disabled: true,
+        placeholder: "Read only",
     },
 };
