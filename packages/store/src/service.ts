@@ -2270,7 +2270,15 @@ class VexService {
             $groupMessagesWritable.set(groupMessagesAcc);
             $permissionsWritable.set(permsAcc);
             $familiarsWritable.set(familiarsAcc);
-            $messagesWritable.set(messagesAcc);
+            // Merge with existing DM threads so we do not wipe in-memory
+            // conversations when SQLite is empty after retention prune, when
+            // `retrieve` fails, or when a peer is not yet in `familiars`.
+            const prevDm = $messagesWritable.get();
+            const mergedDm: Record<string, Message[]> = { ...prevDm };
+            for (const [userID, msgs] of Object.entries(messagesAcc)) {
+                mergedDm[userID] = msgs;
+            }
+            $messagesWritable.set(mergedDm);
         } catch {
             /* non-fatal — UI will show empty state */
         }
