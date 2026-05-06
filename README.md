@@ -4,7 +4,7 @@
 [![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?style=flat-square&logo=pnpm)](./package.json)
 [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/vex-protocol/vex-ui?style=flat-square&label=Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/vex-protocol/vex-chat)
 
-Vex is an end-to-end encrypted, self-hosted chat platform — a privacy-first alternative to Discord and Slack.
+Vex is an end-to-end encrypted chat platform — a privacy-first communication stack you can host yourself.
 
 Every message is encrypted on your device before it leaves. The server stores only ciphertext and deletes your message after it gets to the intended recipient.
 
