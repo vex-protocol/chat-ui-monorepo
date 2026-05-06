@@ -2,7 +2,7 @@
 
 [![Node](https://img.shields.io/badge/node-%3E%3D24.0.0-339933?style=flat-square&logo=nodedotjs)](./package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?style=flat-square&logo=pnpm)](./package.json)
-[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/vex-protocol/vex-chat?style=flat-square&label=Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/vex-protocol/vex-chat)
+[![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/vex-protocol/vex-ui?style=flat-square&label=Scorecard)](https://securityscorecards.dev/viewer/?uri=github.com/vex-protocol/vex-chat)
 
 Vex is an end-to-end encrypted, self-hosted chat platform — a privacy-first alternative to Discord and Slack.
 
