@@ -1,10 +1,10 @@
 # vex-ui
 
-[![CI](https://github.com/vex-protocol/vex-ui/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/vex-protocol/vex-ui/actions/workflows/ci.yml)
-[![npm audit](https://img.shields.io/github/actions/workflow/status/vex-protocol/vex-ui/npm-audit.yml?branch=master&style=flat-square&logo=npm&label=npm%20audit)](https://github.com/vex-protocol/vex-ui/actions/workflows/npm-audit.yml)
-[![Socket](https://img.shields.io/github/actions/workflow/status/vex-protocol/vex-ui/socket.yml?branch=master&style=flat-square&label=Socket)](https://github.com/vex-protocol/vex-ui/actions/workflows/socket.yml)
 [![Node](https://img.shields.io/badge/node-%3E%3D24.0.0-339933?style=flat-square&logo=nodedotjs)](./package.json)
 [![pnpm](https://img.shields.io/badge/pnpm-10.30.3-F69220?style=flat-square&logo=pnpm)](./package.json)
+[![CI](https://img.shields.io/github/actions/workflow/status/vex-protocol/vex-ui/ci.yml?branch=master&event=push&style=flat-square&logo=github&label=CI)](https://github.com/vex-protocol/vex-ui/actions/workflows/ci.yml)
+[![npm audit](https://img.shields.io/github/actions/workflow/status/vex-protocol/vex-ui/npm-audit.yml?branch=master&style=flat-square&logo=npm&label=npm%20audit)](https://github.com/vex-protocol/vex-ui/actions/workflows/npm-audit.yml)
+[![Socket](https://img.shields.io/github/actions/workflow/status/vex-protocol/vex-ui/socket.yml?branch=master&style=flat-square&label=Socket)](https://github.com/vex-protocol/vex-ui/actions/workflows/socket.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/vex-protocol/vex-ui/badge)](https://scorecard.dev/viewer/?uri=github.com/vex-protocol/vex-ui)
 
 Vex is an end-to-end encrypted chat platform — a privacy-first communication stack you can host yourself.
