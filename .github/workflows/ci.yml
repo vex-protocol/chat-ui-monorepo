@@ -189,6 +189,57 @@ jobs:
             - run: pnpm install --frozen-lockfile --ignore-scripts
             - run: pnpm --filter @vex-chat/mobile --if-present check
 
+    # ── Mobile iOS — native build-only compile ────────────────────────────
+    check-mobile-ios:
+        needs: detect-changes
+        if: >-
+            needs.detect-changes.outputs.mobile == 'true' ||
+            needs.detect-changes.outputs.store == 'true' ||
+            needs.detect-changes.outputs.ui == 'true' ||
+            needs.detect-changes.outputs.root == 'true'
+        runs-on: macos-latest
+        timeout-minutes: 45
+        env:
+            CI: "1"
+            EXPO_NO_TELEMETRY: "1"
+            VEX_DISABLE_IOS_CAPABILITIES: "1"
+            VEX_IOS_BUNDLE_IDENTIFIER: "chat.vex.mobile.ci"
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - run: pnpm install --frozen-lockfile --ignore-scripts
+
+            - name: Show native tool versions
+              run: |
+                  xcodebuild -version
+                  pod --version
+
+            - name: Prebuild iOS project
+              run: pnpm -F mobile exec expo prebuild --platform ios --clean --no-install
+
+            - name: Install CocoaPods
+              working-directory: apps/mobile/ios
+              run: pod install
+
+            - name: Build iOS app for generic simulator
+              working-directory: apps/mobile/ios
+              run: |
+                  xcodebuild \
+                    -workspace Vex.xcworkspace \
+                    -scheme Vex \
+                    -configuration Debug \
+                    -sdk iphonesimulator \
+                    -destination 'generic/platform=iOS Simulator' \
+                    CODE_SIGNING_ALLOWED=NO \
+                    build
+
     # ── UI — Mitosis build (standalone, no dependents) ─────────────────────
     check-ui:
         needs: detect-changes
@@ -227,6 +278,7 @@ jobs:
             - check-store
             - check-desktop
             - check-mobile
+            - check-mobile-ios
             - check-ui
         if: always()
         runs-on: ubuntu-latest
