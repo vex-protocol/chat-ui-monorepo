@@ -197,7 +197,7 @@ jobs:
             needs.detect-changes.outputs.store == 'true' ||
             needs.detect-changes.outputs.ui == 'true' ||
             needs.detect-changes.outputs.root == 'true'
-        runs-on: macos-latest
+        runs-on: macos-26
         timeout-minutes: 45
         env:
             CI: "1"
