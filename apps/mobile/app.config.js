@@ -5,6 +5,7 @@
 //   default (all profiles)             → production flavor
 //   VEX_ENABLE_DEV_BUILD=1 + profile=development → dev flavor (opt-in)
 //   env override                        → VEX_IOS_BUNDLE_IDENTIFIER (optional)
+//   local personal-team iOS builds      → VEX_DISABLE_IOS_CAPABILITIES=1
 //
 // The release APK has updates.enabled:false hard-baked into the native
 // config — no EAS Update runtime, no network calls, no OTA code path.
@@ -15,15 +16,25 @@
 // reads it here; the APK's visible version follows automatically.
 
 const pkg = require("./package.json");
+const { withEntitlementsPlist } = require("expo/config-plugins");
 
 // EAS Update requires a stable project id to resolve the update channel.
 // Created via the Expo dashboard — paired with EXPO_TOKEN in CI secrets.
 const EAS_PROJECT_ID = "e0d4cba7-1f2a-4c26-9e66-1fd60178ad20";
 
+const withoutPersonalTeamUnsupportedIosCapabilities = (config) =>
+    withEntitlementsPlist(config, (modConfig) => {
+        delete modConfig.modResults["aps-environment"];
+        delete modConfig.modResults["com.apple.developer.associated-domains"];
+        return modConfig;
+    });
+
 module.exports = ({ config }) => {
     const devFlavorEnabled = process.env.VEX_ENABLE_DEV_BUILD === "1";
     const devMode =
         devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
+    const iosCapabilitiesEnabled =
+        process.env.VEX_DISABLE_IOS_CAPABILITIES !== "1";
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
@@ -60,6 +71,9 @@ module.exports = ({ config }) => {
         ios: {
             ...config.ios,
             bundleIdentifier: iosBundleIdentifier,
+            associatedDomains: iosCapabilitiesEnabled
+                ? config.ios?.associatedDomains
+                : undefined,
         },
         android: {
             ...config.android,
@@ -79,7 +93,13 @@ module.exports = ({ config }) => {
             eas: { projectId: EAS_PROJECT_ID },
         },
         plugins: [
-            ...(config.plugins ?? []),
+            ...(config.plugins ?? []).filter((plugin) => {
+                if (iosCapabilitiesEnabled) return true;
+                if (plugin === "expo-notifications") return false;
+                return !(
+                    Array.isArray(plugin) && plugin[0] === "expo-notifications"
+                );
+            }),
             "expo-background-task",
             "./plugins/withForegroundService",
             // Safety net for Notifee FGS small-icon resolution.
@@ -90,6 +110,9 @@ module.exports = ({ config }) => {
             // catch-all `@drawable/notification_icon` always
             // resolves to a valid white-on-transparent vector.
             "./plugins/withNotificationIcon",
+            ...(iosCapabilitiesEnabled
+                ? []
+                : [withoutPersonalTeamUnsupportedIosCapabilities]),
         ],
     };
 };
