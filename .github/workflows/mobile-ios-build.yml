@@ -1,0 +1,87 @@
+name: Mobile iOS Build
+
+# Compile the Expo iOS app whenever mobile code or shipped mobile
+# dependencies change. This is a build-only simulator target, which
+# catches prebuild, CocoaPods, Xcode, and native-module regressions
+# without requiring Apple signing credentials on GitHub-hosted runners.
+
+on:
+    pull_request:
+        branches: [master]
+        paths:
+            - "apps/mobile/**"
+            - "packages/store/**"
+            - "packages/ui/**"
+            - "package.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - ".tool-versions"
+            - "mise.toml"
+            - ".github/workflows/mobile-ios-build.yml"
+    push:
+        branches: [master]
+        paths:
+            - "apps/mobile/**"
+            - "packages/store/**"
+            - "packages/ui/**"
+            - "package.json"
+            - "pnpm-lock.yaml"
+            - "pnpm-workspace.yaml"
+            - ".tool-versions"
+            - "mise.toml"
+            - ".github/workflows/mobile-ios-build.yml"
+    workflow_dispatch:
+
+concurrency:
+    group: mobile-ios-build-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    ios-build:
+        name: iOS build-only compile
+        runs-on: macos-latest
+        timeout-minutes: 45
+        env:
+            CI: "1"
+            EXPO_NO_TELEMETRY: "1"
+            VEX_DISABLE_IOS_CAPABILITIES: "1"
+            VEX_IOS_BUNDLE_IDENTIFIER: "chat.vex.mobile.ci"
+        steps:
+            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+              with:
+                  node-version-file: .tool-versions
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile --ignore-scripts
+
+            - name: Show native tool versions
+              run: |
+                  xcodebuild -version
+                  pod --version
+
+            - name: Prebuild iOS project
+              run: pnpm -F mobile exec expo prebuild --platform ios --clean --no-install
+
+            - name: Install CocoaPods
+              working-directory: apps/mobile/ios
+              run: pod install
+
+            - name: Build iOS app for generic simulator
+              working-directory: apps/mobile/ios
+              run: |
+                  xcodebuild \
+                    -workspace Vex.xcworkspace \
+                    -scheme Vex \
+                    -configuration Debug \
+                    -sdk iphonesimulator \
+                    -destination 'generic/platform=iOS Simulator' \
+                    CODE_SIGNING_ALLOWED=NO \
+                    build
