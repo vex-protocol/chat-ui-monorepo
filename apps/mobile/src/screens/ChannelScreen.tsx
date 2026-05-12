@@ -54,7 +54,7 @@ export function ChannelScreen({
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
     // Scoped to just this server's slot so other server churn doesn't re-render us.
-    const servers = useStore($servers, { keys: [serverID] });
+    const servers = useStore($servers);
     const user = useStore($user);
     const serverName = servers[serverID]?.name ?? "";
 
@@ -153,7 +153,7 @@ export function ChannelScreen({
         }
     };
 
-    function openMembersDrawer(): void {
+    const openMembersDrawer = useCallback((): void => {
         $leftSidebarOpen.set(false);
         $rightSidebarOpen.set(true);
         setMembersDrawerVisible(true);
@@ -170,9 +170,9 @@ export function ChannelScreen({
             toValue: 1,
             useNativeDriver: true,
         }).start();
-    }
+    }, [membersDrawerAnim]);
 
-    function closeMembersDrawer(): void {
+    const closeMembersDrawer = useCallback((): void => {
         $rightSidebarOpen.set(false);
         setMembersDrawerOpen(false);
         cancelPendingMembersHaptic();
@@ -191,21 +191,21 @@ export function ChannelScreen({
                 setMembersDrawerVisible(false);
             }
         });
-    }
+    }, [membersDrawerAnim]);
 
-    function toggleMembersDrawer(): void {
+    const toggleMembersDrawer = useCallback((): void => {
         if (membersDrawerOpen) {
             closeMembersDrawer();
             return;
         }
         openMembersDrawer();
-    }
+    }, [closeMembersDrawer, membersDrawerOpen, openMembersDrawer]);
 
     useEffect(() => {
         if (leftSidebarOpen && membersDrawerOpen) {
             closeMembersDrawer();
         }
-    }, [leftSidebarOpen, membersDrawerOpen]);
+    }, [closeMembersDrawer, leftSidebarOpen, membersDrawerOpen]);
 
     useEffect(() => {
         return () => {

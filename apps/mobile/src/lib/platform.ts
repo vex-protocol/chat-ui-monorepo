@@ -6,7 +6,9 @@
  * - deviceName: Platform.OS
  */
 import type { Storage } from "@vex-chat/libvex";
+import type { ClientDatabase } from "@vex-chat/libvex/storage/schema";
 import type { BootstrapConfig } from "@vex-chat/store";
+import type { Kysely } from "kysely";
 
 import { Platform } from "react-native";
 
@@ -26,7 +28,7 @@ export function mobileConfig(): BootstrapConfig {
                 await import("@vex-chat/libvex/storage/sqlite");
 
             const dbName = scopedDbName(username);
-            const db = new Kysely({
+            const db = new Kysely<ClientDatabase>({
                 dialect: new ExpoDialect({ database: dbName }),
             });
             const atRestAes = deriveAtRestAesKey(privateKey);
@@ -41,11 +43,7 @@ export function mobileConfig(): BootstrapConfig {
 
 async function applyLibvex6RatchetMigration(
     dbName: string,
-    db: {
-        deleteFrom: (table: string) => {
-            execute: () => Promise<unknown>;
-        };
-    },
+    db: Pick<Kysely<ClientDatabase>, "deleteFrom">,
     username: string,
 ): Promise<void> {
     const key = libv6MigrationKey(username);

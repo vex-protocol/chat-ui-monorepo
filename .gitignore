@@ -15,6 +15,7 @@ apps/mobile/android/
 # downloads keystores and a credentials.json with cleartext passwords.
 apps/mobile/credentials.json
 apps/mobile/credentials/
+apps/mobile/google-services*.json
 **/keystore.jks
 **/upload-keystore.jks
 

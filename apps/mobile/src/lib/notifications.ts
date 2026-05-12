@@ -2,7 +2,7 @@ import type { Message } from "@vex-chat/libvex";
 
 import { Platform } from "react-native";
 
-import { shouldNotify } from "@vex-chat/store";
+import { shouldNotify, vexService } from "@vex-chat/store";
 import {
     $avatarVersions,
     $channels,
@@ -193,8 +193,22 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function setupNotificationHandlers(): () => void {
+    const receivedSubscription = Notifications.addNotificationReceivedListener(
+        (notification) => {
+            handleRemotePushWake(
+                notification.request.content.data as Record<string, unknown>,
+            );
+        },
+    );
+
     const subscription = Notifications.addNotificationResponseReceivedListener(
         (response) => {
+            handleRemotePushWake(
+                response.notification.request.content.data as Record<
+                    string,
+                    unknown
+                >,
+            );
             routeNotificationTap(
                 response.notification.request.content.data as Record<
                     string,
@@ -206,6 +220,12 @@ export function setupNotificationHandlers(): () => void {
 
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse) {
+        handleRemotePushWake(
+            lastResponse.notification.request.content.data as Record<
+                string,
+                unknown
+            >,
+        );
         routeNotificationTap(
             lastResponse.notification.request.content.data as Record<
                 string,
@@ -244,6 +264,7 @@ export function setupNotificationHandlers(): () => void {
     });
 
     return () => {
+        receivedSubscription.remove();
         subscription.remove();
         unsubNotifee?.();
     };
@@ -445,6 +466,20 @@ function handleNotificationPress(
     const familiars = $familiars.get();
     const username = familiars[authorID]?.username ?? authorID.slice(0, 8);
     navigateToConversation(authorID, username);
+}
+
+function handleRemotePushWake(data: Record<string, unknown> | undefined): void {
+    const event = data?.["event"];
+    if (
+        event !== "mail" &&
+        event !== "deviceRequest" &&
+        event !== "deviceListChanged"
+    ) {
+        return;
+    }
+    void vexService.refreshSessionAfterForeground().catch(() => {
+        /* best-effort wake-up sync */
+    });
 }
 
 /** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */

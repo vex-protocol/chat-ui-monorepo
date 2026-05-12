@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@expo/vector-icons':
+      specifier: ^15.1.1
+      version: 15.1.1
     '@nanostores/react':
       specifier: ^1.1.0
       version: 1.1.0
@@ -31,6 +34,9 @@ catalogs:
       specifier: ~55.0.17
       version: 55.0.17
     expo-clipboard:
+      specifier: ~55.0.13
+      version: 55.0.13
+    expo-constants:
       specifier: ~55.0.13
       version: 55.0.13
     expo-document-picker:
@@ -213,6 +219,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@expo/vector-icons':
+        specifier: 'catalog:'
+        version: 15.1.1(expo-font@55.0.6(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
       '@nanostores/react':
         specifier: 'catalog:'
         version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
@@ -246,6 +255,9 @@ importers:
       expo-clipboard:
         specifier: 'catalog:'
         version: 55.0.13(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)
+      expo-constants:
+        specifier: 'catalog:'
+        version: 55.0.13(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(typescript@5.9.3)
       expo-document-picker:
         specifier: 'catalog:'
         version: 55.0.13(expo@55.0.13)

@@ -28,9 +28,9 @@ export function ServerSettingsScreen({
     route,
 }: AppScreenProps<"ServerSettings">) {
     const { serverID } = route.params;
-    const channelsByServer = useStore($channels, { keys: [serverID] });
+    const channelsByServer = useStore($channels);
     const permissions = useStore($permissions);
-    const servers = useStore($servers, { keys: [serverID] });
+    const servers = useStore($servers);
     const user = useStore($user);
     const [channelName, setChannelName] = useState("");
     const [creatingChannel, setCreatingChannel] = useState(false);

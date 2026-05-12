@@ -45,12 +45,15 @@ import {
 import {
     clearNotifiedApprovalRequestIDs,
     dismissDeviceApprovalNotification,
-    requestNotificationPermission,
     setupNotificationHandlers,
     showDeviceApprovalNotification,
     showMessageNotification,
 } from "./src/lib/notifications";
 import { mobileConfig } from "./src/lib/platform";
+import {
+    hydratePushNotificationPreference,
+    reconcilePushNotificationSubscription,
+} from "./src/lib/pushNotifications";
 import { hydrateLocalMessageRetention } from "./src/lib/retentionPreference";
 import {
     navigateToDeviceRequests,
@@ -168,6 +171,7 @@ function App() {
         if (isAlwaysOnSupported()) {
             void hydrateAlwaysOnPreference();
         }
+        void hydratePushNotificationPreference();
         return () => {
             unsubNotif();
         };
@@ -229,7 +233,6 @@ function App() {
         void (async () => {
             try {
                 await hydrateLocalMessageRetention();
-                await requestNotificationPermission();
                 const result = await vexService.autoLogin(
                     keychainKeyStore,
                     mobileConfig(),
@@ -752,6 +755,13 @@ function App() {
                 }
             })();
         }
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) {
+            return;
+        }
+        void reconcilePushNotificationSubscription();
     }, [user]);
 
     return (

@@ -152,6 +152,13 @@ export interface PasskeySignInBegin {
     requestID: string;
 }
 
+export interface PushNotificationSubscriptionInput {
+    channel: "expo";
+    events?: string[];
+    platform?: "android" | "ios" | "web";
+    token: string;
+}
+
 export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 
 /** Server connection options — identical across all auth flows. */
@@ -224,6 +231,11 @@ interface ClientWithInternalHttp {
     http?: ClientHttpLike;
 }
 
+interface ClientWithNotificationSubscriptionsLike {
+    subscribeNotifications?: unknown;
+    unsubscribeNotifications?: unknown;
+}
+
 interface ClientWithServerChannelBootstrapLike {
     servers?: ServersWithBootstrapLike;
 }
@@ -266,6 +278,10 @@ interface DevicesWithApprovalLike {
 
 interface HttpErrorLike {
     response: { status: number };
+}
+
+interface NotificationSubscriptionLike {
+    subscriptionID: string;
 }
 
 interface ServerChannelBootstrapLike {
@@ -1800,8 +1816,6 @@ class VexService {
         c?.setLocalMessageRetentionDays?.(clamped);
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
-
     setWebsocketDebug(enabled: boolean): void {
         this.wsDebugEnabled = enabled;
         if (enabled) {
@@ -1820,8 +1834,63 @@ class VexService {
         this.attachWebsocketDebug();
     }
 
+    // ── Lifecycle ───────────────────────────────────────────────────────
+
     setWebsocketStateDebug(enabled: boolean): void {
         this.wsDebugStateLogsEnabled = enabled;
+    }
+
+    async subscribePushNotifications(
+        input: PushNotificationSubscriptionInput,
+    ): Promise<NotificationSubscriptionLike> {
+        const client = this.requireClient();
+        if (hasNotificationSubscriptionApi(client)) {
+            return client.subscribeNotifications(input);
+        }
+
+        const http = (client as unknown as ClientWithInternalHttp).http;
+        const post = http?.post;
+        if (typeof post !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        const deviceID = client.me.device().deviceID;
+        const response = (await post.call(
+            http,
+            client.getHost() +
+                "/device/" +
+                deviceID +
+                "/notifications/subscriptions",
+            JSON.stringify(input),
+            {
+                headers: { "Content-Type": "application/json" },
+                responseType: "json",
+            },
+        )) as { data?: unknown };
+
+        return parseNotificationSubscription(response.data);
+    }
+
+    async unsubscribePushNotifications(subscriptionID: string): Promise<void> {
+        const client = this.requireClient();
+        if (hasNotificationSubscriptionApi(client)) {
+            await client.unsubscribeNotifications(subscriptionID);
+            return;
+        }
+
+        const http = (client as unknown as ClientWithInternalHttp).http;
+        const del = (http as undefined | { delete?: unknown })?.delete;
+        if (typeof del !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        const deviceID = client.me.device().deviceID;
+        await del.call(
+            http,
+            client.getHost() +
+                "/device/" +
+                deviceID +
+                "/notifications/subscriptions/" +
+                subscriptionID,
+        );
     }
 
     private attachWebsocketDebug(): void {
@@ -3345,6 +3414,20 @@ function hasHttpStatus(err: unknown): err is HttpErrorLike {
     );
 }
 
+function hasNotificationSubscriptionApi(client: Client): client is Client & {
+    subscribeNotifications: (
+        input: PushNotificationSubscriptionInput,
+    ) => Promise<NotificationSubscriptionLike>;
+    unsubscribeNotifications: (subscriptionID: string) => Promise<void>;
+} {
+    const maybeClient =
+        client as unknown as ClientWithNotificationSubscriptionsLike;
+    return (
+        typeof maybeClient.subscribeNotifications === "function" &&
+        typeof maybeClient.unsubscribeNotifications === "function"
+    );
+}
+
 function hasSyncInboxNow(client: Client): client is Client & {
     syncInboxNow: () => Promise<void>;
 } {
@@ -3455,6 +3538,24 @@ function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
 function jwtExpToEpochMs(exp: number): number {
     // JWT exp is conventionally seconds since epoch; tolerate ms values too.
     return exp > 1_000_000_000_000 ? exp : exp * 1000;
+}
+
+function parseNotificationSubscription(
+    value: unknown,
+): NotificationSubscriptionLike {
+    if (
+        typeof value === "object" &&
+        value !== null &&
+        "subscriptionID" in value &&
+        typeof (value as { subscriptionID: unknown }).subscriptionID ===
+            "string"
+    ) {
+        return {
+            subscriptionID: (value as { subscriptionID: string })
+                .subscriptionID,
+        };
+    }
+    throw new Error("Invalid push subscription response.");
 }
 
 function readErrorField(body: unknown): null | string {
