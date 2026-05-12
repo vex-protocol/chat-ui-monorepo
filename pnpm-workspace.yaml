@@ -21,7 +21,7 @@ catalog:
     expo-image-manipulator: ^55.0.15
     expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
-    kysely: ^0.28.15
+    kysely: ^0.28.17
     marked: ^15.0.12
     msgpackr: ^1.11.5
     nanostores: ^1.2.0
