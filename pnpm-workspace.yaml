@@ -13,7 +13,7 @@ catalog:
     "@vex-chat/libvex": 6.5.5
     "@vex-chat/spire": 1.9.0
     "@vex-chat/types": 3.3.0
-    dompurify: ^3.2.6
+    dompurify: ^3.4.0
     expo-background-fetch: ~55.0.15
     expo-background-task: ~55.0.17
     expo-clipboard: ~55.0.13
@@ -23,7 +23,7 @@ catalog:
     expo-image-manipulator: ^55.0.15
     expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
-    kysely: ^0.28.15
+    kysely: ^0.28.17
     marked: ^15.0.12
     msgpackr: ^1.11.5
     nanostores: ^1.2.0
@@ -32,7 +32,7 @@ catalog:
     react-native-passkey: 3.3.3
     svelte: ^5.45.2
     typescript: ~5.9.3
-    uuid: ^11.0.0
+    uuid: ^14.0.0
     vitest: 3.2.4
     zod: ^4.1.12
 
@@ -51,3 +51,6 @@ minimumReleaseAgeExclude:
     - unimodules-app-loader
     - axios
     - uuid
+    - dompurify
+    - fast-xml-builder
+    - kysely

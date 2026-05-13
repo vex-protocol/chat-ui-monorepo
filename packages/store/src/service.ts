@@ -236,6 +236,15 @@ interface ClientWithNotificationSubscriptionsLike {
     unsubscribeNotifications?: unknown;
 }
 
+interface ClientWithPushNotificationFallback extends ClientWithInternalHttp {
+    getHost?: () => string;
+    me?: {
+        device?: () => {
+            deviceID?: unknown;
+        };
+    };
+}
+
 interface ClientWithServerChannelBootstrapLike {
     servers?: ServersWithBootstrapLike;
 }
@@ -1388,8 +1397,12 @@ class VexService {
             // we're not in always-on mode), do the full reconnect — the
             // socket can't be trusted.
             if (!this.isWebsocketLikelyHealthy()) {
+                const reconnect = this.client.reconnectWebsocket();
+                reconnect.catch(() => {
+                    /* consumed by withTimeout below; prevents late RN unhandled rejection logs */
+                });
                 await withTimeout(
-                    this.client.reconnectWebsocket(),
+                    reconnect,
                     10_000,
                     "WebSocket reconnect timed out after app resume.",
                 );
@@ -1844,19 +1857,25 @@ class VexService {
         input: PushNotificationSubscriptionInput,
     ): Promise<NotificationSubscriptionLike> {
         const client = this.requireClient();
+        const legacyClient =
+            client as unknown as ClientWithPushNotificationFallback;
         if (hasNotificationSubscriptionApi(client)) {
             return client.subscribeNotifications(input);
         }
 
-        const http = (client as unknown as ClientWithInternalHttp).http;
+        const http = legacyClient.http;
         const post = http?.post;
         if (typeof post !== "function") {
             throw new Error("Push subscriptions are not supported by libvex.");
         }
-        const deviceID = client.me.device().deviceID;
+        const deviceID = legacyClient.me?.device?.().deviceID;
+        const getHost = legacyClient.getHost;
+        if (typeof deviceID !== "string" || typeof getHost !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
         const response = (await post.call(
             http,
-            client.getHost() +
+            getHost.call(legacyClient) +
                 "/device/" +
                 deviceID +
                 "/notifications/subscriptions",
@@ -1872,20 +1891,26 @@ class VexService {
 
     async unsubscribePushNotifications(subscriptionID: string): Promise<void> {
         const client = this.requireClient();
+        const legacyClient =
+            client as unknown as ClientWithPushNotificationFallback;
         if (hasNotificationSubscriptionApi(client)) {
             await client.unsubscribeNotifications(subscriptionID);
             return;
         }
 
-        const http = (client as unknown as ClientWithInternalHttp).http;
+        const http = legacyClient.http;
         const del = (http as undefined | { delete?: unknown })?.delete;
         if (typeof del !== "function") {
             throw new Error("Push subscriptions are not supported by libvex.");
         }
-        const deviceID = client.me.device().deviceID;
+        const deviceID = legacyClient.me?.device?.().deviceID;
+        const getHost = legacyClient.getHost;
+        if (typeof deviceID !== "string" || typeof getHost !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
         await del.call(
             http,
-            client.getHost() +
+            getHost.call(legacyClient) +
                 "/device/" +
                 deviceID +
                 "/notifications/subscriptions/" +

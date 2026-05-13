@@ -8,6 +8,7 @@ import {
     $channels,
     $familiars,
     $servers,
+    $user,
 } from "@vex-chat/store";
 
 import notifee, {
@@ -23,6 +24,7 @@ import {
     navigateToChannel,
     navigateToConversation,
     navigateToDeviceRequests,
+    navigateToDMList,
     navigationRef,
 } from "../navigation/navigationRef";
 
@@ -96,9 +98,39 @@ let notificationDrainInFlight = false;
 // again for the same ID; we'd rather drop the duplicate than spam.
 const notifiedApprovalRequestIDs = new Set<string>();
 
-type PendingRouteTap = { data: Record<string, unknown>; dedupeKey?: string };
+type PendingRouteTap = {
+    data: Record<string, unknown>;
+    dedupeKey?: string;
+    syncFirst: boolean;
+};
 
 const pendingRouteTapQueue: PendingRouteTap[] = [];
+let pendingRouteDrainInFlight = false;
+
+function logPushDelivery(
+    message: string,
+    details?: Record<string, unknown>,
+): void {
+    if (details) {
+        console.info(`[vex-push] ${message}`, details);
+        return;
+    }
+    console.info(`[vex-push] ${message}`);
+}
+
+function summarizePushData(
+    data: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+    if (!data || typeof data !== "object") {
+        return {};
+    }
+    return {
+        event: data["event"],
+        keys: Object.keys(data).sort(),
+        kind: data["kind"],
+        mailID: data["mailID"],
+    };
+}
 
 // Show banner + play sound when a notification arrives while the app is open.
 Notifications.setNotificationHandler({
@@ -163,9 +195,13 @@ export function enqueueNotificationRouteFromAndroidBackground(data: {
         }
     }
     if (dedupeKey !== undefined) {
-        pendingRouteTapQueue.push({ data: normalized, dedupeKey });
+        pendingRouteTapQueue.push({
+            data: normalized,
+            dedupeKey,
+            syncFirst: true,
+        });
     } else {
-        pendingRouteTapQueue.push({ data: normalized });
+        pendingRouteTapQueue.push({ data: normalized, syncFirst: true });
     }
 }
 
@@ -174,12 +210,7 @@ export function enqueueNotificationRouteFromAndroidBackground(data: {
  * that arrived before the navigator mounted are replayed once.
  */
 export function flushPendingNotificationRoutes(): void {
-    while (navigationRef.isReady() && pendingRouteTapQueue.length > 0) {
-        const next = pendingRouteTapQueue.shift();
-        if (next) {
-            handleNotificationPress(next.data);
-        }
-    }
+    void drainPendingNotificationRoutes();
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {
@@ -193,45 +224,57 @@ export async function requestNotificationPermission(): Promise<boolean> {
 }
 
 export function setupNotificationHandlers(): () => void {
+    logPushDelivery("installing notification listeners", {
+        platform: Platform.OS,
+    });
     const receivedSubscription = Notifications.addNotificationReceivedListener(
         (notification) => {
-            handleRemotePushWake(
-                notification.request.content.data as Record<string, unknown>,
-            );
+            const data = notification.request.content.data as Record<
+                string,
+                unknown
+            >;
+            logPushDelivery("notification received in foreground", {
+                identifier: notification.request.identifier,
+                ...summarizePushData(data),
+            });
+            if (isRemotePushNotification(notification)) {
+                void handleRemotePushWake(data);
+                return;
+            }
+            logPushDelivery("local notification foreground wake skipped", {
+                identifier: notification.request.identifier,
+                ...summarizePushData(data),
+            });
         },
     );
 
     const subscription = Notifications.addNotificationResponseReceivedListener(
         (response) => {
-            handleRemotePushWake(
-                response.notification.request.content.data as Record<
-                    string,
-                    unknown
-                >,
-            );
-            routeNotificationTap(
-                response.notification.request.content.data as Record<
-                    string,
-                    unknown
-                >,
-            );
+            const data = response.notification.request.content.data as Record<
+                string,
+                unknown
+            >;
+            logPushDelivery("notification response received", {
+                actionIdentifier: response.actionIdentifier,
+                identifier: response.notification.request.identifier,
+                ...summarizePushData(data),
+            });
+            routeNotificationTap(data, { syncFirst: true });
         },
     );
 
     const lastResponse = Notifications.getLastNotificationResponse();
     if (lastResponse) {
-        handleRemotePushWake(
-            lastResponse.notification.request.content.data as Record<
-                string,
-                unknown
-            >,
-        );
-        routeNotificationTap(
-            lastResponse.notification.request.content.data as Record<
-                string,
-                unknown
-            >,
-        );
+        const data = lastResponse.notification.request.content.data as Record<
+            string,
+            unknown
+        >;
+        logPushDelivery("last notification response found on startup", {
+            actionIdentifier: lastResponse.actionIdentifier,
+            identifier: lastResponse.notification.request.identifier,
+            ...summarizePushData(data),
+        });
+        routeNotificationTap(data, { syncFirst: true });
     }
 
     let unsubNotifee: (() => void) | undefined;
@@ -244,7 +287,14 @@ export function setupNotificationHandlers(): () => void {
             if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
                 return;
             }
-            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+            logPushDelivery("notifee foreground notification press", {
+                keys: Object.keys(data).sort(),
+                kind: data["kind"],
+                mailID: data["mailID"],
+            });
+            routeNotificationTap(normalizeAndroidMessageRouteData(data), {
+                syncFirst: true,
+            });
         });
 
         void notifee.getInitialNotification().then((initial) => {
@@ -255,7 +305,14 @@ export function setupNotificationHandlers(): () => void {
             if (!data || (data["kind"] !== "dm" && data["kind"] !== "group")) {
                 return;
             }
-            routeNotificationTap(normalizeAndroidMessageRouteData(data));
+            logPushDelivery("notifee initial notification found", {
+                keys: Object.keys(data).sort(),
+                kind: data["kind"],
+                mailID: data["mailID"],
+            });
+            routeNotificationTap(normalizeAndroidMessageRouteData(data), {
+                syncFirst: true,
+            });
         });
     }
 
@@ -344,6 +401,10 @@ export async function showMessageNotification(mail: Message): Promise<void> {
     await drainNotificationQueue();
 }
 
+function canRouteNotificationNow(): boolean {
+    return navigationRef.isReady() && $user.get() !== null;
+}
+
 function deviceApprovalNotificationID(requestID: string): string {
     // Namespaced so it can never collide with a notification ID we
     // generate elsewhere in the app (currently message banners are
@@ -386,6 +447,37 @@ async function drainNotificationQueue(): Promise<void> {
         }
     } finally {
         notificationDrainInFlight = false;
+    }
+}
+
+async function drainPendingNotificationRoutes(): Promise<void> {
+    if (pendingRouteDrainInFlight) {
+        return;
+    }
+    if (!canRouteNotificationNow()) {
+        logPushDelivery("notification route flush deferred", {
+            navigationReady: navigationRef.isReady(),
+            pending: pendingRouteTapQueue.length,
+            signedIn: $user.get() !== null,
+        });
+        return;
+    }
+    pendingRouteDrainInFlight = true;
+    try {
+        while (canRouteNotificationNow() && pendingRouteTapQueue.length > 0) {
+            const next = pendingRouteTapQueue.shift();
+            if (!next) {
+                continue;
+            }
+            if (next.syncFirst) {
+                await handleRemotePushWake(next.data).catch(() => {
+                    /* wake sync is best-effort; taps should still route */
+                });
+            }
+            handleNotificationPress(next.data);
+        }
+    } finally {
+        pendingRouteDrainInFlight = false;
     }
 }
 
@@ -434,6 +526,7 @@ function handleNotificationPress(
     data: Record<string, unknown> | undefined,
 ): void {
     const kind = data?.["kind"];
+    const event = data?.["event"];
     const authorID = data?.["authorID"];
     const channelID = data?.["channelID"];
     const serverID = data?.["serverID"];
@@ -441,6 +534,10 @@ function handleNotificationPress(
         // Land on the actual approve/deny applet — the matching code is
         // displayed inside that screen, and that's the only thing the
         // user has to do here.
+        logPushDelivery("routing notification tap", {
+            kind,
+            target: "DeviceRequests",
+        });
         navigateToDeviceRequests();
         return;
     }
@@ -455,31 +552,73 @@ function handleNotificationPress(
         const serverChannels = channels[serverID] ?? [];
         const channel = serverChannels.find((c) => c.channelID === channelID);
         const channelName = channel?.name ?? "channel";
+        logPushDelivery("routing notification tap", {
+            channelID,
+            kind,
+            serverID,
+            target: "Channel",
+        });
         navigateToChannel(channelID, channelName, serverID);
         return;
     }
     if (typeof authorID !== "string") {
+        if (event === "mail") {
+            logPushDelivery("routing generic mail notification tap", {
+                event,
+                target: "DMList",
+            });
+            navigateToDMList();
+            return;
+        }
+        logPushDelivery("notification tap ignored; no route fields", {
+            ...summarizePushData(data),
+        });
         return;
     }
     // Same rationale — resolve username at tap time. Falls back to a truncated
     // ID if the familiar isn't loaded yet (e.g. cold start before sync).
     const familiars = $familiars.get();
     const username = familiars[authorID]?.username ?? authorID.slice(0, 8);
+    logPushDelivery("routing notification tap", {
+        authorID,
+        kind,
+        target: "Conversation",
+    });
     navigateToConversation(authorID, username);
 }
 
-function handleRemotePushWake(data: Record<string, unknown> | undefined): void {
+async function handleRemotePushWake(
+    data: Record<string, unknown> | undefined,
+): Promise<void> {
     const event = data?.["event"];
+    const kind = data?.["kind"];
     if (
         event !== "mail" &&
         event !== "deviceRequest" &&
-        event !== "deviceListChanged"
+        event !== "deviceListChanged" &&
+        kind !== "dm" &&
+        kind !== "group"
     ) {
+        logPushDelivery("notification data ignored for wake sync", {
+            ...summarizePushData(data),
+        });
         return;
     }
-    void vexService.refreshSessionAfterForeground().catch(() => {
-        /* best-effort wake-up sync */
+    logPushDelivery("remote push wake sync requested", {
+        event,
+        kind,
     });
+    try {
+        const result = await vexService.runBackgroundNetworkFetch();
+        logPushDelivery("remote push wake sync finished", {
+            result,
+        });
+    } catch (err: unknown) {
+        console.warn(
+            "[vex-push] remote push wake sync failed",
+            err instanceof Error ? err.message : String(err),
+        );
+    }
 }
 
 /** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */
@@ -495,6 +634,16 @@ function iosAvatarAttachmentType(url: string): string {
         return "public.webp";
     }
     return "public.jpeg";
+}
+
+function isRemotePushNotification(
+    notification: Notifications.Notification,
+): boolean {
+    const trigger = notification.request.trigger as null | {
+        remoteMessage?: unknown;
+        type?: unknown;
+    };
+    return trigger?.type === "push" || trigger?.remoteMessage != null;
 }
 
 function normalizeAndroidMessageRouteData(raw: {
@@ -532,14 +681,35 @@ function resolveChannelInfoMobile(
     return { channelName, serverName };
 }
 
-function routeNotificationTap(data: Record<string, unknown> | undefined): void {
+function routeNotificationTap(
+    data: Record<string, unknown> | undefined,
+    options: { syncFirst?: boolean } = {},
+): void {
     if (!data || typeof data !== "object") {
         return;
     }
-    if (navigationRef.isReady()) {
+    if (canRouteNotificationNow()) {
+        if (options.syncFirst === true) {
+            void (async () => {
+                await handleRemotePushWake(data);
+                handleNotificationPress(data);
+            })().catch((err: unknown) => {
+                console.warn(
+                    "[vex-push] notification tap handling failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+                handleNotificationPress(data);
+            });
+            return;
+        }
         handleNotificationPress(data);
         return;
     }
+    logPushDelivery("notification tap queued", {
+        navigationReady: navigationRef.isReady(),
+        signedIn: $user.get() !== null,
+        ...summarizePushData(data),
+    });
     const dedupeKey =
         typeof data["mailID"] === "string" ? data["mailID"] : undefined;
     if (dedupeKey) {
@@ -551,9 +721,16 @@ function routeNotificationTap(data: Record<string, unknown> | undefined): void {
         }
     }
     if (dedupeKey !== undefined) {
-        pendingRouteTapQueue.push({ data, dedupeKey });
+        pendingRouteTapQueue.push({
+            data,
+            dedupeKey,
+            syncFirst: options.syncFirst === true,
+        });
     } else {
-        pendingRouteTapQueue.push({ data });
+        pendingRouteTapQueue.push({
+            data,
+            syncFirst: options.syncFirst === true,
+        });
     }
 }
 
@@ -576,6 +753,7 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
     const routeData: Record<string, string> = {
         authorID: payload.authorID,
+        event: "mail",
         kind: payload.group ? "group" : "dm",
         mailID: payload.mailID,
     };
