@@ -72,7 +72,8 @@ export function MessageBubbleRN({
     };
 
     const handlePressIn = (event: GestureResponderEvent) => {
-        if (event.nativeEvent.button === 2) {
+        const maybeMouseEvent = event.nativeEvent as { button?: number };
+        if (maybeMouseEvent.button === 2) {
             openContextMenuAt(event.nativeEvent.pageX, event.nativeEvent.pageY);
         }
     };

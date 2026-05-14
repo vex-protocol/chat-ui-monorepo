@@ -1,4 +1,5 @@
 import type { Message } from "@vex-chat/libvex";
+import type { BackgroundNetworkFetchResult } from "@vex-chat/store";
 
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -24,6 +25,7 @@ import {
 import { useStore } from "@nanostores/react";
 import { NavigationContainer } from "@react-navigation/native";
 import * as BackgroundTask from "expo-background-task";
+import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -45,12 +47,17 @@ import {
 import {
     clearNotifiedApprovalRequestIDs,
     dismissDeviceApprovalNotification,
-    requestNotificationPermission,
+    flushPendingNotificationRoutes,
     setupNotificationHandlers,
     showDeviceApprovalNotification,
     showMessageNotification,
 } from "./src/lib/notifications";
 import { mobileConfig } from "./src/lib/platform";
+import {
+    hydratePushNotificationPreference,
+    reconcilePushNotificationSubscription,
+    unsubscribeStoredPushNotificationSubscription,
+} from "./src/lib/pushNotifications";
 import { hydrateLocalMessageRetention } from "./src/lib/retentionPreference";
 import {
     navigateToDeviceRequests,
@@ -60,6 +67,7 @@ import { RootNavigator } from "./src/navigation/RootNavigator";
 import { colors, fontFamilies } from "./src/theme";
 
 const BACKGROUND_NETWORK_SYNC_TASK = "vex-background-network-sync";
+const BACKGROUND_PUSH_NOTIFICATION_TASK = "vex-background-push-notification";
 const BACKGROUND_NOTIFICATION_LIMIT = 8;
 // Cap on the in-memory mailID dedup sets. Long-lived FGS sessions
 // would otherwise grow these without bound — every message ever
@@ -116,13 +124,7 @@ const runtimeNotifiedMailIDs = new BoundedStringSet(NOTIFIED_MAILID_DEDUP_CAP);
 if (!TaskManager.isTaskDefined(BACKGROUND_NETWORK_SYNC_TASK)) {
     TaskManager.defineTask(BACKGROUND_NETWORK_SYNC_TASK, async () => {
         try {
-            const knownMailIDsBeforeSync = collectKnownMailIDs();
-            const result = await vexService.runBackgroundNetworkFetch();
-            if (result === "new_data" && AppState.currentState !== "active") {
-                await notifyMessagesDownloadedInBackground(
-                    knownMailIDsBeforeSync,
-                );
-            }
+            const result = await runBackgroundSyncFromTask("background-fetch");
             if (result === "new_data") {
                 return BackgroundTask.BackgroundTaskResult.Success;
             }
@@ -134,6 +136,33 @@ if (!TaskManager.isTaskDefined(BACKGROUND_NETWORK_SYNC_TASK)) {
             return BackgroundTask.BackgroundTaskResult.Failed;
         }
     });
+}
+
+if (!TaskManager.isTaskDefined(BACKGROUND_PUSH_NOTIFICATION_TASK)) {
+    TaskManager.defineTask<Notifications.NotificationTaskPayload>(
+        BACKGROUND_PUSH_NOTIFICATION_TASK,
+        async ({ data, error }) => {
+            if (error) {
+                console.warn("[vex-push] background push task failed", {
+                    message: error.message,
+                });
+                return Notifications.BackgroundNotificationTaskResult.Failed;
+            }
+
+            console.info("[vex-push] background push task received", {
+                ...summarizeBackgroundNotificationTaskPayload(data),
+            });
+
+            const result = await runBackgroundSyncFromTask("background-push");
+            if (result === "new_data") {
+                return Notifications.BackgroundNotificationTaskResult.NewData;
+            }
+            if (result === "failed") {
+                return Notifications.BackgroundNotificationTaskResult.Failed;
+            }
+            return Notifications.BackgroundNotificationTaskResult.NoData;
+        },
+    );
 }
 
 function App() {
@@ -155,6 +184,7 @@ function App() {
     );
     const notificationHistoryCutoffMsRef = useRef(0);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
+    const userID = user?.userID;
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -168,6 +198,7 @@ function App() {
         if (isAlwaysOnSupported()) {
             void hydrateAlwaysOnPreference();
         }
+        void hydratePushNotificationPreference();
         return () => {
             unsubNotif();
         };
@@ -222,6 +253,34 @@ function App() {
     }, []);
 
     useEffect(() => {
+        if (Platform.OS !== "android") {
+            return;
+        }
+        const registerBackgroundPushTask = async () => {
+            try {
+                const alreadyRegistered =
+                    await TaskManager.isTaskRegisteredAsync(
+                        BACKGROUND_PUSH_NOTIFICATION_TASK,
+                    );
+                if (alreadyRegistered) {
+                    return;
+                }
+                await Notifications.registerTaskAsync(
+                    BACKGROUND_PUSH_NOTIFICATION_TASK,
+                );
+                console.info("[vex-push] background push task registered");
+            } catch (err: unknown) {
+                console.warn(
+                    "[vex-push] background push task registration failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+            }
+        };
+        void registerBackgroundPushTask();
+        return;
+    }, []);
+
+    useEffect(() => {
         if (bootstrappedRef.current) {
             return;
         }
@@ -229,7 +288,6 @@ function App() {
         void (async () => {
             try {
                 await hydrateLocalMessageRetention();
-                await requestNotificationPermission();
                 const result = await vexService.autoLogin(
                     keychainKeyStore,
                     mobileConfig(),
@@ -720,14 +778,27 @@ function App() {
     // had it enabled. The persisted preference (SecureStore) is the
     // source of truth across sign-out/sign-in cycles.
     const userPresentRef = useRef(user != null);
+    const previousUserIDRef = useRef<null | string>(userID ?? null);
     useEffect(() => {
         const wasPresent = userPresentRef.current;
         const present = user != null;
+        const previousUserID = previousUserIDRef.current;
         userPresentRef.current = present;
+        previousUserIDRef.current = userID ?? null;
         if (!isAlwaysOnSupported()) {
+            if (wasPresent && !present && previousUserID) {
+                void unsubscribeStoredPushNotificationSubscription(
+                    previousUserID,
+                );
+            }
             return;
         }
         if (wasPresent && !present) {
+            if (previousUserID) {
+                void unsubscribeStoredPushNotificationSubscription(
+                    previousUserID,
+                );
+            }
             void suspendAlwaysOn().catch(() => {
                 // Best-effort; the service will stop with the process
                 // anyway when Android reclaims it.
@@ -752,7 +823,15 @@ function App() {
                 }
             })();
         }
-    }, [user]);
+    }, [user, userID]);
+
+    useEffect(() => {
+        if (!userID) {
+            return;
+        }
+        void reconcilePushNotificationSubscription();
+        flushPendingNotificationRoutes();
+    }, [userID]);
 
     return (
         <SafeAreaProvider>
@@ -798,6 +877,9 @@ function App() {
                 </View>
             )}
             <NavigationContainer
+                onReady={() => {
+                    flushPendingNotificationRoutes();
+                }}
                 ref={navigationRef}
                 theme={{
                     colors: {
@@ -1083,6 +1165,12 @@ function isHistoricalMessage(
     return messageMs <= notificationCutoffMs;
 }
 
+function isNotificationResponsePayload(
+    payload: Notifications.NotificationTaskPayload,
+): payload is Notifications.NotificationResponse {
+    return "actionIdentifier" in payload;
+}
+
 async function notifyMessagesDownloadedInBackground(
     knownBeforeSync: Set<string>,
 ): Promise<void> {
@@ -1104,4 +1192,74 @@ async function notifyMessagesDownloadedInBackground(
         runtimeNotifiedMailIDs.add(msg.mailID);
         await showMessageNotification(msg);
     }
+}
+
+function parseDataString(value: unknown): Record<string, unknown> | undefined {
+    if (typeof value !== "string") {
+        return undefined;
+    }
+    try {
+        const parsed: unknown = JSON.parse(value);
+        if (typeof parsed === "object" && parsed !== null) {
+            return parsed as Record<string, unknown>;
+        }
+    } catch {
+        return undefined;
+    }
+    return undefined;
+}
+
+async function runBackgroundSyncFromTask(
+    source: "background-fetch" | "background-push",
+): Promise<BackgroundNetworkFetchResult> {
+    try {
+        const knownMailIDsBeforeSync = collectKnownMailIDs();
+        const result = await vexService.runBackgroundNetworkFetch();
+        console.info("[vex-push] background sync result", {
+            result,
+            source,
+        });
+        if (result === "new_data" && AppState.currentState !== "active") {
+            await notifyMessagesDownloadedInBackground(knownMailIDsBeforeSync);
+        }
+        return result;
+    } catch (err: unknown) {
+        console.warn(
+            "[vex-push] background sync failed",
+            err instanceof Error ? err.message : String(err),
+        );
+        return "failed";
+    }
+}
+
+function summarizeBackgroundNotificationTaskPayload(
+    payload: Notifications.NotificationTaskPayload,
+): Record<string, unknown> {
+    if (isNotificationResponsePayload(payload)) {
+        const data = payload.notification.request.content.data as Record<
+            string,
+            unknown
+        >;
+        return {
+            actionIdentifier: payload.actionIdentifier,
+            event: data["event"],
+            keys: Object.keys(data).sort(),
+            kind: data["kind"],
+            mailID: data["mailID"],
+            payloadType: "response",
+        };
+    }
+
+    const rawData = payload.data;
+    const parsedDataString = parseDataString(rawData["dataString"]);
+    return {
+        event: rawData["event"] ?? parsedDataString?.["event"],
+        keys: Object.keys(rawData).sort(),
+        kind: rawData["kind"] ?? parsedDataString?.["kind"],
+        mailID: rawData["mailID"] ?? parsedDataString?.["mailID"],
+        parsedDataStringKeys: parsedDataString
+            ? Object.keys(parsedDataString).sort()
+            : [],
+        payloadType: "delivery",
+    };
 }

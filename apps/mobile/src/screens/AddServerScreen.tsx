@@ -49,7 +49,7 @@ export function AddServerScreen() {
             }
             navigation.navigate("ChannelList", {
                 serverID: result.serverID,
-                serverName: result.serverName,
+                ...(result.serverName ? { serverName: result.serverName } : {}),
             });
         } catch (err: unknown) {
             setError(

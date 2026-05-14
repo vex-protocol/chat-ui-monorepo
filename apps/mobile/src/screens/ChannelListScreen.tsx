@@ -21,8 +21,8 @@ export function ChannelListScreen({
     route,
 }: AppScreenProps<"ChannelList">) {
     const { serverID } = route.params;
-    const allChannels = useStore($channels, { keys: [serverID] });
-    const servers = useStore($servers, { keys: [serverID] });
+    const allChannels = useStore($channels);
+    const servers = useStore($servers);
     const channels: Channel[] = allChannels[serverID] ?? [];
     const serverName =
         servers[serverID]?.name ?? route.params.serverName ?? "Server";

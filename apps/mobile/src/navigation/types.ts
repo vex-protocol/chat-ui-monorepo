@@ -28,7 +28,13 @@ export type AppStackParamList = {
     SessionDetails: undefined;
     Settings: undefined;
     SettingsSection: {
-        section: "about" | "account" | "connection" | "data" | "developer";
+        section:
+            | "about"
+            | "account"
+            | "connection"
+            | "data"
+            | "developer"
+            | "notifications";
     };
 };
 

@@ -4,7 +4,7 @@ on:
     push:
         branches: [master]
     pull_request:
-        branches: [master]
+        branches: [master, development]
     workflow_dispatch:
 
 permissions:
@@ -94,12 +94,14 @@ jobs:
               # once packages/ui upgrades to a vite-7-compatible Storybook.
               run: pnpm dlx sherif@latest -i vite
             - name: Lint affected packages
+              env:
+                  BASE_REF: ${{ github.base_ref || 'master' }}
               run: |
                   if [ "${{ needs.detect-changes.outputs.root }}" == "true" ] || \
                      [ "${{ needs.detect-changes.outputs.lint-config }}" == "true" ]; then
                     pnpm -r --if-present lint
                   else
-                    pnpm --filter "...[origin/master]" --if-present lint
+                    pnpm --filter "...[origin/${BASE_REF}]" --if-present lint
                   fi
 
     # ── Security — audit + lockfile integrity ──────────────────────────────
@@ -118,7 +120,7 @@ jobs:
                   cache: pnpm
             - run: pnpm install --frozen-lockfile --ignore-scripts
             - name: Security audit
-              run: pnpm audit --audit-level=high || true
+              run: pnpm audit --audit-level=moderate
             - name: License check
               run: pnpm -r --if-present license:check
 

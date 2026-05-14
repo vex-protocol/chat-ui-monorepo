@@ -33,6 +33,9 @@ module.exports = ({ config }) => {
     const iosBundleIdentifier =
         process.env.VEX_IOS_BUNDLE_IDENTIFIER ||
         (devMode ? "chat.vex.mobile.dev" : config.ios?.bundleIdentifier);
+    const androidGoogleServicesFile =
+        process.env.VEX_ANDROID_GOOGLE_SERVICES_FILE ||
+        config.android?.googleServicesFile;
 
     // Permissions required for the optional "Always-on connection"
     // foreground-service mode (Settings → Connection). Even when the
@@ -68,6 +71,9 @@ module.exports = ({ config }) => {
                 foregroundImage: androidAdaptiveForegroundPath,
             },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
+            ...(androidGoogleServicesFile
+                ? { googleServicesFile: androidGoogleServicesFile }
+                : {}),
             permissions: androidPermissions,
         },
         updates: { enabled: false },

@@ -3,6 +3,8 @@ name: Socket
 on:
     push:
         branches: [master]
+    pull_request:
+        branches: [master, development]
     workflow_dispatch:
 
 permissions:

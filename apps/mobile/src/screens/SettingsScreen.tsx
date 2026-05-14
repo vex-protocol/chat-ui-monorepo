@@ -73,6 +73,16 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
               ]
             : []),
         {
+            description: "Push alerts for new messages",
+            icon: "notifications-outline",
+            label: "Notifications",
+            onPress: () => {
+                navigation.navigate("SettingsSection", {
+                    section: "notifications",
+                });
+            },
+        },
+        {
             description: "Unread badges and storage",
             icon: "folder-open-outline",
             label: "Data",

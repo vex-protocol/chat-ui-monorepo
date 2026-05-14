@@ -20,7 +20,7 @@
         "vitest": "catalog:"
     },
     "dependencies": {
-        "@vex-chat/libvex": "catalog:",
+        "@vex-chat/libvex": "file:../../vendor/vex-chat-libvex-6.5.5.tgz",
         "@vex-chat/types": "catalog:",
         "nanostores": "catalog:",
         "uuid": "catalog:"
