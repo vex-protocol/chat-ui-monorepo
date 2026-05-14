@@ -10,7 +10,7 @@ import { atom } from "nanostores";
 
 const ENABLED_STORE_KEY = "vex.pushNotifications.enabled.v1";
 const SUBSCRIPTION_KEY_PREFIX = "vex.pushNotifications.subscription.v1";
-const PUSH_CHANNEL_ID = "vex-push";
+const PUSH_CHANNEL_ID = "vex-push-messages-v2";
 
 export type PushNotificationStatus =
     | "denied"
@@ -180,6 +180,7 @@ async function ensureAndroidPushChannel(): Promise<void> {
     await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
         importance: AndroidImportance.HIGH,
         name: "Push notifications",
+        sound: "default",
         vibrationPattern: [0, 250],
     });
 }
