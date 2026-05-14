@@ -92,6 +92,12 @@ const linkedLibvexSqliteEntry = path.resolve(
     linkedProtocolRoot,
     "packages/libvex/dist/storage/sqlite.js",
 );
+const mobileKyselyEntry = require.resolve("kysely", {
+    paths: [
+        path.resolve(projectRoot, "node_modules"),
+        path.resolve(monorepoRoot, "node_modules"),
+    ],
+});
 
 // Kysely's FileMigrationProvider uses `yield import(runtime-path)` in
 // BOTH its ESM and CJS builds — Node 14+ supports dynamic import() in
@@ -139,12 +145,29 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     // ".js". Metro can resolve it via filesystem fallback, but it warns on
     // every reload because this subpath is not exported. Normalize it to the
     // official exported entry to avoid terminal spam.
+    if (
+        path.isAbsolute(moduleName) &&
+        moduleName.endsWith(
+            `${path.sep}@noble${path.sep}hashes${path.sep}crypto.js`,
+        )
+    ) {
+        return {
+            filePath: moduleName,
+            type: "sourceFile",
+        };
+    }
     if (moduleName === "@noble/hashes/crypto.js") {
         return context.resolveRequest(
             context,
             "@noble/hashes/crypto",
             platform,
         );
+    }
+    if (moduleName === "kysely") {
+        return {
+            filePath: mobileKyselyEntry,
+            type: "sourceFile",
+        };
     }
     const stub = nodeStubs[moduleName];
     if (stub !== undefined) {
