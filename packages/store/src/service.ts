@@ -347,6 +347,7 @@ class Disposable {
 
 class VexService {
     private autoLoginInFlight: null | Promise<AuthResult> = null;
+    private backgroundConnectionRecoverySuspended = false;
     private client: Client | null = null;
     private connectionRecoveryInFlight = false;
     /**
@@ -1770,8 +1771,6 @@ class VexService {
         }
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
         const bumpVersionForCurrentUser = (): void => {
             $avatarHashWritable.set(Date.now());
@@ -1814,6 +1813,12 @@ class VexService {
             }
             return { error: errorMessage(err), ok: false };
         }
+    }
+
+    // ── Unread management ───────────────────────────────────────────────
+
+    setBackgroundConnectionRecoverySuspended(suspended: boolean): void {
+        this.backgroundConnectionRecoverySuspended = suspended;
     }
 
     /**
@@ -1987,6 +1992,9 @@ class VexService {
 
     private checkWebsocketWatchdog(): void {
         if (!this.client || this.wsWatchdogLastFrameAt === 0) {
+            return;
+        }
+        if (this.backgroundConnectionRecoverySuspended) {
             return;
         }
         const elapsed = Date.now() - this.wsWatchdogLastFrameAt;
@@ -2399,6 +2407,13 @@ class VexService {
         reason: string,
     ): Promise<null | ResumeNetworkStatus> {
         if (!this.client) {
+            return null;
+        }
+        if (this.backgroundConnectionRecoverySuspended) {
+            debugAuth("connection:recover:skipped", {
+                reason,
+                suspended: true,
+            });
             return null;
         }
         if (this.connectionRecoveryInFlight) {
@@ -3246,6 +3261,13 @@ class VexService {
         this.subscribe("disconnect", () => {
             this.logWsState("ws:disconnect");
             this.setAuthStatus("offline");
+            if (this.backgroundConnectionRecoverySuspended) {
+                debugAuth("connection:recover:skipped", {
+                    reason: "disconnect",
+                    suspended: true,
+                });
+                return;
+            }
             void this.recoverConnection("disconnect");
         });
         this.subscribe("message", (msg) => {

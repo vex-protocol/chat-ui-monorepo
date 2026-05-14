@@ -187,6 +187,20 @@ function App() {
     const userID = user?.userID;
 
     useEffect(() => {
+        vexService.setBackgroundConnectionRecoverySuspended(
+            AppState.currentState !== "active",
+        );
+        const subscription = AppState.addEventListener("change", (next) => {
+            vexService.setBackgroundConnectionRecoverySuspended(
+                next !== "active",
+            );
+        });
+        return () => {
+            subscription.remove();
+        };
+    }, []);
+
+    useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
         // Hydrate the developer-options easter-egg flag from
         // SecureStore. Fire-and-forget — the atom defaults to false
