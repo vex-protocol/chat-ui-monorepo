@@ -25,6 +25,7 @@ import {
 import { $groupMessages, $servers, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "../components/Avatar";
@@ -32,6 +33,7 @@ import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { haptic } from "../lib/haptics";
+import { clearMessageNotificationEntriesForThread } from "../lib/notifications";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
 
@@ -67,15 +69,17 @@ export function ChannelScreen({
         () => buildIdentityVisibility(messages),
         [messages],
     );
+    const latestMessageID = messages[0]?.mailID;
 
-    // Mark this channel as read while the screen is active
-    useEffect(() => {
-        vexService.markRead(channelID);
-    }, [channelID]);
-
-    useEffect(() => {
-        if (messages.length > 0) vexService.markRead(channelID);
-    }, [messages.length, channelID]);
+    useFocusEffect(
+        useCallback(() => {
+            // Dependency hook: rerun while focused whenever this channel receives
+            // a new latest message.
+            void latestMessageID;
+            clearMessageNotificationEntriesForThread(channelID);
+            vexService.markRead(channelID);
+        }, [channelID, latestMessageID]),
+    );
 
     const insets = useSafeAreaInsets();
     const [text, setText] = useState("");

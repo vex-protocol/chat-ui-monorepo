@@ -3,8 +3,16 @@ import type { NotificationPayload } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
-import { shouldNotify, vexService } from "@vex-chat/store";
-import { $channels, $familiars, $servers, $user } from "@vex-chat/store";
+import {
+    $channels,
+    $familiars,
+    $groupMessages,
+    $messages,
+    $servers,
+    $user,
+    shouldNotify,
+    vexService,
+} from "@vex-chat/store";
 
 import notifee, {
     AndroidCategory,
@@ -445,6 +453,21 @@ function canRouteNotificationNow(): boolean {
     return navigationRef.isReady() && $user.get() !== null;
 }
 
+function collectKnownMailIDs(): Set<string> {
+    const known = new Set<string>();
+    for (const thread of Object.values($messages.get())) {
+        for (const message of thread) {
+            known.add(message.mailID);
+        }
+    }
+    for (const thread of Object.values($groupMessages.get())) {
+        for (const message of thread) {
+            known.add(message.mailID);
+        }
+    }
+    return known;
+}
+
 function deviceApprovalNotificationID(requestID: string): string {
     // Namespaced so it can never collide with a notification ID we
     // generate elsewhere in the app (currently message banners are
@@ -618,8 +641,13 @@ async function handleRemotePushWake(
         kind,
     });
     try {
+        const knownMailIDs = collectKnownMailIDs();
         const result = await vexService.runBackgroundNetworkFetch();
+        if (result === "new_data") {
+            rememberNewlyDownloadedNotificationMessages(knownMailIDs);
+        }
         logPushDelivery("remote push wake sync finished", {
+            entries: $messageNotificationEntries.get().length,
             result,
         });
     } catch (err: unknown) {
@@ -667,6 +695,7 @@ function rememberMessageNotification(
     mail: Message,
     payload: NotificationPayload,
     serverID: string | undefined,
+    options: { countSummary?: boolean } = {},
 ): number {
     const current = $messageNotificationEntries.get();
     const alreadyTracked = current.some(
@@ -691,10 +720,65 @@ function rememberMessageNotification(
         entry,
     ].slice(-MESSAGE_NOTIFICATION_ENTRY_CAP);
     $messageNotificationEntries.set(next);
-    if (!alreadyTracked) {
+    if (!alreadyTracked && options.countSummary !== false) {
         messageNotificationCount += 1;
     }
+    logPushDelivery("message notification remembered", {
+        countSummary: options.countSummary !== false,
+        entries: next.length,
+        kind: entry.kind,
+        mailID: entry.mailID,
+        threadID: entry.threadID,
+    });
     return messageNotificationCount;
+}
+
+function rememberNewlyDownloadedNotificationMessages(
+    knownMailIDs: Set<string>,
+): void {
+    const candidates: Array<{ message: Message; serverID?: string }> = [];
+    for (const thread of Object.values($messages.get())) {
+        for (const message of thread) {
+            if (!knownMailIDs.has(message.mailID)) {
+                candidates.push({ message });
+            }
+        }
+    }
+    for (const [channelID, thread] of Object.entries($groupMessages.get())) {
+        const serverID = findServerForChannel(channelID);
+        for (const message of thread) {
+            if (!knownMailIDs.has(message.mailID)) {
+                candidates.push({ message, serverID });
+            }
+        }
+    }
+
+    let remembered = 0;
+    for (const { message, serverID } of candidates.sort(
+        (a, b) =>
+            (Date.parse(a.message.timestamp) || 0) -
+            (Date.parse(b.message.timestamp) || 0),
+    )) {
+        const payload = shouldNotify(
+            message,
+            (uid) => resolveAuthorNameMobile(uid),
+            message.group ? (cid) => resolveChannelInfoMobile(cid) : undefined,
+        );
+        if (!payload) {
+            continue;
+        }
+        rememberMessageNotification(message, payload, serverID, {
+            countSummary: false,
+        });
+        remembered += 1;
+    }
+
+    if (remembered > 0) {
+        logPushDelivery("remote push wake messages remembered", {
+            remembered,
+            totalEntries: $messageNotificationEntries.get().length,
+        });
+    }
 }
 
 function resetMessageNotificationSummary(): void {

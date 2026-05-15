@@ -1,7 +1,7 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -129,9 +129,7 @@ export function NotificationsScreen({
                 entry.kind === "group"
                     ? (channelUnreadCounts[entry.threadID] ?? 0)
                     : (dmUnreadCounts[entry.threadID] ?? 0);
-            if (unreadCount <= 0) {
-                continue;
-            }
+            const displayCount = Math.max(1, unreadCount);
 
             const message =
                 entry.kind === "group"
@@ -143,8 +141,8 @@ export function NotificationsScreen({
             if (message) {
                 addRow(
                     entry.kind === "group"
-                        ? makeGroupRow(message, entry.threadID, unreadCount)
-                        : makeDmRow(message, unreadCount),
+                        ? makeGroupRow(message, entry.threadID, displayCount)
+                        : makeDmRow(message, displayCount),
                 );
                 continue;
             }
@@ -178,7 +176,7 @@ export function NotificationsScreen({
                     threadID: entry.threadID,
                     time: formatTime(entry.timestamp),
                     title: authorName,
-                    unreadCount,
+                    unreadCount: displayCount,
                 });
                 continue;
             }
@@ -193,7 +191,7 @@ export function NotificationsScreen({
                 threadID: entry.threadID,
                 time: formatTime(entry.timestamp),
                 title: authorName,
-                unreadCount,
+                unreadCount: displayCount,
             });
         }
 
@@ -237,6 +235,15 @@ export function NotificationsScreen({
         servers,
         user?.userID,
     ]);
+
+    useEffect(() => {
+        console.info("[vex-push] notifications screen state", {
+            channelUnreadThreads: Object.keys(channelUnreadCounts).length,
+            dmUnreadThreads: Object.keys(dmUnreadCounts).length,
+            entries: entries.length,
+            rows: rows.length,
+        });
+    }, [channelUnreadCounts, dmUnreadCounts, entries.length, rows.length]);
 
     function openRow(row: NotificationRow): void {
         clearMessageNotificationEntriesForThread(row.threadID);

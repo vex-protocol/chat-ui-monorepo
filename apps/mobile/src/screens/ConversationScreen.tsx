@@ -1,13 +1,7 @@
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
-import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
     FlatList,
     KeyboardAvoidingView,
@@ -20,11 +14,13 @@ import {
 import { $messages, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { clearMessageNotificationEntriesForThread } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -46,16 +42,17 @@ export function ConversationScreen({
         () => buildIdentityVisibility(messages),
         [messages],
     );
+    const latestMessageID = messages[0]?.mailID;
 
-    // Mark this DM as read while the screen is active
-    useEffect(() => {
-        vexService.markRead(userID);
-    }, [userID]);
-
-    // Mark read whenever new messages arrive while viewing
-    useEffect(() => {
-        if (messages.length > 0) vexService.markRead(userID);
-    }, [messages.length, userID]);
+    useFocusEffect(
+        useCallback(() => {
+            // Dependency hook: rerun while focused whenever this thread receives
+            // a new latest message.
+            void latestMessageID;
+            clearMessageNotificationEntriesForThread(userID);
+            vexService.markRead(userID);
+        }, [latestMessageID, userID]),
+    );
 
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
