@@ -3,17 +3,10 @@ import type { Message } from "@vex-chat/libvex";
 import { Platform } from "react-native";
 
 import { shouldNotify, vexService } from "@vex-chat/store";
-import {
-    $avatarVersions,
-    $channels,
-    $familiars,
-    $servers,
-    $user,
-} from "@vex-chat/store";
+import { $channels, $familiars, $servers, $user } from "@vex-chat/store";
 
 import notifee, {
     AndroidCategory,
-    AndroidStyle,
     EventType,
     AndroidImportance as NotifeeAndroidImportance,
 } from "@notifee/react-native";
@@ -28,9 +21,9 @@ import {
     navigationRef,
 } from "../navigation/navigationRef";
 
-import { buildAvatarUrl } from "./avatarUrl";
-
 const CHANNEL_ID = "vex-messages";
+const MESSAGE_NOTIFICATION_BODY = "Open Vex to read it.";
+const MESSAGE_NOTIFICATION_TITLE = "New Vex message";
 // Separate channel so users can mute messages but keep account-security
 // notifications loud (or vice versa) from system Settings → Notifications.
 // Device-approval requests are time-bounded (the request expires on a
@@ -38,18 +31,10 @@ const CHANNEL_ID = "vex-messages";
 // default sound regardless of the messages channel preference.
 const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
-// Message banners show sender display name, a short message preview, optional
-// group context (subtitle), and a sender avatar (iOS: Expo attachment;
-// Android: Notifee largeIcon + MessagingStyle person icon). Be aware the OS
-// may persist visible notification text and images in notification history,
-// backups, and platform logging — a tradeoff for readable alerts.
-//
-// iOS always shows the app icon on the compact banner; the sender attachment
-// appears in the expanded notification / notification list. Replacing the
-// banner icon with the sender requires Apple Communication Notifications
-// (special entitlement + server push patterns). Android requires a
-// monochrome smallIcon in the status bar; the sender avatar is shown as
-// largeIcon / MessagingStyle person art where the OS allows.
+// Message banners intentionally avoid sender names, channel names, avatars, and
+// plaintext previews. The OS may persist notification text/images in
+// notification history, backups, and platform logs. Routing data remains opaque
+// IDs so taps still open the right conversation after the app decrypts locally.
 //
 // Android message taps use Notifee (`displayNotification`); routing data is
 // also queued from `onBackgroundEvent` in index.js until NavigationContainer
@@ -621,21 +606,6 @@ async function handleRemotePushWake(
     }
 }
 
-/** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */
-function iosAvatarAttachmentType(url: string): string {
-    const path = (url.split("?")[0] ?? url).toLowerCase();
-    if (path.endsWith(".png")) {
-        return "public.png";
-    }
-    if (path.endsWith(".gif")) {
-        return "public.gif";
-    }
-    if (path.endsWith(".webp")) {
-        return "public.webp";
-    }
-    return "public.jpeg";
-}
-
 function isRemotePushNotification(
     notification: Notifications.Notification,
 ): boolean {
@@ -746,11 +716,6 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
     await ensureChannel();
 
-    const avatarUrl = buildAvatarUrl(
-        payload.authorID,
-        $avatarVersions.get()[payload.authorID],
-    );
-
     const routeData: Record<string, string> = {
         authorID: payload.authorID,
         event: "mail",
@@ -765,63 +730,29 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
     if (Platform.OS === "android") {
         await notifee.displayNotification({
             android: {
-                category: AndroidCategory.MESSAGE,
+                category: AndroidCategory.STATUS,
                 channelId: CHANNEL_ID,
                 pressAction: { id: "default" },
                 smallIcon: "notification_icon",
-                ...(avatarUrl != null
-                    ? { circularLargeIcon: true, largeIcon: avatarUrl }
-                    : {}),
-                style: {
-                    group: true,
-                    messages: [
-                        {
-                            person: {
-                                ...(avatarUrl != null
-                                    ? { icon: avatarUrl }
-                                    : {}),
-                                id: payload.authorID,
-                                name: payload.title,
-                            },
-                            text: payload.body,
-                            timestamp: Date.now(),
-                        },
-                    ],
-                    person: { id: "self", name: "You" },
-                    title: payload.subtitle,
-                    type: AndroidStyle.MESSAGING,
-                },
             },
-            body: `${payload.title}: ${payload.body}`,
+            body: MESSAGE_NOTIFICATION_BODY,
             data: routeData,
             id: payload.mailID,
-            title: payload.subtitle,
+            title: MESSAGE_NOTIFICATION_TITLE,
         });
         return;
     }
 
-    const iosAvatar =
-        avatarUrl != null
-            ? [
-                  {
-                      identifier: "vex-sender-avatar",
-                      type: iosAvatarAttachmentType(avatarUrl),
-                      url: avatarUrl,
-                  },
-              ]
-            : null;
-
     await Notifications.scheduleNotificationAsync({
         content: {
-            body: `${payload.title}: ${payload.body}`,
+            body: MESSAGE_NOTIFICATION_BODY,
             data: {
                 authorID: payload.authorID,
                 channelID: payload.group ?? undefined,
                 kind: payload.group ? "group" : "dm",
                 serverID,
             },
-            title: payload.subtitle,
-            ...(iosAvatar != null ? { attachments: iosAvatar } : {}),
+            title: MESSAGE_NOTIFICATION_TITLE,
         },
         trigger: { channelId: CHANNEL_ID },
     });
