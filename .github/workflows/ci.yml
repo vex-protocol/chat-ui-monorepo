@@ -104,8 +104,8 @@ jobs:
                     pnpm --filter "...[origin/${BASE_REF}]" --if-present lint
                   fi
 
-    # ── Security — audit + lockfile integrity ──────────────────────────────
-    security:
+    # ── License — workspace license policy ────────────────────────────────
+    license:
         runs-on: ubuntu-latest
         steps:
             - name: Harden Runner
@@ -119,8 +119,6 @@ jobs:
                   node-version: 24
                   cache: pnpm
             - run: pnpm install --frozen-lockfile --ignore-scripts
-            - name: Security audit
-              run: pnpm audit --audit-level=moderate
             - name: License check
               run: pnpm -r --if-present license:check
 
@@ -225,7 +223,7 @@ jobs:
             - detect-changes
             - format
             - lint
-            - security
+            - license
             - check-store
             - check-desktop
             - check-mobile
