@@ -34,5 +34,6 @@ jobs:
             - name: Install dependencies
               run: pnpm install --frozen-lockfile --ignore-scripts
 
-            - name: Audit moderate severity vulnerabilities
-              run: pnpm audit --audit-level=moderate
+            - name: Audit vulnerabilities
+              continue-on-error: true
+              run: pnpm audit

@@ -2,18 +2,17 @@ import type { Message } from "@vex-chat/libvex";
 
 import { Platform } from "react-native";
 
-import { shouldNotify, vexService } from "@vex-chat/store";
 import {
-    $avatarVersions,
     $channels,
     $familiars,
     $servers,
     $user,
+    shouldNotify,
+    vexService,
 } from "@vex-chat/store";
 
 import notifee, {
     AndroidCategory,
-    AndroidStyle,
     EventType,
     AndroidImportance as NotifeeAndroidImportance,
 } from "@notifee/react-native";
@@ -21,16 +20,12 @@ import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
 
 import {
-    navigateToChannel,
-    navigateToConversation,
     navigateToDeviceRequests,
-    navigateToDMList,
     navigationRef,
 } from "../navigation/navigationRef";
 
-import { buildAvatarUrl } from "./avatarUrl";
-
 const CHANNEL_ID = "vex-messages";
+const MESSAGE_NOTIFICATION_ID = "vex-message-summary";
 // Separate channel so users can mute messages but keep account-security
 // notifications loud (or vice versa) from system Settings → Notifications.
 // Device-approval requests are time-bounded (the request expires on a
@@ -38,25 +33,17 @@ const CHANNEL_ID = "vex-messages";
 // default sound regardless of the messages channel preference.
 const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 
-// Message banners show sender display name, a short message preview, optional
-// group context (subtitle), and a sender avatar (iOS: Expo attachment;
-// Android: Notifee largeIcon + MessagingStyle person icon). Be aware the OS
-// may persist visible notification text and images in notification history,
-// backups, and platform logging — a tradeoff for readable alerts.
-//
-// iOS always shows the app icon on the compact banner; the sender attachment
-// appears in the expanded notification / notification list. Replacing the
-// banner icon with the sender requires Apple Communication Notifications
-// (special entitlement + server push patterns). Android requires a
-// monochrome smallIcon in the status bar; the sender avatar is shown as
-// largeIcon / MessagingStyle person art where the OS allows.
+// Message banners intentionally avoid sender names, channel names, avatars, and
+// plaintext previews. The OS may persist notification text/images in
+// notification history, backups, and platform logs. Routing data remains opaque
+// IDs for wake-sync/dedupe; message taps only wake/sync the app so the user
+// returns to whatever route they had open last.
 //
 // Android message taps use Notifee (`displayNotification`); routing data is
 // also queued from `onBackgroundEvent` in index.js until NavigationContainer
 // is ready (`flushPendingNotificationRoutes`).
 //
-// Routing still uses opaque IDs in `data` for `handleNotificationPress`; human
-// strings are not required there.
+// Routing still uses opaque IDs in `data`; human strings are not required there.
 
 // Device-approval banners are also content-free for the same reason:
 // the approval flow proves which device wants in via the matching
@@ -92,6 +79,7 @@ let channelReady = false;
 let deviceApprovalChannelReady = false;
 const notificationQueue: Message[] = [];
 let notificationDrainInFlight = false;
+let messageNotificationCount = 0;
 // Per-process dedupe so we never fire the same OS banner twice for the
 // same requestID. App.tsx already tracks "seen" request IDs at the toast
 // layer, but if the watcher re-runs (resume, refresh) it can call us
@@ -142,6 +130,31 @@ Notifications.setNotificationHandler({
             shouldShowList: true,
         }),
 });
+
+export async function clearMessageNotificationSummary(): Promise<void> {
+    resetMessageNotificationSummary();
+    if (Platform.OS === "android") {
+        await notifee
+            .cancelNotification(
+                MESSAGE_NOTIFICATION_ID,
+                MESSAGE_NOTIFICATION_ID,
+            )
+            .catch(() => {
+                // Best-effort; the notification may already be gone.
+            });
+        return;
+    }
+    await Notifications.dismissNotificationAsync(MESSAGE_NOTIFICATION_ID).catch(
+        () => {
+            // Best-effort; the notification may already be gone.
+        },
+    );
+    await Notifications.cancelScheduledNotificationAsync(
+        MESSAGE_NOTIFICATION_ID,
+    ).catch(() => {
+        // Best-effort; the notification may already be delivered or gone.
+    });
+}
 
 /**
  * Lets App.tsx forget previously-notified request IDs. Called on
@@ -280,6 +293,13 @@ export function setupNotificationHandlers(): () => void {
     let unsubNotifee: (() => void) | undefined;
     if (Platform.OS === "android") {
         unsubNotifee = notifee.onForegroundEvent(({ detail, type }) => {
+            if (
+                type === EventType.DISMISSED &&
+                detail.notification?.id === MESSAGE_NOTIFICATION_ID
+            ) {
+                resetMessageNotificationSummary();
+                return;
+            }
             if (type !== EventType.PRESS) {
                 return;
             }
@@ -454,20 +474,30 @@ async function drainPendingNotificationRoutes(): Promise<void> {
     if (pendingRouteDrainInFlight) {
         return;
     }
-    if (!canRouteNotificationNow()) {
-        logPushDelivery("notification route flush deferred", {
-            navigationReady: navigationRef.isReady(),
-            pending: pendingRouteTapQueue.length,
-            signedIn: $user.get() !== null,
-        });
-        return;
-    }
     pendingRouteDrainInFlight = true;
     try {
-        while (canRouteNotificationNow() && pendingRouteTapQueue.length > 0) {
+        while (pendingRouteTapQueue.length > 0) {
             const next = pendingRouteTapQueue.shift();
             if (!next) {
                 continue;
+            }
+            if (isMessageNotificationData(next.data)) {
+                if (next.syncFirst) {
+                    await handleRemotePushWake(next.data).catch(() => {
+                        /* wake sync is best-effort; taps should still be handled */
+                    });
+                }
+                handleNotificationPress(next.data);
+                continue;
+            }
+            if (!canRouteNotificationNow()) {
+                pendingRouteTapQueue.unshift(next);
+                logPushDelivery("notification route flush deferred", {
+                    navigationReady: navigationRef.isReady(),
+                    pending: pendingRouteTapQueue.length,
+                    signedIn: $user.get() !== null,
+                });
+                return;
             }
             if (next.syncFirst) {
                 await handleRemotePushWake(next.data).catch(() => {
@@ -488,7 +518,10 @@ async function ensureChannel(): Promise<void> {
             id: CHANNEL_ID,
             importance: NotifeeAndroidImportance.HIGH,
             name: "Messages",
-            sound: "default",
+            // Do not set `sound: "default"` here. Current native notification
+            // modules treat it as a custom sound resource named "default" and
+            // warn when that resource is not bundled. Omit sound to use
+            // platform/channel default behavior.
             vibration: true,
         });
     } else {
@@ -527,9 +560,6 @@ function handleNotificationPress(
 ): void {
     const kind = data?.["kind"];
     const event = data?.["event"];
-    const authorID = data?.["authorID"];
-    const channelID = data?.["channelID"];
-    const serverID = data?.["serverID"];
     if (kind === "deviceApproval") {
         // Land on the actual approve/deny applet — the matching code is
         // displayed inside that screen, and that's the only thing the
@@ -541,50 +571,17 @@ function handleNotificationPress(
         navigateToDeviceRequests();
         return;
     }
-    if (
-        kind === "group" &&
-        typeof channelID === "string" &&
-        typeof serverID === "string"
-    ) {
-        // Resolve the channel name from in-memory state at tap time rather
-        // than embedding it in the notification payload (which the OS logs).
-        const channels = $channels.get();
-        const serverChannels = channels[serverID] ?? [];
-        const channel = serverChannels.find((c) => c.channelID === channelID);
-        const channelName = channel?.name ?? "channel";
-        logPushDelivery("routing notification tap", {
-            channelID,
+    if (data && isMessageNotificationData(data)) {
+        logPushDelivery("message notification tap handled", {
+            event,
             kind,
-            serverID,
-            target: "Channel",
         });
-        navigateToChannel(channelID, channelName, serverID);
+        void clearMessageNotificationSummary();
         return;
     }
-    if (typeof authorID !== "string") {
-        if (event === "mail") {
-            logPushDelivery("routing generic mail notification tap", {
-                event,
-                target: "DMList",
-            });
-            navigateToDMList();
-            return;
-        }
-        logPushDelivery("notification tap ignored; no route fields", {
-            ...summarizePushData(data),
-        });
-        return;
-    }
-    // Same rationale — resolve username at tap time. Falls back to a truncated
-    // ID if the familiar isn't loaded yet (e.g. cold start before sync).
-    const familiars = $familiars.get();
-    const username = familiars[authorID]?.username ?? authorID.slice(0, 8);
-    logPushDelivery("routing notification tap", {
-        authorID,
-        kind,
-        target: "Conversation",
+    logPushDelivery("notification tap ignored; no route fields", {
+        ...summarizePushData(data),
     });
-    navigateToConversation(authorID, username);
 }
 
 async function handleRemotePushWake(
@@ -621,19 +618,14 @@ async function handleRemotePushWake(
     }
 }
 
-/** Best-effort UTI for UNNotificationAttachment when scheduling from a remote URL. */
-function iosAvatarAttachmentType(url: string): string {
-    const path = (url.split("?")[0] ?? url).toLowerCase();
-    if (path.endsWith(".png")) {
-        return "public.png";
-    }
-    if (path.endsWith(".gif")) {
-        return "public.gif";
-    }
-    if (path.endsWith(".webp")) {
-        return "public.webp";
-    }
-    return "public.jpeg";
+function incrementMessageNotificationSummary(): number {
+    messageNotificationCount += 1;
+    return messageNotificationCount;
+}
+
+function isMessageNotificationData(data: Record<string, unknown>): boolean {
+    const kind = data["kind"];
+    return data["event"] === "mail" || kind === "dm" || kind === "group";
 }
 
 function isRemotePushNotification(
@@ -646,12 +638,19 @@ function isRemotePushNotification(
     return trigger?.type === "push" || trigger?.remoteMessage != null;
 }
 
+function messageNotificationTitle(count: number): string {
+    return count <= 1 ? "New Message" : `${count.toString()} New Messages`;
+}
+
 function normalizeAndroidMessageRouteData(raw: {
     [key: string]: number | object | string;
 }): Record<string, unknown> {
     const kind = stringifyRouteField(raw["kind"]);
     const authorID = stringifyRouteField(raw["authorID"]);
     const out: Record<string, unknown> = { authorID, kind };
+    if (raw["event"] != null) {
+        out["event"] = stringifyRouteField(raw["event"]);
+    }
     if (raw["mailID"] != null) {
         out["mailID"] = stringifyRouteField(raw["mailID"]);
     }
@@ -660,6 +659,10 @@ function normalizeAndroidMessageRouteData(raw: {
         out["serverID"] = stringifyRouteField(raw["serverID"]);
     }
     return out;
+}
+
+function resetMessageNotificationSummary(): void {
+    messageNotificationCount = 0;
 }
 
 function resolveAuthorNameMobile(userID: string): string | undefined {
@@ -686,6 +689,23 @@ function routeNotificationTap(
     options: { syncFirst?: boolean } = {},
 ): void {
     if (!data || typeof data !== "object") {
+        return;
+    }
+    if (isMessageNotificationData(data)) {
+        if (options.syncFirst === true) {
+            void (async () => {
+                await handleRemotePushWake(data);
+                handleNotificationPress(data);
+            })().catch((err: unknown) => {
+                console.warn(
+                    "[vex-push] message notification tap handling failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+                handleNotificationPress(data);
+            });
+            return;
+        }
+        handleNotificationPress(data);
         return;
     }
     if (canRouteNotificationNow()) {
@@ -746,11 +766,6 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
 
     await ensureChannel();
 
-    const avatarUrl = buildAvatarUrl(
-        payload.authorID,
-        $avatarVersions.get()[payload.authorID],
-    );
-
     const routeData: Record<string, string> = {
         authorID: payload.authorID,
         event: "mail",
@@ -762,67 +777,42 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
         routeData["serverID"] = serverID;
     }
 
+    const title = messageNotificationTitle(
+        incrementMessageNotificationSummary(),
+    );
+
     if (Platform.OS === "android") {
         await notifee.displayNotification({
             android: {
-                category: AndroidCategory.MESSAGE,
+                category: AndroidCategory.STATUS,
                 channelId: CHANNEL_ID,
                 pressAction: { id: "default" },
                 smallIcon: "notification_icon",
-                ...(avatarUrl != null
-                    ? { circularLargeIcon: true, largeIcon: avatarUrl }
-                    : {}),
-                style: {
-                    group: true,
-                    messages: [
-                        {
-                            person: {
-                                ...(avatarUrl != null
-                                    ? { icon: avatarUrl }
-                                    : {}),
-                                id: payload.authorID,
-                                name: payload.title,
-                            },
-                            text: payload.body,
-                            timestamp: Date.now(),
-                        },
-                    ],
-                    person: { id: "self", name: "You" },
-                    title: payload.subtitle,
-                    type: AndroidStyle.MESSAGING,
-                },
+                tag: MESSAGE_NOTIFICATION_ID,
             },
-            body: `${payload.title}: ${payload.body}`,
             data: routeData,
-            id: payload.mailID,
-            title: payload.subtitle,
+            id: MESSAGE_NOTIFICATION_ID,
+            title,
         });
         return;
     }
 
-    const iosAvatar =
-        avatarUrl != null
-            ? [
-                  {
-                      identifier: "vex-sender-avatar",
-                      type: iosAvatarAttachmentType(avatarUrl),
-                      url: avatarUrl,
-                  },
-              ]
-            : null;
-
+    await Notifications.dismissNotificationAsync(MESSAGE_NOTIFICATION_ID).catch(
+        () => {
+            // Best-effort; the prior summary may already be gone.
+        },
+    );
+    await Notifications.cancelScheduledNotificationAsync(
+        MESSAGE_NOTIFICATION_ID,
+    ).catch(() => {
+        // Best-effort; the prior summary may already be delivered or gone.
+    });
     await Notifications.scheduleNotificationAsync({
         content: {
-            body: `${payload.title}: ${payload.body}`,
-            data: {
-                authorID: payload.authorID,
-                channelID: payload.group ?? undefined,
-                kind: payload.group ? "group" : "dm",
-                serverID,
-            },
-            title: payload.subtitle,
-            ...(iosAvatar != null ? { attachments: iosAvatar } : {}),
+            data: routeData,
+            title,
         },
+        identifier: MESSAGE_NOTIFICATION_ID,
         trigger: { channelId: CHANNEL_ID },
     });
 }
