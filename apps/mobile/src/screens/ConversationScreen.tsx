@@ -20,7 +20,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
-import { clearMessageNotificationEntriesForThread } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -49,7 +48,6 @@ export function ConversationScreen({
             // Dependency hook: rerun while focused whenever this thread receives
             // a new latest message.
             void latestMessageID;
-            clearMessageNotificationEntriesForThread(userID);
             vexService.markRead(userID);
         }, [latestMessageID, userID]),
     );

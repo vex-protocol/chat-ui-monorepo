@@ -1,13 +1,10 @@
 import type { Message } from "@vex-chat/libvex";
-import type { NotificationPayload } from "@vex-chat/store";
 
 import { Platform } from "react-native";
 
 import {
     $channels,
     $familiars,
-    $groupMessages,
-    $messages,
     $servers,
     $user,
     shouldNotify,
@@ -21,17 +18,14 @@ import notifee, {
 } from "@notifee/react-native";
 import * as Notifications from "expo-notifications";
 import { AndroidImportance, IosAuthorizationStatus } from "expo-notifications";
-import { atom } from "nanostores";
 
 import {
     navigateToDeviceRequests,
-    navigateToNotifications,
     navigationRef,
 } from "../navigation/navigationRef";
 
 const CHANNEL_ID = "vex-messages";
 const MESSAGE_NOTIFICATION_ID = "vex-message-summary";
-const MESSAGE_NOTIFICATION_ENTRY_CAP = 50;
 // Separate channel so users can mute messages but keep account-security
 // notifications loud (or vice versa) from system Settings → Notifications.
 // Device-approval requests are time-bounded (the request expires on a
@@ -42,8 +36,8 @@ const DEVICE_APPROVAL_CHANNEL_ID = "vex-device-approval";
 // Message banners intentionally avoid sender names, channel names, avatars, and
 // plaintext previews. The OS may persist notification text/images in
 // notification history, backups, and platform logs. Routing data remains opaque
-// IDs for wake-sync/dedupe; message taps land on the in-app notification list
-// instead of trying to resolve a specific route from stale notification payload.
+// IDs for wake-sync/dedupe; message taps only wake/sync the app so the user
+// returns to whatever route they had open last.
 //
 // Android message taps use Notifee (`displayNotification`); routing data is
 // also queued from `onBackgroundEvent` in index.js until NavigationContainer
@@ -80,18 +74,6 @@ const DEVICE_APPROVAL_BODY = "New device sign-in request";
 const NOTIFICATION_DRAIN_CAP = 6;
 const NOTIFICATION_QUEUE_CAP = 50;
 const NOTIFICATION_DRAIN_YIELD_MS = 25;
-
-export interface MessageNotificationEntry {
-    authorID: string;
-    channelID?: string;
-    kind: "dm" | "group";
-    mailID: string;
-    serverID?: string;
-    threadID: string;
-    timestamp: string;
-}
-
-export const $messageNotificationEntries = atom<MessageNotificationEntry[]>([]);
 
 let channelReady = false;
 let deviceApprovalChannelReady = false;
@@ -148,16 +130,6 @@ Notifications.setNotificationHandler({
             shouldShowList: true,
         }),
 });
-
-export function clearMessageNotificationEntriesForThread(
-    threadID: string,
-): void {
-    const current = $messageNotificationEntries.get();
-    const next = current.filter((entry) => entry.threadID !== threadID);
-    if (next.length !== current.length) {
-        $messageNotificationEntries.set(next);
-    }
-}
 
 export async function clearMessageNotificationSummary(): Promise<void> {
     resetMessageNotificationSummary();
@@ -453,21 +425,6 @@ function canRouteNotificationNow(): boolean {
     return navigationRef.isReady() && $user.get() !== null;
 }
 
-function collectKnownMailIDs(): Set<string> {
-    const known = new Set<string>();
-    for (const thread of Object.values($messages.get())) {
-        for (const message of thread) {
-            known.add(message.mailID);
-        }
-    }
-    for (const thread of Object.values($groupMessages.get())) {
-        for (const message of thread) {
-            known.add(message.mailID);
-        }
-    }
-    return known;
-}
-
 function deviceApprovalNotificationID(requestID: string): string {
     // Namespaced so it can never collide with a notification ID we
     // generate elsewhere in the app (currently message banners are
@@ -517,20 +474,30 @@ async function drainPendingNotificationRoutes(): Promise<void> {
     if (pendingRouteDrainInFlight) {
         return;
     }
-    if (!canRouteNotificationNow()) {
-        logPushDelivery("notification route flush deferred", {
-            navigationReady: navigationRef.isReady(),
-            pending: pendingRouteTapQueue.length,
-            signedIn: $user.get() !== null,
-        });
-        return;
-    }
     pendingRouteDrainInFlight = true;
     try {
-        while (canRouteNotificationNow() && pendingRouteTapQueue.length > 0) {
+        while (pendingRouteTapQueue.length > 0) {
             const next = pendingRouteTapQueue.shift();
             if (!next) {
                 continue;
+            }
+            if (isMessageNotificationData(next.data)) {
+                if (next.syncFirst) {
+                    await handleRemotePushWake(next.data).catch(() => {
+                        /* wake sync is best-effort; taps should still be handled */
+                    });
+                }
+                handleNotificationPress(next.data);
+                continue;
+            }
+            if (!canRouteNotificationNow()) {
+                pendingRouteTapQueue.unshift(next);
+                logPushDelivery("notification route flush deferred", {
+                    navigationReady: navigationRef.isReady(),
+                    pending: pendingRouteTapQueue.length,
+                    signedIn: $user.get() !== null,
+                });
+                return;
             }
             if (next.syncFirst) {
                 await handleRemotePushWake(next.data).catch(() => {
@@ -604,14 +571,12 @@ function handleNotificationPress(
         navigateToDeviceRequests();
         return;
     }
-    if (event === "mail" || kind === "dm" || kind === "group") {
-        logPushDelivery("routing message notification tap", {
+    if (data && isMessageNotificationData(data)) {
+        logPushDelivery("message notification tap handled", {
             event,
             kind,
-            target: "Notifications",
         });
         void clearMessageNotificationSummary();
-        navigateToNotifications();
         return;
     }
     logPushDelivery("notification tap ignored; no route fields", {
@@ -641,13 +606,8 @@ async function handleRemotePushWake(
         kind,
     });
     try {
-        const knownMailIDs = collectKnownMailIDs();
         const result = await vexService.runBackgroundNetworkFetch();
-        if (result === "new_data") {
-            rememberNewlyDownloadedNotificationMessages(knownMailIDs);
-        }
         logPushDelivery("remote push wake sync finished", {
-            entries: $messageNotificationEntries.get().length,
             result,
         });
     } catch (err: unknown) {
@@ -656,6 +616,16 @@ async function handleRemotePushWake(
             err instanceof Error ? err.message : String(err),
         );
     }
+}
+
+function incrementMessageNotificationSummary(): number {
+    messageNotificationCount += 1;
+    return messageNotificationCount;
+}
+
+function isMessageNotificationData(data: Record<string, unknown>): boolean {
+    const kind = data["kind"];
+    return data["event"] === "mail" || kind === "dm" || kind === "group";
 }
 
 function isRemotePushNotification(
@@ -691,96 +661,6 @@ function normalizeAndroidMessageRouteData(raw: {
     return out;
 }
 
-function rememberMessageNotification(
-    mail: Message,
-    payload: NotificationPayload,
-    serverID: string | undefined,
-    options: { countSummary?: boolean } = {},
-): number {
-    const current = $messageNotificationEntries.get();
-    const alreadyTracked = current.some(
-        (entry) => entry.mailID === payload.mailID,
-    );
-    const entry: MessageNotificationEntry = {
-        authorID: payload.authorID,
-        kind: payload.group ? "group" : "dm",
-        mailID: payload.mailID,
-        threadID: payload.conversationKey,
-        timestamp: mail.timestamp,
-    };
-    if (payload.group) {
-        entry.channelID = payload.group;
-    }
-    if (serverID) {
-        entry.serverID = serverID;
-    }
-
-    const next = [
-        ...current.filter((item) => item.mailID !== payload.mailID),
-        entry,
-    ].slice(-MESSAGE_NOTIFICATION_ENTRY_CAP);
-    $messageNotificationEntries.set(next);
-    if (!alreadyTracked && options.countSummary !== false) {
-        messageNotificationCount += 1;
-    }
-    logPushDelivery("message notification remembered", {
-        countSummary: options.countSummary !== false,
-        entries: next.length,
-        kind: entry.kind,
-        mailID: entry.mailID,
-        threadID: entry.threadID,
-    });
-    return messageNotificationCount;
-}
-
-function rememberNewlyDownloadedNotificationMessages(
-    knownMailIDs: Set<string>,
-): void {
-    const candidates: Array<{ message: Message; serverID?: string }> = [];
-    for (const thread of Object.values($messages.get())) {
-        for (const message of thread) {
-            if (!knownMailIDs.has(message.mailID)) {
-                candidates.push({ message });
-            }
-        }
-    }
-    for (const [channelID, thread] of Object.entries($groupMessages.get())) {
-        const serverID = findServerForChannel(channelID);
-        for (const message of thread) {
-            if (!knownMailIDs.has(message.mailID)) {
-                candidates.push({ message, serverID });
-            }
-        }
-    }
-
-    let remembered = 0;
-    for (const { message, serverID } of candidates.sort(
-        (a, b) =>
-            (Date.parse(a.message.timestamp) || 0) -
-            (Date.parse(b.message.timestamp) || 0),
-    )) {
-        const payload = shouldNotify(
-            message,
-            (uid) => resolveAuthorNameMobile(uid),
-            message.group ? (cid) => resolveChannelInfoMobile(cid) : undefined,
-        );
-        if (!payload) {
-            continue;
-        }
-        rememberMessageNotification(message, payload, serverID, {
-            countSummary: false,
-        });
-        remembered += 1;
-    }
-
-    if (remembered > 0) {
-        logPushDelivery("remote push wake messages remembered", {
-            remembered,
-            totalEntries: $messageNotificationEntries.get().length,
-        });
-    }
-}
-
 function resetMessageNotificationSummary(): void {
     messageNotificationCount = 0;
 }
@@ -809,6 +689,23 @@ function routeNotificationTap(
     options: { syncFirst?: boolean } = {},
 ): void {
     if (!data || typeof data !== "object") {
+        return;
+    }
+    if (isMessageNotificationData(data)) {
+        if (options.syncFirst === true) {
+            void (async () => {
+                await handleRemotePushWake(data);
+                handleNotificationPress(data);
+            })().catch((err: unknown) => {
+                console.warn(
+                    "[vex-push] message notification tap handling failed",
+                    err instanceof Error ? err.message : String(err),
+                );
+                handleNotificationPress(data);
+            });
+            return;
+        }
+        handleNotificationPress(data);
         return;
     }
     if (canRouteNotificationNow()) {
@@ -881,7 +778,7 @@ async function scheduleOneMessageNotification(mail: Message): Promise<void> {
     }
 
     const title = messageNotificationTitle(
-        rememberMessageNotification(mail, payload, serverID),
+        incrementMessageNotificationSummary(),
     );
 
     if (Platform.OS === "android") {

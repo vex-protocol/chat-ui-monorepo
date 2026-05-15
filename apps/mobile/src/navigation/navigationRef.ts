@@ -44,10 +44,3 @@ export function navigateToDMList(): void {
         screen: "DMList",
     });
 }
-
-export function navigateToNotifications(): void {
-    if (!navigationRef.isReady()) return;
-    navigationRef.navigate("App", {
-        screen: "Notifications",
-    });
-}

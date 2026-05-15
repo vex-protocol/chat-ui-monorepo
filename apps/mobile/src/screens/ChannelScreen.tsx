@@ -33,7 +33,6 @@ import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
 import { haptic } from "../lib/haptics";
-import { clearMessageNotificationEntriesForThread } from "../lib/notifications";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
 
@@ -76,7 +75,6 @@ export function ChannelScreen({
             // Dependency hook: rerun while focused whenever this channel receives
             // a new latest message.
             void latestMessageID;
-            clearMessageNotificationEntriesForThread(channelID);
             vexService.markRead(channelID);
         }, [channelID, latestMessageID]),
     );
