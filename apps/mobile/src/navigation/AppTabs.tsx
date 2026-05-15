@@ -23,6 +23,7 @@ import { DeviceRequestsScreen } from "../screens/DeviceRequestsScreen";
 import { DMListScreen } from "../screens/DMListScreen";
 import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
+import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
 import { PasskeysScreen } from "../screens/PasskeysScreen";
 import { PendingApprovalsScreen } from "../screens/PendingApprovalsScreen";
@@ -58,6 +59,7 @@ const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "Devices",
     "Invite",
     "JoinGroup",
+    "Notifications",
     "Passkeys",
     "ServerSettings",
     "SessionDetails",
@@ -282,7 +284,8 @@ export function AppTabs() {
                             setActiveServerId(serverID);
                         } else if (
                             route === "DMList" ||
-                            route === "Conversation"
+                            route === "Conversation" ||
+                            route === "Notifications"
                         ) {
                             setActiveServerId(null);
                         }
@@ -610,6 +613,11 @@ function ContentStack({
                 component={DMListScreen}
                 listeners={withFocus("DMList")}
                 name="DMList"
+            />
+            <Stack.Screen
+                component={NotificationsScreen}
+                listeners={withFocus("Notifications")}
+                name="Notifications"
             />
             <Stack.Screen
                 component={ConversationScreen}
