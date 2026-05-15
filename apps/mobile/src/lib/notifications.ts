@@ -473,7 +473,10 @@ async function ensureChannel(): Promise<void> {
             id: CHANNEL_ID,
             importance: NotifeeAndroidImportance.HIGH,
             name: "Messages",
-            sound: "default",
+            // Do not set `sound: "default"` here. Current native notification
+            // modules treat it as a custom sound resource named "default" and
+            // warn when that resource is not bundled. Omit sound to use
+            // platform/channel default behavior.
             vibration: true,
         });
     } else {
