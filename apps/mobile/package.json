@@ -5,7 +5,9 @@
     "scripts": {
         "android:clean-autolinking": "node -e \"require('node:fs').rmSync('android/build/generated/autolinking', { recursive: true, force: true })\"",
         "android": "pnpm run android:clean-autolinking && bash ./scripts/run-with-android-jdk.sh bash ./scripts/android-run.sh",
-        "android:staging": "bash ./scripts/android-staging.sh",
+        "android:dev": "bash ./scripts/android-dev.sh",
+        "android:dev:install": "bash ./scripts/android-dev-install.sh",
+        "android:staging": "pnpm run android:dev",
         "android:multi": "bash ./scripts/run-with-android-jdk.sh bash ./scripts/android-with-logs.sh",
         "android:emulator": "bash ./scripts/run-with-android-jdk.sh bash ./scripts/start-android-emulator.sh",
         "android:release:install-all": "bash ./scripts/release-apk-install-all.sh",
