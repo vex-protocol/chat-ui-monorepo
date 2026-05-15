@@ -53,7 +53,7 @@ module.exports = ({ config }) => {
     return {
         ...config,
         version: pkg.version,
-        name: devMode ? "Vex Beta" : config.name,
+        name: devMode ? "Vex Developer" : config.name,
         icon: iconPath,
         splash: {
             backgroundColor: "#0a0a0a",
