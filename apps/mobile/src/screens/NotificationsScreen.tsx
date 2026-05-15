@@ -2,7 +2,7 @@ import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
 import React, { useEffect, useMemo } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
     $channels,
@@ -27,6 +27,18 @@ import {
 } from "../lib/notifications";
 import { colors, typography } from "../theme";
 
+interface DmNotificationRow {
+    key: string;
+    latestMailID: string;
+    preview: string;
+    sortTimestamp: number;
+    threadID: string;
+    time: string;
+    title: string;
+    unreadCount: number;
+    userID: string;
+}
+
 interface NotificationRow {
     authorID: string;
     channelID?: string;
@@ -36,9 +48,28 @@ interface NotificationRow {
     message?: Message;
     preview: string;
     serverID?: string;
+    serverName?: string;
     sortTimestamp: number;
     subtitle: string;
     threadID: string;
+    time: string;
+    title: string;
+    unreadCount: number;
+}
+
+interface ServerNotificationRow {
+    authorIDs: string[];
+    authorNames: Record<string, string>;
+    channelID?: string;
+    channelName?: string;
+    key: string;
+    latestMailID: string;
+    latestThreadID: string;
+    preview: string;
+    serverID?: string;
+    sortTimestamp: number;
+    subtitle: string;
+    threadIDs: string[];
     time: string;
     title: string;
     unreadCount: number;
@@ -115,6 +146,7 @@ export function NotificationsScreen({
                 message,
                 preview: message.message,
                 serverID,
+                serverName,
                 sortTimestamp: Date.parse(message.timestamp),
                 subtitle: `${serverName} · #${channelName}`,
                 threadID: channelID,
@@ -171,6 +203,7 @@ export function NotificationsScreen({
                     kind: "group",
                     preview: "New message",
                     serverID,
+                    serverName,
                     sortTimestamp: Date.parse(entry.timestamp),
                     subtitle: `${serverName} · #${channelName}`,
                     threadID: entry.threadID,
@@ -236,58 +269,104 @@ export function NotificationsScreen({
         user?.userID,
     ]);
 
+    const { dmRows, serverRows } = useMemo(
+        () => aggregateNotificationRows(rows),
+        [rows],
+    );
+
     useEffect(() => {
         console.info("[vex-push] notifications screen state", {
             channelUnreadThreads: Object.keys(channelUnreadCounts).length,
+            dms: dmRows.length,
             dmUnreadThreads: Object.keys(dmUnreadCounts).length,
             entries: entries.length,
             rows: rows.length,
+            servers: serverRows.length,
         });
-    }, [channelUnreadCounts, dmUnreadCounts, entries.length, rows.length]);
+    }, [
+        channelUnreadCounts,
+        dmRows.length,
+        dmUnreadCounts,
+        entries.length,
+        rows.length,
+        serverRows.length,
+    ]);
 
-    function openRow(row: NotificationRow): void {
+    function openDmRow(row: DmNotificationRow): void {
         clearMessageNotificationEntriesForThread(row.threadID);
         vexService.markRead(row.threadID);
-
-        if (row.kind === "group") {
-            if (!row.channelID || !row.channelName || !row.serverID) {
-                return;
-            }
-            navigation.navigate("Channel", {
-                channelID: row.channelID,
-                channelName: row.channelName,
-                serverID: row.serverID,
-            });
-            return;
-        }
-
         navigation.navigate("Conversation", {
-            userID: row.authorID,
+            userID: row.userID,
             username: row.title,
         });
     }
 
-    function renderRow({ item }: { item: NotificationRow }) {
-        const disabled =
-            item.kind === "group" &&
-            (!item.channelID || !item.channelName || !item.serverID);
+    function openServerRow(row: ServerNotificationRow): void {
+        if (!row.channelID || !row.channelName || !row.serverID) {
+            return;
+        }
+        clearMessageNotificationEntriesForThread(row.latestThreadID);
+        vexService.markRead(row.latestThreadID);
+        navigation.navigate("Channel", {
+            channelID: row.channelID,
+            channelName: row.channelName,
+            serverID: row.serverID,
+        });
+    }
+
+    function renderDmRow(item: DmNotificationRow) {
         return (
             <Pressable
                 accessibilityRole="button"
-                disabled={disabled}
+                key={item.key}
                 onPress={() => {
-                    openRow(item);
+                    openDmRow(item);
                 }}
                 style={({ pressed }) => [
                     styles.row,
                     pressed && styles.rowPressed,
-                    disabled && styles.rowDisabled,
                 ]}
             >
                 <Avatar
                     displayName={item.title}
                     size={40}
-                    userID={item.authorID}
+                    userID={item.userID}
+                />
+                <View style={styles.rowContent}>
+                    <View style={styles.rowTitleLine}>
+                        <Text numberOfLines={1} style={styles.rowTitle}>
+                            {item.title}
+                        </Text>
+                        <Text style={styles.rowTime}>{item.time}</Text>
+                    </View>
+                    <Text numberOfLines={1} style={styles.rowPreview}>
+                        {item.preview}
+                    </Text>
+                </View>
+                <UnreadBadge count={item.unreadCount} />
+            </Pressable>
+        );
+    }
+
+    function renderServerRow(item: ServerNotificationRow) {
+        const disabled = !item.channelID || !item.channelName || !item.serverID;
+        return (
+            <Pressable
+                accessibilityRole="button"
+                disabled={disabled}
+                key={item.key}
+                onPress={() => {
+                    openServerRow(item);
+                }}
+                style={({ pressed }) => [
+                    styles.serverRow,
+                    pressed && styles.rowPressed,
+                    disabled && styles.rowDisabled,
+                ]}
+            >
+                <AvatarStack
+                    authorIDs={item.authorIDs}
+                    authorNames={item.authorNames}
                 />
                 <View style={styles.rowContent}>
                     <View style={styles.rowTitleLine}>
@@ -299,18 +378,16 @@ export function NotificationsScreen({
                     <Text numberOfLines={1} style={styles.rowSubtitle}>
                         {item.subtitle}
                     </Text>
-                    <Text numberOfLines={2} style={styles.rowPreview}>
+                    <Text numberOfLines={1} style={styles.rowPreview}>
                         {item.preview}
                     </Text>
                 </View>
-                <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>
-                        {item.unreadCount > 99 ? "99+" : item.unreadCount}
-                    </Text>
-                </View>
+                <UnreadBadge count={item.unreadCount} />
             </Pressable>
         );
     }
+
+    const totalRows = dmRows.length + serverRows.length;
 
     return (
         <View style={styles.container}>
@@ -321,23 +398,220 @@ export function NotificationsScreen({
                 title="Notifications"
             />
 
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>NEW MESSAGES</Text>
-                <Text style={styles.sectionMeta}>{rows.length}</Text>
-            </View>
-
-            {rows.length === 0 ? (
+            {totalRows === 0 ? (
                 <View style={styles.empty}>
                     <Text style={styles.emptyText}>You're caught up.</Text>
                 </View>
             ) : (
-                <FlatList
-                    contentContainerStyle={styles.list}
-                    data={rows}
-                    keyExtractor={(item) => item.key}
-                    renderItem={renderRow}
-                />
+                <ScrollView contentContainerStyle={styles.list}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>DIRECT MESSAGES</Text>
+                        <Text style={styles.sectionMeta}>{dmRows.length}</Text>
+                    </View>
+                    {dmRows.length === 0 ? (
+                        <Text style={styles.sectionEmpty}>
+                            No new direct messages
+                        </Text>
+                    ) : (
+                        dmRows.map(renderDmRow)
+                    )}
+
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>SERVERS</Text>
+                        <Text style={styles.sectionMeta}>
+                            {serverRows.length}
+                        </Text>
+                    </View>
+                    {serverRows.length === 0 ? (
+                        <Text style={styles.sectionEmpty}>
+                            No new server messages
+                        </Text>
+                    ) : (
+                        serverRows.map(renderServerRow)
+                    )}
+                </ScrollView>
             )}
+        </View>
+    );
+}
+
+function aggregateNotificationRows(rows: NotificationRow[]): {
+    dmRows: DmNotificationRow[];
+    serverRows: ServerNotificationRow[];
+} {
+    const dmByThread = new Map<
+        string,
+        {
+            latest?: NotificationRow;
+            mailIDs: Set<string>;
+            maxUnread: number;
+        }
+    >();
+    const serverByKey = new Map<
+        string,
+        {
+            authorLatest: Map<string, { name: string; timestamp: number }>;
+            latest?: NotificationRow;
+            mailIDsByThread: Map<string, Set<string>>;
+            maxUnreadByThread: Map<string, number>;
+            threadIDs: Set<string>;
+        }
+    >();
+
+    for (const row of rows) {
+        if (row.kind === "dm") {
+            const bucket = dmByThread.get(row.threadID) ?? {
+                mailIDs: new Set<string>(),
+                maxUnread: 0,
+            };
+            bucket.mailIDs.add(row.key);
+            bucket.maxUnread = Math.max(bucket.maxUnread, row.unreadCount);
+            if (
+                !bucket.latest ||
+                row.sortTimestamp > bucket.latest.sortTimestamp
+            ) {
+                bucket.latest = row;
+            }
+            dmByThread.set(row.threadID, bucket);
+            continue;
+        }
+
+        const serverKey = row.serverID ?? row.channelID ?? row.threadID;
+        const bucket = serverByKey.get(serverKey) ?? {
+            authorLatest: new Map<
+                string,
+                { name: string; timestamp: number }
+            >(),
+            mailIDsByThread: new Map<string, Set<string>>(),
+            maxUnreadByThread: new Map<string, number>(),
+            threadIDs: new Set<string>(),
+        };
+        bucket.threadIDs.add(row.threadID);
+        const mailIDs = bucket.mailIDsByThread.get(row.threadID) ?? new Set();
+        mailIDs.add(row.key);
+        bucket.mailIDsByThread.set(row.threadID, mailIDs);
+        bucket.maxUnreadByThread.set(
+            row.threadID,
+            Math.max(
+                bucket.maxUnreadByThread.get(row.threadID) ?? 0,
+                row.unreadCount,
+            ),
+        );
+        const authorLatest = bucket.authorLatest.get(row.authorID);
+        if (!authorLatest || row.sortTimestamp > authorLatest.timestamp) {
+            bucket.authorLatest.set(row.authorID, {
+                name: row.title,
+                timestamp: row.sortTimestamp,
+            });
+        }
+        if (!bucket.latest || row.sortTimestamp > bucket.latest.sortTimestamp) {
+            bucket.latest = row;
+        }
+        serverByKey.set(serverKey, bucket);
+    }
+
+    const dmRows = [...dmByThread.entries()]
+        .flatMap(([threadID, bucket]): DmNotificationRow[] => {
+            const latest = bucket.latest;
+            if (!latest) return [];
+            return [
+                {
+                    key: threadID,
+                    latestMailID: latest.key,
+                    preview: latest.preview,
+                    sortTimestamp: latest.sortTimestamp,
+                    threadID,
+                    time: latest.time,
+                    title: latest.title,
+                    unreadCount: Math.max(
+                        bucket.maxUnread,
+                        bucket.mailIDs.size,
+                    ),
+                    userID: latest.authorID,
+                },
+            ];
+        })
+        .sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+
+    const serverRows = [...serverByKey.entries()]
+        .flatMap(([serverKey, bucket]): ServerNotificationRow[] => {
+            const latest = bucket.latest;
+            if (!latest) return [];
+            const authorIDs = [...bucket.authorLatest.entries()]
+                .sort((a, b) => b[1].timestamp - a[1].timestamp)
+                .map(([authorID]) => authorID);
+            const authorNames = Object.fromEntries(
+                [...bucket.authorLatest.entries()].map(([authorID, value]) => [
+                    authorID,
+                    value.name,
+                ]),
+            );
+            const unreadCount = [...bucket.threadIDs].reduce(
+                (total, threadID) => {
+                    const messageCount =
+                        bucket.mailIDsByThread.get(threadID)?.size ?? 0;
+                    const maxUnread =
+                        bucket.maxUnreadByThread.get(threadID) ?? 0;
+                    return total + Math.max(maxUnread, messageCount);
+                },
+                0,
+            );
+            const channelCount = bucket.threadIDs.size;
+            return [
+                {
+                    authorIDs,
+                    authorNames,
+                    channelID: latest.channelID,
+                    channelName: latest.channelName,
+                    key: serverKey,
+                    latestMailID: latest.key,
+                    latestThreadID: latest.threadID,
+                    preview: latest.preview,
+                    serverID: latest.serverID,
+                    sortTimestamp: latest.sortTimestamp,
+                    subtitle:
+                        channelCount > 1
+                            ? `${channelCount.toString()} channels · latest #${latest.channelName ?? "channel"}`
+                            : `#${latest.channelName ?? "channel"}`,
+                    threadIDs: [...bucket.threadIDs],
+                    time: latest.time,
+                    title: latest.serverName ?? latest.subtitle.split(" · ")[0],
+                    unreadCount,
+                },
+            ];
+        })
+        .sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+
+    return { dmRows, serverRows };
+}
+
+function AvatarStack({
+    authorIDs,
+    authorNames,
+}: {
+    authorIDs: string[];
+    authorNames: Record<string, string>;
+}) {
+    const visible = authorIDs.slice(0, 4);
+    return (
+        <View style={styles.avatarStack}>
+            {visible.map((authorID, idx) => (
+                <View
+                    key={authorID}
+                    style={[
+                        styles.avatarStackItem,
+                        idx > 0 && styles.avatarStackOverlap,
+                        { zIndex: visible.length - idx },
+                    ]}
+                >
+                    <Avatar
+                        displayName={authorNames[authorID]}
+                        ring={{ color: "#11131a", width: 2 }}
+                        size={30}
+                        userID={authorID}
+                    />
+                </View>
+            ))}
         </View>
     );
 }
@@ -361,7 +635,30 @@ function findServerForChannel(
     return undefined;
 }
 
+function UnreadBadge({ count }: { count: number }) {
+    return (
+        <View style={styles.unreadBadge}>
+            <Text style={styles.unreadText}>
+                {count > 99 ? "99+" : count.toString()}
+            </Text>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
+    avatarStack: {
+        alignItems: "center",
+        flexDirection: "row",
+        height: 40,
+        width: 88,
+    },
+    avatarStackItem: {
+        backgroundColor: "#11131a",
+        borderRadius: 16,
+    },
+    avatarStackOverlap: {
+        marginLeft: -10,
+    },
     container: {
         backgroundColor: "#11131a",
         flex: 1,
@@ -407,6 +704,7 @@ const styles = StyleSheet.create({
     rowPreview: {
         ...typography.body,
         color: "rgba(255,255,255,0.62)",
+        flexShrink: 1,
         marginTop: 2,
     },
     rowSubtitle: {
@@ -430,6 +728,14 @@ const styles = StyleSheet.create({
         alignItems: "center",
         flexDirection: "row",
         gap: 8,
+        minWidth: 0,
+    },
+    sectionEmpty: {
+        ...typography.body,
+        color: "rgba(255,255,255,0.42)",
+        marginBottom: 12,
+        marginHorizontal: 14,
+        marginTop: -2,
     },
     sectionHeader: {
         alignItems: "center",
@@ -446,6 +752,18 @@ const styles = StyleSheet.create({
     sectionTitle: {
         ...typography.label,
         color: "rgba(255,255,255,0.52)",
+    },
+    serverRow: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.03)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 12,
+        marginBottom: 8,
+        marginHorizontal: 14,
+        paddingHorizontal: 10,
+        paddingVertical: 12,
     },
     unreadBadge: {
         alignItems: "center",
