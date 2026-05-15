@@ -20,6 +20,8 @@
         "mobile": "pnpm -F mobile dev",
         "android:dev": "pnpm -F mobile run android:dev",
         "android:dev:install": "pnpm -F mobile run android:dev:install",
+        "android:prod": "pnpm -F mobile run android:prod",
+        "android:prod:install": "pnpm -F mobile run android:prod:install",
         "android:staging": "pnpm run android:dev",
         "install:android": "pnpm -F mobile run android:release:install-all",
         "install:ios": "pnpm -F mobile run ios:release:install",

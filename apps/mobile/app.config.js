@@ -24,6 +24,9 @@ module.exports = ({ config }) => {
     const devFlavorEnabled = process.env.VEX_ENABLE_DEV_BUILD === "1";
     const devMode =
         devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
+    const appDisplayName =
+        process.env.VEX_APP_DISPLAY_NAME ||
+        (devMode ? "Vex Developer" : config.name);
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
@@ -53,7 +56,7 @@ module.exports = ({ config }) => {
     return {
         ...config,
         version: pkg.version,
-        name: devMode ? "Vex Developer" : config.name,
+        name: appDisplayName,
         icon: iconPath,
         splash: {
             backgroundColor: "#0a0a0a",

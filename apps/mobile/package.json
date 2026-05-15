@@ -7,6 +7,8 @@
         "android": "pnpm run android:clean-autolinking && bash ./scripts/run-with-android-jdk.sh bash ./scripts/android-run.sh",
         "android:dev": "bash ./scripts/android-dev.sh",
         "android:dev:install": "bash ./scripts/android-dev-install.sh",
+        "android:prod": "bash ./scripts/android-prod.sh",
+        "android:prod:install": "bash ./scripts/android-prod-install.sh",
         "android:staging": "pnpm run android:dev",
         "android:multi": "bash ./scripts/run-with-android-jdk.sh bash ./scripts/android-with-logs.sh",
         "android:emulator": "bash ./scripts/run-with-android-jdk.sh bash ./scripts/start-android-emulator.sh",
