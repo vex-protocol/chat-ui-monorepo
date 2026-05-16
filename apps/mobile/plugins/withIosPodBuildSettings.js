@@ -60,7 +60,9 @@ function replaceLegacyBlock(contents) {
     const endToken = "    end\n";
     const end = contents.indexOf(endToken, begin);
     if (end === -1) {
-        throw new Error("Found legacy Vex Podfile settings without closing end");
+        throw new Error(
+            "Found legacy Vex Podfile settings without closing end",
+        );
     }
 
     return (
