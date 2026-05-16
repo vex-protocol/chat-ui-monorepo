@@ -5,6 +5,7 @@
 //   default (all profiles)             → production flavor
 //   VEX_ENABLE_DEV_BUILD=1 + profile=development → dev flavor (opt-in)
 //   env override                        → VEX_IOS_BUNDLE_IDENTIFIER (optional)
+//   signing team override               → VEX_IOS_DEVELOPMENT_TEAM (optional)
 //   local personal-team iOS builds      → VEX_DISABLE_IOS_CAPABILITIES=1
 //
 // The release APK has updates.enabled:false hard-baked into the native
@@ -35,6 +36,8 @@ module.exports = ({ config }) => {
         devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
     const iosCapabilitiesEnabled =
         process.env.VEX_DISABLE_IOS_CAPABILITIES !== "1";
+    const iosDevelopmentTeam =
+        process.env.VEX_IOS_DEVELOPMENT_TEAM || config.ios?.appleTeamId;
     const appDisplayName =
         process.env.VEX_APP_DISPLAY_NAME ||
         (devMode ? "Vex Developer" : config.name);
@@ -77,6 +80,7 @@ module.exports = ({ config }) => {
         ios: {
             ...config.ios,
             bundleIdentifier: iosBundleIdentifier,
+            ...(iosDevelopmentTeam ? { appleTeamId: iosDevelopmentTeam } : {}),
             associatedDomains: iosCapabilitiesEnabled
                 ? config.ios?.associatedDomains
                 : undefined,
@@ -119,6 +123,7 @@ module.exports = ({ config }) => {
             // catch-all `@drawable/notification_icon` always
             // resolves to a valid white-on-transparent vector.
             "./plugins/withNotificationIcon",
+            "./plugins/withIosPodBuildSettings",
             ...(iosCapabilitiesEnabled
                 ? []
                 : [withoutPersonalTeamUnsupportedIosCapabilities]),

@@ -23,8 +23,12 @@
         "android:prod": "pnpm -F mobile run android:prod",
         "android:prod:install": "pnpm -F mobile run android:prod:install",
         "android:staging": "pnpm run android:dev",
+        "ios:dev": "pnpm -F mobile run ios:dev",
+        "ios:dev:install": "pnpm -F mobile run ios:dev:install",
+        "ios:prod": "pnpm -F mobile run ios:prod",
+        "ios:prod:install": "pnpm -F mobile run ios:prod:install",
         "install:android": "pnpm -F mobile run android:release:install-all",
-        "install:ios": "pnpm -F mobile run ios:release:install",
+        "install:ios": "pnpm run ios:prod:install",
         "preinstall": "npx only-allow pnpm"
     },
     "packageManager": "pnpm@10.33.0",
