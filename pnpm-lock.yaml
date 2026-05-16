@@ -19,8 +19,8 @@ catalogs:
       specifier: ^24.10.1
       version: 24.12.2
     '@vex-chat/libvex':
-      specifier: 6.6.1
-      version: 6.6.1
+      specifier: 6.6.2
+      version: 6.6.2
     '@vex-chat/types':
       specifier: 3.3.0
       version: 3.3.0
@@ -93,10 +93,10 @@ overrides:
   dompurify@>=1.0.10 <3.4.0: '>=3.4.0'
   dompurify@>=3.0.1 <3.4.0: '>=3.4.0'
   fast-xml-builder@<=1.1.6: 1.1.7
-  axios@>=1.0.0 <1.15.1: '>=1.15.1'
-  axios@>=1.0.0 <1.15.2: '>=1.15.2'
   uuid@>=11.0.0 <11.1.1: '>=11.1.1'
   '@angular/compiler@<=18.2.14': 19.2.21
+
+pnpmfileChecksum: sha256-/mRFvmpKtTw1Jrlka4dAnOBvu2y3fvHAFunyovX5zoc=
 
 importers:
 
@@ -195,7 +195,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 6.6.1(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 6.6.2(better-sqlite3@11.10.0)(typescript@5.9.3)
       eslint-plugin-svelte:
         specifier: ^3.17.0
         version: 3.17.0(eslint@10.2.0(jiti@2.6.1))(svelte@5.55.1)
@@ -340,7 +340,7 @@ importers:
         version: link:../../packages/eslint-config
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 6.6.1(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 6.6.2(better-sqlite3@11.10.0)(typescript@5.9.3)
       babel-preset-expo:
         specifier: ^55.0.15
         version: 55.0.15(@babel/core@7.29.0)(@babel/runtime@7.29.2)(expo@55.0.13)(react-refresh@0.14.2)
@@ -376,7 +376,7 @@ importers:
         version: 1.1.0(nanostores@1.2.0)(react@19.2.0)
       '@vex-chat/libvex':
         specifier: 'catalog:'
-        version: 6.6.1(better-sqlite3@11.10.0)(typescript@5.9.3)
+        version: 6.6.2(better-sqlite3@11.10.0)(typescript@5.9.3)
       '@vex-chat/types':
         specifier: 'catalog:'
         version: 3.3.0
@@ -411,6 +411,9 @@ importers:
       '@storybook/svelte-vite':
         specifier: ^8.6.0
         version: 8.6.18(@babel/core@7.29.0)(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)))(postcss-load-config@3.1.4(postcss@8.5.13))(postcss@8.5.13)(storybook@8.6.18(prettier@2.8.8))(svelte@5.55.1)(vite@6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.2
       '@vex-chat/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
@@ -435,9 +438,6 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
-      wait-on:
-        specifier: ^8.0.0
-        version: 8.0.5
 
 packages:
 
@@ -1466,31 +1466,11 @@ packages:
     resolution: {integrity: sha512-KZNxZvnGCtiM2aYYZ6Wz0Ix5r47dAvpNLApFtZWnSoERzAdOMzVBOPysBoM0JlF6FKWZ8GPqgn6qt3dV/8Zlpg==}
     hasBin: true
 
-  '@hapi/address@5.1.1':
-    resolution: {integrity: sha512-A+po2d/dVoY7cYajycYI43ZbYMXukuopIsqCjh5QzsBCipDtdofHntljDlpccMjIfTy6UOkg+5KPriwYch2bXA==}
-    engines: {node: '>=14.0.0'}
-
-  '@hapi/formula@3.0.2':
-    resolution: {integrity: sha512-hY5YPNXzw1He7s0iqkRQi+uMGh383CGdyyIGYtB+W5N3KHPXoqychklvHhKCC9M3Xtv0OCs/IHw+r4dcHtBYWw==}
-
-  '@hapi/hoek@11.0.7':
-    resolution: {integrity: sha512-HV5undWkKzcB4RZUusqOpcgxOaq6VOAH7zhhIr2g3G8NF/MlFO75SjOr2NfuSx0Mh40+1FqCkagKLJRykUWoFQ==}
-
   '@hapi/hoek@9.3.0':
     resolution: {integrity: sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ==}
 
-  '@hapi/pinpoint@2.0.1':
-    resolution: {integrity: sha512-EKQmr16tM8s16vTT3cA5L0kZZcTMU5DUOZTuvpnY738m+jyP3JIUj+Mm1xc1rsLkGBQ/gVnfKYPwOmPg1tUR4Q==}
-
-  '@hapi/tlds@1.1.6':
-    resolution: {integrity: sha512-xdi7A/4NZokvV0ewovme3aUO5kQhW9pQ2YD1hRqZGhhSi5rBv4usHYidVocXSi9eihYsznZxLtAiEYYUL6VBGw==}
-    engines: {node: '>=14.0.0'}
-
   '@hapi/topo@5.1.0':
     resolution: {integrity: sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg==}
-
-  '@hapi/topo@6.0.2':
-    resolution: {integrity: sha512-KR3rD5inZbGMrHmgPxsJ9dbi6zEK+C3ZwUwTa+eMwWLz7oijWUTWD2pMSNNYJAU6Qq+65NkxXjqHr/7LM2Xkqg==}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -2016,9 +1996,6 @@ packages:
   '@stablelib/utf8@2.1.0':
     resolution: {integrity: sha512-peZgjgrPYOvjbJcVp91yYQLocr/qw5zcLsQBL+vH3D/d0IS+Cvcsbvlu+LLEcG8sVbkWMxr0ZABhY/0t3JMh0w==}
 
-  '@standard-schema/spec@1.1.0':
-    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
-
   '@storybook/addon-actions@8.6.14':
     resolution: {integrity: sha512-mDQxylxGGCQSK7tJPkD144J8jWh9IU9ziJMHfB84PKpI/V5ZgqMDnpr2bssTrUaGDqU5e1/z8KcRF+Melhs9pQ==}
     peerDependencies:
@@ -2473,8 +2450,8 @@ packages:
       typescript:
         optional: true
 
-  '@vex-chat/libvex@6.6.1':
-    resolution: {integrity: sha512-xNC6hFMQZjPc6xoDWDpU6g68etnEf2BuxPbaGW+KERa8gCT3CImYRM1lkOMdWuQb/iDVcyONaUXqkJL56t7mWA==}
+  '@vex-chat/libvex@6.6.2':
+    resolution: {integrity: sha512-1TrhdTBWYe1Bjzh9YG2PNFEdqeliB8UFnDG0XPUZ9ipZmP7L/skmP3g2OfQinEF4i5DQwxqcEcfFvNPgFIwbgQ==}
     engines: {node: '>=24.0.0'}
     peerDependencies:
       better-sqlite3: '>=11.0.0'
@@ -2601,9 +2578,6 @@ packages:
     resolution: {integrity: sha512-KMReFUr0B4t+D+OBkjR3KYqvocp2XaSzO55UcB6mgQMd3KbcE+mWTyvVV7D/zsdEbNnV6acZUutkiHQXvTr1Rw==}
     engines: {node: '>= 8'}
 
-  apisauce@3.2.2:
-    resolution: {integrity: sha512-YvZ6v7KgGWSjqHEDcGxE+U5bI8U8ckVqVFvfs0SKGtMrvbX0o3MDMlMzlL9lvWgg9hb//162vAHPconN/Ed1oA==}
-
   app-module-path@2.2.0:
     resolution: {integrity: sha512-gkco+qxENJV+8vFcDiiFhuoSvRXb2a/QPqpSoWhVz829VNJfOTnELbBmPmNKFxf3xdNnw4DWCkzkDaavcX/1YQ==}
 
@@ -2683,9 +2657,6 @@ packages:
   async@3.2.6:
     resolution: {integrity: sha512-htCUDlxyyCLMgaM3xXg0C0LW2xqfuQ6p05pCEIsXuyQ+a1koYKTuBMzRNwmybfLgvJDMd0r1LTn4+E0Ti6C2AA==}
 
-  asynckit@0.4.0:
-    resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
-
   at-least-node@1.0.0:
     resolution: {integrity: sha512-+q/t7Ekv1EDY2l6Gda6LLiX14rU9TV20Wa3ofeQmwPFZbOMo9DXrLbOjFaaclkXKWidIaopwAObQDqwWtGUjqg==}
     engines: {node: '>= 4.0.0'}
@@ -2696,12 +2667,6 @@ packages:
 
   await-lock@2.2.2:
     resolution: {integrity: sha512-aDczADvlvTGajTDjcjpJMqRkOF6Qdz3YbPZm/PyW6tKPkx2hlYBzxMhEywM/tU72HrVZjgl5VCdRuMlA7pZ8Gw==}
-
-  axios@1.15.2:
-    resolution: {integrity: sha512-wLrXxPtcrPTsNlJmKjkPnNPK2Ihe0hn0wGSaTEiHRPxwjvJwT3hKmXF4dpqxmPO9SoNb2FsYXj/xEo0gHN+D5A==}
-
-  axios@1.16.0:
-    resolution: {integrity: sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==}
 
   axobject-query@4.1.0:
     resolution: {integrity: sha512-qIj0G9wZbMGNLjLmg1PT6v2mE9AH2zlnADJD/2tC6E00hgmhUOfEB6greHPAfLRSufHqROIUTkw6E+M3lH0PTQ==}
@@ -3025,10 +2990,6 @@ packages:
     resolution: {integrity: sha512-a+UqTh4kgZg/SlGvfbzDHpgRu7AAQOmmqRHJnxhRZICKFUT91brVhNNt58CMWU9PsBbv3PDCZUHbVxuDiH2mtA==}
     engines: {node: '>=0.1.90'}
 
-  combined-stream@1.0.8:
-    resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
-    engines: {node: '>= 0.8'}
-
   command-exists@1.2.9:
     resolution: {integrity: sha512-LTQ/SGc+s0Xc0Fu5WaKnR0YiygZkm9eKFvyS+fRsU7/ZWFF8ykFM6Pc9aCVf1+xasOOZpO3BAVgVrKvsqKHV7w==}
 
@@ -3216,10 +3177,6 @@ packages:
   define-properties@1.2.1:
     resolution: {integrity: sha512-8QmQKqEASLd5nx0U1B1okLElbUuuttJ/AnYmRXbbbGDWh6uS208EjD4Xqq/I9wK7u0v6O08XhTWnt5XtEbR6Dg==}
     engines: {node: '>= 0.4'}
-
-  delayed-stream@1.0.0:
-    resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
-    engines: {node: '>=0.4.0'}
 
   depd@2.0.0:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
@@ -3869,15 +3826,6 @@ packages:
   flow-enums-runtime@0.0.6:
     resolution: {integrity: sha512-3PYnM29RFXwvAN6Pc/scUfkI7RwhQ/xqyLUyPNlXUp9S40zI8nup9tUSrTLSVnWGBN38FNiGWbwZOB6uR4OGdw==}
 
-  follow-redirects@1.16.0:
-    resolution: {integrity: sha512-y5rN/uOsadFT/JfYwhxRS5R7Qce+g3zG97+JrtFZlC9klX/W5hD7iiLzScI4nZqUS7DNUdhPgw4xI8W2LuXlUw==}
-    engines: {node: '>=4.0'}
-    peerDependencies:
-      debug: '*'
-    peerDependenciesMeta:
-      debug:
-        optional: true
-
   fontfaceobserver@2.3.0:
     resolution: {integrity: sha512-6FPvD/IVyT4ZlNe7Wcn5Fb/4ChigpucKYSvD6a+0iMoLn2inpo711eyIcKjmDtE5XNcgAkSH9uN/nfAeZzHEfg==}
 
@@ -3888,10 +3836,6 @@ packages:
   foreground-child@3.3.1:
     resolution: {integrity: sha512-gIXjKqtFuWEgzFRJA9WCQeSJLZDjgJUOMCMzxtvFq/37KojM1BFGufqsCy0r4qSQmYLsZYMeyRqzIWOMup03sw==}
     engines: {node: '>=14'}
-
-  form-data@4.0.5:
-    resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
-    engines: {node: '>= 6'}
 
   fp-ts@2.16.11:
     resolution: {integrity: sha512-LaI+KaX2NFkfn1ZGHoKCmcfv7yrZsC3b8NtWsTVQeHkq4F27vI5igUuO53sxqDEa2gNQMHFPmpojDw/1zmUK7w==}
@@ -4374,10 +4318,6 @@ packages:
 
   joi@17.13.3:
     resolution: {integrity: sha512-otDA4ldcIx+ZXsKHWmp0YizCweVRZG96J10b0FevjfuncLO1oX59THoAmHkNubYJ+9gWsYsp5k8v4ib6oDv1fA==}
-
-  joi@18.1.2:
-    resolution: {integrity: sha512-rF5MAmps5esSlhCA+N1b6IYHDw9j/btzGaqfgie522jS02Ju/HXBxamlXVlKEHAxoMKQL77HWI8jlqWsFuekZA==}
-    engines: {node: '>= 20'}
 
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -5259,10 +5199,6 @@ packages:
 
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
-
-  proxy-from-env@2.1.0:
-    resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
-    engines: {node: '>=10'}
 
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
@@ -6299,11 +6235,6 @@ packages:
   vlq@1.0.1:
     resolution: {integrity: sha512-gQpnTgkubC6hQgdIcRdYGDSDc+SaujOdyesZQMv6JlfQee/9Mp0Qhnys6WxDWvQnL5WZdT7o2Ul187aSt0Rq+w==}
 
-  wait-on@8.0.5:
-    resolution: {integrity: sha512-J3WlS0txVHkhLRb2FsmRg3dkMTCV1+M6Xra3Ho7HzZDHpE7DCOnoSoCJsZotrmW3uRMhvIJGSKUKrh/MeF4iag==}
-    engines: {node: '>=12.0.0'}
-    hasBin: true
-
   walker@1.0.8:
     resolution: {integrity: sha512-ts/8E8l5b7kY0vlWLewOkDXMmPdLcVV4GmOQLyxuSswIJsweeFZtAsMF7k1Nszz+TYBQrlYRmzOnr398y1JemQ==}
 
@@ -7206,7 +7137,7 @@ snapshots:
       fast-glob: 3.3.3
       fp-ts: 2.16.11
       fs-extra: 9.1.0
-      gluegun: 5.2.2(debug@4.4.3)
+      gluegun: 5.2.2
       lodash: 4.18.1
       prettier: 2.8.8
       ts-morph: 19.0.0
@@ -7883,29 +7814,13 @@ snapshots:
       chalk: 4.1.2
       js-yaml: 4.1.1
 
-  '@hapi/address@5.1.1':
-    dependencies:
-      '@hapi/hoek': 11.0.7
-
-  '@hapi/formula@3.0.2': {}
-
-  '@hapi/hoek@11.0.7': {}
-
   '@hapi/hoek@9.3.0':
     optional: true
-
-  '@hapi/pinpoint@2.0.1': {}
-
-  '@hapi/tlds@1.1.6': {}
 
   '@hapi/topo@5.1.0':
     dependencies:
       '@hapi/hoek': 9.3.0
     optional: true
-
-  '@hapi/topo@6.0.2':
-    dependencies:
-      '@hapi/hoek': 11.0.7
 
   '@humanfs/core@0.19.1': {}
 
@@ -8434,7 +8349,9 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
+      - bufferutil
       - supports-color
+      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.4': {}
@@ -8618,8 +8535,6 @@ snapshots:
   '@stablelib/base64@2.0.1': {}
 
   '@stablelib/utf8@2.1.0': {}
-
-  '@standard-schema/spec@1.1.0': {}
 
   '@storybook/addon-actions@8.6.14(storybook@8.6.18(prettier@2.8.8))':
     dependencies:
@@ -9174,11 +9089,10 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  '@vex-chat/libvex@6.6.1(better-sqlite3@11.10.0)(typescript@5.9.3)':
+  '@vex-chat/libvex@6.6.2(better-sqlite3@11.10.0)(typescript@5.9.3)':
     dependencies:
       '@vex-chat/crypto': 6.0.0(@vex-chat/types@3.3.0)(typescript@5.9.3)
       '@vex-chat/types': 3.3.0
-      axios: 1.15.2
       eventemitter3: 5.0.4
       kysely: 0.28.17
       msgpackr: 1.11.10
@@ -9187,7 +9101,6 @@ snapshots:
     optionalDependencies:
       better-sqlite3: 11.10.0
     transitivePeerDependencies:
-      - debug
       - typescript
 
   '@vex-chat/types@3.3.0':
@@ -9312,12 +9225,6 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.2
 
-  apisauce@3.2.2(debug@4.4.3):
-    dependencies:
-      axios: 1.16.0(debug@4.4.3)
-    transitivePeerDependencies:
-      - debug
-
   app-module-path@2.2.0: {}
 
   appdirsjs@1.2.7:
@@ -9412,8 +9319,6 @@ snapshots:
 
   async@3.2.6: {}
 
-  asynckit@0.4.0: {}
-
   at-least-node@1.0.0: {}
 
   available-typed-arrays@1.0.7:
@@ -9421,22 +9326,6 @@ snapshots:
       possible-typed-array-names: 1.1.0
 
   await-lock@2.2.2: {}
-
-  axios@1.15.2:
-    dependencies:
-      follow-redirects: 1.16.0(debug@4.4.3)
-      form-data: 4.0.5
-      proxy-from-env: 2.1.0
-    transitivePeerDependencies:
-      - debug
-
-  axios@1.16.0(debug@4.4.3):
-    dependencies:
-      follow-redirects: 1.16.0(debug@4.4.3)
-      form-data: 4.0.5
-      proxy-from-env: 2.1.0
-    transitivePeerDependencies:
-      - debug
 
   axobject-query@4.1.0: {}
 
@@ -9867,10 +9756,6 @@ snapshots:
 
   colors@1.4.0: {}
 
-  combined-stream@1.0.8:
-    dependencies:
-      delayed-stream: 1.0.0
-
   command-exists@1.2.9:
     optional: true
 
@@ -10057,8 +9942,6 @@ snapshots:
       define-data-property: 1.1.4
       has-property-descriptors: 1.0.2
       object-keys: 1.1.1
-
-  delayed-stream@1.0.0: {}
 
   depd@2.0.0: {}
 
@@ -10960,10 +10843,6 @@ snapshots:
 
   flow-enums-runtime@0.0.6: {}
 
-  follow-redirects@1.16.0(debug@4.4.3):
-    optionalDependencies:
-      debug: 4.4.3
-
   fontfaceobserver@2.3.0: {}
 
   for-each@0.3.5:
@@ -10974,14 +10853,6 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
-
-  form-data@4.0.5:
-    dependencies:
-      asynckit: 0.4.0
-      combined-stream: 1.0.8
-      es-set-tostringtag: 2.1.0
-      hasown: 2.0.2
-      mime-types: 2.1.35
 
   fp-ts@2.16.11: {}
 
@@ -11117,9 +10988,8 @@ snapshots:
       define-properties: 1.2.1
       gopd: 1.2.0
 
-  gluegun@5.2.2(debug@4.4.3):
+  gluegun@5.2.2:
     dependencies:
-      apisauce: 3.2.2(debug@4.4.3)
       app-module-path: 2.2.0
       cli-table3: 0.6.0
       colors: 1.4.0
@@ -11135,8 +11005,6 @@ snapshots:
       semver: 7.7.0
       which: 2.0.2
       yargs-parser: 21.1.1
-    transitivePeerDependencies:
-      - debug
 
   gopd@1.2.0: {}
 
@@ -11531,16 +11399,6 @@ snapshots:
       '@sideway/formula': 3.0.1
       '@sideway/pinpoint': 2.0.0
     optional: true
-
-  joi@18.1.2:
-    dependencies:
-      '@hapi/address': 5.1.1
-      '@hapi/formula': 3.0.2
-      '@hapi/hoek': 11.0.7
-      '@hapi/pinpoint': 2.0.1
-      '@hapi/tlds': 1.1.6
-      '@hapi/topo': 6.0.2
-      '@standard-schema/spec': 1.1.0
 
   js-tokens@4.0.0: {}
 
@@ -12459,8 +12317,6 @@ snapshots:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
-
-  proxy-from-env@2.1.0: {}
 
   pump@3.0.4:
     dependencies:
@@ -13598,7 +13454,7 @@ snapshots:
       std-env: 3.10.0
       tinybench: 2.9.0
       tinyexec: 0.3.2
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
       vite: 7.3.2(@types/node@24.12.2)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3)
@@ -13621,16 +13477,6 @@ snapshots:
       - yaml
 
   vlq@1.0.1: {}
-
-  wait-on@8.0.5:
-    dependencies:
-      axios: 1.16.0(debug@4.4.3)
-      joi: 18.1.2
-      lodash: 4.18.1
-      minimist: 1.2.8
-      rxjs: 7.8.2
-    transitivePeerDependencies:
-      - debug
 
   walker@1.0.8:
     dependencies:
