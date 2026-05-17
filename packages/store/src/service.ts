@@ -196,31 +196,9 @@ export interface SessionInfo {
     username: string;
 }
 
-interface ClientHttpDefaultsLike {
-    signal?: unknown;
-    timeout?: number;
-}
-
-interface ClientHttpInterceptorsLike {
-    request?: {
-        use?: (
-            onFulfilled: (
-                config: ClientHttpRequestConfigLike,
-            ) => ClientHttpRequestConfigLike,
-        ) => unknown;
-    };
-}
-
 interface ClientHttpLike {
-    defaults?: ClientHttpDefaultsLike;
     get?: (...args: unknown[]) => Promise<unknown>;
-    interceptors?: ClientHttpInterceptorsLike;
     post?: (...args: unknown[]) => Promise<unknown>;
-}
-
-interface ClientHttpRequestConfigLike {
-    signal?: unknown;
-    timeout?: number;
 }
 
 type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
@@ -2025,29 +2003,10 @@ class VexService {
             return;
         }
         const internals = client as unknown as ClientWithInternalHttp;
-        const defaults = internals.http?.defaults;
         const http = internals.http;
-        if (!defaults || !http) {
+        if (!http) {
             return;
         }
-        // In some RN environments axios + default AbortSignal can stall
-        // requests before dispatch. Keep abort semantics in SDK runtimes
-        // that support it reliably, but clear it on mobile app runtime.
-        defaults.signal = undefined;
-        if (typeof defaults.timeout !== "number" || defaults.timeout <= 0) {
-            defaults.timeout = 15000;
-        }
-        http.interceptors?.request?.use?.(
-            (
-                config: ClientHttpRequestConfigLike,
-            ): ClientHttpRequestConfigLike => {
-                config.signal = undefined;
-                if (typeof config.timeout !== "number" || config.timeout <= 0) {
-                    config.timeout = 15000;
-                }
-                return config;
-            },
-        );
         this.wrapHttpMethodsWithTimeout(http);
     }
 
@@ -3360,9 +3319,9 @@ function describeWsFrame(data: Uint8Array): {
 /**
  * Extract a human-readable message from an error.
  *
- * For axios HTTP errors, surface the server-sent body instead of
+ * For HTTP errors, surface the server-sent body instead of
  * the generic "Request failed with status code N". libvex configures
- * its axios instance with `responseType: "arraybuffer"` so the body
+ * binary responses so the body
  * arrives as raw bytes regardless of `Content-Type`; spire's error
  * envelopes are JSON in practice, in one of two shapes:
  *

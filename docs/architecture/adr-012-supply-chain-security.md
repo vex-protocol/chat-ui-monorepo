@@ -9,13 +9,13 @@
 
 ## Context
 
-On March 31, 2026, the `axios` npm package was compromised via credential theft.
+On March 31, 2026, a widely used HTTP client npm package was compromised via credential theft.
 North Korean state actors published a malicious version that added
 `plain-crypto-js` as a dependency — a typosquat of `crypto-js` containing a
 Remote Access Trojan delivered via a `postinstall` hook. The RAT exfiltrated
 environment variables (including `NPM_TOKEN`) and established a reverse shell.
 
-The attack succeeded despite axios having:
+The attack succeeded despite the package having:
 - OIDC provenance configured (but a classic `NPM_TOKEN` was also set, and npm
   defaults to tokens over OIDC when both exist)
 - CI/CD pipeline (but the stolen token allowed direct `npm publish`, bypassing CI)
@@ -30,7 +30,7 @@ before encryption, or inject backdoored crypto primitives.
 
 | Threat | Vector | Historical example |
 |--------|--------|--------------------|
-| Credential theft → malicious publish | Stolen npm token, phishing | axios (2026), ua-parser-js (2021) |
+| Credential theft → malicious publish | Stolen npm token, phishing | HTTP client package (2026), ua-parser-js (2021) |
 | Social engineering → maintainer transfer | New maintainer adds malware | event-stream (2018) |
 | Typosquatting | Install look-alike package | `plain-crypto-js` (2026), `crossenv` (2017) |
 | Install script attack | `postinstall` runs arbitrary code | `plain-crypto-js` RAT (2026) |
@@ -90,7 +90,7 @@ for CodeQL uploads).
 
 **`--ignore-scripts` on CI installs.** Blocks `postinstall` hooks from executing
 during `pnpm install`. Trusted build scripts are run explicitly after install.
-This directly prevents the axios-style RAT delivery vector.
+This directly prevents the package-compromise RAT delivery vector.
 
 ### Layer 3: Dependency scanning (three tools, three threat classes)
 
@@ -108,7 +108,7 @@ All three run in CI on every PR. A failure in any layer blocks merge.
 trusted publishing (`id-token: write`). No `NPM_TOKEN` or `NODE_AUTH_TOKEN`
 environment variable is ever set in CI.
 
-This is the critical lesson from the axios attack: when both OIDC and a classic
+This is the critical lesson from the HTTP client package attack: when both OIDC and a classic
 token exist, npm defaults to the token. The token can be stolen and used to
 publish from anywhere. OIDC-only means packages can **only** be published from
 a verified GitHub Actions workflow run.
@@ -163,7 +163,7 @@ Security tab via SARIF.
 - **Free.** All tools (CodeQL, Scorecard, Dependabot, Socket free tier,
   lockfile-lint, harden-runner audit mode) are free for public repos.
 - **Proactive, not reactive.** Socket's behavioral analysis and lockfile-lint
-  catch threats before CVEs are assigned — the axios RAT had no CVE at the
+  catch threats before CVEs are assigned — the HTTP client package RAT had no CVE at the
   time of the attack.
 
 ### Negative
@@ -180,7 +180,7 @@ Security tab via SARIF.
 
 ## References
 
-- [axios supply chain attack postmortem (March 2026)](https://socket.dev/blog/axios-compromise) — the triggering incident
+- Socket.dev postmortem for the March 2026 HTTP client package compromise — the triggering incident
 - [event-stream incident (2018)](https://blog.npmjs.org/post/180565383195/details-about-the-event-stream-incident)
 - [ua-parser-js compromise (2021)](https://github.com/nicedoc/ua-parser-js/issues/536)
 - [colors.js / faker.js self-sabotage (2022)](https://snyk.io/blog/open-source-npm-packages-colors-faker/)

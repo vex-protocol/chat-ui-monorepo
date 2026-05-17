@@ -52,7 +52,7 @@ existing credential rather than introducing weaker ones.
 ### Option 1: Store and restore the JWT token
 
 Save the JWT from `login()` to the keystore. On auto-login, inject it into
-axios headers before calling `connect()`.
+HTTP client headers before calling `connect()`.
 
 | Criteria | Assessment |
 |----------|-----------|
