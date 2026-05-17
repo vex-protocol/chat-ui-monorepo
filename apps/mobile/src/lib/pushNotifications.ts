@@ -10,6 +10,7 @@ import { atom } from "nanostores";
 
 const ENABLED_STORE_KEY = "vex.pushNotifications.enabled.v1";
 const SUBSCRIPTION_KEY_PREFIX = "vex.pushNotifications.subscription.v1";
+const CLEANUP_KEY_PREFIX = "vex.pushNotifications.cleanup.v1";
 const PUSH_CHANNEL_ID = "vex-push-messages-v2";
 
 export type PushNotificationStatus =
@@ -49,12 +50,18 @@ export async function hydratePushNotificationPreference(): Promise<void> {
 export async function reconcilePushNotificationSubscription(): Promise<void> {
     await hydratePushNotificationPreference();
     if (!$pushNotificationsEnabled.get()) {
+        const cleanupSucceeded =
+            await cleanupStoredPushNotificationSubscription();
         $pushNotificationStatus.set("disabled");
+        if (!cleanupSucceeded) {
+            $pushNotificationStatus.set("error");
+        }
         return;
     }
 
     $pushNotificationStatus.set("subscribing");
     try {
+        await cleanupQueuedPushNotificationSubscriptions();
         logPush("reconciling subscription", {
             platform: Platform.OS,
         });
@@ -84,6 +91,15 @@ export async function reconcilePushNotificationSubscription(): Promise<void> {
             token,
         });
 
+        if (
+            previous &&
+            previous.subscriptionID !== subscription.subscriptionID
+        ) {
+            await queuePushNotificationSubscriptionCleanup(
+                previous.subscriptionID,
+            );
+        }
+
         await writeStoredSubscription({
             subscriptionID: subscription.subscriptionID,
             token,
@@ -92,19 +108,7 @@ export async function reconcilePushNotificationSubscription(): Promise<void> {
             subscriptionID: subscription.subscriptionID,
         });
 
-        if (
-            previous &&
-            previous.subscriptionID !== subscription.subscriptionID
-        ) {
-            logPush("removing stale server subscription", {
-                subscriptionID: previous.subscriptionID,
-            });
-            await vexService
-                .unsubscribePushNotifications(previous.subscriptionID)
-                .catch(() => {
-                    /* best-effort cleanup of stale token row */
-                });
-        }
+        await cleanupQueuedPushNotificationSubscriptions();
 
         $pushNotificationStatus.set("subscribed");
     } catch (err: unknown) {
@@ -128,18 +132,8 @@ export async function setPushNotificationsEnabled(
     }
 
     $pushNotificationStatus.set("disabled");
-    const previous = await readStoredSubscription();
-    if (!previous) {
-        return;
-    }
-    try {
-        await vexService.unsubscribePushNotifications(previous.subscriptionID);
-        await clearStoredSubscription();
-    } catch (err: unknown) {
-        console.warn(
-            "[vex-push] subscription disable cleanup failed",
-            err instanceof Error ? err.message : String(err),
-        );
+    const cleanupSucceeded = await cleanupStoredPushNotificationSubscription();
+    if (!cleanupSucceeded) {
         $pushNotificationStatus.set("error");
     }
 }
@@ -147,23 +141,54 @@ export async function setPushNotificationsEnabled(
 export async function unsubscribeStoredPushNotificationSubscription(
     userID: string,
 ): Promise<void> {
+    await cleanupStoredPushNotificationSubscription(userID);
+}
+
+async function cleanupQueuedPushNotificationSubscriptions(
+    userID?: string,
+): Promise<boolean> {
+    const pending = await readPendingCleanupSubscriptionIDs(userID);
+    if (pending.length === 0) {
+        return true;
+    }
+
+    const remaining: string[] = [];
+    for (const subscriptionID of pending) {
+        try {
+            logPush("removing queued subscription", {
+                subscriptionID,
+                userID: userID ?? $user.get()?.userID ?? null,
+            });
+            await vexService.unsubscribePushNotifications(subscriptionID);
+        } catch (err: unknown) {
+            remaining.push(subscriptionID);
+            console.warn(
+                "[vex-push] queued subscription cleanup failed",
+                err instanceof Error ? err.message : String(err),
+            );
+        }
+    }
+
+    await writePendingCleanupSubscriptionIDs(remaining, userID);
+    return remaining.length === 0;
+}
+
+async function cleanupStoredPushNotificationSubscription(
+    userID?: string,
+): Promise<boolean> {
     const previous = await readStoredSubscription(userID);
-    if (!previous) {
-        return;
-    }
-    try {
-        logPush("removing stored subscription", {
-            subscriptionID: previous.subscriptionID,
+    if (previous) {
+        await queuePushNotificationSubscriptionCleanup(
+            previous.subscriptionID,
             userID,
-        });
-        await vexService.unsubscribePushNotifications(previous.subscriptionID);
-        await clearStoredSubscription(userID);
-    } catch (err: unknown) {
-        console.warn(
-            "[vex-push] stored subscription cleanup failed",
-            err instanceof Error ? err.message : String(err),
         );
+        await clearStoredSubscription(userID);
     }
+    return cleanupQueuedPushNotificationSubscriptions(userID);
+}
+
+function cleanupStoreKey(userID = $user.get()?.userID): string {
+    return `${CLEANUP_KEY_PREFIX}.${userID ?? "anonymous"}`;
 }
 
 async function clearStoredSubscription(userID?: string): Promise<void> {
@@ -252,6 +277,40 @@ function logPush(message: string, details?: Record<string, unknown>): void {
     console.info(`[vex-push] ${message}`);
 }
 
+async function queuePushNotificationSubscriptionCleanup(
+    subscriptionID: string,
+    userID?: string,
+): Promise<void> {
+    const pending = await readPendingCleanupSubscriptionIDs(userID);
+    await writePendingCleanupSubscriptionIDs(
+        uniqueSubscriptionIDs([...pending, subscriptionID]),
+        userID,
+    );
+}
+
+async function readPendingCleanupSubscriptionIDs(
+    userID?: string,
+): Promise<string[]> {
+    try {
+        const raw = await SecureStore.getItemAsync(cleanupStoreKey(userID));
+        if (!raw) {
+            return [];
+        }
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            return uniqueSubscriptionIDs(
+                parsed.filter(
+                    (value): value is string => typeof value === "string",
+                ),
+            );
+        }
+    } catch {
+        // Treat corrupt cleanup state as empty; a later active subscription
+        // record can still be queued again if it needs cleanup.
+    }
+    return [];
+}
+
 async function readPushNotificationPreference(): Promise<void> {
     try {
         const raw = await SecureStore.getItemAsync(ENABLED_STORE_KEY);
@@ -300,6 +359,25 @@ function redactToken(token: string): string {
 
 function subscriptionStoreKey(userID = $user.get()?.userID): string {
     return `${SUBSCRIPTION_KEY_PREFIX}.${userID ?? "anonymous"}`;
+}
+
+function uniqueSubscriptionIDs(subscriptionIDs: string[]): string[] {
+    return [...new Set(subscriptionIDs)];
+}
+
+async function writePendingCleanupSubscriptionIDs(
+    subscriptionIDs: string[],
+    userID?: string,
+): Promise<void> {
+    const uniqueIDs = uniqueSubscriptionIDs(subscriptionIDs);
+    if (uniqueIDs.length === 0) {
+        await SecureStore.deleteItemAsync(cleanupStoreKey(userID));
+        return;
+    }
+    await SecureStore.setItemAsync(
+        cleanupStoreKey(userID),
+        JSON.stringify(uniqueIDs),
+    );
 }
 
 async function writeStoredSubscription(

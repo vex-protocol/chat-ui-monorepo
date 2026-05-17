@@ -1,7 +1,7 @@
 import type { Message } from "@vex-chat/libvex";
 import type { BackgroundNetworkFetchResult } from "@vex-chat/store";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     AppState,
     Platform,
@@ -185,6 +185,22 @@ function App() {
     const notificationHistoryCutoffMsRef = useRef(0);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
     const userID = user?.userID;
+    const logoutWithPushNotificationCleanup = useCallback(async () => {
+        const activeUserID = $user.get()?.userID ?? userID;
+        try {
+            if (activeUserID) {
+                await unsubscribeStoredPushNotificationSubscription(
+                    activeUserID,
+                );
+            }
+        } catch (err: unknown) {
+            console.warn(
+                "[vex-push] pre-logout cleanup failed",
+                err instanceof Error ? err.message : String(err),
+            );
+        }
+        await vexService.logout();
+    }, [userID]);
 
     useEffect(() => {
         vexService.setBackgroundConnectionRecoverySuspended(
@@ -584,7 +600,7 @@ function App() {
                         if (refreshed !== "unauthorized") {
                             return;
                         }
-                        await vexService.logout();
+                        await logoutWithPushNotificationCleanup();
                         setAuthNotice("Session expired. Please sign in again.");
                         return;
                     } finally {
@@ -605,7 +621,7 @@ function App() {
                     if (refreshed !== "unauthorized") {
                         return;
                     }
-                    await vexService.logout();
+                    await logoutWithPushNotificationCleanup();
                     setAuthNotice("Session expired. Please sign in again.");
                 } finally {
                     networkRefreshInFlightRef.current = false;
@@ -627,7 +643,7 @@ function App() {
             active = false;
             clearInterval(interval);
         };
-    }, [user]);
+    }, [logoutWithPushNotificationCleanup, user]);
 
     useEffect(() => {
         if (!user) {
@@ -649,7 +665,7 @@ function App() {
                 if (!active || status !== "unauthorized") {
                     return;
                 }
-                await vexService.logout();
+                await logoutWithPushNotificationCleanup();
                 setAuthNotice("Session expired. Please sign in again.");
             } catch (err: unknown) {
                 console.warn(
@@ -705,7 +721,7 @@ function App() {
             active = false;
             subscription.remove();
         };
-    }, [user]);
+    }, [logoutWithPushNotificationCleanup, user]);
 
     // Show local notifications for incoming messages.
     //
@@ -799,20 +815,13 @@ function App() {
         const previousUserID = previousUserIDRef.current;
         userPresentRef.current = present;
         previousUserIDRef.current = userID ?? null;
+        if (wasPresent && !present && previousUserID) {
+            void unsubscribeStoredPushNotificationSubscription(previousUserID);
+        }
         if (!isAlwaysOnSupported()) {
-            if (wasPresent && !present && previousUserID) {
-                void unsubscribeStoredPushNotificationSubscription(
-                    previousUserID,
-                );
-            }
             return;
         }
         if (wasPresent && !present) {
-            if (previousUserID) {
-                void unsubscribeStoredPushNotificationSubscription(
-                    previousUserID,
-                );
-            }
             void suspendAlwaysOn().catch(() => {
                 // Best-effort; the service will stop with the process
                 // anyway when Android reclaims it.
