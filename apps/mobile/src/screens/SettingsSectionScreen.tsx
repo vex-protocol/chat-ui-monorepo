@@ -41,6 +41,7 @@ import {
     $pushNotificationsEnabled,
     $pushNotificationStatus,
     setPushNotificationsEnabled,
+    unsubscribeStoredPushNotificationSubscription,
 } from "../lib/pushNotifications";
 import { persistLocalMessageRetentionDays } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
@@ -262,6 +263,20 @@ export function SettingsSectionScreen({
                         setLoggingOut(true);
                         void (async () => {
                             try {
+                                if (user?.userID) {
+                                    try {
+                                        await unsubscribeStoredPushNotificationSubscription(
+                                            user.userID,
+                                        );
+                                    } catch (err: unknown) {
+                                        console.warn(
+                                            "[vex-push] pre-logout cleanup failed",
+                                            err instanceof Error
+                                                ? err.message
+                                                : String(err),
+                                        );
+                                    }
+                                }
                                 await vexService.logout();
                             } catch {
                                 /* ignore */
