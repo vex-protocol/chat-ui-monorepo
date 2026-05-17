@@ -12,8 +12,9 @@
 //
 // CJS intentional: apps/mobile/package.json has no "type":"module", so
 // a plain require('./package.json') is the simplest single-source-of-truth
-// for the version field. release-pr.yml bumps package.json; app.config.js
-// reads it here; the APK's visible version follows automatically.
+// for the version field in local builds. CI release workflows may pass
+// VEX_APP_VERSION to stamp a release tag version into the APK without
+// needing a bot commit directly on protected branches.
 
 const pkg = require("./package.json");
 const { withEntitlementsPlist } = require("expo/config-plugins");
@@ -50,6 +51,7 @@ module.exports = ({ config }) => {
     const androidGoogleServicesFile =
         process.env.VEX_ANDROID_GOOGLE_SERVICES_FILE ||
         config.android?.googleServicesFile;
+    const appVersion = process.env.VEX_APP_VERSION || pkg.version;
 
     // Permissions required for the optional "Always-on connection"
     // foreground-service mode (Settings → Connection). Even when the
@@ -66,7 +68,7 @@ module.exports = ({ config }) => {
 
     return {
         ...config,
-        version: pkg.version,
+        version: appVersion,
         name: appDisplayName,
         icon: iconPath,
         splash: {
