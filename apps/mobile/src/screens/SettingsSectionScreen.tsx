@@ -479,21 +479,27 @@ export function SettingsSectionScreen({
         }
     }
 
-    const latestCreatedAt = formatTimestamp(
-        appUpdateState.latestCommit?.committedAt ??
-            appUpdateState.nativeRelease?.publishedAt,
-    );
+    const latestReleaseVersion =
+        appUpdateState.nativeRelease?.tagName?.match(/^mobile-v(.+)$/)?.[1] ??
+        buildInfo.version;
+    const latestShortCommit =
+        appUpdateState.latestCommit?.shortSha ??
+        appUpdateState.nativeRelease?.targetShortCommit;
+    const latestVersionValue =
+        latestShortCommit != null
+            ? `${latestReleaseVersion}-${latestShortCommit}`
+            : latestReleaseVersion;
     const latestVersionDescription =
-        latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
+        latestVersionValue !== "unknown"
+            ? `Latest ${latestVersionValue}`
+            : undefined;
     const isLatestVerified =
         appUpdateState.status === "current" &&
         commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
     const aboutUpdateLabel = isLatestVerified
         ? "No updates available"
         : "Latest available";
-    const aboutUpdateDescription = isLatestVerified
-        ? "Installed version is current"
-        : latestVersionDescription;
+    const aboutUpdateDescription = latestVersionDescription;
     const shouldShowAboutUpdateRow =
         appUpdateState.status !== "checking" &&
         appUpdateState.status !== "idle";
@@ -596,19 +602,6 @@ export function SettingsSectionScreen({
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
-
-    function formatTimestamp(value: string | undefined): string | undefined {
-        if (!value) return undefined;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return undefined;
-        return date.toLocaleString(undefined, {
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
     }
 
     function readImageBytesFromBase64(base64Data: string): Uint8Array {
