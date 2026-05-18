@@ -17,6 +17,7 @@ import type {
     Permission,
     Server,
     Storage,
+    StoredCredentials,
     User,
 } from "@vex-chat/libvex";
 import type {
@@ -289,6 +290,8 @@ interface WebSocketDebugLike {
 const REGISTER_STEP_TIMEOUT_MS = 12000;
 const DEVICE_AUTH_REFRESH_THRESHOLD_MS = 6 * 24 * 60 * 60 * 1000;
 const DEVICE_AUTH_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const LOCAL_DECRYPT_RECOVERY_ERROR =
+    "Local encrypted data could not be recovered on this device. Please sign in again.";
 // WebSocket watchdog: spire pings every 5s, libvex's own keep-alive
 // fires after ~30s of silence (post-fix in 6.1.7+). 45s gives that
 // path a chance to run first; the watchdog only triggers if libvex's
@@ -576,7 +579,7 @@ class VexService {
                             username: creds.username,
                         });
                         return {
-                            error: "Local encrypted data could not be recovered on this device. Please sign in again.",
+                            error: LOCAL_DECRYPT_RECOVERY_ERROR,
                             ok: false,
                         };
                     }
@@ -1082,9 +1085,58 @@ class VexService {
         $signedOutIntentWritable.set(false);
         this.setAuthStatus("checking");
         debugAuth("login:start", { host: options.host, username });
+        let creds: null | StoredCredentials = null;
+        const identifier = username.trim();
+        const resolvedUsername = (): string =>
+            identifier.length > 0 ? identifier : (creds?.username ?? "");
+        const finishLogin = async (
+            client: Client,
+            loadedCreds: StoredCredentials,
+        ): Promise<AuthResult> => {
+            const authErr = await this.loginWithDeviceKeyWithRetry(
+                client,
+                loadedCreds.deviceID,
+            );
+            debugAuth("login:device-key:done", {
+                error: authErr?.message ?? null,
+                ok: !authErr,
+            });
+            if (authErr) {
+                if (isStaleCredentialError(authErr)) {
+                    debugAuth("login:stale-credentials:clearingCredentials", {
+                        status: hasHttpStatus(authErr)
+                            ? authErr.response.status
+                            : null,
+                        username: loadedCreds.username,
+                    });
+                    await this.clearStoredCredentials(
+                        keyStore,
+                        loadedCreds.username,
+                    );
+                    this.setAuthStatus("unauthorized");
+                    return {
+                        error: "Session expired. Please sign in again.",
+                        ok: false,
+                        requireReauth: true,
+                    };
+                }
+                return { error: authErr.message, ok: false };
+            }
+
+            try {
+                await keyStore.save({ ...loadedCreds, token: "" });
+            } catch {
+                /* non-fatal token update */
+            }
+
+            await client.connect();
+            $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
+            this.kickPopulateState();
+            return { ok: true };
+        };
         try {
-            const identifier = username.trim();
-            const creds =
+            creds =
                 identifier.length > 0
                     ? await keyStore.load(identifier)
                     : await keyStore.load();
@@ -1092,7 +1144,7 @@ class VexService {
 
             await this.initClient(
                 privateKey,
-                identifier.length > 0 ? identifier : (creds?.username ?? ""),
+                resolvedUsername(),
                 config,
                 options,
                 !creds,
@@ -1109,42 +1161,50 @@ class VexService {
                     ok: false,
                 };
             }
-            const authErr = await client.loginWithDeviceKey(creds.deviceID);
-            debugAuth("login:device-key:done", {
-                error: authErr?.message ?? null,
-                ok: !authErr,
-            });
-            if (authErr) {
-                if (isStaleCredentialError(authErr)) {
-                    debugAuth("login:stale-credentials:clearingCredentials", {
-                        status: hasHttpStatus(authErr)
-                            ? authErr.response.status
-                            : null,
+            return await finishLogin(client, creds);
+        } catch (err: unknown) {
+            if (isDecryptMismatchError(err)) {
+                if (creds) {
+                    debugAuth("login:decrypt-mismatch:recover:start", {
                         username: creds.username,
                     });
-                    await this.clearStoredCredentials(keyStore, creds.username);
-                    this.setAuthStatus("unauthorized");
-                    return {
-                        error: "Session expired. Please sign in again.",
-                        ok: false,
-                        requireReauth: true,
-                    };
+                    try {
+                        await this.initClient(
+                            creds.deviceKey,
+                            resolvedUsername(),
+                            config,
+                            options,
+                            true,
+                        );
+                        const recovered = this.requireClient();
+                        const result = await finishLogin(recovered, creds);
+                        if (result.ok) {
+                            debugAuth("login:decrypt-mismatch:recover:ok", {
+                                username: creds.username,
+                            });
+                        }
+                        return result;
+                    } catch (recoveryErr: unknown) {
+                        try {
+                            await this.close();
+                        } catch {
+                            /* ignore close errors */
+                        }
+                        debugAuth("login:decrypt-mismatch:recover:failed", {
+                            message: errorMessage(recoveryErr),
+                            username: creds.username,
+                        });
+                        return {
+                            error: LOCAL_DECRYPT_RECOVERY_ERROR,
+                            ok: false,
+                        };
+                    }
                 }
-                return { error: authErr.message, ok: false };
+                return {
+                    error: LOCAL_DECRYPT_RECOVERY_ERROR,
+                    ok: false,
+                };
             }
-
-            try {
-                await keyStore.save({ ...creds, token: "" });
-            } catch {
-                /* non-fatal token update */
-            }
-
-            await client.connect();
-            $userWritable.set(client.me.user());
-            this.setAuthStatus("authenticated");
-            this.kickPopulateState();
-            return { ok: true };
-        } catch (err: unknown) {
             if (isStaleCredentialError(err)) {
                 this.setAuthStatus("unauthorized");
             } else if (isNetworkError(err)) {
