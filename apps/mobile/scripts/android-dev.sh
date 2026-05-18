@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 export EXPO_PUBLIC_ENABLE_DEV_SERVER=1
 export EXPO_PUBLIC_SERVER_URL=dev.vex.wtf
+export VEX_APP_ENV=development
 export VEX_ENABLE_DEV_BUILD=1
 export EAS_BUILD_PROFILE=development
 export APP_PACKAGE=chat.vex.mobile.dev
