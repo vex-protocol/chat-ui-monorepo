@@ -18,6 +18,12 @@ on:
     push:
         branches: [development]
     workflow_dispatch:
+        inputs:
+            force_build:
+                description: Build and publish a fresh RC APK even when the native fingerprint is unchanged.
+                required: false
+                default: false
+                type: boolean
 
 concurrency:
     group: mobile-release-candidate
@@ -113,8 +119,13 @@ jobs:
 
             - name: Decide path
               id: decide
+              env:
+                  FORCE_BUILD: ${{ inputs.force_build || false }}
               run: |
-                  if [ "${{ steps.prev_fp.outputs.exists }}" = "true" ] && \
+                  if [ "$FORCE_BUILD" = "true" ]; then
+                    PATH_DECISION=build
+                    echo "Force build requested via workflow_dispatch."
+                  elif [ "${{ steps.prev_fp.outputs.exists }}" = "true" ] && \
                      [ "${{ steps.fp.outputs.hash }}" = "${{ steps.prev_fp.outputs.hash }}" ]; then
                     PATH_DECISION=ota
                   else
