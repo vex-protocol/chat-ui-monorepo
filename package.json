@@ -22,6 +22,7 @@
         "android:dev:install": "pnpm -F mobile run android:dev:install",
         "android:prod": "pnpm -F mobile run android:prod",
         "android:prod:install": "pnpm -F mobile run android:prod:install",
+        "android:reset-db": "pnpm -F mobile run android:reset-db",
         "android:staging": "pnpm run android:dev",
         "install:android": "pnpm -F mobile run android:release:install-all",
         "install:ios": "pnpm -F mobile run ios:release:install",
@@ -66,7 +67,9 @@
             "dompurify@>=3.0.1 <3.4.0": ">=3.4.0",
             "fast-xml-builder@<=1.1.6": "1.1.7",
             "uuid@>=11.0.0 <11.1.1": ">=11.1.1",
-            "@angular/compiler@<=18.2.14": "19.2.21"
+            "@angular/compiler@<=18.2.14": "19.2.21",
+            "brace-expansion@>=5.0.0 <5.0.6": "5.0.6",
+            "ws@>=8.0.0 <8.20.1": "8.20.1"
         },
         "peerDependencyRules": {
             "allowedVersions": {

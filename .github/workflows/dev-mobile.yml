@@ -18,6 +18,12 @@ on:
     push:
         branches: [development]
     workflow_dispatch:
+        inputs:
+            force_build:
+                description: Build and publish a fresh RC APK even when the native fingerprint is unchanged.
+                required: false
+                default: false
+                type: boolean
 
 concurrency:
     group: mobile-release-candidate
@@ -113,8 +119,13 @@ jobs:
 
             - name: Decide path
               id: decide
+              env:
+                  FORCE_BUILD: ${{ inputs.force_build || false }}
               run: |
-                  if [ "${{ steps.prev_fp.outputs.exists }}" = "true" ] && \
+                  if [ "$FORCE_BUILD" = "true" ]; then
+                    PATH_DECISION=build
+                    echo "Force build requested via workflow_dispatch."
+                  elif [ "${{ steps.prev_fp.outputs.exists }}" = "true" ] && \
                      [ "${{ steps.fp.outputs.hash }}" = "${{ steps.prev_fp.outputs.hash }}" ]; then
                     PATH_DECISION=ota
                   else
@@ -135,9 +146,11 @@ jobs:
                   EAS_BUILD_PROFILE: development
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "1"
                   EXPO_PUBLIC_SERVER_URL: dev.vex.wtf
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: development
                   VEX_ENABLE_DEV_BUILD: "1"
               run: |
+                  export EXPO_PUBLIC_VEX_APP_VERSION="$(node -pe "require('./package.json').version")"
                   eas update \
                     --channel development \
                     --message "development ${GITHUB_SHA::8}" \
@@ -180,9 +193,11 @@ jobs:
                   EAS_BUILD_PROFILE: development
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "1"
                   EXPO_PUBLIC_SERVER_URL: dev.vex.wtf
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: development
                   VEX_ENABLE_DEV_BUILD: "1"
               run: |
+                  export EXPO_PUBLIC_VEX_APP_VERSION="$(node -pe "require('./package.json').version")"
                   eas build \
                     --profile development \
                     --platform android \
@@ -219,6 +234,9 @@ jobs:
                     echo ""
                     echo "Vex Development APK built from commit ${{ steps.meta.outputs.short_sha }}."
                     echo ""
+                    echo "Direct latest APK:"
+                    echo "https://github.com/${{ github.repository }}/releases/download/mobile-rc-latest/vex-development-latest.apk"
+                    echo ""
                     echo "- Package id: \`chat.vex.mobile.dev\`"
                     echo "- Branch: \`development\`"
                     echo "- Commit: \`${{ github.sha }}\`"
@@ -240,6 +258,7 @@ jobs:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   cp vex-development.apk "${{ steps.meta.outputs.asset }}"
+                  sha256sum "${{ steps.meta.outputs.asset }}" > "${{ steps.meta.outputs.asset }}.sha256"
                   cp /tmp/current-fingerprint.json fingerprint.json
                   TAG="${{ steps.meta.outputs.tag }}"
                   TITLE="Vex Development ${{ steps.meta.outputs.version }} RC (${{ steps.meta.outputs.short_sha }})"
@@ -247,6 +266,7 @@ jobs:
                   if gh release view "$TAG" >/dev/null 2>&1; then
                     gh release upload "$TAG" fingerprint.json --clobber
                     gh release upload "$TAG" "${{ steps.meta.outputs.asset }}" --clobber
+                    gh release upload "$TAG" "${{ steps.meta.outputs.asset }}.sha256" --clobber
                     gh release edit "$TAG" \
                       --target "$GITHUB_SHA" \
                       --title "$TITLE" \
@@ -254,6 +274,7 @@ jobs:
                       --prerelease
                   else
                     gh release create "$TAG" "${{ steps.meta.outputs.asset }}" \
+                      "${{ steps.meta.outputs.asset }}.sha256" \
                       fingerprint.json \
                       --target "$GITHUB_SHA" \
                       --prerelease \
@@ -268,9 +289,13 @@ jobs:
               run: |
                   TAG="mobile-rc-latest"
                   TITLE="Vex Development RC (latest)"
+                  cp vex-development.apk vex-development-latest.apk
+                  sha256sum vex-development-latest.apk > vex-development-latest.apk.sha256
+                  sha256sum "${{ steps.meta.outputs.asset }}" > "${{ steps.meta.outputs.asset }}.sha256"
                   gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
-                  gh release create "$TAG" "${{ steps.meta.outputs.asset }}" fingerprint.json \
+                  gh release create "$TAG" vex-development-latest.apk vex-development-latest.apk.sha256 "${{ steps.meta.outputs.asset }}" "${{ steps.meta.outputs.asset }}.sha256" fingerprint.json \
                     --target "$GITHUB_SHA" \
                     --prerelease \
+                    --latest=false \
                     --title "$TITLE" \
                     --notes-file /tmp/mobile-rc-notes.md

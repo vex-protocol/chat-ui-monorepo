@@ -247,7 +247,16 @@ export function ChannelScreen({
 
     const deleteMessage = useCallback(
         (message: Message) => {
-            void vexService.deleteLocalMessage(channelID, message.mailID, true);
+            void (async () => {
+                const deleted = await vexService.deleteLocalMessage(
+                    channelID,
+                    message.mailID,
+                    true,
+                );
+                if (!deleted) {
+                    setSendError("Failed to delete message");
+                }
+            })();
         },
         [channelID],
     );

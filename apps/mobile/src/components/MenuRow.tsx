@@ -21,16 +21,16 @@ interface MenuRowProps {
      * Custom node rendered in the right slot. When provided, the chevron
      * is suppressed (use `showChevron` to force it back on).
      */
-    accessory?: ReactNode;
-    description?: string;
-    disabled?: boolean;
+    accessory?: ReactNode | undefined;
+    description?: string | undefined;
+    disabled?: boolean | undefined;
     icon: keyof typeof Ionicons.glyphMap;
     /**
      * Override the default badge background. Useful for stacked icon badges
      * matching iOS-style settings rows (e.g. blue for "About").
      */
-    iconBg?: string;
-    iconColor?: string;
+    iconBg?: string | undefined;
+    iconColor?: string | undefined;
     label: string;
     /**
      * Render a single-line, horizontally scrollable monospaced strip below
@@ -40,21 +40,21 @@ interface MenuRowProps {
      * can swipe sideways inside the strip to reveal characters that don't
      * fit on screen.
      */
-    monoBlock?: string;
-    monoValue?: boolean;
-    onPress?: () => void;
+    monoBlock?: string | undefined;
+    monoValue?: boolean | undefined;
+    onPress?: (() => void) | undefined;
     /**
      * Render a chevron on the right edge. Defaults to `true` whenever the row
      * has an `onPress` handler and no `accessory` is supplied.
      */
-    showChevron?: boolean;
-    style?: StyleProp<ViewStyle>;
-    tone?: MenuRowTone;
+    showChevron?: boolean | undefined;
+    style?: StyleProp<ViewStyle> | undefined;
+    tone?: MenuRowTone | undefined;
     /**
      * Inline value text displayed before any chevron. Used for simple
      * informational rows (e.g. "Version 0.1.0").
      */
-    value?: string;
+    value?: string | undefined;
 }
 
 interface MenuSectionProps {

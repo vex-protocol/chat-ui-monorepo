@@ -18,9 +18,11 @@ catalog:
     expo-background-task: ~55.0.17
     expo-clipboard: ~55.0.13
     expo-constants: ~55.0.13
+    expo-crypto: ~55.0.14
     expo-document-picker: ~55.0.13
     expo-file-system: ~55.0.17
     expo-image-manipulator: ^55.0.15
+    expo-intent-launcher: ~55.0.12
     expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
     kysely: ^0.28.17
@@ -55,3 +57,4 @@ minimumReleaseAgeExclude:
     - devalue
     - fast-xml-builder
     - kysely
+    - ws

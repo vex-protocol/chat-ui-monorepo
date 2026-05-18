@@ -17,6 +17,7 @@ import type {
     Permission,
     Server,
     Storage,
+    StoredCredentials,
     User,
 } from "@vex-chat/libvex";
 import type {
@@ -24,7 +25,7 @@ import type {
     PublicKeyCredentialRequestOptionsJSON,
 } from "@vex-chat/types";
 
-import { Client } from "@vex-chat/libvex";
+import { Client, msgpack } from "@vex-chat/libvex";
 
 import { validate as uuidValidate } from "uuid";
 
@@ -133,6 +134,19 @@ export interface DeviceApprovalRequest {
     username: string;
 }
 
+export interface InvitePreview {
+    channels: Channel[];
+    invite: Invite;
+    server: null | Server;
+}
+
+export interface JoinInviteResult extends OperationResult {
+    channelID?: string;
+    channelName?: string;
+    serverID?: string;
+    serverName?: string;
+}
+
 /** Result from any mutation operation. */
 export interface OperationResult {
     error?: string;
@@ -207,6 +221,10 @@ type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
 
 interface ClientWithInternalHttp {
     http?: ClientHttpLike;
+}
+
+interface ClientWithLocalDatabaseLike {
+    database?: Pick<Storage, "deleteMessage">;
 }
 
 interface ClientWithNotificationSubscriptionsLike {
@@ -289,6 +307,8 @@ interface WebSocketDebugLike {
 const REGISTER_STEP_TIMEOUT_MS = 12000;
 const DEVICE_AUTH_REFRESH_THRESHOLD_MS = 6 * 24 * 60 * 60 * 1000;
 const DEVICE_AUTH_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const LOCAL_DECRYPT_RECOVERY_ERROR =
+    "Local encrypted data could not be recovered on this device. Please sign in again.";
 // WebSocket watchdog: spire pings every 5s, libvex's own keep-alive
 // fires after ~30s of silence (post-fix in 6.1.7+). 45s gives that
 // path a chance to run first; the watchdog only triggers if libvex's
@@ -343,6 +363,10 @@ class VexService {
     private readonly deviceRequestQueueListeners = new Set<() => void>();
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
+    private readonly invitePreviewCache = new Map<
+        string,
+        Promise<InvitePreview | null>
+    >();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
     private logoutInFlight: null | Promise<void> = null;
@@ -576,7 +600,7 @@ class VexService {
                             username: creds.username,
                         });
                         return {
-                            error: "Local encrypted data could not be recovered on this device. Please sign in again.",
+                            error: LOCAL_DECRYPT_RECOVERY_ERROR,
                             ok: false,
                         };
                     }
@@ -809,21 +833,86 @@ class VexService {
         this.resetAll();
     }
 
-    deleteLocalMessage(
+    async deleteLocalMessage(
         conversationKey: string,
         mailID: string,
         isGroup: boolean,
-    ): boolean {
+    ): Promise<boolean> {
         const writable = isGroup ? $groupMessagesWritable : $messagesWritable;
         const thread = writable.get()[conversationKey] ?? [];
         if (thread.length === 0) {
             return false;
         }
-        const nextThread = thread.filter((msg) => msg.mailID !== mailID);
-        if (nextThread.length === thread.length) {
+        if (!thread.some((msg) => msg.mailID === mailID)) {
             return false;
         }
+
+        const database = (this.client as ClientWithLocalDatabaseLike | null)
+            ?.database;
+        const deleteMessage = database?.deleteMessage;
+        if (typeof deleteMessage !== "function") {
+            debugAuth("local-message-delete:missing-storage", {
+                conversationKey,
+                isGroup,
+                mailID,
+            });
+            return false;
+        }
+
+        try {
+            await deleteMessage.call(database, mailID);
+        } catch (err: unknown) {
+            debugAuth("local-message-delete:failed", {
+                conversationKey,
+                isGroup,
+                mailID,
+                message: errorMessage(err),
+            });
+            return false;
+        }
+
+        const currentThread = writable.get()[conversationKey] ?? [];
+        const nextThread = currentThread.filter((msg) => msg.mailID !== mailID);
+        if (nextThread.length === currentThread.length) {
+            return true;
+        }
         writable.setKey(conversationKey, nextThread);
+        return true;
+    }
+
+    async deleteLocalThread(
+        conversationKey: string,
+        isGroup: boolean,
+    ): Promise<boolean> {
+        const writable = isGroup ? $groupMessagesWritable : $messagesWritable;
+        const thread = writable.get()[conversationKey] ?? [];
+        if (thread.length === 0) {
+            return false;
+        }
+
+        try {
+            const client = this.requireClient();
+            await client.messages.delete(conversationKey);
+        } catch (err: unknown) {
+            debugAuth("local-thread-delete:failed", {
+                conversationKey,
+                isGroup,
+                message: errorMessage(err),
+            });
+            return false;
+        }
+
+        const threads: Record<string, Message[]> = Object.fromEntries(
+            Object.entries(writable.get()).filter(
+                ([key]) => key !== conversationKey,
+            ),
+        );
+        writable.set(threads);
+        if (isGroup) {
+            $channelUnreadCountsWritable.setKey(conversationKey, 0);
+        } else {
+            $dmUnreadCountsWritable.setKey(conversationKey, 0);
+        }
         return true;
     }
 
@@ -847,12 +936,7 @@ class VexService {
         try {
             const client = this.requireClient();
             await client.servers.delete(serverID);
-            const servers = new Map(Object.entries($serversWritable.get()));
-            servers.delete(serverID);
-            $serversWritable.set(Object.fromEntries(servers));
-            const channels = new Map(Object.entries($channelsWritable.get()));
-            channels.delete(serverID);
-            $channelsWritable.set(Object.fromEntries(channels));
+            this.removeServerFromLocalState(serverID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1015,7 +1099,7 @@ class VexService {
         return this.wsDebugStateLogsEnabled;
     }
 
-    async joinInvite(inviteID: string): Promise<OperationResult> {
+    async joinInvite(inviteID: string): Promise<JoinInviteResult> {
         try {
             const client = this.requireClient();
             const permission = await client.invites.redeem(inviteID);
@@ -1028,6 +1112,29 @@ class VexService {
             $serversWritable.setKey(server.serverID, server);
             const channels = await client.channels.retrieve(server.serverID);
             $channelsWritable.setKey(server.serverID, channels);
+            $permissionsWritable.setKey(permission.permissionID, permission);
+            const firstChannel = channels[0];
+            return {
+                ok: true,
+                serverID: server.serverID,
+                serverName: server.name,
+                ...(firstChannel
+                    ? {
+                          channelID: firstChannel.channelID,
+                          channelName: firstChannel.name,
+                      }
+                    : {}),
+            };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async leaveServer(serverID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.servers.leave(serverID);
+            this.removeServerFromLocalState(serverID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1082,9 +1189,58 @@ class VexService {
         $signedOutIntentWritable.set(false);
         this.setAuthStatus("checking");
         debugAuth("login:start", { host: options.host, username });
+        let creds: null | StoredCredentials = null;
+        const identifier = username.trim();
+        const resolvedUsername = (): string =>
+            identifier.length > 0 ? identifier : (creds?.username ?? "");
+        const finishLogin = async (
+            client: Client,
+            loadedCreds: StoredCredentials,
+        ): Promise<AuthResult> => {
+            const authErr = await this.loginWithDeviceKeyWithRetry(
+                client,
+                loadedCreds.deviceID,
+            );
+            debugAuth("login:device-key:done", {
+                error: authErr?.message ?? null,
+                ok: !authErr,
+            });
+            if (authErr) {
+                if (isStaleCredentialError(authErr)) {
+                    debugAuth("login:stale-credentials:clearingCredentials", {
+                        status: hasHttpStatus(authErr)
+                            ? authErr.response.status
+                            : null,
+                        username: loadedCreds.username,
+                    });
+                    await this.clearStoredCredentials(
+                        keyStore,
+                        loadedCreds.username,
+                    );
+                    this.setAuthStatus("unauthorized");
+                    return {
+                        error: "Session expired. Please sign in again.",
+                        ok: false,
+                        requireReauth: true,
+                    };
+                }
+                return { error: authErr.message, ok: false };
+            }
+
+            try {
+                await keyStore.save({ ...loadedCreds, token: "" });
+            } catch {
+                /* non-fatal token update */
+            }
+
+            await client.connect();
+            $userWritable.set(client.me.user());
+            this.setAuthStatus("authenticated");
+            this.kickPopulateState();
+            return { ok: true };
+        };
         try {
-            const identifier = username.trim();
-            const creds =
+            creds =
                 identifier.length > 0
                     ? await keyStore.load(identifier)
                     : await keyStore.load();
@@ -1092,7 +1248,7 @@ class VexService {
 
             await this.initClient(
                 privateKey,
-                identifier.length > 0 ? identifier : (creds?.username ?? ""),
+                resolvedUsername(),
                 config,
                 options,
                 !creds,
@@ -1109,42 +1265,50 @@ class VexService {
                     ok: false,
                 };
             }
-            const authErr = await client.loginWithDeviceKey(creds.deviceID);
-            debugAuth("login:device-key:done", {
-                error: authErr?.message ?? null,
-                ok: !authErr,
-            });
-            if (authErr) {
-                if (isStaleCredentialError(authErr)) {
-                    debugAuth("login:stale-credentials:clearingCredentials", {
-                        status: hasHttpStatus(authErr)
-                            ? authErr.response.status
-                            : null,
+            return await finishLogin(client, creds);
+        } catch (err: unknown) {
+            if (isDecryptMismatchError(err)) {
+                if (creds) {
+                    debugAuth("login:decrypt-mismatch:recover:start", {
                         username: creds.username,
                     });
-                    await this.clearStoredCredentials(keyStore, creds.username);
-                    this.setAuthStatus("unauthorized");
-                    return {
-                        error: "Session expired. Please sign in again.",
-                        ok: false,
-                        requireReauth: true,
-                    };
+                    try {
+                        await this.initClient(
+                            creds.deviceKey,
+                            resolvedUsername(),
+                            config,
+                            options,
+                            true,
+                        );
+                        const recovered = this.requireClient();
+                        const result = await finishLogin(recovered, creds);
+                        if (result.ok) {
+                            debugAuth("login:decrypt-mismatch:recover:ok", {
+                                username: creds.username,
+                            });
+                        }
+                        return result;
+                    } catch (recoveryErr: unknown) {
+                        try {
+                            await this.close();
+                        } catch {
+                            /* ignore close errors */
+                        }
+                        debugAuth("login:decrypt-mismatch:recover:failed", {
+                            message: errorMessage(recoveryErr),
+                            username: creds.username,
+                        });
+                        return {
+                            error: LOCAL_DECRYPT_RECOVERY_ERROR,
+                            ok: false,
+                        };
+                    }
                 }
-                return { error: authErr.message, ok: false };
+                return {
+                    error: LOCAL_DECRYPT_RECOVERY_ERROR,
+                    ok: false,
+                };
             }
-
-            try {
-                await keyStore.save({ ...creds, token: "" });
-            } catch {
-                /* non-fatal token update */
-            }
-
-            await client.connect();
-            $userWritable.set(client.me.user());
-            this.setAuthStatus("authenticated");
-            this.kickPopulateState();
-            return { ok: true };
-        } catch (err: unknown) {
             if (isStaleCredentialError(err)) {
                 this.setAuthStatus("unauthorized");
             } else if (isNetworkError(err)) {
@@ -1259,6 +1423,22 @@ class VexService {
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
+    }
+
+    async previewInvite(inviteID: string): Promise<InvitePreview | null> {
+        const cached = this.invitePreviewCache.get(inviteID);
+        if (cached) {
+            return cached;
+        }
+
+        const previewPromise = this.fetchInvitePreview(inviteID).catch(
+            (err: unknown) => {
+                this.invitePreviewCache.delete(inviteID);
+                throw err;
+            },
+        );
+        this.invitePreviewCache.set(inviteID, previewPromise);
+        return previewPromise;
     }
 
     async probeAuthSession(): Promise<AuthProbeStatus> {
@@ -2131,6 +2311,52 @@ class VexService {
         return null;
     }
 
+    private async fetchInvitePreview(
+        inviteID: string,
+    ): Promise<InvitePreview | null> {
+        const client = this.requireClient();
+        const internals = client as unknown as ClientWithInternalHttp;
+        const http = internals.http;
+        const get = http?.get;
+        if (typeof get !== "function") {
+            throw new Error("Invite previews are not supported by libvex.");
+        }
+
+        try {
+            const response = await get.call(
+                http,
+                `${client.getHost()}/invite/${inviteID}/preview`,
+            );
+            return decodeInvitePreviewResponseData(
+                getHttpResponseData(response),
+            );
+        } catch (err: unknown) {
+            if (isUnauthorizedError(err)) {
+                return null;
+            }
+            if (!isNotFoundError(err)) {
+                throw err;
+            }
+        }
+
+        try {
+            const response = await get.call(
+                http,
+                `${client.getHost()}/invite/${inviteID}`,
+            );
+            return {
+                channels: [],
+                invite: decodeInviteResponseData(getHttpResponseData(response)),
+                server: null,
+            };
+        } catch (err: unknown) {
+            if (isNotFoundError(err) || isUnauthorizedError(err)) {
+                return null;
+            }
+            throw err;
+        }
+    }
+
     private async findPendingRequestAfterRegisterFailure(
         client: Client,
         username: string,
@@ -2430,6 +2656,32 @@ class VexService {
         }, 200);
     }
 
+    private removeServerFromLocalState(serverID: string): void {
+        const servers = new Map(Object.entries($serversWritable.get()));
+        servers.delete(serverID);
+        $serversWritable.set(Object.fromEntries(servers));
+
+        const channels = new Map(Object.entries($channelsWritable.get()));
+        const removedChannels = channels.get(serverID) ?? [];
+        channels.delete(serverID);
+        $channelsWritable.set(Object.fromEntries(channels));
+
+        const groupMessages = new Map(
+            Object.entries($groupMessagesWritable.get()),
+        );
+        for (const channel of removedChannels) {
+            groupMessages.delete(channel.channelID);
+        }
+        $groupMessagesWritable.set(Object.fromEntries(groupMessages));
+
+        const permissions = Object.fromEntries(
+            Object.entries($permissionsWritable.get()).filter(
+                ([, permission]) => permission.resourceID !== serverID,
+            ),
+        );
+        $permissionsWritable.set(permissions);
+    }
+
     private requireClient(): Client {
         if (!this.client) throw new Error("Not authenticated");
         return this.client;
@@ -2444,6 +2696,7 @@ class VexService {
         this.populateStateInFlight = null;
         this.client = null;
         this.failedUserLookups.clear();
+        this.invitePreviewCache.clear();
         $authStatusWritable.set("signed_out");
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
@@ -3280,6 +3533,41 @@ function debugAuth(step: string, meta?: Record<string, unknown>): void {
     }
 }
 
+function decodeInvitePreviewResponseData(data: unknown): InvitePreview {
+    const decoded = decodeMsgpackHttpData(data);
+    const invite = isRecord(decoded) ? decoded["invite"] : null;
+    if (!isRecord(decoded) || !isRecord(invite)) {
+        throw new Error("Invalid invite preview response");
+    }
+    const channels = decoded["channels"];
+    const server = decoded["server"];
+    return {
+        channels: Array.isArray(channels)
+            ? (channels as unknown as Channel[])
+            : [],
+        invite: invite as unknown as Invite,
+        server: isRecord(server) ? (server as unknown as Server) : null,
+    };
+}
+
+function decodeInviteResponseData(data: unknown): Invite {
+    const decoded = decodeMsgpackHttpData(data);
+    if (!isRecord(decoded)) {
+        throw new Error("Invalid invite response");
+    }
+    return decoded as unknown as Invite;
+}
+
+function decodeMsgpackHttpData(data: unknown): unknown {
+    if (data instanceof Uint8Array) {
+        return msgpack.decode(data);
+    }
+    if (data instanceof ArrayBuffer) {
+        return msgpack.decode(new Uint8Array(data));
+    }
+    throw new Error("Expected msgpack HTTP response");
+}
+
 function deduplicateMessages(messages: Message[]): Message[] {
     const seen = new Set<string>();
     return messages.filter((m) => {
@@ -3409,6 +3697,13 @@ function getClientSocket(client: Client): null | WebSocketDebugLike {
     return maybeSocket;
 }
 
+function getHttpResponseData(response: unknown): unknown {
+    if (!isRecord(response) || !("data" in response)) {
+        throw new Error("Expected HTTP response data");
+    }
+    return response["data"];
+}
+
 function hasHttpStatus(err: unknown): err is HttpErrorLike {
     if (!(err instanceof Error) || !("response" in err)) return false;
     const res = (err as { response: unknown }).response;
@@ -3494,6 +3789,10 @@ function isReactNativeRuntime(): boolean {
         "product" in navigator &&
         (navigator as { product?: string }).product === "ReactNative"
     );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
 }
 
 /**

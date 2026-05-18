@@ -1,6 +1,12 @@
 // ── VexService (primary API for apps) ───────────────────────────────────────
 
-export { parseInviteID, parseVexLink } from "./deeplink.ts";
+export {
+    extractInviteID,
+    formatInviteAppLink,
+    formatInviteLink,
+    parseInviteID,
+    parseVexLink,
+} from "./deeplink.ts";
 export type { VexLink } from "./deeplink.ts";
 
 // ── Domain atoms (readonly — apps can subscribe, not write) ─────────────────
@@ -77,6 +83,8 @@ export type {
     BootstrapConfig,
     CreateServerResult,
     DeviceApprovalRequest,
+    InvitePreview,
+    JoinInviteResult,
     OperationResult,
     PasskeySignInBegin,
     ResumeNetworkStatus,

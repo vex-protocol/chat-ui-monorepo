@@ -171,6 +171,8 @@ jobs:
                   EAS_BUILD_PROFILE: production
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
                   EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  EXPO_PUBLIC_VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: production
                   VEX_APP_DISPLAY_NAME: Vex Beta
                   VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
@@ -281,6 +283,8 @@ jobs:
                   EAS_BUILD_PROFILE: production
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
                   EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  EXPO_PUBLIC_VEX_APP_VERSION: ${{ steps.version.outputs.version }}
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: production
                   VEX_APP_DISPLAY_NAME: Vex Beta
                   VEX_APP_VERSION: ${{ steps.version.outputs.version }}
@@ -345,10 +349,12 @@ jobs:
                   TITLE="Vex ${{ steps.version.outputs.version }}"
                   ASSET="${{ steps.version.outputs.asset }}"
                   cp release.apk "$ASSET"
+                  sha256sum "$ASSET" > "$ASSET.sha256"
                   cp /tmp/current-fingerprint.json fingerprint.json
 
                   if gh release view "$TAG" >/dev/null 2>&1; then
                     gh release upload "$TAG" "$ASSET" --clobber
+                    gh release upload "$TAG" "$ASSET.sha256" --clobber
                     gh release upload "$TAG" fingerprint.json --clobber
                     gh release edit "$TAG" \
                       --target "$GITHUB_SHA" \
@@ -356,7 +362,7 @@ jobs:
                       --notes-file /tmp/release-notes.md \
                       --latest
                   else
-                    gh release create "$TAG" "$ASSET" fingerprint.json \
+                    gh release create "$TAG" "$ASSET" "$ASSET.sha256" fingerprint.json \
                       --target "$GITHUB_SHA" \
                       --latest \
                       --title "$TITLE" \

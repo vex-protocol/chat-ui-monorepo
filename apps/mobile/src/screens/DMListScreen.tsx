@@ -10,6 +10,7 @@ import React, {
     useState,
 } from "react";
 import {
+    Alert,
     Animated,
     FlatList,
     Pressable,
@@ -149,6 +150,41 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
         });
     }
 
+    function deleteThread(user: User): void {
+        void (async () => {
+            const deleted = await vexService.deleteLocalThread(
+                user.userID,
+                false,
+            );
+            if (!deleted) {
+                Alert.alert(
+                    "Could not delete conversation",
+                    "The local history was not removed. Please try again.",
+                );
+            }
+        })();
+    }
+
+    function confirmDeleteThread(user: User): void {
+        Alert.alert(
+            "Delete conversation?",
+            `Delete local messages with ${user.username} on this device?`,
+            [
+                {
+                    style: "cancel",
+                    text: "Cancel",
+                },
+                {
+                    onPress: () => {
+                        deleteThread(user);
+                    },
+                    style: "destructive",
+                    text: "Delete",
+                },
+            ],
+        );
+    }
+
     function lastMessage(userID: string): Message | undefined {
         const thread = allMessages[userID];
         return thread?.[thread.length - 1];
@@ -223,6 +259,9 @@ export function DMListScreen({ navigation }: AppScreenProps<"DMList">) {
         const unread = unreadCounts[item.userID] ?? 0;
         return (
             <TouchableOpacity
+                onLongPress={() => {
+                    confirmDeleteThread(item);
+                }}
                 onPress={() => {
                     openConversation(item);
                 }}

@@ -9,6 +9,9 @@ import React, {
 } from "react";
 import {
     Alert,
+    Platform,
+    Pressable,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Switch,
@@ -17,7 +20,13 @@ import {
     View,
 } from "react-native";
 
-import { $localMessageRetentionDays, $user, vexService } from "@vex-chat/store";
+import {
+    $channels,
+    $localMessageRetentionDays,
+    $servers,
+    $user,
+    vexService,
+} from "@vex-chat/store";
 
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
@@ -27,8 +36,16 @@ import * as ImagePicker from "expo-image-picker";
 import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
+import {
+    $appUpdateState,
+    checkForAppUpdates,
+    downloadAndInstallApkUpdate,
+    fetchOtaUpdate,
+    openUnknownAppSourcesSettings,
+    restartForOtaUpdate,
+} from "../lib/appUpdates";
 import { $avatarCropResult } from "../lib/avatarCropResult";
-import { getServerUrl } from "../lib/config";
+import { buildInfo } from "../lib/buildInfo";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
     $alwaysOnEnabled,
@@ -50,16 +67,19 @@ const LOCAL_RETENTION_CHOICES = [7, 14, 21, 30] as const;
 
 const DEV_UNLOCK_TAPS = 7;
 const DEV_UNLOCK_WINDOW_MS = 3000;
-const DEV_UNLOCK_HINT_AT = 4;
 
 export function SettingsSectionScreen({
     navigation,
     route,
 }: AppScreenProps<"SettingsSection">) {
     const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+    const appUpdateState = useStore($appUpdateState);
+    const channelsByServer = useStore($channels);
+    const servers = useStore($servers);
     const user = useStore($user);
     const localRetentionDays = useStore($localMessageRetentionDays);
     const section = route.params.section;
+    const [aboutRefreshing, setAboutRefreshing] = useState(false);
     const [avatarError, setAvatarError] = useState("");
     const [avatarLastAttemptBytes, setAvatarLastAttemptBytes] = useState<
         null | number
@@ -67,6 +87,7 @@ export function SettingsSectionScreen({
     const [avatarNotice, setAvatarNotice] = useState("");
     const [avatarUploading, setAvatarUploading] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [updateBusy, setUpdateBusy] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
     );
@@ -81,6 +102,7 @@ export function SettingsSectionScreen({
     // only consume *our* result (not stale state from a previous
     // cropper invocation that the user cancelled).
     const cropResult = useStore($avatarCropResult);
+    const aboutRefreshInFlightRef = useRef(false);
     const expectedCropRequestRef = useRef<null | number>(null);
     // Easter-egg counter for unlocking the developer surface from
     // About → Version. State sticks while the user is on this screen;
@@ -110,23 +132,10 @@ export function SettingsSectionScreen({
             setVersionTaps(0);
             Vibration.vibrate([0, 25, 60, 25, 60, 25]);
             void setDevOptionsUnlocked(true);
-            Alert.alert(
-                "Developer options unlocked",
-                "Connection diagnostics are now available under Settings → Developer.",
-            );
             return;
         }
         setVersionTaps(next);
         Vibration.vibrate(8);
-        if (next === DEV_UNLOCK_HINT_AT) {
-            // Subtle nudge once the user is most of the way there.
-            Alert.alert(
-                "Almost there",
-                `${DEV_UNLOCK_TAPS - next} more tap${
-                    DEV_UNLOCK_TAPS - next === 1 ? "" : "s"
-                } to unlock developer options.`,
-            );
-        }
         versionTapResetRef.current = setTimeout(() => {
             setVersionTaps(0);
         }, DEV_UNLOCK_WINDOW_MS);
@@ -309,6 +318,140 @@ export function SettingsSectionScreen({
         );
     }
 
+    const refreshAboutInfo = useCallback(
+        async (options?: { forceUpdateCheck?: boolean; silent?: boolean }) => {
+            if (aboutRefreshInFlightRef.current) {
+                return;
+            }
+            aboutRefreshInFlightRef.current = true;
+            const silent = options?.silent === true;
+            try {
+                if (!silent) {
+                    setAboutRefreshing(true);
+                }
+                await checkForAppUpdates({
+                    force: options?.forceUpdateCheck === true,
+                    silent,
+                });
+            } finally {
+                if (!silent) {
+                    setAboutRefreshing(false);
+                }
+                aboutRefreshInFlightRef.current = false;
+            }
+        },
+        [],
+    );
+
+    useEffect(() => {
+        if (section !== "about" && section !== "developer") {
+            return;
+        }
+        void refreshAboutInfo({ silent: true });
+    }, [refreshAboutInfo, section, user?.userID]);
+
+    async function handleManualUpdateCheck(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            await refreshAboutInfo({ forceUpdateCheck: true });
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
+    async function handleFetchOtaUpdate(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            const next = await fetchOtaUpdate();
+            if (next.status === "ota_ready") {
+                Alert.alert(
+                    "Restart to update?",
+                    "The OTA update is downloaded and will run after Vex restarts.",
+                    [
+                        { style: "cancel", text: "Later" },
+                        {
+                            onPress: () => {
+                                void restartForOtaUpdate();
+                            },
+                            text: "Restart",
+                        },
+                    ],
+                );
+            }
+        } catch (err: unknown) {
+            Alert.alert("OTA update failed", errorMessage(err));
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
+    function handleDownloadApkUpdate(): void {
+        const release = appUpdateState.nativeRelease;
+        if (!release?.apkUrl) {
+            Alert.alert("APK unavailable", "No APK asset was found.");
+            return;
+        }
+        if (Platform.OS !== "android") {
+            Alert.alert(
+                "Open release?",
+                "APK self-updates are Android-only. Open the GitHub release instead?",
+                [
+                    { style: "cancel", text: "Cancel" },
+                    {
+                        onPress: () => {
+                            void downloadAndInstallApkUpdate();
+                        },
+                        text: "Open",
+                    },
+                ],
+            );
+            return;
+        }
+        Alert.alert(
+            "Install APK update?",
+            release.sha256
+                ? "Vex will download the APK, verify its checksum, then open Android's installer."
+                : "Vex will download the APK and open Android's installer. This release does not include a checksum yet.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void installApkUpdate();
+                    },
+                    text: "Download",
+                },
+            ],
+        );
+    }
+
+    async function installApkUpdate(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            await downloadAndInstallApkUpdate();
+        } catch (err: unknown) {
+            Alert.alert(
+                "APK install failed",
+                `${errorMessage(
+                    err,
+                )}\n\nIf Android blocks the install, allow Vex to install unknown apps and try again.`,
+                [
+                    { style: "cancel", text: "OK" },
+                    {
+                        onPress: () => {
+                            void openUnknownAppSourcesSettings();
+                        },
+                        text: "Open settings",
+                    },
+                ],
+            );
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
     async function handleSelectLocalRetention(
         days: (typeof LOCAL_RETENTION_CHOICES)[number],
     ): Promise<void> {
@@ -336,10 +479,136 @@ export function SettingsSectionScreen({
         }
     }
 
+    const latestCreatedAt = formatTimestamp(
+        appUpdateState.latestCommit?.committedAt ??
+            appUpdateState.nativeRelease?.publishedAt,
+    );
+    const latestVersionDescription =
+        latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
+    const isLatestVerified =
+        appUpdateState.status === "current" &&
+        commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
+    const aboutUpdateLabel = isLatestVerified
+        ? "No updates available"
+        : "Latest available";
+    const aboutUpdateDescription = isLatestVerified
+        ? "Installed version is current"
+        : latestVersionDescription;
+    const shouldShowAboutUpdateRow =
+        appUpdateState.status !== "checking" &&
+        appUpdateState.status !== "idle";
+    const versionTapDescription = devUnlocked
+        ? "Developer options are unlocked"
+        : versionTaps > 0
+          ? `${DEV_UNLOCK_TAPS - versionTaps} more tap${
+                DEV_UNLOCK_TAPS - versionTaps === 1 ? "" : "s"
+            } to unlock developer options`
+          : undefined;
+    const serverCount = Object.keys(servers).length;
+    const channelCount = Object.values(channelsByServer).reduce(
+        (total, channels) => total + channels.length,
+        0,
+    );
+
+    function updateRowLabel(): string {
+        switch (appUpdateState.status) {
+            case "apk_available":
+                return "APK update available";
+            case "apk_downloading":
+                return "Downloading APK...";
+            case "checking":
+                return "Checking for updates...";
+            case "current":
+                return "Up to date";
+            case "error":
+                return "Update check failed";
+            case "ota_available":
+                return "OTA update available";
+            case "ota_ready":
+                return "Restart to update";
+            case "unsupported":
+                return "Updates unavailable";
+            case "idle":
+            default:
+                return "Check for updates";
+        }
+    }
+
+    function updateActionLabel(): string {
+        switch (appUpdateState.status) {
+            case "apk_available":
+                return "Install";
+            case "apk_downloading":
+                return appUpdateState.apkDownloadProgress != null
+                    ? `${String(
+                          Math.round(appUpdateState.apkDownloadProgress * 100),
+                      )}%`
+                    : "Downloading";
+            case "checking":
+                return "Checking";
+            case "ota_available":
+                return "Download";
+            case "ota_ready":
+                return "Restart";
+            default:
+                return "Check for Updates";
+        }
+    }
+
+    function updateActionDisabled(): boolean {
+        return (
+            updateBusy ||
+            appUpdateState.status === "checking" ||
+            appUpdateState.status === "apk_downloading"
+        );
+    }
+
+    function renderUpdateAccessory() {
+        if (isLatestVerified) {
+            return <VerifiedCheck />;
+        }
+        return (
+            <InlineActionButton
+                disabled={updateActionDisabled()}
+                label={updateActionLabel()}
+                onPress={handleUpdateRowPress}
+            />
+        );
+    }
+
+    function handleUpdateRowPress(): void {
+        if (appUpdateState.status === "ota_available") {
+            void handleFetchOtaUpdate();
+            return;
+        }
+        if (appUpdateState.status === "ota_ready") {
+            void restartForOtaUpdate();
+            return;
+        }
+        if (appUpdateState.status === "apk_available") {
+            handleDownloadApkUpdate();
+            return;
+        }
+        void handleManualUpdateCheck();
+    }
+
     function formatBytes(bytes: number): string {
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function formatTimestamp(value: string | undefined): string | undefined {
+        if (!value) return undefined;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return undefined;
+        return date.toLocaleString(undefined, {
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
     }
 
     function readImageBytesFromBase64(base64Data: string): Uint8Array {
@@ -568,35 +837,55 @@ export function SettingsSectionScreen({
                 }}
                 title={title}
             />
-            <ScrollView contentContainerStyle={styles.content}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    section === "about" || section === "developer" ? (
+                        <RefreshControl
+                            onRefresh={() => {
+                                void refreshAboutInfo({
+                                    forceUpdateCheck: true,
+                                });
+                            }}
+                            refreshing={aboutRefreshing}
+                            tintColor={colors.textSecondary}
+                        />
+                    ) : undefined
+                }
+            >
                 {section === "about" ? (
-                    <MenuSection title="App">
-                        <MenuRow
-                            icon="pricetag-outline"
-                            label="Version"
-                            onPress={handleVersionTap}
-                            value="0.1.0"
-                            {...(devUnlocked
-                                ? {
-                                      description:
-                                          "Developer options are unlocked",
-                                  }
-                                : versionTaps > 0
-                                  ? {
-                                        description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
-                                            DEV_UNLOCK_TAPS - versionTaps === 1
-                                                ? ""
-                                                : "s"
-                                        } to unlock developer options`,
+                    <>
+                        <MenuSection title="App">
+                            <MenuRow
+                                description={versionTapDescription}
+                                icon="pricetag-outline"
+                                label="Version"
+                                monoValue
+                                onPress={handleVersionTap}
+                                value={buildInfo.displayVersion}
+                            />
+                            {shouldShowAboutUpdateRow ? (
+                                <MenuRow
+                                    accessory={renderUpdateAccessory()}
+                                    description={aboutUpdateDescription}
+                                    icon={
+                                        isLatestVerified
+                                            ? "checkmark-circle-outline"
+                                            : "cloud-download-outline"
                                     }
-                                  : {})}
-                        />
-                        <MenuRow
-                            icon="server-outline"
-                            label="Server"
-                            value={getServerUrl()}
-                        />
-                    </MenuSection>
+                                    label={aboutUpdateLabel}
+                                    onPress={
+                                        isLatestVerified
+                                            ? handleUpdateRowPress
+                                            : undefined
+                                    }
+                                    tone={
+                                        isLatestVerified ? "success" : "default"
+                                    }
+                                />
+                            ) : null}
+                        </MenuSection>
+                    </>
                 ) : null}
 
                 {section === "account" ? (
@@ -667,6 +956,19 @@ export function SettingsSectionScreen({
                             />
                         </MenuSection>
 
+                        <MenuSection title="Memberships">
+                            <MenuRow
+                                icon="people-outline"
+                                label="Groups"
+                                value={String(serverCount)}
+                            />
+                            <MenuRow
+                                icon="chatbubbles-outline"
+                                label="Channels"
+                                value={String(channelCount)}
+                            />
+                        </MenuSection>
+
                         <MenuSection title="Account">
                             <MenuRow
                                 description="Disconnect and return to login"
@@ -684,6 +986,111 @@ export function SettingsSectionScreen({
 
                 {section === "developer" && devUnlocked ? (
                     <>
+                        <MenuSection title="Update diagnostics">
+                            <MenuRow
+                                icon="pricetag-outline"
+                                label="Version"
+                                monoValue
+                                value={buildInfo.label}
+                            />
+                            <MenuRow
+                                icon="git-commit-outline"
+                                label="Commit"
+                                monoBlock={buildInfo.commit}
+                                value={buildInfo.shortCommit}
+                            />
+                            <MenuRow
+                                description={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "Running the APK bundle"
+                                        : "Running an OTA bundle"
+                                }
+                                icon={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "archive-outline"
+                                        : "cloud-download-outline"
+                                }
+                                label="Update ID"
+                                value={
+                                    buildInfo.shortUpdateId ??
+                                    (buildInfo.isEmbeddedLaunch
+                                        ? "embedded"
+                                        : "unknown")
+                                }
+                                {...(buildInfo.updateId != null
+                                    ? { monoBlock: buildInfo.updateId }
+                                    : {})}
+                            />
+                            <MenuRow
+                                icon="git-branch-outline"
+                                label="Channel"
+                                value={buildInfo.channel}
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="Fingerprint"
+                                monoBlock={buildInfo.fingerprint}
+                                value={buildInfo.shortFingerprint}
+                            />
+                            <MenuRow
+                                icon="time-outline"
+                                label="Created"
+                                value={buildInfo.createdAt ?? "unknown"}
+                            />
+                            <MenuRow
+                                description={appUpdateState.message}
+                                icon="cloud-download-outline"
+                                label="Update status"
+                                onPress={handleUpdateRowPress}
+                                value={updateRowLabel()}
+                            />
+                            <MenuRow
+                                icon="git-compare-outline"
+                                label="Latest GitHub"
+                                monoBlock={
+                                    appUpdateState.latestCommit?.sha ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.latestCommit?.shortSha ??
+                                    "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="archive-outline"
+                                label="APK release"
+                                value={
+                                    appUpdateState.nativeRelease?.tagName ??
+                                    "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="Release fingerprint"
+                                monoBlock={
+                                    appUpdateState.nativeRelease?.fingerprint ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.nativeRelease
+                                        ?.fingerprintShort ?? "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="shield-checkmark-outline"
+                                label="APK checksum"
+                                monoBlock={
+                                    appUpdateState.nativeRelease?.sha256 ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.nativeRelease?.sha256?.slice(
+                                        0,
+                                        8,
+                                    ) ?? "unknown"
+                                }
+                            />
+                        </MenuSection>
                         <MenuSection
                             footer="Logs print to the device terminal/logcat. Useful when reporting issues."
                             title="WebSocket Debug"
@@ -867,6 +1274,59 @@ export function SettingsSectionScreen({
     );
 }
 
+function commitsMatch(
+    left: string | undefined,
+    right: string | undefined,
+): boolean {
+    const a = normalizeCommit(left);
+    const b = normalizeCommit(right);
+    if (!a || !b) return false;
+    return a === b || a.startsWith(b) || b.startsWith(a);
+}
+
+function errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+}
+
+function InlineActionButton({
+    disabled,
+    label,
+    onPress,
+}: {
+    disabled: boolean;
+    label: string;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable
+            accessibilityRole="button"
+            disabled={disabled}
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.inlineActionButton,
+                pressed && styles.inlineActionButtonPressed,
+                disabled && styles.inlineActionButtonDisabled,
+            ]}
+        >
+            <Text style={styles.inlineActionText}>{label}</Text>
+        </Pressable>
+    );
+}
+
+function normalizeCommit(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim().toLowerCase();
+    return /^[a-f0-9]{7,40}$/.test(trimmed) ? trimmed : undefined;
+}
+
+function VerifiedCheck() {
+    return (
+        <View style={styles.verifiedCheck}>
+            <Ionicons color="#8DF5B0" name="checkmark-circle" size={18} />
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     container: {
         backgroundColor: colors.bg,
@@ -882,6 +1342,28 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.error,
         fontSize: 12,
+    },
+    inlineActionButton: {
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.45)",
+        borderRadius: 6,
+        borderWidth: 1,
+        minWidth: 128,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    inlineActionButtonDisabled: {
+        opacity: 0.45,
+    },
+    inlineActionButtonPressed: {
+        backgroundColor: "rgba(74, 222, 128, 0.22)",
+        borderColor: "rgba(74, 222, 128, 0.62)",
+    },
+    inlineActionText: {
+        ...typography.button,
+        color: "#B5F5CD",
+        fontSize: 12,
+        textAlign: "center",
     },
     statusCardError: {
         backgroundColor: "rgba(229, 57, 53, 0.12)",
@@ -922,5 +1404,15 @@ const styles = StyleSheet.create({
         color: "#A7F3BD",
         fontSize: 13,
         fontWeight: "700",
+    },
+    verifiedCheck: {
+        alignItems: "center",
+        backgroundColor: "rgba(74,222,128,0.14)",
+        borderColor: "rgba(74,222,128,0.45)",
+        borderRadius: 999,
+        borderWidth: 1,
+        height: 30,
+        justifyContent: "center",
+        width: 30,
     },
 });

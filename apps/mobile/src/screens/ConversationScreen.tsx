@@ -80,14 +80,16 @@ export function ConversationScreen({
 
     const deleteMessage = useCallback(
         (message: Message) => {
-            const deleted = vexService.deleteLocalMessage(
-                userID,
-                message.mailID,
-                false,
-            );
-            if (!deleted) {
-                setError("Failed to delete message");
-            }
+            void (async () => {
+                const deleted = await vexService.deleteLocalMessage(
+                    userID,
+                    message.mailID,
+                    false,
+                );
+                if (!deleted) {
+                    setError("Failed to delete message");
+                }
+            })();
         },
         [userID],
     );

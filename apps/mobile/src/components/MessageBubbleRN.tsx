@@ -12,11 +12,12 @@ import {
     View,
 } from "react-native";
 
-import { formatTime } from "@vex-chat/store";
+import { extractInviteID, formatTime } from "@vex-chat/store";
 
 import { colors, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
+import { InvitePreviewCard } from "./InvitePreviewCard";
 
 interface MessageBubbleRNProps {
     authorName: string;
@@ -37,6 +38,10 @@ export function MessageBubbleRN({
     const [menuOpen, setMenuOpen] = React.useState(false);
     const [menuX, setMenuX] = React.useState(0);
     const [menuY, setMenuY] = React.useState(0);
+    const inviteID = React.useMemo(
+        () => extractInviteID(message.message),
+        [message.message],
+    );
 
     const menuActions = React.useMemo(
         () => [
@@ -206,6 +211,12 @@ export function MessageBubbleRN({
                         >
                             {message.message}
                         </Text>
+                        {inviteID ? (
+                            <InvitePreviewCard
+                                inviteID={inviteID}
+                                isOwn={isOwn}
+                            />
+                        ) : null}
                     </View>
                 </View>
             </Pressable>

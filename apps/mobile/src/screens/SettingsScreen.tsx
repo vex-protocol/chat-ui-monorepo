@@ -8,6 +8,7 @@ import { useStore } from "@nanostores/react";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
+import { $appUpdateState } from "../lib/appUpdates";
 import { $devOptionsUnlocked } from "../lib/devMode";
 import { isAlwaysOnSupported } from "../lib/foregroundService";
 import { colors } from "../theme";
@@ -21,6 +22,15 @@ interface SettingsRow {
 
 export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
     const devUnlocked = useStore($devOptionsUnlocked);
+    const appUpdateState = useStore($appUpdateState);
+    const aboutDescription =
+        appUpdateState.status === "ota_available"
+            ? "OTA update available"
+            : appUpdateState.status === "ota_ready"
+              ? "Restart to apply update"
+              : appUpdateState.status === "apk_available"
+                ? "APK update available"
+                : "Version and updates";
     const accountRows: ReadonlyArray<SettingsRow> = [
         {
             description: "Profile, identity, sign out",
@@ -107,7 +117,7 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
               ]
             : []),
         {
-            description: "Version and server",
+            description: aboutDescription,
             icon: "information-circle-outline",
             label: "About",
             onPress: () => {
