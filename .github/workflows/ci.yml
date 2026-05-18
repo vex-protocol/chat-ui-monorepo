@@ -218,16 +218,41 @@ jobs:
             - run: pnpm install --frozen-lockfile --ignore-scripts
 
             - name: Show native tool versions
+              id: native_tools
               run: |
                   xcodebuild -version
                   pod --version
+                  {
+                    echo "xcode_cache_key=$(xcodebuild -version | shasum -a 256 | awk '{print $1}')"
+                    echo "cocoapods_cache_key=$(pod --version | shasum -a 256 | awk '{print $1}')"
+                  } >> "$GITHUB_OUTPUT"
 
             - name: Prebuild iOS project
               run: pnpm -F mobile exec expo prebuild --platform ios --clean --no-install
 
+            - name: Cache CocoaPods
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      apps/mobile/ios/Pods
+                      ~/Library/Caches/CocoaPods
+                  key: ${{ runner.os }}-ios-pods-${{ steps.native_tools.outputs.cocoapods_cache_key }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/ios/Podfile.lock') }}
+                  restore-keys: |
+                      ${{ runner.os }}-ios-pods-${{ steps.native_tools.outputs.cocoapods_cache_key }}-
+                      ${{ runner.os }}-ios-pods-
+
             - name: Install CocoaPods
               working-directory: apps/mobile/ios
               run: pod install
+
+            - name: Cache Xcode DerivedData
+              uses: actions/cache@v4
+              with:
+                  path: apps/mobile/ios/build/DerivedData
+                  key: ${{ runner.os }}-xcode-deriveddata-${{ steps.native_tools.outputs.xcode_cache_key }}-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.json', 'apps/mobile/app.config.js', 'apps/mobile/eas.json', 'apps/mobile/plugins/**', 'apps/mobile/ios/Podfile', 'apps/mobile/ios/Podfile.lock', 'apps/mobile/ios/**/*.h', 'apps/mobile/ios/**/*.pbxproj', 'apps/mobile/ios/**/*.plist', 'apps/mobile/ios/**/*.swift') }}
+                  restore-keys: |
+                      ${{ runner.os }}-xcode-deriveddata-${{ steps.native_tools.outputs.xcode_cache_key }}-
+                      ${{ runner.os }}-xcode-deriveddata-
 
             - name: Build iOS app for generic simulator
               working-directory: apps/mobile/ios
@@ -239,6 +264,8 @@ jobs:
                     -sdk iphonesimulator \
                     -destination 'generic/platform=iOS Simulator' \
                     CODE_SIGNING_ALLOWED=NO \
+                    -derivedDataPath build/DerivedData \
+                    -showBuildTimingSummary \
                     build
 
     # ── UI — Mitosis build (standalone, no dependents) ─────────────────────
