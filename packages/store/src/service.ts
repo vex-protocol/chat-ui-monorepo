@@ -25,7 +25,7 @@ import type {
     PublicKeyCredentialRequestOptionsJSON,
 } from "@vex-chat/types";
 
-import { Client } from "@vex-chat/libvex";
+import { Client, msgpack } from "@vex-chat/libvex";
 
 import { validate as uuidValidate } from "uuid";
 
@@ -132,6 +132,12 @@ export interface DeviceApprovalRequest {
     signKey: string;
     status: "approved" | "expired" | "pending" | "rejected";
     username: string;
+}
+
+export interface InvitePreview {
+    channels: Channel[];
+    invite: Invite;
+    server: null | Server;
 }
 
 /** Result from any mutation operation. */
@@ -350,6 +356,10 @@ class VexService {
     private readonly deviceRequestQueueListeners = new Set<() => void>();
     private readonly disposable = new Disposable();
     private readonly failedUserLookups = new Set<string>();
+    private readonly invitePreviewCache = new Map<
+        string,
+        Promise<InvitePreview | null>
+    >();
     private lastConnectionRecoveryAt = 0;
     private lastDeviceAuthRefreshAttemptAt = 0;
     private logoutInFlight: null | Promise<void> = null;
@@ -1396,6 +1406,22 @@ class VexService {
         }
     }
 
+    async previewInvite(inviteID: string): Promise<InvitePreview | null> {
+        const cached = this.invitePreviewCache.get(inviteID);
+        if (cached) {
+            return cached;
+        }
+
+        const previewPromise = this.fetchInvitePreview(inviteID).catch(
+            (err: unknown) => {
+                this.invitePreviewCache.delete(inviteID);
+                throw err;
+            },
+        );
+        this.invitePreviewCache.set(inviteID, previewPromise);
+        return previewPromise;
+    }
+
     async probeAuthSession(): Promise<AuthProbeStatus> {
         try {
             const client = this.requireClient();
@@ -2266,6 +2292,52 @@ class VexService {
         return null;
     }
 
+    private async fetchInvitePreview(
+        inviteID: string,
+    ): Promise<InvitePreview | null> {
+        const client = this.requireClient();
+        const internals = client as unknown as ClientWithInternalHttp;
+        const http = internals.http;
+        const get = http?.get;
+        if (typeof get !== "function") {
+            throw new Error("Invite previews are not supported by libvex.");
+        }
+
+        try {
+            const response = await get.call(
+                http,
+                `${client.getHost()}/invite/${inviteID}/preview`,
+            );
+            return decodeInvitePreviewResponseData(
+                getHttpResponseData(response),
+            );
+        } catch (err: unknown) {
+            if (isUnauthorizedError(err)) {
+                return null;
+            }
+            if (!isNotFoundError(err)) {
+                throw err;
+            }
+        }
+
+        try {
+            const response = await get.call(
+                http,
+                `${client.getHost()}/invite/${inviteID}`,
+            );
+            return {
+                channels: [],
+                invite: decodeInviteResponseData(getHttpResponseData(response)),
+                server: null,
+            };
+        } catch (err: unknown) {
+            if (isNotFoundError(err) || isUnauthorizedError(err)) {
+                return null;
+            }
+            throw err;
+        }
+    }
+
     private async findPendingRequestAfterRegisterFailure(
         client: Client,
         username: string,
@@ -2605,6 +2677,7 @@ class VexService {
         this.populateStateInFlight = null;
         this.client = null;
         this.failedUserLookups.clear();
+        this.invitePreviewCache.clear();
         $authStatusWritable.set("signed_out");
         $userWritable.set(null);
         $keyReplacedWritable.set(false);
@@ -3441,6 +3514,41 @@ function debugAuth(step: string, meta?: Record<string, unknown>): void {
     }
 }
 
+function decodeInvitePreviewResponseData(data: unknown): InvitePreview {
+    const decoded = decodeMsgpackHttpData(data);
+    const invite = isRecord(decoded) ? decoded["invite"] : null;
+    if (!isRecord(decoded) || !isRecord(invite)) {
+        throw new Error("Invalid invite preview response");
+    }
+    const channels = decoded["channels"];
+    const server = decoded["server"];
+    return {
+        channels: Array.isArray(channels)
+            ? (channels as unknown as Channel[])
+            : [],
+        invite: invite as unknown as Invite,
+        server: isRecord(server) ? (server as unknown as Server) : null,
+    };
+}
+
+function decodeInviteResponseData(data: unknown): Invite {
+    const decoded = decodeMsgpackHttpData(data);
+    if (!isRecord(decoded)) {
+        throw new Error("Invalid invite response");
+    }
+    return decoded as unknown as Invite;
+}
+
+function decodeMsgpackHttpData(data: unknown): unknown {
+    if (data instanceof Uint8Array) {
+        return msgpack.decode(data);
+    }
+    if (data instanceof ArrayBuffer) {
+        return msgpack.decode(new Uint8Array(data));
+    }
+    throw new Error("Expected msgpack HTTP response");
+}
+
 function deduplicateMessages(messages: Message[]): Message[] {
     const seen = new Set<string>();
     return messages.filter((m) => {
@@ -3570,6 +3678,13 @@ function getClientSocket(client: Client): null | WebSocketDebugLike {
     return maybeSocket;
 }
 
+function getHttpResponseData(response: unknown): unknown {
+    if (!isRecord(response) || !("data" in response)) {
+        throw new Error("Expected HTTP response data");
+    }
+    return response["data"];
+}
+
 function hasHttpStatus(err: unknown): err is HttpErrorLike {
     if (!(err instanceof Error) || !("response" in err)) return false;
     const res = (err as { response: unknown }).response;
@@ -3655,6 +3770,10 @@ function isReactNativeRuntime(): boolean {
         "product" in navigator &&
         (navigator as { product?: string }).product === "ReactNative"
     );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
 }
 
 /**
