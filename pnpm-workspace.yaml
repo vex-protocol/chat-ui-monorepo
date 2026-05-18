@@ -57,3 +57,4 @@ minimumReleaseAgeExclude:
     - devalue
     - fast-xml-builder
     - kysely
+    - ws
