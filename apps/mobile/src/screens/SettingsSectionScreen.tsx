@@ -51,7 +51,6 @@ const LOCAL_RETENTION_CHOICES = [7, 14, 21, 30] as const;
 
 const DEV_UNLOCK_TAPS = 7;
 const DEV_UNLOCK_WINDOW_MS = 3000;
-const DEV_UNLOCK_HINT_AT = 4;
 
 export function SettingsSectionScreen({
     navigation,
@@ -111,23 +110,10 @@ export function SettingsSectionScreen({
             setVersionTaps(0);
             Vibration.vibrate([0, 25, 60, 25, 60, 25]);
             void setDevOptionsUnlocked(true);
-            Alert.alert(
-                "Developer options unlocked",
-                "Connection diagnostics are now available under Settings → Developer.",
-            );
             return;
         }
         setVersionTaps(next);
         Vibration.vibrate(8);
-        if (next === DEV_UNLOCK_HINT_AT) {
-            // Subtle nudge once the user is most of the way there.
-            Alert.alert(
-                "Almost there",
-                `${DEV_UNLOCK_TAPS - next} more tap${
-                    DEV_UNLOCK_TAPS - next === 1 ? "" : "s"
-                } to unlock developer options.`,
-            );
-        }
         versionTapResetRef.current = setTimeout(() => {
             setVersionTaps(0);
         }, DEV_UNLOCK_WINDOW_MS);
