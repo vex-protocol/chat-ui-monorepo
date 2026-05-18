@@ -13,6 +13,8 @@ name: Mobile - Release Candidate
 # so queued builds always run to completion.
 #
 # Secrets: EXPO_TOKEN, GITHUB_TOKEN (automatic).
+# Required secret: VEX_ANDROID_GOOGLE_SERVICES_DEV_JSON_BASE64.
+# Fallback raw JSON secret: VEX_ANDROID_GOOGLE_SERVICES_DEV_JSON.
 
 on:
     push:
@@ -64,6 +66,37 @@ jobs:
             - name: Install EAS CLI + local build plugin
               run: npm install -g eas-cli@latest eas-cli-local-build-plugin@latest
 
+            - name: Prepare development Firebase config
+              working-directory: apps/mobile
+              env:
+                  GOOGLE_SERVICES_JSON: ${{ secrets.VEX_ANDROID_GOOGLE_SERVICES_DEV_JSON }}
+                  GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.VEX_ANDROID_GOOGLE_SERVICES_DEV_JSON_BASE64 }}
+              run: |
+                  if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
+                    printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > google-services.dev.json
+                  elif [ -n "${GOOGLE_SERVICES_JSON:-}" ]; then
+                    printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.dev.json
+                  else
+                    echo "::error::Missing VEX_ANDROID_GOOGLE_SERVICES_DEV_JSON_BASE64. Add it from apps/mobile/google-services.dev.json so CI can reproduce the local dev build."
+                    exit 1
+                  fi
+
+                  node -e '
+                    const fs = require("node:fs");
+                    const path = "google-services.dev.json";
+                    const expected = "chat.vex.mobile.dev";
+                    const data = JSON.parse(fs.readFileSync(path, "utf8"));
+                    const packages = (data.client ?? [])
+                      .map((client) => client.client_info?.android_client_info?.package_name)
+                      .filter(Boolean);
+                    if (!packages.includes(expected)) {
+                      console.error(`${path} does not contain Android package ${expected}`);
+                      console.error(`Found package(s): ${packages.join(", ") || "(none)"}`);
+                      process.exit(1);
+                    }
+                  '
+                  echo "VEX_ANDROID_GOOGLE_SERVICES_FILE=./google-services.dev.json" >> "$GITHUB_ENV"
+
             - name: Build development APK (local)
               working-directory: apps/mobile
               env:
@@ -71,7 +104,6 @@ jobs:
                   EAS_BUILD_PROFILE: development
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "1"
                   EXPO_PUBLIC_SERVER_URL: dev.vex.wtf
-                  VEX_ANDROID_GOOGLE_SERVICES_FILE: ./google-services.dev.json
                   VEX_ENABLE_DEV_BUILD: "1"
               run: |
                   eas build \
