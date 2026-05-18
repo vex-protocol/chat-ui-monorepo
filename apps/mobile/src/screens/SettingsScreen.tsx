@@ -30,7 +30,7 @@ export function SettingsScreen({ navigation }: AppScreenProps<"Settings">) {
               ? "Restart to apply update"
               : appUpdateState.status === "apk_available"
                 ? "APK update available"
-                : "Version and server";
+                : "Version and updates";
     const accountRows: ReadonlyArray<SettingsRow> = [
         {
             description: "Profile, identity, sign out",

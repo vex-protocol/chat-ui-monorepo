@@ -34,6 +34,7 @@ export type AppUpdateStatus =
     | "unsupported";
 
 export interface GitHubCommitInfo {
+    committedAt?: string | undefined;
     htmlUrl?: string | undefined;
     sha: string;
     shortSha: string;
@@ -304,7 +305,12 @@ async function fetchLatestCommit(branch: string): Promise<GitHubCommitInfo> {
     if (!sha) {
         throw new Error("GitHub commit response did not include a SHA.");
     }
+    const commitRecord = asRecord(record["commit"]);
+    const committer = asRecord(commitRecord["committer"]);
+    const author = asRecord(commitRecord["author"]);
     return {
+        committedAt:
+            stringField(committer, "date") ?? stringField(author, "date"),
         htmlUrl: stringField(record, "html_url"),
         sha,
         shortSha: sha.slice(0, 8).toLowerCase(),
@@ -387,22 +393,42 @@ function getReleaseTarget(): "development" | "production" {
         : "production";
 }
 
-function isNativeReleaseNewer(release: NativeReleaseInfo | undefined): boolean {
+function isNativeReleaseNewer(
+    release: NativeReleaseInfo | undefined,
+    latestCommit: GitHubCommitInfo | undefined,
+): boolean {
     if (!release) return false;
     if (
-        release.fingerprint &&
-        buildInfo.fingerprint !== "unknown" &&
-        release.fingerprint !== buildInfo.fingerprint
+        sameCommit(buildInfo.commit, latestCommit?.sha) ||
+        sameCommit(buildInfo.commit, release.targetCommit)
+    ) {
+        return false;
+    }
+
+    const releaseFingerprint = normalizeFingerprint(release.fingerprint);
+    const buildFingerprint = normalizeFingerprint(buildInfo.fingerprint);
+    if (
+        releaseFingerprint != null &&
+        buildFingerprint != null &&
+        releaseFingerprint !== buildFingerprint
     ) {
         return true;
     }
+
     if (!Updates.isEnabled || __DEV__) {
         return (
             release.targetCommit != null &&
             !sameCommit(buildInfo.commit, release.targetCommit)
         );
     }
+
     return false;
+}
+
+function normalizeFingerprint(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim().toLowerCase();
+    return /^[a-f0-9]{16,128}$/.test(trimmed) ? trimmed : undefined;
 }
 
 function normalizeSha(value: string | undefined): string | undefined {
@@ -434,11 +460,15 @@ async function runUpdateCheck(): Promise<AppUpdateState> {
                   isAvailable: false,
               };
 
-    const nativeUpdateAvailable = isNativeReleaseNewer(nativeRelease);
     const runningLatestCommit =
         latestCommit != null && sameCommit(buildInfo.commit, latestCommit.sha);
+    const nativeUpdateAvailable = isNativeReleaseNewer(
+        nativeRelease,
+        latestCommit,
+    );
+    const otaUpdateAvailable = ota.isAvailable && !runningLatestCommit;
 
-    if (ota.isAvailable) {
+    if (otaUpdateAvailable) {
         return {
             checkedAt,
             latestCommit,
