@@ -177,8 +177,6 @@ export function SettingsSectionScreen({
                 return "Developer";
             case "notifications":
                 return "Notifications";
-            case "version":
-                return "Version";
             default:
                 return "Settings";
         }
@@ -346,11 +344,7 @@ export function SettingsSectionScreen({
     );
 
     useEffect(() => {
-        if (
-            section !== "about" &&
-            section !== "developer" &&
-            section !== "version"
-        ) {
+        if (section !== "about" && section !== "developer") {
             return;
         }
         void refreshAboutInfo({ silent: true });
@@ -485,7 +479,6 @@ export function SettingsSectionScreen({
         }
     }
 
-    const installedCreatedAt = formatTimestamp(buildInfo.createdAt);
     const latestCreatedAt = formatTimestamp(
         appUpdateState.latestCommit?.committedAt ??
             appUpdateState.nativeRelease?.publishedAt,
@@ -498,6 +491,22 @@ export function SettingsSectionScreen({
               : "unknown";
     const latestVersionDescription =
         latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
+    const isLatestVerified =
+        appUpdateState.status === "current" &&
+        commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
+    const aboutUpdateLabel = isLatestVerified
+        ? "No updates available"
+        : "Latest available";
+    const aboutUpdateDescription = isLatestVerified
+        ? "Installed version is current"
+        : latestVersionDescription;
+    const versionTapDescription = devUnlocked
+        ? "Developer options are unlocked"
+        : versionTaps > 0
+          ? `${DEV_UNLOCK_TAPS - versionTaps} more tap${
+                DEV_UNLOCK_TAPS - versionTaps === 1 ? "" : "s"
+            } to unlock developer options`
+          : undefined;
     const serverCount = Object.keys(servers).length;
     const channelCount = Object.values(channelsByServer).reduce(
         (total, channels) => total + channels.length,
@@ -513,7 +522,7 @@ export function SettingsSectionScreen({
             case "checking":
                 return "Checking for updates...";
             case "current":
-                return "Up to date";
+                return isLatestVerified ? "Verified" : "Up to date";
             case "error":
                 return "Update check failed";
             case "ota_available":
@@ -554,6 +563,19 @@ export function SettingsSectionScreen({
             updateBusy ||
             appUpdateState.status === "checking" ||
             appUpdateState.status === "apk_downloading"
+        );
+    }
+
+    function renderUpdateAccessory() {
+        if (isLatestVerified) {
+            return <VerifiedBadge />;
+        }
+        return (
+            <InlineActionButton
+                disabled={updateActionDisabled()}
+                label={updateActionLabel()}
+                onPress={handleUpdateRowPress}
+            />
         );
     }
 
@@ -821,9 +843,7 @@ export function SettingsSectionScreen({
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
-                    section === "about" ||
-                    section === "developer" ||
-                    section === "version" ? (
+                    section === "about" || section === "developer" ? (
                         <RefreshControl
                             onRefresh={() => {
                                 void refreshAboutInfo({
@@ -840,171 +860,30 @@ export function SettingsSectionScreen({
                     <>
                         <MenuSection title="App">
                             <MenuRow
-                                icon="pricetag-outline"
-                                label="Version"
-                                monoValue
-                                onPress={() => {
-                                    navigation.navigate("SettingsSection", {
-                                        section: "version",
-                                    });
-                                }}
-                                value={buildInfo.displayVersion}
-                            />
-                            <MenuRow
-                                accessory={
-                                    <InlineActionButton
-                                        disabled={updateActionDisabled()}
-                                        label={updateActionLabel()}
-                                        onPress={handleUpdateRowPress}
-                                    />
-                                }
-                                description={latestVersionDescription}
-                                icon="cloud-download-outline"
-                                label="Latest available"
-                                monoValue
-                                value={latestVersionValue}
-                            />
-                        </MenuSection>
-                    </>
-                ) : null}
-
-                {section === "version" ? (
-                    <>
-                        <MenuSection title="Installed">
-                            <MenuRow
+                                description={versionTapDescription}
                                 icon="pricetag-outline"
                                 label="Version"
                                 monoValue
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
-                                {...(devUnlocked
-                                    ? {
-                                          description:
-                                              "Developer options are unlocked",
-                                      }
-                                    : versionTaps > 0
-                                      ? {
-                                            description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
-                                                DEV_UNLOCK_TAPS -
-                                                    versionTaps ===
-                                                1
-                                                    ? ""
-                                                    : "s"
-                                            } to unlock developer options`,
-                                        }
-                                      : {})}
                             />
                             <MenuRow
-                                icon="time-outline"
-                                label="Created"
-                                value={installedCreatedAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                icon="git-commit-outline"
-                                label="Commit"
-                                monoBlock={buildInfo.commit}
-                                value={buildInfo.shortCommit}
-                            />
-                            <MenuRow
-                                description={
-                                    buildInfo.isEmbeddedLaunch
-                                        ? "Running the APK bundle"
-                                        : "Running an OTA bundle"
-                                }
+                                accessory={renderUpdateAccessory()}
+                                description={aboutUpdateDescription}
                                 icon={
-                                    buildInfo.isEmbeddedLaunch
-                                        ? "archive-outline"
+                                    isLatestVerified
+                                        ? "checkmark-circle-outline"
                                         : "cloud-download-outline"
                                 }
-                                label="Update ID"
-                                value={
-                                    buildInfo.shortUpdateId ??
-                                    (buildInfo.isEmbeddedLaunch
-                                        ? "embedded"
-                                        : "unknown")
-                                }
-                                {...(buildInfo.updateId != null
-                                    ? { monoBlock: buildInfo.updateId }
-                                    : {})}
-                            />
-                            <MenuRow
-                                icon="git-branch-outline"
-                                label="Channel"
-                                value={buildInfo.channel}
-                            />
-                            <MenuRow
-                                icon="finger-print-outline"
-                                label="Fingerprint"
-                                monoBlock={buildInfo.fingerprint}
-                                value={buildInfo.shortFingerprint}
-                            />
-                        </MenuSection>
-                        <MenuSection title="Latest Available">
-                            <MenuRow
-                                accessory={
-                                    <InlineActionButton
-                                        disabled={updateActionDisabled()}
-                                        label={updateActionLabel()}
-                                        onPress={handleUpdateRowPress}
-                                    />
-                                }
-                                description={appUpdateState.message}
-                                icon="cloud-download-outline"
-                                label="Status"
-                                value={updateRowLabel()}
-                            />
-                            <MenuRow
-                                icon="pricetag-outline"
-                                label="Version"
+                                label={aboutUpdateLabel}
                                 monoValue
+                                onPress={
+                                    isLatestVerified
+                                        ? handleUpdateRowPress
+                                        : undefined
+                                }
+                                tone={isLatestVerified ? "success" : "default"}
                                 value={latestVersionValue}
-                            />
-                            <MenuRow
-                                icon="time-outline"
-                                label="Created"
-                                value={latestCreatedAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                icon="git-compare-outline"
-                                label="GitHub commit"
-                                monoBlock={
-                                    appUpdateState.latestCommit?.sha ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.latestCommit?.shortSha ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="archive-outline"
-                                label="APK release"
-                                value={
-                                    appUpdateState.nativeRelease?.tagName ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="time-outline"
-                                label="APK published"
-                                value={
-                                    formatTimestamp(
-                                        appUpdateState.nativeRelease
-                                            ?.publishedAt,
-                                    ) ?? "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="finger-print-outline"
-                                label="Release fingerprint"
-                                monoBlock={
-                                    appUpdateState.nativeRelease?.fingerprint ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.nativeRelease
-                                        ?.fingerprintShort ?? "unknown"
-                                }
                             />
                         </MenuSection>
                     </>
@@ -1396,6 +1275,16 @@ export function SettingsSectionScreen({
     );
 }
 
+function commitsMatch(
+    left: string | undefined,
+    right: string | undefined,
+): boolean {
+    const a = normalizeCommit(left);
+    const b = normalizeCommit(right);
+    if (!a || !b) return false;
+    return a === b || a.startsWith(b) || b.startsWith(a);
+}
+
 function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
@@ -1422,6 +1311,21 @@ function InlineActionButton({
         >
             <Text style={styles.inlineActionText}>{label}</Text>
         </Pressable>
+    );
+}
+
+function normalizeCommit(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim().toLowerCase();
+    return /^[a-f0-9]{7,40}$/.test(trimmed) ? trimmed : undefined;
+}
+
+function VerifiedBadge() {
+    return (
+        <View style={styles.verifiedBadge}>
+            <Ionicons color="#8DF5B0" name="checkmark-circle" size={16} />
+            <Text style={styles.verifiedBadgeText}>Verified</Text>
+        </View>
     );
 }
 
@@ -1499,5 +1403,21 @@ const styles = StyleSheet.create({
         color: "#A7F3BD",
         fontSize: 13,
         fontWeight: "700",
+    },
+    verifiedBadge: {
+        alignItems: "center",
+        backgroundColor: "rgba(74,222,128,0.14)",
+        borderColor: "rgba(74,222,128,0.45)",
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    verifiedBadgeText: {
+        ...typography.button,
+        color: "#8DF5B0",
+        fontSize: 12,
     },
 });
