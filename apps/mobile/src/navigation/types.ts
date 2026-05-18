@@ -21,6 +21,7 @@ export type AppStackParamList = {
     Devices: undefined;
     DMList: undefined;
     Invite: { serverID: string; serverName?: string };
+    InvitePreview: { inviteID: string };
     JoinGroup: undefined | { inviteID?: string };
     OnboardingEmpty: undefined;
     Passkeys: undefined;
