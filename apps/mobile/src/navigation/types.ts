@@ -35,8 +35,7 @@ export type AppStackParamList = {
             | "connection"
             | "data"
             | "developer"
-            | "notifications"
-            | "version";
+            | "notifications";
     };
 };
 

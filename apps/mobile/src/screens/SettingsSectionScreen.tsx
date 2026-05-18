@@ -177,8 +177,6 @@ export function SettingsSectionScreen({
                 return "Developer";
             case "notifications":
                 return "Notifications";
-            case "version":
-                return "Version";
             default:
                 return "Settings";
         }
@@ -346,11 +344,7 @@ export function SettingsSectionScreen({
     );
 
     useEffect(() => {
-        if (
-            section !== "about" &&
-            section !== "developer" &&
-            section !== "version"
-        ) {
+        if (section !== "about" && section !== "developer") {
             return;
         }
         void refreshAboutInfo({ silent: true });
@@ -485,7 +479,6 @@ export function SettingsSectionScreen({
         }
     }
 
-    const installedCreatedAt = formatTimestamp(buildInfo.createdAt);
     const latestCreatedAt = formatTimestamp(
         appUpdateState.latestCommit?.committedAt ??
             appUpdateState.nativeRelease?.publishedAt,
@@ -507,6 +500,13 @@ export function SettingsSectionScreen({
     const aboutUpdateDescription = isLatestVerified
         ? "Installed version is current"
         : latestVersionDescription;
+    const versionTapDescription = devUnlocked
+        ? "Developer options are unlocked"
+        : versionTaps > 0
+          ? `${DEV_UNLOCK_TAPS - versionTaps} more tap${
+                DEV_UNLOCK_TAPS - versionTaps === 1 ? "" : "s"
+            } to unlock developer options`
+          : undefined;
     const serverCount = Object.keys(servers).length;
     const channelCount = Object.values(channelsByServer).reduce(
         (total, channels) => total + channels.length,
@@ -843,9 +843,7 @@ export function SettingsSectionScreen({
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
-                    section === "about" ||
-                    section === "developer" ||
-                    section === "version" ? (
+                    section === "about" || section === "developer" ? (
                         <RefreshControl
                             onRefresh={() => {
                                 void refreshAboutInfo({
@@ -862,14 +860,11 @@ export function SettingsSectionScreen({
                     <>
                         <MenuSection title="App">
                             <MenuRow
+                                description={versionTapDescription}
                                 icon="pricetag-outline"
                                 label="Version"
                                 monoValue
-                                onPress={() => {
-                                    navigation.navigate("SettingsSection", {
-                                        section: "version",
-                                    });
-                                }}
+                                onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
                             />
                             <MenuRow
@@ -889,148 +884,6 @@ export function SettingsSectionScreen({
                                 }
                                 tone={isLatestVerified ? "success" : "default"}
                                 value={latestVersionValue}
-                            />
-                        </MenuSection>
-                    </>
-                ) : null}
-
-                {section === "version" ? (
-                    <>
-                        <MenuSection title="Installed">
-                            <MenuRow
-                                icon="pricetag-outline"
-                                label="Version"
-                                monoValue
-                                onPress={handleVersionTap}
-                                value={buildInfo.displayVersion}
-                                {...(devUnlocked
-                                    ? {
-                                          description:
-                                              "Developer options are unlocked",
-                                      }
-                                    : versionTaps > 0
-                                      ? {
-                                            description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
-                                                DEV_UNLOCK_TAPS -
-                                                    versionTaps ===
-                                                1
-                                                    ? ""
-                                                    : "s"
-                                            } to unlock developer options`,
-                                        }
-                                      : {})}
-                            />
-                            <MenuRow
-                                icon="time-outline"
-                                label="Created"
-                                value={installedCreatedAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                icon="git-commit-outline"
-                                label="Commit"
-                                monoBlock={buildInfo.commit}
-                                value={buildInfo.shortCommit}
-                            />
-                            <MenuRow
-                                description={
-                                    buildInfo.isEmbeddedLaunch
-                                        ? "Running the APK bundle"
-                                        : "Running an OTA bundle"
-                                }
-                                icon={
-                                    buildInfo.isEmbeddedLaunch
-                                        ? "archive-outline"
-                                        : "cloud-download-outline"
-                                }
-                                label="Update ID"
-                                value={
-                                    buildInfo.shortUpdateId ??
-                                    (buildInfo.isEmbeddedLaunch
-                                        ? "embedded"
-                                        : "unknown")
-                                }
-                                {...(buildInfo.updateId != null
-                                    ? { monoBlock: buildInfo.updateId }
-                                    : {})}
-                            />
-                            <MenuRow
-                                icon="git-branch-outline"
-                                label="Channel"
-                                value={buildInfo.channel}
-                            />
-                            <MenuRow
-                                icon="finger-print-outline"
-                                label="Fingerprint"
-                                monoBlock={buildInfo.fingerprint}
-                                value={buildInfo.shortFingerprint}
-                            />
-                        </MenuSection>
-                        <MenuSection title="Latest Available">
-                            <MenuRow
-                                accessory={renderUpdateAccessory()}
-                                description={appUpdateState.message}
-                                icon="cloud-download-outline"
-                                label="Status"
-                                onPress={
-                                    isLatestVerified
-                                        ? handleUpdateRowPress
-                                        : undefined
-                                }
-                                tone={isLatestVerified ? "success" : "default"}
-                                value={updateRowLabel()}
-                            />
-                            <MenuRow
-                                icon="pricetag-outline"
-                                label="Version"
-                                monoValue
-                                value={latestVersionValue}
-                            />
-                            <MenuRow
-                                icon="time-outline"
-                                label="Created"
-                                value={latestCreatedAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                icon="git-compare-outline"
-                                label="GitHub commit"
-                                monoBlock={
-                                    appUpdateState.latestCommit?.sha ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.latestCommit?.shortSha ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="archive-outline"
-                                label="APK release"
-                                value={
-                                    appUpdateState.nativeRelease?.tagName ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="time-outline"
-                                label="APK published"
-                                value={
-                                    formatTimestamp(
-                                        appUpdateState.nativeRelease
-                                            ?.publishedAt,
-                                    ) ?? "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="finger-print-outline"
-                                label="Release fingerprint"
-                                monoBlock={
-                                    appUpdateState.nativeRelease?.fingerprint ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.nativeRelease
-                                        ?.fingerprintShort ?? "unknown"
-                                }
                             />
                         </MenuSection>
                     </>
