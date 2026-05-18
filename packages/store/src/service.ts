@@ -850,12 +850,7 @@ class VexService {
         try {
             const client = this.requireClient();
             await client.servers.delete(serverID);
-            const servers = new Map(Object.entries($serversWritable.get()));
-            servers.delete(serverID);
-            $serversWritable.set(Object.fromEntries(servers));
-            const channels = new Map(Object.entries($channelsWritable.get()));
-            channels.delete(serverID);
-            $channelsWritable.set(Object.fromEntries(channels));
+            this.removeServerFromLocalState(serverID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -1031,6 +1026,17 @@ class VexService {
             $serversWritable.setKey(server.serverID, server);
             const channels = await client.channels.retrieve(server.serverID);
             $channelsWritable.setKey(server.serverID, channels);
+            return { ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async leaveServer(serverID: string): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.servers.leave(serverID);
+            this.removeServerFromLocalState(serverID);
             return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
@@ -2488,6 +2494,32 @@ class VexService {
         setTimeout(() => {
             this.kickPopulateState(attempt + 1);
         }, 200);
+    }
+
+    private removeServerFromLocalState(serverID: string): void {
+        const servers = new Map(Object.entries($serversWritable.get()));
+        servers.delete(serverID);
+        $serversWritable.set(Object.fromEntries(servers));
+
+        const channels = new Map(Object.entries($channelsWritable.get()));
+        const removedChannels = channels.get(serverID) ?? [];
+        channels.delete(serverID);
+        $channelsWritable.set(Object.fromEntries(channels));
+
+        const groupMessages = new Map(
+            Object.entries($groupMessagesWritable.get()),
+        );
+        for (const channel of removedChannels) {
+            groupMessages.delete(channel.channelID);
+        }
+        $groupMessagesWritable.set(Object.fromEntries(groupMessages));
+
+        const permissions = Object.fromEntries(
+            Object.entries($permissionsWritable.get()).filter(
+                ([, permission]) => permission.resourceID !== serverID,
+            ),
+        );
+        $permissionsWritable.set(permissions);
     }
 
     private requireClient(): Client {

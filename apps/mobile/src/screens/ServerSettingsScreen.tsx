@@ -36,6 +36,7 @@ export function ServerSettingsScreen({
     const [creatingChannel, setCreatingChannel] = useState(false);
     const [createChannelError, setCreateChannelError] = useState("");
     const [deletingServer, setDeletingServer] = useState(false);
+    const [leavingServer, setLeavingServer] = useState(false);
     const serverName =
         servers[serverID]?.name ?? route.params.serverName ?? "Server";
     const channels = channelsByServer[serverID] ?? [];
@@ -58,6 +59,7 @@ export function ServerSettingsScreen({
     }, [membershipPermissions]);
     const canCreateChannelByRole = serverPowerLevel >= 50;
     const canDeleteServerByRole = serverPowerLevel >= 100;
+    const canLeaveServer = membershipPermissions.length > 0;
     const canManageInvitesByRole = membershipPermissions.length > 0;
 
     const canCreateChannel = useMemo(
@@ -136,6 +138,47 @@ export function ServerSettingsScreen({
             });
         } finally {
             setDeletingServer(false);
+        }
+    }
+
+    function confirmLeaveServer(): void {
+        if (!canLeaveServer || leavingServer) {
+            return;
+        }
+        Alert.alert(
+            "Leave group?",
+            `Leave ${serverName}? You will need an invite to rejoin.`,
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void handleLeaveServer();
+                    },
+                    style: "destructive",
+                    text: "Leave group",
+                },
+            ],
+        );
+    }
+
+    async function handleLeaveServer(): Promise<void> {
+        if (leavingServer) return;
+        setLeavingServer(true);
+        try {
+            const result = await vexService.leaveServer(serverID);
+            if (!result.ok) {
+                Alert.alert(
+                    "Leave failed",
+                    result.error ?? "Failed to leave group.",
+                );
+                return;
+            }
+            navigation.reset({
+                index: 0,
+                routes: [{ name: "DMList" }],
+            });
+        } finally {
+            setLeavingServer(false);
         }
     }
 
@@ -221,13 +264,36 @@ export function ServerSettingsScreen({
                     )}
                 </View>
 
+                {canLeaveServer ? (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Membership</Text>
+                        <TouchableOpacity
+                            disabled={leavingServer}
+                            onPress={confirmLeaveServer}
+                            style={[
+                                styles.button,
+                                styles.buttonDanger,
+                                leavingServer && styles.buttonDisabled,
+                            ]}
+                        >
+                            <Text style={styles.buttonDangerText}>
+                                {leavingServer ? "Leaving..." : "Leave group"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : null}
+
                 {canDeleteServerByRole ? (
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Danger zone</Text>
                         <TouchableOpacity
                             disabled={deletingServer}
                             onPress={confirmDeleteServer}
-                            style={[styles.button, styles.buttonDanger]}
+                            style={[
+                                styles.button,
+                                styles.buttonDanger,
+                                deletingServer && styles.buttonDisabled,
+                            ]}
                         >
                             <Text style={styles.buttonDangerText}>
                                 {deletingServer
