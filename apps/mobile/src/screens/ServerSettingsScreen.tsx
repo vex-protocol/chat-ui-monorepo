@@ -37,8 +37,9 @@ export function ServerSettingsScreen({
     const [createChannelError, setCreateChannelError] = useState("");
     const [deletingServer, setDeletingServer] = useState(false);
     const [leavingServer, setLeavingServer] = useState(false);
+    const currentServer = servers[serverID];
     const serverName =
-        servers[serverID]?.name ?? route.params.serverName ?? "Server";
+        currentServer?.name ?? route.params.serverName ?? "Server";
     const channels = channelsByServer[serverID] ?? [];
     const membershipPermissions = useMemo(() => {
         const myUserID = user?.userID;
@@ -59,7 +60,7 @@ export function ServerSettingsScreen({
     }, [membershipPermissions]);
     const canCreateChannelByRole = serverPowerLevel >= 50;
     const canDeleteServerByRole = serverPowerLevel >= 100;
-    const canLeaveServer = membershipPermissions.length > 0;
+    const canLeaveServer = Boolean(currentServer);
     const canManageInvitesByRole = membershipPermissions.length > 0;
 
     const canCreateChannel = useMemo(
