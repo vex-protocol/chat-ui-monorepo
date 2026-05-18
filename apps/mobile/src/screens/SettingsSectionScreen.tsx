@@ -498,6 +498,15 @@ export function SettingsSectionScreen({
               : "unknown";
     const latestVersionDescription =
         latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
+    const isLatestVerified =
+        appUpdateState.status === "current" &&
+        commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
+    const aboutUpdateLabel = isLatestVerified
+        ? "No updates available"
+        : "Latest available";
+    const aboutUpdateDescription = isLatestVerified
+        ? "Installed version is current"
+        : latestVersionDescription;
     const serverCount = Object.keys(servers).length;
     const channelCount = Object.values(channelsByServer).reduce(
         (total, channels) => total + channels.length,
@@ -513,7 +522,7 @@ export function SettingsSectionScreen({
             case "checking":
                 return "Checking for updates...";
             case "current":
-                return "Up to date";
+                return isLatestVerified ? "Verified" : "Up to date";
             case "error":
                 return "Update check failed";
             case "ota_available":
@@ -554,6 +563,19 @@ export function SettingsSectionScreen({
             updateBusy ||
             appUpdateState.status === "checking" ||
             appUpdateState.status === "apk_downloading"
+        );
+    }
+
+    function renderUpdateAccessory() {
+        if (isLatestVerified) {
+            return <VerifiedBadge />;
+        }
+        return (
+            <InlineActionButton
+                disabled={updateActionDisabled()}
+                label={updateActionLabel()}
+                onPress={handleUpdateRowPress}
+            />
         );
     }
 
@@ -851,17 +873,21 @@ export function SettingsSectionScreen({
                                 value={buildInfo.displayVersion}
                             />
                             <MenuRow
-                                accessory={
-                                    <InlineActionButton
-                                        disabled={updateActionDisabled()}
-                                        label={updateActionLabel()}
-                                        onPress={handleUpdateRowPress}
-                                    />
+                                accessory={renderUpdateAccessory()}
+                                description={aboutUpdateDescription}
+                                icon={
+                                    isLatestVerified
+                                        ? "checkmark-circle-outline"
+                                        : "cloud-download-outline"
                                 }
-                                description={latestVersionDescription}
-                                icon="cloud-download-outline"
-                                label="Latest available"
+                                label={aboutUpdateLabel}
                                 monoValue
+                                onPress={
+                                    isLatestVerified
+                                        ? handleUpdateRowPress
+                                        : undefined
+                                }
+                                tone={isLatestVerified ? "success" : "default"}
                                 value={latestVersionValue}
                             />
                         </MenuSection>
@@ -941,16 +967,16 @@ export function SettingsSectionScreen({
                         </MenuSection>
                         <MenuSection title="Latest Available">
                             <MenuRow
-                                accessory={
-                                    <InlineActionButton
-                                        disabled={updateActionDisabled()}
-                                        label={updateActionLabel()}
-                                        onPress={handleUpdateRowPress}
-                                    />
-                                }
+                                accessory={renderUpdateAccessory()}
                                 description={appUpdateState.message}
                                 icon="cloud-download-outline"
                                 label="Status"
+                                onPress={
+                                    isLatestVerified
+                                        ? handleUpdateRowPress
+                                        : undefined
+                                }
+                                tone={isLatestVerified ? "success" : "default"}
                                 value={updateRowLabel()}
                             />
                             <MenuRow
@@ -1396,6 +1422,16 @@ export function SettingsSectionScreen({
     );
 }
 
+function commitsMatch(
+    left: string | undefined,
+    right: string | undefined,
+): boolean {
+    const a = normalizeCommit(left);
+    const b = normalizeCommit(right);
+    if (!a || !b) return false;
+    return a === b || a.startsWith(b) || b.startsWith(a);
+}
+
 function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
@@ -1422,6 +1458,21 @@ function InlineActionButton({
         >
             <Text style={styles.inlineActionText}>{label}</Text>
         </Pressable>
+    );
+}
+
+function normalizeCommit(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    const trimmed = value.trim().toLowerCase();
+    return /^[a-f0-9]{7,40}$/.test(trimmed) ? trimmed : undefined;
+}
+
+function VerifiedBadge() {
+    return (
+        <View style={styles.verifiedBadge}>
+            <Ionicons color="#8DF5B0" name="checkmark-circle" size={16} />
+            <Text style={styles.verifiedBadgeText}>Verified</Text>
+        </View>
     );
 }
 
@@ -1499,5 +1550,21 @@ const styles = StyleSheet.create({
         color: "#A7F3BD",
         fontSize: 13,
         fontWeight: "700",
+    },
+    verifiedBadge: {
+        alignItems: "center",
+        backgroundColor: "rgba(74,222,128,0.14)",
+        borderColor: "rgba(74,222,128,0.45)",
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 5,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+    },
+    verifiedBadgeText: {
+        ...typography.button,
+        color: "#8DF5B0",
+        fontSize: 12,
     },
 });
