@@ -494,6 +494,9 @@ export function SettingsSectionScreen({
     const aboutUpdateDescription = isLatestVerified
         ? "Installed version is current"
         : latestVersionDescription;
+    const shouldShowAboutUpdateRow =
+        appUpdateState.status !== "checking" &&
+        appUpdateState.status !== "idle";
     const versionTapDescription = devUnlocked
         ? "Developer options are unlocked"
         : versionTaps > 0
@@ -861,22 +864,26 @@ export function SettingsSectionScreen({
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
                             />
-                            <MenuRow
-                                accessory={renderUpdateAccessory()}
-                                description={aboutUpdateDescription}
-                                icon={
-                                    isLatestVerified
-                                        ? "checkmark-circle-outline"
-                                        : "cloud-download-outline"
-                                }
-                                label={aboutUpdateLabel}
-                                onPress={
-                                    isLatestVerified
-                                        ? handleUpdateRowPress
-                                        : undefined
-                                }
-                                tone={isLatestVerified ? "success" : "default"}
-                            />
+                            {shouldShowAboutUpdateRow ? (
+                                <MenuRow
+                                    accessory={renderUpdateAccessory()}
+                                    description={aboutUpdateDescription}
+                                    icon={
+                                        isLatestVerified
+                                            ? "checkmark-circle-outline"
+                                            : "cloud-download-outline"
+                                    }
+                                    label={aboutUpdateLabel}
+                                    onPress={
+                                        isLatestVerified
+                                            ? handleUpdateRowPress
+                                            : undefined
+                                    }
+                                    tone={
+                                        isLatestVerified ? "success" : "default"
+                                    }
+                                />
+                            ) : null}
                         </MenuSection>
                     </>
                 ) : null}
