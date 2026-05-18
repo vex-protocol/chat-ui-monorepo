@@ -210,6 +210,10 @@ interface ClientWithInternalHttp {
     http?: ClientHttpLike;
 }
 
+interface ClientWithLocalDatabaseLike {
+    database?: Pick<Storage, "deleteMessage">;
+}
+
 interface ClientWithNotificationSubscriptionsLike {
     subscribeNotifications?: unknown;
     unsubscribeNotifications?: unknown;
@@ -812,21 +816,86 @@ class VexService {
         this.resetAll();
     }
 
-    deleteLocalMessage(
+    async deleteLocalMessage(
         conversationKey: string,
         mailID: string,
         isGroup: boolean,
-    ): boolean {
+    ): Promise<boolean> {
         const writable = isGroup ? $groupMessagesWritable : $messagesWritable;
         const thread = writable.get()[conversationKey] ?? [];
         if (thread.length === 0) {
             return false;
         }
-        const nextThread = thread.filter((msg) => msg.mailID !== mailID);
-        if (nextThread.length === thread.length) {
+        if (!thread.some((msg) => msg.mailID === mailID)) {
             return false;
         }
+
+        const database = (this.client as ClientWithLocalDatabaseLike | null)
+            ?.database;
+        const deleteMessage = database?.deleteMessage;
+        if (typeof deleteMessage !== "function") {
+            debugAuth("local-message-delete:missing-storage", {
+                conversationKey,
+                isGroup,
+                mailID,
+            });
+            return false;
+        }
+
+        try {
+            await deleteMessage.call(database, mailID);
+        } catch (err: unknown) {
+            debugAuth("local-message-delete:failed", {
+                conversationKey,
+                isGroup,
+                mailID,
+                message: errorMessage(err),
+            });
+            return false;
+        }
+
+        const currentThread = writable.get()[conversationKey] ?? [];
+        const nextThread = currentThread.filter((msg) => msg.mailID !== mailID);
+        if (nextThread.length === currentThread.length) {
+            return true;
+        }
         writable.setKey(conversationKey, nextThread);
+        return true;
+    }
+
+    async deleteLocalThread(
+        conversationKey: string,
+        isGroup: boolean,
+    ): Promise<boolean> {
+        const writable = isGroup ? $groupMessagesWritable : $messagesWritable;
+        const thread = writable.get()[conversationKey] ?? [];
+        if (thread.length === 0) {
+            return false;
+        }
+
+        try {
+            const client = this.requireClient();
+            await client.messages.delete(conversationKey);
+        } catch (err: unknown) {
+            debugAuth("local-thread-delete:failed", {
+                conversationKey,
+                isGroup,
+                message: errorMessage(err),
+            });
+            return false;
+        }
+
+        const threads: Record<string, Message[]> = Object.fromEntries(
+            Object.entries(writable.get()).filter(
+                ([key]) => key !== conversationKey,
+            ),
+        );
+        writable.set(threads);
+        if (isGroup) {
+            $channelUnreadCountsWritable.setKey(conversationKey, 0);
+        } else {
+            $dmUnreadCountsWritable.setKey(conversationKey, 0);
+        }
         return true;
     }
 
