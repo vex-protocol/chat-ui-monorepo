@@ -11,19 +11,34 @@ const publicVersion = normalize(process.env.EXPO_PUBLIC_VEX_APP_VERSION);
 const commit = normalize(process.env.EXPO_PUBLIC_VEX_COMMIT_SHA) ?? "local";
 const shortCommit =
     commit === "local" ? commit : commit.slice(0, 8).toLowerCase();
+const displayVersion = `${publicVersion ?? expoVersion ?? "0.0.0"}-${shortCommit}`;
 const updateId = Updates.updateId ?? undefined;
 const shortUpdateId = updateId?.slice(0, 8);
 const createdAt = Updates.createdAt?.toISOString();
 const runtimeVersion = Updates.runtimeVersion ?? "unknown";
 const shortRuntimeVersion = runtimeVersion.slice(0, 8);
+const vexExtra =
+    typeof Constants.expoConfig?.extra?.["vex"] === "object" &&
+    Constants.expoConfig.extra["vex"] != null
+        ? (Constants.expoConfig.extra["vex"] as Record<string, unknown>)
+        : undefined;
+const environment =
+    normalize(
+        typeof vexExtra?.["environment"] === "string"
+            ? vexExtra["environment"]
+            : undefined,
+    ) ?? "production";
 
 export const buildInfo = {
+    androidPackage: Constants.expoConfig?.android?.package,
     channel: Updates.channel ?? "embedded",
     commit,
     createdAt,
+    displayVersion,
+    environment,
     fingerprint: runtimeVersion,
     isEmbeddedLaunch: Updates.isEmbeddedLaunch,
-    label: `${publicVersion ?? expoVersion ?? "0.0.0"}+${shortCommit}`,
+    label: displayVersion,
     runtimeVersion,
     shortCommit,
     shortFingerprint: shortRuntimeVersion,

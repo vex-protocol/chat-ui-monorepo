@@ -39,6 +39,9 @@ catalogs:
     expo-constants:
       specifier: ~55.0.13
       version: 55.0.13
+    expo-crypto:
+      specifier: ~55.0.14
+      version: 55.0.14
     expo-document-picker:
       specifier: ~55.0.13
       version: 55.0.13
@@ -48,6 +51,9 @@ catalogs:
     expo-image-manipulator:
       specifier: ^55.0.15
       version: 55.0.15
+    expo-intent-launcher:
+      specifier: ~55.0.12
+      version: 55.0.12
     expo-sharing:
       specifier: ~55.0.18
       version: 55.0.18
@@ -262,6 +268,9 @@ importers:
       expo-constants:
         specifier: 'catalog:'
         version: 55.0.13(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(typescript@5.9.3)
+      expo-crypto:
+        specifier: 'catalog:'
+        version: 55.0.14(expo@55.0.13)
       expo-document-picker:
         specifier: 'catalog:'
         version: 55.0.13(expo@55.0.13)
@@ -277,6 +286,9 @@ importers:
       expo-image-picker:
         specifier: ^55.0.18
         version: 55.0.18(expo@55.0.13)
+      expo-intent-launcher:
+        specifier: 'catalog:'
+        version: 55.0.12(expo@55.0.13)
       expo-notifications:
         specifier: ~55.0.18
         version: 55.0.18(expo@55.0.13)(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
@@ -3590,6 +3602,11 @@ packages:
       expo: '*'
       react-native: '*'
 
+  expo-crypto@55.0.14:
+    resolution: {integrity: sha512-TfAADBGZNNv9OOmdKFJCz54wDj87ufxtzQNSY+Roycpm8e5tuCnDIL7EjqUOmNTGH99Jj8ftPGFt4KGG2Ii2fg==}
+    peerDependencies:
+      expo: '*'
+
   expo-document-picker@55.0.13:
     resolution: {integrity: sha512-IhswJElhdzs3fKDEKW8KXYRoFkWGEsXRMYAZT46Yo56zqqy8yQXrczo33RSwD2hFzNQBdLT97SJL9N311UyS3g==}
     peerDependencies:
@@ -3628,6 +3645,11 @@ packages:
 
   expo-image-picker@55.0.18:
     resolution: {integrity: sha512-lGpPGRu+7mE8qN0ma2boRsCmfOGbdHZ2bXTpWVeWly0JCZdogGlTrYFnhTqgS8+lmiRb/UCOs7iTm2P5Rra6kw==}
+    peerDependencies:
+      expo: '*'
+
+  expo-intent-launcher@55.0.12:
+    resolution: {integrity: sha512-Mo94T8rq1bFSiXX8vR/2U5xIlrbGnXXqT6gfp/fsR5IsBBog3Jf2MbSvAfqj78Z/ho5LK3d/PXJjCOONFqXZ2A==}
     peerDependencies:
       expo: '*'
 
@@ -8348,9 +8370,7 @@ snapshots:
       metro-runtime: 0.83.5
     transitivePeerDependencies:
       - '@babel/core'
-      - bufferutil
       - supports-color
-      - utf-8-validate
     optional: true
 
   '@react-native/normalize-colors@0.83.4': {}
@@ -10553,6 +10573,10 @@ snapshots:
       - supports-color
       - typescript
 
+  expo-crypto@55.0.14(expo@55.0.13):
+    dependencies:
+      expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
+
   expo-document-picker@55.0.13(expo@55.0.13):
     dependencies:
       expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
@@ -10588,6 +10612,10 @@ snapshots:
     dependencies:
       expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
       expo-image-loader: 55.0.0(expo@55.0.13)
+
+  expo-intent-launcher@55.0.12(expo@55.0.13):
+    dependencies:
+      expo: 55.0.13(@babel/core@7.29.0)(@expo/dom-webview@55.0.5)(react-dom@19.2.0(react@19.2.0))(react-native@0.83.4(@babel/core@7.29.0)(@react-native-community/cli@20.1.0(typescript@5.9.3))(@react-native/metro-config@0.84.1(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
 
   expo-json-utils@55.0.2: {}
 

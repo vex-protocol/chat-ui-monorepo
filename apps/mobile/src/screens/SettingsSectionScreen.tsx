@@ -9,6 +9,8 @@ import React, {
 } from "react";
 import {
     Alert,
+    Platform,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Switch,
@@ -17,7 +19,14 @@ import {
     View,
 } from "react-native";
 
-import { $localMessageRetentionDays, $user, vexService } from "@vex-chat/store";
+import {
+    $authStatus,
+    $channels,
+    $localMessageRetentionDays,
+    $servers,
+    $user,
+    vexService,
+} from "@vex-chat/store";
 
 import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
@@ -27,8 +36,17 @@ import * as ImagePicker from "expo-image-picker";
 import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
+import {
+    $appUpdateState,
+    checkForAppUpdates,
+    downloadAndInstallApkUpdate,
+    fetchOtaUpdate,
+    openUnknownAppSourcesSettings,
+    restartForOtaUpdate,
+} from "../lib/appUpdates";
 import { $avatarCropResult } from "../lib/avatarCropResult";
 import { buildInfo } from "../lib/buildInfo";
+import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
     $alwaysOnEnabled,
@@ -44,6 +62,10 @@ import {
     unsubscribeStoredPushNotificationSubscription,
 } from "../lib/pushNotifications";
 import { persistLocalMessageRetentionDays } from "../lib/retentionPreference";
+import {
+    type ConnectedServerInfo,
+    fetchConnectedServerInfo,
+} from "../lib/serverInfo";
 import { colors, typography } from "../theme";
 
 const LOCAL_RETENTION_CHOICES = [7, 14, 21, 30] as const;
@@ -56,9 +78,14 @@ export function SettingsSectionScreen({
     route,
 }: AppScreenProps<"SettingsSection">) {
     const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+    const authStatus = useStore($authStatus);
+    const appUpdateState = useStore($appUpdateState);
+    const channelsByServer = useStore($channels);
+    const servers = useStore($servers);
     const user = useStore($user);
     const localRetentionDays = useStore($localMessageRetentionDays);
     const section = route.params.section;
+    const [aboutRefreshing, setAboutRefreshing] = useState(false);
     const [avatarError, setAvatarError] = useState("");
     const [avatarLastAttemptBytes, setAvatarLastAttemptBytes] = useState<
         null | number
@@ -66,6 +93,12 @@ export function SettingsSectionScreen({
     const [avatarNotice, setAvatarNotice] = useState("");
     const [avatarUploading, setAvatarUploading] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
+    const [serverInfo, setServerInfo] = useState<ConnectedServerInfo | null>(
+        null,
+    );
+    const [sessionInfo, setSessionInfo] =
+        useState<Awaited<ReturnType<typeof vexService.getSessionInfo>>>(null);
+    const [updateBusy, setUpdateBusy] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
     );
@@ -80,6 +113,7 @@ export function SettingsSectionScreen({
     // only consume *our* result (not stale state from a previous
     // cropper invocation that the user cancelled).
     const cropResult = useStore($avatarCropResult);
+    const aboutRefreshInFlightRef = useRef(false);
     const expectedCropRequestRef = useRef<null | number>(null);
     // Easter-egg counter for unlocking the developer surface from
     // About → Version. State sticks while the user is on this screen;
@@ -295,6 +329,156 @@ export function SettingsSectionScreen({
         );
     }
 
+    const refreshAboutInfo = useCallback(
+        async (options?: { forceUpdateCheck?: boolean; silent?: boolean }) => {
+            if (aboutRefreshInFlightRef.current) {
+                return;
+            }
+            aboutRefreshInFlightRef.current = true;
+            const silent = options?.silent === true;
+            try {
+                if (!silent) {
+                    setAboutRefreshing(true);
+                }
+                const [nextServerInfo, nextSessionInfo] = await Promise.all([
+                    fetchConnectedServerInfo(),
+                    vexService.getSessionInfo(),
+                    checkForAppUpdates({
+                        force: options?.forceUpdateCheck === true,
+                        silent,
+                    }),
+                ]);
+                setServerInfo(nextServerInfo);
+                setSessionInfo(nextSessionInfo);
+            } catch (err: unknown) {
+                setServerInfo({
+                    baseUrl: getServerUrl(),
+                    checkedAt: new Date().toISOString(),
+                    error:
+                        err instanceof Error
+                            ? err.message
+                            : "Could not refresh About details.",
+                    host: getServerUrl(),
+                });
+            } finally {
+                if (!silent) {
+                    setAboutRefreshing(false);
+                }
+                aboutRefreshInFlightRef.current = false;
+            }
+        },
+        [],
+    );
+
+    useEffect(() => {
+        if (section !== "about" && section !== "developer") {
+            return;
+        }
+        void refreshAboutInfo({ silent: true });
+    }, [refreshAboutInfo, section, user?.userID]);
+
+    async function handleManualUpdateCheck(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            await refreshAboutInfo({ forceUpdateCheck: true });
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
+    async function handleFetchOtaUpdate(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            const next = await fetchOtaUpdate();
+            if (next.status === "ota_ready") {
+                Alert.alert(
+                    "Restart to update?",
+                    "The OTA update is downloaded and will run after Vex restarts.",
+                    [
+                        { style: "cancel", text: "Later" },
+                        {
+                            onPress: () => {
+                                void restartForOtaUpdate();
+                            },
+                            text: "Restart",
+                        },
+                    ],
+                );
+            }
+        } catch (err: unknown) {
+            Alert.alert("OTA update failed", errorMessage(err));
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
+    function handleDownloadApkUpdate(): void {
+        const release = appUpdateState.nativeRelease;
+        if (!release?.apkUrl) {
+            Alert.alert("APK unavailable", "No APK asset was found.");
+            return;
+        }
+        if (Platform.OS !== "android") {
+            Alert.alert(
+                "Open release?",
+                "APK self-updates are Android-only. Open the GitHub release instead?",
+                [
+                    { style: "cancel", text: "Cancel" },
+                    {
+                        onPress: () => {
+                            void downloadAndInstallApkUpdate();
+                        },
+                        text: "Open",
+                    },
+                ],
+            );
+            return;
+        }
+        Alert.alert(
+            "Install APK update?",
+            release.sha256
+                ? "Vex will download the APK, verify its checksum, then open Android's installer."
+                : "Vex will download the APK and open Android's installer. This release does not include a checksum yet.",
+            [
+                { style: "cancel", text: "Cancel" },
+                {
+                    onPress: () => {
+                        void installApkUpdate();
+                    },
+                    text: "Download",
+                },
+            ],
+        );
+    }
+
+    async function installApkUpdate(): Promise<void> {
+        if (updateBusy) return;
+        setUpdateBusy(true);
+        try {
+            await downloadAndInstallApkUpdate();
+        } catch (err: unknown) {
+            Alert.alert(
+                "APK install failed",
+                `${errorMessage(
+                    err,
+                )}\n\nIf Android blocks the install, allow Vex to install unknown apps and try again.`,
+                [
+                    { style: "cancel", text: "OK" },
+                    {
+                        onPress: () => {
+                            void openUnknownAppSourcesSettings();
+                        },
+                        text: "Open settings",
+                    },
+                ],
+            );
+        } finally {
+            setUpdateBusy(false);
+        }
+    }
+
     async function handleSelectLocalRetention(
         days: (typeof LOCAL_RETENTION_CHOICES)[number],
     ): Promise<void> {
@@ -320,6 +504,109 @@ export function SettingsSectionScreen({
             default:
                 return "Notify this device when new mail arrives";
         }
+    }
+
+    const serverCount = Object.keys(servers).length;
+    const channelCount = Object.values(channelsByServer).reduce(
+        (total, channels) => total + channels.length,
+        0,
+    );
+    const serverOk =
+        serverInfo?.health?.ok ?? serverInfo?.status?.ok ?? undefined;
+    const serverStatusLabel =
+        serverInfo?.error != null
+            ? "offline"
+            : serverOk === true
+              ? "healthy"
+              : serverOk === false
+                ? "degraded"
+                : "unknown";
+    const serverDbLabel =
+        serverInfo?.health?.dbReady === true
+            ? "ready"
+            : serverInfo?.health?.dbReady === false
+              ? "degraded"
+              : "unknown";
+
+    function updateRowLabel(): string {
+        switch (appUpdateState.status) {
+            case "apk_available":
+                return "APK update available";
+            case "apk_downloading":
+                return "Downloading APK...";
+            case "checking":
+                return "Checking for updates...";
+            case "current":
+                return "Up to date";
+            case "error":
+                return "Update check failed";
+            case "ota_available":
+                return "OTA update available";
+            case "ota_ready":
+                return "Restart to update";
+            case "unsupported":
+                return "Updates unavailable";
+            case "idle":
+            default:
+                return "Check for updates";
+        }
+    }
+
+    function updateRowDescription(): string {
+        if (appUpdateState.status === "apk_downloading") {
+            const progress = appUpdateState.apkDownloadProgress;
+            return typeof progress === "number"
+                ? `${String(Math.round(progress * 100))}% downloaded`
+                : "Downloading latest APK";
+        }
+        if (appUpdateState.status === "apk_available") {
+            return appUpdateState.nativeRelease?.tagName
+                ? `${appUpdateState.nativeRelease.tagName} requires a new APK`
+                : "Native runtime changed";
+        }
+        if (appUpdateState.status === "ota_available") {
+            return appUpdateState.latestCommit?.shortSha
+                ? `Latest compatible commit ${appUpdateState.latestCommit.shortSha}`
+                : "Tap to download";
+        }
+        if (appUpdateState.status === "ota_ready") {
+            return "Downloaded and ready";
+        }
+        if (appUpdateState.status === "error") {
+            return appUpdateState.error ?? "Tap to retry";
+        }
+        if (appUpdateState.message) {
+            return appUpdateState.message;
+        }
+        return appUpdateState.latestCommit?.shortSha
+            ? `Latest GitHub commit ${appUpdateState.latestCommit.shortSha}`
+            : "Checks OTA and APK releases";
+    }
+
+    function updateRowValue(): string | undefined {
+        if (appUpdateState.status === "apk_downloading") {
+            const progress = appUpdateState.apkDownloadProgress;
+            return typeof progress === "number"
+                ? `${String(Math.round(progress * 100))}%`
+                : undefined;
+        }
+        return appUpdateState.latestCommit?.shortSha;
+    }
+
+    function handleUpdateRowPress(): void {
+        if (appUpdateState.status === "ota_available") {
+            void handleFetchOtaUpdate();
+            return;
+        }
+        if (appUpdateState.status === "ota_ready") {
+            void restartForOtaUpdate();
+            return;
+        }
+        if (appUpdateState.status === "apk_available") {
+            handleDownloadApkUpdate();
+            return;
+        }
+        void handleManualUpdateCheck();
     }
 
     function formatBytes(bytes: number): string {
@@ -554,31 +841,162 @@ export function SettingsSectionScreen({
                 }}
                 title={title}
             />
-            <ScrollView contentContainerStyle={styles.content}>
-                {section === "about" ? (
-                    <MenuSection title="App">
-                        <MenuRow
-                            icon="pricetag-outline"
-                            label="Version"
-                            monoValue
-                            onPress={handleVersionTap}
-                            value={buildInfo.version}
-                            {...(devUnlocked
-                                ? {
-                                      description:
-                                          "Developer options are unlocked",
-                                  }
-                                : versionTaps > 0
-                                  ? {
-                                        description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
-                                            DEV_UNLOCK_TAPS - versionTaps === 1
-                                                ? ""
-                                                : "s"
-                                        } to unlock developer options`,
-                                    }
-                                  : {})}
+            <ScrollView
+                contentContainerStyle={styles.content}
+                refreshControl={
+                    section === "about" || section === "developer" ? (
+                        <RefreshControl
+                            onRefresh={() => {
+                                void refreshAboutInfo({
+                                    forceUpdateCheck: true,
+                                });
+                            }}
+                            refreshing={aboutRefreshing}
+                            tintColor={colors.textSecondary}
                         />
-                    </MenuSection>
+                    ) : undefined
+                }
+            >
+                {section === "about" ? (
+                    <>
+                        <MenuSection title="App">
+                            <MenuRow
+                                icon="pricetag-outline"
+                                label="Version"
+                                monoValue
+                                onPress={handleVersionTap}
+                                value={buildInfo.displayVersion}
+                                {...(devUnlocked
+                                    ? {
+                                          description:
+                                              "Developer options are unlocked",
+                                      }
+                                    : versionTaps > 0
+                                      ? {
+                                            description: `${DEV_UNLOCK_TAPS - versionTaps} more tap${
+                                                DEV_UNLOCK_TAPS -
+                                                    versionTaps ===
+                                                1
+                                                    ? ""
+                                                    : "s"
+                                            } to unlock developer options`,
+                                        }
+                                      : {})}
+                            />
+                            <MenuRow
+                                description={updateRowDescription()}
+                                disabled={
+                                    updateBusy ||
+                                    appUpdateState.status === "checking" ||
+                                    appUpdateState.status === "apk_downloading"
+                                }
+                                icon={
+                                    appUpdateState.status === "apk_available"
+                                        ? "archive-outline"
+                                        : appUpdateState.status === "ota_ready"
+                                          ? "refresh-circle-outline"
+                                          : "cloud-download-outline"
+                                }
+                                label={updateRowLabel()}
+                                monoValue
+                                onPress={handleUpdateRowPress}
+                                tone={
+                                    appUpdateState.status === "ota_available" ||
+                                    appUpdateState.status === "ota_ready" ||
+                                    appUpdateState.status === "apk_available"
+                                        ? "success"
+                                        : appUpdateState.status === "error"
+                                          ? "danger"
+                                          : "default"
+                                }
+                                value={updateRowValue()}
+                            />
+                            <MenuRow
+                                description="Compare against GitHub"
+                                icon="git-commit-outline"
+                                label="Latest commit"
+                                monoValue
+                                value={
+                                    appUpdateState.latestCommit?.shortSha ??
+                                    "unknown"
+                                }
+                            />
+                        </MenuSection>
+
+                        <MenuSection title="Connected Server">
+                            <MenuRow
+                                icon="server-outline"
+                                label="API host"
+                                value={serverInfo?.host ?? getServerUrl()}
+                            />
+                            <MenuRow
+                                description={
+                                    serverInfo?.health?.latencyMs != null
+                                        ? `${String(
+                                              serverInfo.health.latencyMs,
+                                          )}ms`
+                                        : serverInfo?.error
+                                          ? serverInfo.error
+                                          : undefined
+                                }
+                                icon="pulse-outline"
+                                label="Service"
+                                tone={
+                                    serverStatusLabel === "healthy"
+                                        ? "success"
+                                        : serverStatusLabel === "degraded" ||
+                                            serverStatusLabel === "offline"
+                                          ? "danger"
+                                          : "default"
+                                }
+                                value={serverStatusLabel}
+                            />
+                            <MenuRow
+                                icon="shield-checkmark-outline"
+                                label="Auth"
+                                value={authStatus}
+                            />
+                            <MenuRow
+                                icon="at-outline"
+                                label="Account"
+                                value={
+                                    sessionInfo?.username ??
+                                    user?.username ??
+                                    "signed out"
+                                }
+                            />
+                            <MenuRow
+                                icon="people-outline"
+                                label="Groups"
+                                value={String(serverCount)}
+                            />
+                            <MenuRow
+                                icon="chatbubbles-outline"
+                                label="Channels"
+                                value={String(channelCount)}
+                            />
+                            <MenuRow
+                                icon="hardware-chip-outline"
+                                label="Crypto"
+                                value={
+                                    serverInfo?.status?.cryptoProfile ??
+                                    "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="file-tray-full-outline"
+                                label="Database"
+                                tone={
+                                    serverDbLabel === "ready"
+                                        ? "success"
+                                        : serverDbLabel === "degraded"
+                                          ? "danger"
+                                          : "default"
+                                }
+                                value={serverDbLabel}
+                            />
+                        </MenuSection>
+                    </>
                 ) : null}
 
                 {section === "account" ? (
@@ -716,6 +1134,59 @@ export function SettingsSectionScreen({
                                 icon="time-outline"
                                 label="Created"
                                 value={buildInfo.createdAt ?? "unknown"}
+                            />
+                            <MenuRow
+                                description={appUpdateState.message}
+                                icon="cloud-download-outline"
+                                label="Update status"
+                                onPress={handleUpdateRowPress}
+                                value={updateRowLabel()}
+                            />
+                            <MenuRow
+                                icon="git-compare-outline"
+                                label="Latest GitHub"
+                                monoBlock={
+                                    appUpdateState.latestCommit?.sha ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.latestCommit?.shortSha ??
+                                    "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="archive-outline"
+                                label="APK release"
+                                value={
+                                    appUpdateState.nativeRelease?.tagName ??
+                                    "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="Release fingerprint"
+                                monoBlock={
+                                    appUpdateState.nativeRelease?.fingerprint ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.nativeRelease
+                                        ?.fingerprintShort ?? "unknown"
+                                }
+                            />
+                            <MenuRow
+                                icon="shield-checkmark-outline"
+                                label="APK checksum"
+                                monoBlock={
+                                    appUpdateState.nativeRelease?.sha256 ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.nativeRelease?.sha256?.slice(
+                                        0,
+                                        8,
+                                    ) ?? "unknown"
+                                }
                             />
                         </MenuSection>
                         <MenuSection
@@ -899,6 +1370,10 @@ export function SettingsSectionScreen({
             </ScrollView>
         </View>
     );
+}
+
+function errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
 }
 
 const styles = StyleSheet.create({
