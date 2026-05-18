@@ -234,6 +234,9 @@ jobs:
                     echo ""
                     echo "Vex Development APK built from commit ${{ steps.meta.outputs.short_sha }}."
                     echo ""
+                    echo "Direct latest APK:"
+                    echo "https://github.com/${{ github.repository }}/releases/download/mobile-rc-latest/vex-development-latest.apk"
+                    echo ""
                     echo "- Package id: \`chat.vex.mobile.dev\`"
                     echo "- Branch: \`development\`"
                     echo "- Commit: \`${{ github.sha }}\`"
@@ -283,9 +286,11 @@ jobs:
               run: |
                   TAG="mobile-rc-latest"
                   TITLE="Vex Development RC (latest)"
+                  cp vex-development.apk vex-development-latest.apk
                   gh release delete "$TAG" --cleanup-tag --yes 2>/dev/null || true
-                  gh release create "$TAG" "${{ steps.meta.outputs.asset }}" fingerprint.json \
+                  gh release create "$TAG" vex-development-latest.apk "${{ steps.meta.outputs.asset }}" fingerprint.json \
                     --target "$GITHUB_SHA" \
                     --prerelease \
+                    --latest=false \
                     --title "$TITLE" \
                     --notes-file /tmp/mobile-rc-notes.md
