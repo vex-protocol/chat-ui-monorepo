@@ -29,7 +29,6 @@ import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
 import { $avatarCropResult } from "../lib/avatarCropResult";
 import { buildInfo } from "../lib/buildInfo";
-import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
     $alwaysOnEnabled,
@@ -563,7 +562,7 @@ export function SettingsSectionScreen({
                             label="Version"
                             monoValue
                             onPress={handleVersionTap}
-                            value={buildInfo.label}
+                            value={buildInfo.version}
                             {...(devUnlocked
                                 ? {
                                       description:
@@ -578,44 +577,6 @@ export function SettingsSectionScreen({
                                         } to unlock developer options`,
                                     }
                                   : {})}
-                        />
-                        <MenuRow
-                            icon="git-commit-outline"
-                            label="Commit"
-                            monoBlock={buildInfo.commit}
-                            value={buildInfo.shortCommit}
-                        />
-                        <MenuRow
-                            description={
-                                buildInfo.isEmbeddedLaunch
-                                    ? "Running the APK bundle"
-                                    : "Running an OTA bundle"
-                            }
-                            icon={
-                                buildInfo.isEmbeddedLaunch
-                                    ? "archive-outline"
-                                    : "cloud-download-outline"
-                            }
-                            label="Update"
-                            value={
-                                buildInfo.shortUpdateId ??
-                                (buildInfo.isEmbeddedLaunch
-                                    ? "embedded"
-                                    : "unknown")
-                            }
-                            {...(buildInfo.updateId != null
-                                ? { monoBlock: buildInfo.updateId }
-                                : {})}
-                        />
-                        <MenuRow
-                            icon="git-branch-outline"
-                            label="Channel"
-                            value={buildInfo.channel}
-                        />
-                        <MenuRow
-                            icon="server-outline"
-                            label="Server"
-                            value={getServerUrl()}
                         />
                     </MenuSection>
                 ) : null}
@@ -746,10 +707,10 @@ export function SettingsSectionScreen({
                                 value={buildInfo.channel}
                             />
                             <MenuRow
-                                icon="cube-outline"
-                                label="Runtime"
-                                monoBlock={buildInfo.runtimeVersion}
-                                value={buildInfo.runtimeVersion.slice(0, 8)}
+                                icon="finger-print-outline"
+                                label="Fingerprint"
+                                monoBlock={buildInfo.fingerprint}
+                                value={buildInfo.shortFingerprint}
                             />
                             <MenuRow
                                 icon="time-outline"
