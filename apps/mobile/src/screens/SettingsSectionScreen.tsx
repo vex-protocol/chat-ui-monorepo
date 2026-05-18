@@ -510,30 +510,6 @@ export function SettingsSectionScreen({
         0,
     );
 
-    function updateRowLabel(): string {
-        switch (appUpdateState.status) {
-            case "apk_available":
-                return "APK update available";
-            case "apk_downloading":
-                return "Downloading APK...";
-            case "checking":
-                return "Checking for updates...";
-            case "current":
-                return "Up to date";
-            case "error":
-                return "Update check failed";
-            case "ota_available":
-                return "OTA update available";
-            case "ota_ready":
-                return "Restart to update";
-            case "unsupported":
-                return "Updates unavailable";
-            case "idle":
-            default:
-                return "Check for updates";
-        }
-    }
-
     function updateActionLabel(): string {
         switch (appUpdateState.status) {
             case "apk_available":
@@ -1036,33 +1012,6 @@ export function SettingsSectionScreen({
                                 icon="time-outline"
                                 label="Created"
                                 value={buildInfo.createdAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                description={appUpdateState.message}
-                                icon="cloud-download-outline"
-                                label="Update status"
-                                onPress={handleUpdateRowPress}
-                                value={updateRowLabel()}
-                            />
-                            <MenuRow
-                                icon="git-compare-outline"
-                                label="Latest GitHub"
-                                monoBlock={
-                                    appUpdateState.latestCommit?.sha ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.latestCommit?.shortSha ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="archive-outline"
-                                label="APK release"
-                                value={
-                                    appUpdateState.nativeRelease?.tagName ??
-                                    "unknown"
-                                }
                             />
                             <MenuRow
                                 icon="finger-print-outline"
