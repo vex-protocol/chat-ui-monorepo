@@ -1,0 +1,50 @@
+node_modules
+
+# Agents
+.claude
+.cursor
+.agents
+
+AGENTS.md
+
+# Mobile native dirs (Expo Prebuild / CNG generates these)
+apps/mobile/ios/
+apps/mobile/android/
+
+# EAS-managed signing material — NEVER commit. `eas credentials`
+# downloads keystores and a credentials.json with cleartext passwords.
+apps/mobile/credentials.json
+apps/mobile/credentials/
+apps/mobile/google-services*.json
+**/keystore.jks
+**/upload-keystore.jks
+
+# Per-app env overrides — only .env.example is committed
+.env
+.env.local
+.env.*.local
+
+# Dolt database files
+.dolt/
+*.db
+
+# Beads auto-generated backup dumps — noisy, regenerated per run
+.beads/backup/
+
+.expo
+
+# Verdaccio local registry
+.verdaccio/storage/
+.verdaccio/htpasswd
+
+# Wrong lockfiles / package managers
+package-lock.json
+yarn.lock
+
+# Local registry config — points to localhost:4873, breaks without Verdaccio running
+.npmrc
+
+# CI writes these files from GitHub Actions secrets immediately before running
+# `eas build --local`. They stay gitignored, but EAS must include them in its
+# project archive so Expo prebuild can copy android.googleServicesFile.
+!apps/mobile/google-services*.json
