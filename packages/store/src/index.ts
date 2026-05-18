@@ -84,6 +84,7 @@ export type {
     CreateServerResult,
     DeviceApprovalRequest,
     InvitePreview,
+    JoinInviteResult,
     OperationResult,
     PasskeySignInBegin,
     ResumeNetworkStatus,

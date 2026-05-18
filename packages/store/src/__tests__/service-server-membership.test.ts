@@ -11,9 +11,16 @@ import {
 import { vexService } from "../service.ts";
 
 type TestClient = {
+    channels?: {
+        retrieve: ReturnType<typeof vi.fn>;
+    };
     close: ReturnType<typeof vi.fn>;
+    invites?: {
+        redeem: ReturnType<typeof vi.fn>;
+    };
     servers: {
         leave: ReturnType<typeof vi.fn>;
+        retrieveByID?: ReturnType<typeof vi.fn>;
     };
 };
 
@@ -33,15 +40,79 @@ function makeMessage(channelID: string, mailID: string): Message {
     } as unknown as Message;
 }
 
-describe("vexService.leaveServer", () => {
-    beforeEach(async () => {
-        await vexService.close();
-        serviceInternals.client = null;
-        $serversWritable.set({});
-        $channelsWritable.set({});
-        $permissionsWritable.set({});
-        $groupMessagesWritable.set({});
+async function resetMembershipState(): Promise<void> {
+    await vexService.close();
+    serviceInternals.client = null;
+    $serversWritable.set({});
+    $channelsWritable.set({});
+    $permissionsWritable.set({});
+    $groupMessagesWritable.set({});
+}
+
+describe("vexService.joinInvite", () => {
+    beforeEach(resetMembershipState);
+
+    test("joins the server and returns a navigation target", async () => {
+        const server: Server = {
+            name: "Blood Group",
+            serverID: "server-blood",
+        };
+        const channel: Channel = {
+            channelID: "channel-blood",
+            name: "general",
+            serverID: server.serverID,
+        };
+        const permission: Permission = {
+            permissionID: "permission-blood",
+            powerLevel: 10,
+            resourceID: server.serverID,
+            resourceType: "server",
+            userID: "user-me",
+        };
+        const client: TestClient = {
+            channels: {
+                retrieve: vi.fn(async () => [channel]),
+            },
+            close: vi.fn(async () => undefined),
+            invites: {
+                redeem: vi.fn(async () => permission),
+            },
+            servers: {
+                leave: vi.fn(async () => undefined),
+                retrieveByID: vi.fn(async () => server),
+            },
+        };
+
+        serviceInternals.client = client;
+
+        const result = await vexService.joinInvite("invite-blood");
+
+        expect(result).toEqual({
+            channelID: channel.channelID,
+            channelName: channel.name,
+            ok: true,
+            serverID: server.serverID,
+            serverName: server.name,
+        });
+        expect(client.invites?.redeem).toHaveBeenCalledWith("invite-blood");
+        expect(client.servers.retrieveByID).toHaveBeenCalledWith(
+            server.serverID,
+        );
+        expect(client.channels?.retrieve).toHaveBeenCalledWith(server.serverID);
+        expect($serversWritable.get()).toEqual({
+            [server.serverID]: server,
+        });
+        expect($channelsWritable.get()).toEqual({
+            [server.serverID]: [channel],
+        });
+        expect($permissionsWritable.get()).toEqual({
+            [permission.permissionID]: permission,
+        });
     });
+});
+
+describe("vexService.leaveServer", () => {
+    beforeEach(resetMembershipState);
 
     test("leaves the server and removes local server state", async () => {
         const targetServer: Server = {

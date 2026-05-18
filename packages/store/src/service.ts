@@ -140,6 +140,13 @@ export interface InvitePreview {
     server: null | Server;
 }
 
+export interface JoinInviteResult extends OperationResult {
+    channelID?: string;
+    channelName?: string;
+    serverID?: string;
+    serverName?: string;
+}
+
 /** Result from any mutation operation. */
 export interface OperationResult {
     error?: string;
@@ -1092,7 +1099,7 @@ class VexService {
         return this.wsDebugStateLogsEnabled;
     }
 
-    async joinInvite(inviteID: string): Promise<OperationResult> {
+    async joinInvite(inviteID: string): Promise<JoinInviteResult> {
         try {
             const client = this.requireClient();
             const permission = await client.invites.redeem(inviteID);
@@ -1105,7 +1112,19 @@ class VexService {
             $serversWritable.setKey(server.serverID, server);
             const channels = await client.channels.retrieve(server.serverID);
             $channelsWritable.setKey(server.serverID, channels);
-            return { ok: true };
+            $permissionsWritable.setKey(permission.permissionID, permission);
+            const firstChannel = channels[0];
+            return {
+                ok: true,
+                serverID: server.serverID,
+                serverName: server.name,
+                ...(firstChannel
+                    ? {
+                          channelID: firstChannel.channelID,
+                          channelName: firstChannel.name,
+                      }
+                    : {}),
+            };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
