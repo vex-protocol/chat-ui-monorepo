@@ -14,15 +14,20 @@ const shortCommit =
 const updateId = Updates.updateId ?? undefined;
 const shortUpdateId = updateId?.slice(0, 8);
 const createdAt = Updates.createdAt?.toISOString();
+const runtimeVersion = Updates.runtimeVersion ?? "unknown";
+const shortRuntimeVersion = runtimeVersion.slice(0, 8);
 
 export const buildInfo = {
     channel: Updates.channel ?? "embedded",
     commit,
     createdAt,
+    fingerprint: runtimeVersion,
     isEmbeddedLaunch: Updates.isEmbeddedLaunch,
     label: `${publicVersion ?? expoVersion ?? "0.0.0"}+${shortCommit}`,
-    runtimeVersion: Updates.runtimeVersion ?? "unknown",
+    runtimeVersion,
     shortCommit,
+    shortFingerprint: shortRuntimeVersion,
+    shortRuntimeVersion,
     shortUpdateId,
     updateId,
     version: publicVersion ?? expoVersion ?? "0.0.0",
