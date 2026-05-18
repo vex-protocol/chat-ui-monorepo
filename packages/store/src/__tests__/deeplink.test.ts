@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 
-import { extractInviteID, parseInviteID, parseVexLink } from "../deeplink.ts";
+import {
+    extractInviteID,
+    formatInviteAppLink,
+    formatInviteLink,
+    parseInviteID,
+    parseVexLink,
+} from "../deeplink.ts";
 
 // ── parseInviteID ───────────────────────────────────────────────────────────
 
@@ -12,6 +18,9 @@ describe("parseInviteID", () => {
     });
 
     test("accepts UUID at the end of a full URL", () => {
+        expect(parseInviteID(`https://vex.wtf/invite/${validUUID}`)).toBe(
+            validUUID,
+        );
         expect(parseInviteID(`https://vex.chat/invite/${validUUID}`)).toBe(
             validUUID,
         );
@@ -58,7 +67,10 @@ describe("extractInviteID", () => {
             validUUID,
         );
         expect(
-            extractInviteID(`try https://vex.chat/invite/${validUUID}.`),
+            extractInviteID(`try https://vex.wtf/invite/${validUUID}.`),
+        ).toBe(validUUID);
+        expect(
+            extractInviteID(`legacy https://vex.chat/invite/${validUUID}`),
         ).toBe(validUUID);
         expect(extractInviteID(`(/invite/${validUUID})`)).toBe(validUUID);
     });
@@ -75,12 +87,47 @@ describe("extractInviteID", () => {
     });
 });
 
+// ── formatInviteLink ────────────────────────────────────────────────────────
+
+describe("formatInviteLink", () => {
+    const validUUID = "3f2ae9b8-c5a7-4d4a-9f3e-1a2b3c4d5e6f";
+
+    test("formats the public invite URL", () => {
+        expect(formatInviteLink(validUUID)).toBe(
+            `https://vex.wtf/invite/${validUUID}`,
+        );
+    });
+});
+
+// ── formatInviteAppLink ─────────────────────────────────────────────────────
+
+describe("formatInviteAppLink", () => {
+    const validUUID = "3f2ae9b8-c5a7-4d4a-9f3e-1a2b3c4d5e6f";
+
+    test("formats the canonical app invite URI", () => {
+        expect(formatInviteAppLink(validUUID)).toBe(
+            `vex://invite/${validUUID}`,
+        );
+    });
+});
+
 // ── parseVexLink ────────────────────────────────────────────────────────────
 
 describe("parseVexLink", () => {
     test("parses vex://invite/<id>", () => {
         const result = parseVexLink("vex://invite/abc-123");
         expect(result).toEqual({ inviteID: "abc-123", type: "invite" });
+    });
+
+    test("parses web invite URLs", () => {
+        expect(parseVexLink("https://vex.wtf/invite/abc-123")).toEqual({
+            inviteID: "abc-123",
+            type: "invite",
+        });
+        expect(parseVexLink("https://vex.chat/invite/abc-123")).toEqual({
+            inviteID: "abc-123",
+            type: "invite",
+        });
     });
 
     test("parses vex://user/<id>", () => {

@@ -1,3 +1,5 @@
+import type { AppScreenProps } from "../navigation/types";
+
 import React, { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 
@@ -11,11 +13,19 @@ import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
 import { colors, typography } from "../theme";
 
-export function JoinGroupScreen() {
+export function JoinGroupScreen({ route }: AppScreenProps<"JoinGroup">) {
     const navigation = useNavigation();
-    const [input, setInput] = useState("");
+    const [input, setInput] = useState(route.params?.inviteID ?? "");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
+
+    React.useEffect(() => {
+        if (!route.params?.inviteID) {
+            return;
+        }
+        setInput(route.params.inviteID);
+        setError("");
+    }, [route.params?.inviteID]);
 
     async function handleJoin() {
         const inviteID = parseInviteID(input);
