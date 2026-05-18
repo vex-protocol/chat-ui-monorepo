@@ -9,8 +9,24 @@ export type VexLink =
     | { serverID: string; type: "server" }
     | { type: "user"; userID: string };
 
-const UUID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_PATTERN =
+    "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const UUID_RE = new RegExp(`^${UUID_PATTERN}$`, "i");
+const EMBEDDED_INVITE_RE = new RegExp(
+    `(?:vex://invite/|https?://(?:www\\.)?vex\\.chat/invite/|(?:^|[\\s([{])\\/invite\\/)(${UUID_PATTERN})(?=$|[^0-9a-f-])`,
+    "i",
+);
+
+/**
+ * Finds the first invite UUID in arbitrary message text.
+ * Bare UUIDs still need to be the entire input to avoid turning random IDs
+ * in chat copy into invite previews.
+ */
+export function extractInviteID(raw: string): null | string {
+    const trimmed = raw.trim();
+    if (UUID_RE.test(trimmed)) return trimmed;
+    return EMBEDDED_INVITE_RE.exec(raw)?.[1] ?? null;
+}
 
 /**
  * Extracts an invite UUID from a raw string.

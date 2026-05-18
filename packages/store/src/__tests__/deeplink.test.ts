@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { parseInviteID, parseVexLink } from "../deeplink.ts";
+import { extractInviteID, parseInviteID, parseVexLink } from "../deeplink.ts";
 
 // ── parseInviteID ───────────────────────────────────────────────────────────
 
@@ -41,6 +41,37 @@ describe("parseInviteID", () => {
     test("returns null when only non-UUID segments follow trailing slash", () => {
         expect(parseInviteID("https://vex.chat/invite/")).toBeNull();
         expect(parseInviteID("/invite/not-a-uuid")).toBeNull();
+    });
+});
+
+// ── extractInviteID ─────────────────────────────────────────────────────────
+
+describe("extractInviteID", () => {
+    const validUUID = "3f2ae9b8-c5a7-4d4a-9f3e-1a2b3c4d5e6f";
+
+    test("accepts a bare invite code", () => {
+        expect(extractInviteID(validUUID)).toBe(validUUID);
+    });
+
+    test("finds invite links embedded in message text", () => {
+        expect(extractInviteID(`join us at vex://invite/${validUUID}`)).toBe(
+            validUUID,
+        );
+        expect(
+            extractInviteID(`try https://vex.chat/invite/${validUUID}.`),
+        ).toBe(validUUID);
+        expect(extractInviteID(`(/invite/${validUUID})`)).toBe(validUUID);
+    });
+
+    test("does not treat arbitrary embedded UUIDs as invite links", () => {
+        expect(extractInviteID(`trace id ${validUUID}`)).toBeNull();
+        expect(
+            extractInviteID(`see https://example.com/path/${validUUID}`),
+        ).toBeNull();
+    });
+
+    test("does not match invite IDs with extra UUID-ish suffixes", () => {
+        expect(extractInviteID(`vex://invite/${validUUID}-extra`)).toBeNull();
     });
 });
 
