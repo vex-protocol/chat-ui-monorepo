@@ -31,6 +31,7 @@ import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import { checkForAppUpdates } from "./src/lib/appUpdates";
 import { getServerOptions } from "./src/lib/config";
 import { hydrateDevOptionsUnlocked } from "./src/lib/devMode";
 import {
@@ -391,6 +392,18 @@ function App() {
                 );
             }
         })();
+    }, []);
+
+    useEffect(() => {
+        void checkForAppUpdates({ silent: true });
+        const subscription = AppState.addEventListener("change", (next) => {
+            if (next === "active") {
+                void checkForAppUpdates({ silent: true });
+            }
+        });
+        return () => {
+            subscription.remove();
+        };
     }, []);
 
     // Resilience: retry `autoLogin` on AppState resume when we still

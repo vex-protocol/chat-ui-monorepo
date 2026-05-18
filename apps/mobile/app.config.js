@@ -69,6 +69,7 @@ module.exports = ({ config }) => {
             ...(config.android?.permissions ?? []),
             "FOREGROUND_SERVICE",
             "FOREGROUND_SERVICE_DATA_SYNC",
+            "REQUEST_INSTALL_PACKAGES",
             "WAKE_LOCK",
         ]),
     );
