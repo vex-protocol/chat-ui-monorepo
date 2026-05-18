@@ -24,6 +24,7 @@ import {
     vexService,
 } from "@vex-chat/store";
 
+import { Ionicons } from "@expo/vector-icons";
 import { useStore } from "@nanostores/react";
 import { NavigationContainer } from "@react-navigation/native";
 import * as BackgroundTask from "expo-background-task";
@@ -31,7 +32,7 @@ import * as Notifications from "expo-notifications";
 import * as TaskManager from "expo-task-manager";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { checkForAppUpdates } from "./src/lib/appUpdates";
+import { type AppUpdateState, checkForAppUpdates } from "./src/lib/appUpdates";
 import { getServerOptions } from "./src/lib/config";
 import { hydrateDevOptionsUnlocked } from "./src/lib/devMode";
 import {
@@ -63,6 +64,7 @@ import {
 } from "./src/lib/pushNotifications";
 import { hydrateLocalMessageRetention } from "./src/lib/retentionPreference";
 import {
+    navigateToAboutSettings,
     navigateToDeviceRequests,
     navigationRef,
 } from "./src/navigation/navigationRef";
@@ -80,6 +82,11 @@ const BACKGROUND_NOTIFICATION_LIMIT = 8;
 // from very far in the past," which the historical-cutoff timestamp
 // already filters out separately.
 const NOTIFIED_MAILID_DEDUP_CAP = 1000;
+
+interface AppUpdateNotice {
+    message: string;
+    title: string;
+}
 
 /**
  * Bounded `Set<string>` with FIFO eviction: when adding past the cap,
@@ -182,6 +189,8 @@ function App() {
     const [pendingApprovalNotice, setPendingApprovalNotice] = useState<null | {
         count: number;
     }>(null);
+    const [appUpdateNotice, setAppUpdateNotice] =
+        useState<AppUpdateNotice | null>(null);
     const notifiedMailIDsRef = useRef<BoundedStringSet>(
         new BoundedStringSet(NOTIFIED_MAILID_DEDUP_CAP),
     );
@@ -394,17 +403,31 @@ function App() {
         })();
     }, []);
 
+    const checkForOpeningAppUpdate = useCallback(() => {
+        void checkForAppUpdates({ force: true, silent: true }).then((state) => {
+            if (!$user.get()) {
+                return;
+            }
+            const notice = appUpdateNoticeForState(state);
+            setAppUpdateNotice(notice);
+        });
+    }, []);
+
     useEffect(() => {
-        void checkForAppUpdates({ silent: true });
+        if (!userID) {
+            setAppUpdateNotice(null);
+            return;
+        }
+        checkForOpeningAppUpdate();
         const subscription = AppState.addEventListener("change", (next) => {
             if (next === "active") {
-                void checkForAppUpdates({ silent: true });
+                checkForOpeningAppUpdate();
             }
         });
         return () => {
             subscription.remove();
         };
-    }, []);
+    }, [checkForOpeningAppUpdate, userID]);
 
     // Resilience: retry `autoLogin` on AppState resume when we still
     // don't have a logged-in user.
@@ -517,6 +540,18 @@ function App() {
             clearTimeout(timer);
         };
     }, [pendingApprovalNotice]);
+
+    useEffect(() => {
+        if (!appUpdateNotice) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            setAppUpdateNotice(null);
+        }, 8000);
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [appUpdateNotice]);
 
     const maybeShowRateLimitNotice = () => {
         if (!vexService.consumeRateLimitNotice()) {
@@ -961,6 +996,40 @@ function App() {
                     </Pressable>
                 </View>
             )}
+            {appUpdateNotice && (
+                <View
+                    style={[
+                        styles.updateNoticeWrap,
+                        pendingApprovalNotice
+                            ? styles.updateNoticeWrapStacked
+                            : null,
+                    ]}
+                >
+                    <Pressable
+                        onPress={() => {
+                            setAppUpdateNotice(null);
+                            navigateToAboutSettings();
+                        }}
+                        style={styles.updateNoticeCard}
+                    >
+                        <View style={styles.updateNoticeIcon}>
+                            <Ionicons
+                                color="#8DF5B0"
+                                name="sparkles-outline"
+                                size={18}
+                            />
+                        </View>
+                        <View style={styles.updateNoticeCopy}>
+                            <Text style={styles.updateNoticeTitle}>
+                                {appUpdateNotice.title}
+                            </Text>
+                            <Text style={styles.updateNoticeText}>
+                                {appUpdateNotice.message}
+                            </Text>
+                        </View>
+                    </Pressable>
+                </View>
+            )}
             <NavigationContainer
                 onReady={() => {
                     flushPendingNotificationRoutes();
@@ -1195,9 +1264,87 @@ const styles = StyleSheet.create({
         top: 54,
         zIndex: 1000,
     },
+    updateNoticeCard: {
+        alignItems: "center",
+        backgroundColor: "rgba(18, 34, 26, 0.97)",
+        borderColor: "rgba(74, 222, 128, 0.42)",
+        borderRadius: 12,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 10,
+        maxWidth: 440,
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        shadowColor: "#4ADE80",
+        shadowOffset: { height: 0, width: 0 },
+        shadowOpacity: 0.18,
+        shadowRadius: 18,
+        width: "90%",
+    },
+    updateNoticeCopy: {
+        flex: 1,
+        gap: 2,
+    },
+    updateNoticeIcon: {
+        alignItems: "center",
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.46)",
+        borderRadius: 999,
+        borderWidth: 1,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    updateNoticeText: {
+        color: "rgba(224,255,236,0.86)",
+        fontSize: 12,
+    },
+    updateNoticeTitle: {
+        color: "#B5F5CD",
+        fontSize: 13,
+        fontWeight: "700",
+    },
+    updateNoticeWrap: {
+        alignItems: "center",
+        left: 0,
+        position: "absolute",
+        right: 0,
+        top: 98,
+        zIndex: 997,
+    },
+    updateNoticeWrapStacked: {
+        top: 164,
+    },
 });
 
 export default App;
+
+function appUpdateNoticeForState(
+    state: AppUpdateState,
+): AppUpdateNotice | null {
+    switch (state.status) {
+        case "apk_available":
+            return {
+                message: "A new APK is ready. Tap to open the updater.",
+                title: "App update available",
+            };
+        case "ota_available":
+            return {
+                message: state.latestCommit?.shortSha
+                    ? `Version ${state.latestCommit.shortSha} is ready. Tap to install.`
+                    : "A compatible OTA update is ready. Tap to install.",
+                title: "OTA update available",
+            };
+        case "ota_ready":
+            return {
+                message:
+                    "Restart Vex to finish installing the downloaded update.",
+                title: "Update ready",
+            };
+        default:
+            return null;
+    }
+}
 
 function collectKnownMailIDs(): Set<string> {
     const known = new Set<string>();

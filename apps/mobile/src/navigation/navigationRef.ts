@@ -11,6 +11,14 @@ export interface JoinedServerRouteTarget {
     serverName?: string;
 }
 
+export function navigateToAboutSettings(): void {
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate("App", {
+        params: { section: "about" },
+        screen: "SettingsSection",
+    });
+}
+
 export function navigateToChannel(
     channelID: string,
     channelName: string,
