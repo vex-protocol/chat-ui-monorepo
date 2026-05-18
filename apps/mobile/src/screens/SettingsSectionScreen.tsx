@@ -10,6 +10,7 @@ import React, {
 import {
     Alert,
     Platform,
+    Pressable,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -20,7 +21,6 @@ import {
 } from "react-native";
 
 import {
-    $authStatus,
     $channels,
     $localMessageRetentionDays,
     $servers,
@@ -46,7 +46,6 @@ import {
 } from "../lib/appUpdates";
 import { $avatarCropResult } from "../lib/avatarCropResult";
 import { buildInfo } from "../lib/buildInfo";
-import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
     $alwaysOnEnabled,
@@ -62,10 +61,6 @@ import {
     unsubscribeStoredPushNotificationSubscription,
 } from "../lib/pushNotifications";
 import { persistLocalMessageRetentionDays } from "../lib/retentionPreference";
-import {
-    type ConnectedServerInfo,
-    fetchConnectedServerInfo,
-} from "../lib/serverInfo";
 import { colors, typography } from "../theme";
 
 const LOCAL_RETENTION_CHOICES = [7, 14, 21, 30] as const;
@@ -78,7 +73,6 @@ export function SettingsSectionScreen({
     route,
 }: AppScreenProps<"SettingsSection">) {
     const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
-    const authStatus = useStore($authStatus);
     const appUpdateState = useStore($appUpdateState);
     const channelsByServer = useStore($channels);
     const servers = useStore($servers);
@@ -93,11 +87,6 @@ export function SettingsSectionScreen({
     const [avatarNotice, setAvatarNotice] = useState("");
     const [avatarUploading, setAvatarUploading] = useState(false);
     const [loggingOut, setLoggingOut] = useState(false);
-    const [serverInfo, setServerInfo] = useState<ConnectedServerInfo | null>(
-        null,
-    );
-    const [sessionInfo, setSessionInfo] =
-        useState<Awaited<ReturnType<typeof vexService.getSessionInfo>>>(null);
     const [updateBusy, setUpdateBusy] = useState(false);
     const [wsDebugEnabled, setWsDebugEnabled] = useState(() =>
         vexService.getWebsocketDebugEnabled(),
@@ -188,6 +177,8 @@ export function SettingsSectionScreen({
                 return "Developer";
             case "notifications":
                 return "Notifications";
+            case "version":
+                return "Version";
             default:
                 return "Settings";
         }
@@ -340,25 +331,9 @@ export function SettingsSectionScreen({
                 if (!silent) {
                     setAboutRefreshing(true);
                 }
-                const [nextServerInfo, nextSessionInfo] = await Promise.all([
-                    fetchConnectedServerInfo(),
-                    vexService.getSessionInfo(),
-                    checkForAppUpdates({
-                        force: options?.forceUpdateCheck === true,
-                        silent,
-                    }),
-                ]);
-                setServerInfo(nextServerInfo);
-                setSessionInfo(nextSessionInfo);
-            } catch (err: unknown) {
-                setServerInfo({
-                    baseUrl: getServerUrl(),
-                    checkedAt: new Date().toISOString(),
-                    error:
-                        err instanceof Error
-                            ? err.message
-                            : "Could not refresh About details.",
-                    host: getServerUrl(),
+                await checkForAppUpdates({
+                    force: options?.forceUpdateCheck === true,
+                    silent,
                 });
             } finally {
                 if (!silent) {
@@ -371,7 +346,11 @@ export function SettingsSectionScreen({
     );
 
     useEffect(() => {
-        if (section !== "about" && section !== "developer") {
+        if (
+            section !== "about" &&
+            section !== "developer" &&
+            section !== "version"
+        ) {
             return;
         }
         void refreshAboutInfo({ silent: true });
@@ -506,27 +485,24 @@ export function SettingsSectionScreen({
         }
     }
 
+    const installedCreatedAt = formatTimestamp(buildInfo.createdAt);
+    const latestCreatedAt = formatTimestamp(
+        appUpdateState.latestCommit?.committedAt ??
+            appUpdateState.nativeRelease?.publishedAt,
+    );
+    const latestVersionValue =
+        appUpdateState.latestCommit?.shortSha != null
+            ? `${buildInfo.version}-${appUpdateState.latestCommit.shortSha}`
+            : appUpdateState.nativeRelease?.targetShortCommit != null
+              ? `${buildInfo.version}-${appUpdateState.nativeRelease.targetShortCommit}`
+              : "unknown";
+    const latestVersionDescription =
+        latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
     const serverCount = Object.keys(servers).length;
     const channelCount = Object.values(channelsByServer).reduce(
         (total, channels) => total + channels.length,
         0,
     );
-    const serverOk =
-        serverInfo?.health?.ok ?? serverInfo?.status?.ok ?? undefined;
-    const serverStatusLabel =
-        serverInfo?.error != null
-            ? "offline"
-            : serverOk === true
-              ? "healthy"
-              : serverOk === false
-                ? "degraded"
-                : "unknown";
-    const serverDbLabel =
-        serverInfo?.health?.dbReady === true
-            ? "ready"
-            : serverInfo?.health?.dbReady === false
-              ? "degraded"
-              : "unknown";
 
     function updateRowLabel(): string {
         switch (appUpdateState.status) {
@@ -552,45 +528,33 @@ export function SettingsSectionScreen({
         }
     }
 
-    function updateRowDescription(): string {
-        if (appUpdateState.status === "apk_downloading") {
-            const progress = appUpdateState.apkDownloadProgress;
-            return typeof progress === "number"
-                ? `${String(Math.round(progress * 100))}% downloaded`
-                : "Downloading latest APK";
+    function updateActionLabel(): string {
+        switch (appUpdateState.status) {
+            case "apk_available":
+                return "Install";
+            case "apk_downloading":
+                return appUpdateState.apkDownloadProgress != null
+                    ? `${String(
+                          Math.round(appUpdateState.apkDownloadProgress * 100),
+                      )}%`
+                    : "Downloading";
+            case "checking":
+                return "Checking";
+            case "ota_available":
+                return "Download";
+            case "ota_ready":
+                return "Restart";
+            default:
+                return "Check";
         }
-        if (appUpdateState.status === "apk_available") {
-            return appUpdateState.nativeRelease?.tagName
-                ? `${appUpdateState.nativeRelease.tagName} requires a new APK`
-                : "Native runtime changed";
-        }
-        if (appUpdateState.status === "ota_available") {
-            return appUpdateState.latestCommit?.shortSha
-                ? `Latest compatible commit ${appUpdateState.latestCommit.shortSha}`
-                : "Tap to download";
-        }
-        if (appUpdateState.status === "ota_ready") {
-            return "Downloaded and ready";
-        }
-        if (appUpdateState.status === "error") {
-            return appUpdateState.error ?? "Tap to retry";
-        }
-        if (appUpdateState.message) {
-            return appUpdateState.message;
-        }
-        return appUpdateState.latestCommit?.shortSha
-            ? `Latest GitHub commit ${appUpdateState.latestCommit.shortSha}`
-            : "Checks OTA and APK releases";
     }
 
-    function updateRowValue(): string | undefined {
-        if (appUpdateState.status === "apk_downloading") {
-            const progress = appUpdateState.apkDownloadProgress;
-            return typeof progress === "number"
-                ? `${String(Math.round(progress * 100))}%`
-                : undefined;
-        }
-        return appUpdateState.latestCommit?.shortSha;
+    function updateActionDisabled(): boolean {
+        return (
+            updateBusy ||
+            appUpdateState.status === "checking" ||
+            appUpdateState.status === "apk_downloading"
+        );
     }
 
     function handleUpdateRowPress(): void {
@@ -613,6 +577,19 @@ export function SettingsSectionScreen({
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function formatTimestamp(value: string | undefined): string | undefined {
+        if (!value) return undefined;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return undefined;
+        return date.toLocaleString(undefined, {
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            month: "short",
+            year: "numeric",
+        });
     }
 
     function readImageBytesFromBase64(base64Data: string): Uint8Array {
@@ -844,7 +821,9 @@ export function SettingsSectionScreen({
             <ScrollView
                 contentContainerStyle={styles.content}
                 refreshControl={
-                    section === "about" || section === "developer" ? (
+                    section === "about" ||
+                    section === "developer" ||
+                    section === "version" ? (
                         <RefreshControl
                             onRefresh={() => {
                                 void refreshAboutInfo({
@@ -860,6 +839,38 @@ export function SettingsSectionScreen({
                 {section === "about" ? (
                     <>
                         <MenuSection title="App">
+                            <MenuRow
+                                icon="pricetag-outline"
+                                label="Version"
+                                monoValue
+                                onPress={() => {
+                                    navigation.navigate("SettingsSection", {
+                                        section: "version",
+                                    });
+                                }}
+                                value={buildInfo.displayVersion}
+                            />
+                            <MenuRow
+                                accessory={
+                                    <InlineActionButton
+                                        disabled={updateActionDisabled()}
+                                        label={updateActionLabel()}
+                                        onPress={handleUpdateRowPress}
+                                    />
+                                }
+                                description={latestVersionDescription}
+                                icon="cloud-download-outline"
+                                label="Latest available"
+                                monoValue
+                                value={latestVersionValue}
+                            />
+                        </MenuSection>
+                    </>
+                ) : null}
+
+                {section === "version" ? (
+                    <>
+                        <MenuSection title="Installed">
                             <MenuRow
                                 icon="pricetag-outline"
                                 label="Version"
@@ -884,116 +895,116 @@ export function SettingsSectionScreen({
                                       : {})}
                             />
                             <MenuRow
-                                description={updateRowDescription()}
-                                disabled={
-                                    updateBusy ||
-                                    appUpdateState.status === "checking" ||
-                                    appUpdateState.status === "apk_downloading"
-                                }
-                                icon={
-                                    appUpdateState.status === "apk_available"
-                                        ? "archive-outline"
-                                        : appUpdateState.status === "ota_ready"
-                                          ? "refresh-circle-outline"
-                                          : "cloud-download-outline"
-                                }
-                                label={updateRowLabel()}
-                                monoValue
-                                onPress={handleUpdateRowPress}
-                                tone={
-                                    appUpdateState.status === "ota_available" ||
-                                    appUpdateState.status === "ota_ready" ||
-                                    appUpdateState.status === "apk_available"
-                                        ? "success"
-                                        : appUpdateState.status === "error"
-                                          ? "danger"
-                                          : "default"
-                                }
-                                value={updateRowValue()}
+                                icon="time-outline"
+                                label="Created"
+                                value={installedCreatedAt ?? "unknown"}
                             />
                             <MenuRow
-                                description="Compare against GitHub"
                                 icon="git-commit-outline"
-                                label="Latest commit"
+                                label="Commit"
+                                monoBlock={buildInfo.commit}
+                                value={buildInfo.shortCommit}
+                            />
+                            <MenuRow
+                                description={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "Running the APK bundle"
+                                        : "Running an OTA bundle"
+                                }
+                                icon={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "archive-outline"
+                                        : "cloud-download-outline"
+                                }
+                                label="Update ID"
+                                value={
+                                    buildInfo.shortUpdateId ??
+                                    (buildInfo.isEmbeddedLaunch
+                                        ? "embedded"
+                                        : "unknown")
+                                }
+                                {...(buildInfo.updateId != null
+                                    ? { monoBlock: buildInfo.updateId }
+                                    : {})}
+                            />
+                            <MenuRow
+                                icon="git-branch-outline"
+                                label="Channel"
+                                value={buildInfo.channel}
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="Fingerprint"
+                                monoBlock={buildInfo.fingerprint}
+                                value={buildInfo.shortFingerprint}
+                            />
+                        </MenuSection>
+                        <MenuSection title="Latest Available">
+                            <MenuRow
+                                accessory={
+                                    <InlineActionButton
+                                        disabled={updateActionDisabled()}
+                                        label={updateActionLabel()}
+                                        onPress={handleUpdateRowPress}
+                                    />
+                                }
+                                description={appUpdateState.message}
+                                icon="cloud-download-outline"
+                                label="Status"
+                                value={updateRowLabel()}
+                            />
+                            <MenuRow
+                                icon="pricetag-outline"
+                                label="Version"
                                 monoValue
+                                value={latestVersionValue}
+                            />
+                            <MenuRow
+                                icon="time-outline"
+                                label="Created"
+                                value={latestCreatedAt ?? "unknown"}
+                            />
+                            <MenuRow
+                                icon="git-compare-outline"
+                                label="GitHub commit"
+                                monoBlock={
+                                    appUpdateState.latestCommit?.sha ??
+                                    "unknown"
+                                }
                                 value={
                                     appUpdateState.latestCommit?.shortSha ??
                                     "unknown"
                                 }
                             />
-                        </MenuSection>
-
-                        <MenuSection title="Connected Server">
                             <MenuRow
-                                icon="server-outline"
-                                label="API host"
-                                value={serverInfo?.host ?? getServerUrl()}
-                            />
-                            <MenuRow
-                                description={
-                                    serverInfo?.health?.latencyMs != null
-                                        ? `${String(
-                                              serverInfo.health.latencyMs,
-                                          )}ms`
-                                        : serverInfo?.error
-                                          ? serverInfo.error
-                                          : undefined
-                                }
-                                icon="pulse-outline"
-                                label="Service"
-                                tone={
-                                    serverStatusLabel === "healthy"
-                                        ? "success"
-                                        : serverStatusLabel === "degraded" ||
-                                            serverStatusLabel === "offline"
-                                          ? "danger"
-                                          : "default"
-                                }
-                                value={serverStatusLabel}
-                            />
-                            <MenuRow
-                                icon="shield-checkmark-outline"
-                                label="Auth"
-                                value={authStatus}
-                            />
-                            <MenuRow
-                                icon="at-outline"
-                                label="Account"
+                                icon="archive-outline"
+                                label="APK release"
                                 value={
-                                    sessionInfo?.username ??
-                                    user?.username ??
-                                    "signed out"
-                                }
-                            />
-                            <MenuRow
-                                icon="people-outline"
-                                label="Groups"
-                                value={String(serverCount)}
-                            />
-                            <MenuRow
-                                icon="chatbubbles-outline"
-                                label="Channels"
-                                value={String(channelCount)}
-                            />
-                            <MenuRow
-                                icon="hardware-chip-outline"
-                                label="Crypto"
-                                value={
-                                    serverInfo?.status?.cryptoProfile ??
+                                    appUpdateState.nativeRelease?.tagName ??
                                     "unknown"
                                 }
                             />
                             <MenuRow
-                                icon="file-tray-full-outline"
-                                label="Database"
-                                tone={
-                                    serverDbLabel === "ready"
-                                        ? "success"
-                                        : serverDbLabel === "degraded"
-                                          ? "danger"
-                                          : "default"
+                                icon="time-outline"
+                                label="APK published"
+                                value={
+                                    formatTimestamp(
+                                        appUpdateState.nativeRelease
+                                            ?.publishedAt,
+                                    ) ?? "unknown"
                                 }
-                                value={serverDbLabel}
+                            />
+                            <MenuRow
+                                icon="finger-print-outline"
+                                label="Release fingerprint"
+                                monoBlock={
+                                    appUpdateState.nativeRelease?.fingerprint ??
+                                    "unknown"
+                                }
+                                value={
+                                    appUpdateState.nativeRelease
+                                        ?.fingerprintShort ?? "unknown"
+                                }
                             />
                         </MenuSection>
                     </>
@@ -1064,6 +1075,19 @@ export function SettingsSectionScreen({
                                 icon="finger-print-outline"
                                 label="User ID"
                                 monoBlock={user?.userID ?? "—"}
+                            />
+                        </MenuSection>
+
+                        <MenuSection title="Memberships">
+                            <MenuRow
+                                icon="people-outline"
+                                label="Groups"
+                                value={String(serverCount)}
+                            />
+                            <MenuRow
+                                icon="chatbubbles-outline"
+                                label="Channels"
+                                value={String(channelCount)}
                             />
                         </MenuSection>
 
@@ -1376,6 +1400,31 @@ function errorMessage(err: unknown): string {
     return err instanceof Error ? err.message : String(err);
 }
 
+function InlineActionButton({
+    disabled,
+    label,
+    onPress,
+}: {
+    disabled: boolean;
+    label: string;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable
+            accessibilityRole="button"
+            disabled={disabled}
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.inlineActionButton,
+                pressed && styles.inlineActionButtonPressed,
+                disabled && styles.inlineActionButtonDisabled,
+            ]}
+        >
+            <Text style={styles.inlineActionText}>{label}</Text>
+        </Pressable>
+    );
+}
+
 const styles = StyleSheet.create({
     container: {
         backgroundColor: colors.bg,
@@ -1391,6 +1440,25 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.error,
         fontSize: 12,
+    },
+    inlineActionButton: {
+        backgroundColor: colors.accent,
+        borderRadius: 6,
+        minWidth: 76,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    inlineActionButtonDisabled: {
+        opacity: 0.45,
+    },
+    inlineActionButtonPressed: {
+        backgroundColor: colors.accentDark,
+    },
+    inlineActionText: {
+        ...typography.button,
+        color: colors.text,
+        fontSize: 12,
+        textAlign: "center",
     },
     statusCardError: {
         backgroundColor: "rgba(229, 57, 53, 0.12)",
