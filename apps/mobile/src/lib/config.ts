@@ -2,11 +2,28 @@ import type { ServerOptions } from "@vex-chat/store";
 
 import { $localMessageRetentionDays } from "@vex-chat/store";
 
+import Constants from "expo-constants";
+
 // Production server URL lives in code as a typed constant — never read from
-// .env. A missing or empty override can only resolve to prod, making it
-// impossible to ship a dev URL by forgetting to set something.
+// .env. Production defaults to prod, while the dev APK is identified by
+// app.config.js metadata and defaults to the dev API even for OTA updates.
 const PROD_SERVER_URL = "api.vex.wtf";
+const DEV_SERVER_URL = "dev.vex.wtf";
 const DEV_OVERRIDE_FLAG = "EXPO_PUBLIC_ENABLE_DEV_SERVER";
+
+type VexExpoConfig = {
+    extra?: {
+        vex?: {
+            environment?: string;
+        };
+    };
+};
+
+const expoConfig = Constants.expoConfig as null | undefined | VexExpoConfig;
+const DEFAULT_SERVER_URL =
+    expoConfig?.extra?.vex?.environment === "development"
+        ? DEV_SERVER_URL
+        : PROD_SERVER_URL;
 
 // Any host that looks like a local/LAN dev target. Used for the release-build
 // fail-safe and for deciding when http:// is acceptable.
@@ -26,7 +43,7 @@ export function getServerOptions(): ServerOptions {
 // Server host — no protocol prefix (Client adds http:// or https:// based on unsafeHttp)
 export function getServerUrl(): string {
     const override = readOverride();
-    const host = normalizeHost(override ?? PROD_SERVER_URL);
+    const host = normalizeHost(override ?? DEFAULT_SERVER_URL);
 
     // Fail-safe: a release build must never resolve to a dev host.
     if (!__DEV__ && DEV_HOST_RE.test(host)) {
@@ -52,7 +69,7 @@ function normalizeHost(raw: string): string {
                     .replace(/\/+$/, "")
                     .split("/")[0] ??
                 firstSegment ??
-                PROD_SERVER_URL
+                DEFAULT_SERVER_URL
             );
         }
     }

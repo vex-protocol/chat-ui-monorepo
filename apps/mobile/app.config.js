@@ -7,8 +7,9 @@
 //   env override                        → VEX_IOS_BUNDLE_IDENTIFIER (optional)
 //   local personal-team iOS builds      → VEX_DISABLE_IOS_CAPABILITIES=1
 //
-// The release APK has updates.enabled:false hard-baked into the native
-// config — no EAS Update runtime, no network calls, no OTA code path.
+// Dev and production APKs both use EAS Update. Runtime compatibility is
+// fingerprint-based, so JS/assets can ship OTA while native changes still
+// require a fresh APK.
 //
 // CJS intentional: apps/mobile/package.json has no "type":"module", so
 // a plain require('./package.json') is the simplest single-source-of-truth
@@ -31,9 +32,14 @@ const withoutPersonalTeamUnsupportedIosCapabilities = (config) =>
     });
 
 module.exports = ({ config }) => {
-    const devFlavorEnabled = process.env.VEX_ENABLE_DEV_BUILD === "1";
+    const requestedEnvironment = process.env.VEX_APP_ENV;
+    const devFlavorEnabled =
+        process.env.VEX_ENABLE_DEV_BUILD === "1" ||
+        requestedEnvironment === "development";
     const devMode =
-        devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
+        devFlavorEnabled &&
+        (process.env.EAS_BUILD_PROFILE === "development" ||
+            requestedEnvironment === "development");
     const iosCapabilitiesEnabled =
         process.env.VEX_DISABLE_IOS_CAPABILITIES !== "1";
     const appDisplayName =
@@ -52,6 +58,7 @@ module.exports = ({ config }) => {
         process.env.VEX_ANDROID_GOOGLE_SERVICES_FILE ||
         config.android?.googleServicesFile;
     const appVersion = process.env.VEX_APP_VERSION || pkg.version;
+    const environment = devMode ? "development" : "production";
 
     // Permissions required for the optional "Always-on connection"
     // foreground-service mode (Settings → Connection). Even when the
@@ -95,12 +102,16 @@ module.exports = ({ config }) => {
                 : {}),
             permissions: androidPermissions,
         },
-        updates: { enabled: false },
-        runtimeVersion: devMode
-            ? { policy: "fingerprint" }
-            : { policy: "appVersion" },
+        updates: {
+            enabled: true,
+            url: `https://u.expo.dev/${EAS_PROJECT_ID}`,
+            checkAutomatically: "ON_LOAD",
+            fallbackToCacheTimeout: 0,
+        },
+        runtimeVersion: { policy: "fingerprint" },
         extra: {
             ...config.extra,
+            vex: { environment },
             eas: { projectId: EAS_PROJECT_ID },
         },
         plugins: [

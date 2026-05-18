@@ -1,16 +1,11 @@
 name: Mobile - Release
 
-# Builds the production APK and creates a GitHub Release for every merge to
-# master. The release version is derived from mobile-v* tags:
+# Publishes production for every merge to master.
+# Native fingerprint unchanged -> EAS Update on the production channel.
+# Native fingerprint changed   -> local APK build plus GitHub Release.
 #
-#   - if HEAD already has a mobile-v* tag, reruns reuse that version
-#   - otherwise, use apps/mobile/package.json when it has advanced beyond the
-#     latest mobile-v* tag, or bump patch from the latest mobile-v* tag
-#   - on a first release, use apps/mobile/package.json's version
-#
-# The calculated version is passed to app.config.js via VEX_APP_VERSION so the
-# APK's visible version matches the GitHub Release without requiring the
-# workflow to push a version commit directly to protected master.
+# APK release versions are derived from mobile-v* tags. OTA updates reuse the
+# latest APK's version/runtime so installed builds can receive the update.
 #
 # Concurrency: cancel-in-progress:false. Canceling an EAS local build while it
 # is talking to remote versionCode state can corrupt the queued version state,
@@ -54,74 +49,39 @@ jobs:
                   node-version-file: .tool-versions
                   cache: pnpm
 
-            - name: Resolve release version
-              id: version
+            - name: Resolve release baseline
+              id: baseline
               run: |
                   git fetch --force --tags
                   PACKAGE_VERSION=$(node -pe "require('./apps/mobile/package.json').version")
                   HEAD_TAG=$(git tag --points-at HEAD --list 'mobile-v*' | sort -V | tail -n 1)
+                  LATEST_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 2>/dev/null || echo '')
                   if [ -n "$HEAD_TAG" ]; then
-                    VERSION="${HEAD_TAG#mobile-v}"
-                    PREV_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 HEAD^ 2>/dev/null || echo '')
-                    echo "Reusing version from existing HEAD tag: $HEAD_TAG"
+                    BASE_VERSION="${HEAD_TAG#mobile-v}"
+                    FINGERPRINT_TAG="$HEAD_TAG"
+                    NOTES_PREV_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 HEAD^ 2>/dev/null || echo '')
+                    echo "Reusing existing HEAD tag as baseline: $HEAD_TAG"
+                  elif [ -n "$LATEST_TAG" ]; then
+                    BASE_VERSION="${LATEST_TAG#mobile-v}"
+                    FINGERPRINT_TAG="$LATEST_TAG"
+                    NOTES_PREV_TAG="$LATEST_TAG"
+                    echo "Latest APK baseline: $LATEST_TAG"
                   else
-                    PREV_TAG=$(git describe --tags --match='mobile-v*' --abbrev=0 2>/dev/null || echo '')
-                    if [ -n "$PREV_TAG" ]; then
-                      BASE_VERSION="${PREV_TAG#mobile-v}"
-                      VERSION=$(BASE_VERSION="$BASE_VERSION" PACKAGE_VERSION="$PACKAGE_VERSION" node -e '
-                        const base = process.env.BASE_VERSION;
-                        const pkg = process.env.PACKAGE_VERSION;
-                        const parse = (value, label) => {
-                          const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value ?? "");
-                          if (!match) {
-                            console.error(`Invalid ${label} version: ${value}`);
-                            process.exit(1);
-                          }
-                          return match.slice(1).map(Number);
-                        };
-                        const compare = (left, right) => {
-                          for (let i = 0; i < 3; i += 1) {
-                            if (left[i] !== right[i]) return left[i] - right[i];
-                          }
-                          return 0;
-                        };
-                        const baseParts = parse(base, "mobile release base");
-                        const pkgParts = parse(pkg, "mobile package");
-                        if (compare(pkgParts, baseParts) > 0) {
-                          console.log(pkg);
-                          process.exit(0);
-                        }
-                        const [major, minor, patch] = baseParts;
-                        console.log(`${major}.${minor}.${Number(patch) + 1}`);
-                      ')
-                      echo "Resolved next version from latest tag ${BASE_VERSION} and package ${PACKAGE_VERSION}: ${VERSION}"
-                    else
-                      VERSION="$PACKAGE_VERSION"
-                      echo "Resolved first version from package.json: ${VERSION}"
-                    fi
+                    BASE_VERSION="$PACKAGE_VERSION"
+                    FINGERPRINT_TAG=""
+                    NOTES_PREV_TAG=""
+                    echo "No previous mobile-v* tag; using package baseline ${PACKAGE_VERSION}"
                   fi
 
-                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "tag=mobile-v$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "previous_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
-                  echo "asset=vex-${VERSION}.apk" >> "$GITHUB_OUTPUT"
-
-            - name: Setup Java (Temurin 17)
-              uses: actions/setup-java@v5
-              with:
-                  distribution: temurin
-                  java-version: "17"
-
-            - name: Setup Android SDK
-              uses: android-actions/setup-android@v4
-              with:
-                  cmdline-tools-version: "13114758"
+                  echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "head_tag=$HEAD_TAG" >> "$GITHUB_OUTPUT"
+                  echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+                  echo "base_version=$BASE_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "fingerprint_tag=$FINGERPRINT_TAG" >> "$GITHUB_OUTPUT"
+                  echo "notes_previous_tag=$NOTES_PREV_TAG" >> "$GITHUB_OUTPUT"
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile --ignore-scripts
-
-            - name: Install EAS CLI + local build plugin
-              run: npm install -g eas-cli@latest eas-cli-local-build-plugin@latest
 
             - name: Prepare production Firebase config
               working-directory: apps/mobile
@@ -154,13 +114,174 @@ jobs:
                   '
                   echo "VEX_ANDROID_GOOGLE_SERVICES_FILE=./google-services.prod.json" >> "$GITHUB_ENV"
 
-            - name: Build production APK (local)
+            - name: Compute current fingerprint
+              id: fp
+              working-directory: apps/mobile
+              env:
+                  EAS_BUILD_PROFILE: production
+                  VEX_APP_ENV: production
+                  VEX_APP_DISPLAY_NAME: Vex Beta
+                  VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
+                  VEX_ENABLE_DEV_BUILD: "0"
+              run: |
+                  npx @expo/fingerprint@latest . > /tmp/current-fingerprint.json
+                  HASH=$(node -pe "require('/tmp/current-fingerprint.json').hash")
+                  echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+                  echo "Current fingerprint hash: $HASH"
+
+            - name: Download previous fingerprint asset
+              id: prev_fp
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  TAG="${{ steps.baseline.outputs.fingerprint_tag }}"
+                  if [ -n "$TAG" ] && gh release download "$TAG" \
+                        --pattern 'fingerprint.json' \
+                        --output /tmp/prev-fingerprint.json 2>/dev/null; then
+                    PREV_HASH=$(node -pe "require('/tmp/prev-fingerprint.json').hash")
+                    echo "hash=$PREV_HASH" >> "$GITHUB_OUTPUT"
+                    echo "exists=true" >> "$GITHUB_OUTPUT"
+                    echo "Previous fingerprint hash: $PREV_HASH"
+                  else
+                    echo "exists=false" >> "$GITHUB_OUTPUT"
+                    echo "No previous fingerprint asset; will build"
+                  fi
+
+            - name: Decide path
+              id: decide
+              run: |
+                  if [ "${{ steps.prev_fp.outputs.exists }}" = "true" ] && \
+                     [ "${{ steps.fp.outputs.hash }}" = "${{ steps.prev_fp.outputs.hash }}" ]; then
+                    PATH_DECISION=ota
+                  else
+                    PATH_DECISION=build
+                  fi
+                  echo "path=$PATH_DECISION" >> "$GITHUB_OUTPUT"
+                  echo "Decision: $PATH_DECISION"
+
+            - name: Install EAS CLI (OTA path)
+              if: steps.decide.outputs.path == 'ota'
+              run: npm install -g eas-cli@latest
+
+            - name: Push OTA update
+              if: steps.decide.outputs.path == 'ota'
               working-directory: apps/mobile
               env:
                   EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
                   EAS_BUILD_PROFILE: production
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
                   EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  VEX_APP_ENV: production
+                  VEX_APP_DISPLAY_NAME: Vex Beta
+                  VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
+                  VEX_ENABLE_DEV_BUILD: "0"
+              run: |
+                  eas update \
+                    --channel production \
+                    --message "production ${GITHUB_SHA::8}" \
+                    --environment production \
+                    --non-interactive
+
+            - name: Resolve release version
+              if: steps.decide.outputs.path == 'build'
+              id: version
+              env:
+                  HEAD_TAG: ${{ steps.baseline.outputs.head_tag }}
+                  LATEST_TAG: ${{ steps.baseline.outputs.latest_tag }}
+                  BASE_VERSION: ${{ steps.baseline.outputs.base_version }}
+                  PACKAGE_VERSION: ${{ steps.baseline.outputs.package_version }}
+              run: |
+                  if [ -n "$HEAD_TAG" ]; then
+                    VERSION="${HEAD_TAG#mobile-v}"
+                    echo "Reusing version from existing HEAD tag: $HEAD_TAG"
+                  elif [ -z "$LATEST_TAG" ]; then
+                    VERSION="$PACKAGE_VERSION"
+                    echo "Resolved first version from package.json: ${VERSION}"
+                  else
+                    VERSION=$(BASE_VERSION="$BASE_VERSION" PACKAGE_VERSION="$PACKAGE_VERSION" node -e '
+                      const base = process.env.BASE_VERSION;
+                      const pkg = process.env.PACKAGE_VERSION;
+                      const parse = (value, label) => {
+                        const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value ?? "");
+                        if (!match) {
+                          console.error(`Invalid ${label} version: ${value}`);
+                          process.exit(1);
+                        }
+                        return match.slice(1).map(Number);
+                      };
+                      const compare = (left, right) => {
+                        for (let i = 0; i < 3; i += 1) {
+                          if (left[i] !== right[i]) return left[i] - right[i];
+                        }
+                        return 0;
+                      };
+                      const baseParts = parse(base, "mobile release base");
+                      const pkgParts = parse(pkg, "mobile package");
+                      if (compare(pkgParts, baseParts) > 0) {
+                        console.log(pkg);
+                        process.exit(0);
+                      }
+                      const [major, minor, patch] = baseParts;
+                      console.log(`${major}.${minor}.${Number(patch) + 1}`);
+                    ')
+                    echo "Resolved next APK version from latest tag ${BASE_VERSION} and package ${PACKAGE_VERSION}: ${VERSION}"
+                  fi
+
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "tag=mobile-v$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "asset=vex-${VERSION}.apk" >> "$GITHUB_OUTPUT"
+
+            - name: Compute build fingerprint
+              if: steps.decide.outputs.path == 'build'
+              working-directory: apps/mobile
+              env:
+                  EAS_BUILD_PROFILE: production
+                  VEX_APP_ENV: production
+                  VEX_APP_DISPLAY_NAME: Vex Beta
+                  VEX_APP_VERSION: ${{ steps.version.outputs.version }}
+                  VEX_ENABLE_DEV_BUILD: "0"
+              run: |
+                  npx @expo/fingerprint@latest . > /tmp/current-fingerprint.json
+                  HASH=$(node -pe "require('/tmp/current-fingerprint.json').hash")
+                  echo "Build fingerprint hash: $HASH"
+
+            - name: Setup Java (Temurin 17)
+              if: steps.decide.outputs.path == 'build'
+              uses: actions/setup-java@v5
+              with:
+                  distribution: temurin
+                  java-version: "17"
+
+            - name: Setup Android SDK
+              if: steps.decide.outputs.path == 'build'
+              uses: android-actions/setup-android@v4
+              with:
+                  cmdline-tools-version: "13114758"
+
+            - name: Cache Gradle
+              if: steps.decide.outputs.path == 'build'
+              uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.gradle/caches
+                      ~/.gradle/wrapper
+                  key: ${{ runner.os }}-gradle-${{ hashFiles('pnpm-lock.yaml', 'apps/mobile/package.json', 'apps/mobile/app.json', 'apps/mobile/app.config.js', 'apps/mobile/eas.json', 'apps/mobile/plugins/**') }}
+                  restore-keys: |
+                      ${{ runner.os }}-gradle-
+
+            - name: Install EAS CLI + local build plugin
+              if: steps.decide.outputs.path == 'build'
+              run: npm install -g eas-cli@latest eas-cli-local-build-plugin@latest
+
+            - name: Build production APK (local)
+              if: steps.decide.outputs.path == 'build'
+              working-directory: apps/mobile
+              env:
+                  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+                  EAS_BUILD_PROFILE: production
+                  EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
+                  EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  VEX_APP_ENV: production
                   VEX_APP_DISPLAY_NAME: Vex Beta
                   VEX_APP_VERSION: ${{ steps.version.outputs.version }}
                   VEX_ENABLE_DEV_BUILD: "0"
@@ -173,9 +294,10 @@ jobs:
                     --output "${{ github.workspace }}/release.apk"
 
             - name: Build release notes
+              if: steps.decide.outputs.path == 'build'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  PREV_TAG: ${{ steps.version.outputs.previous_tag }}
+                  PREV_TAG: ${{ steps.baseline.outputs.notes_previous_tag }}
               run: |
                   PR=$(gh pr list \
                     --search "${{ github.sha }}" \
@@ -215,6 +337,7 @@ jobs:
                   cat /tmp/release-notes.md
 
             - name: Create or update GitHub Release
+              if: steps.decide.outputs.path == 'build'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
@@ -222,16 +345,18 @@ jobs:
                   TITLE="Vex ${{ steps.version.outputs.version }}"
                   ASSET="${{ steps.version.outputs.asset }}"
                   cp release.apk "$ASSET"
+                  cp /tmp/current-fingerprint.json fingerprint.json
 
                   if gh release view "$TAG" >/dev/null 2>&1; then
                     gh release upload "$TAG" "$ASSET" --clobber
+                    gh release upload "$TAG" fingerprint.json --clobber
                     gh release edit "$TAG" \
                       --target "$GITHUB_SHA" \
                       --title "$TITLE" \
                       --notes-file /tmp/release-notes.md \
                       --latest
                   else
-                    gh release create "$TAG" "$ASSET" \
+                    gh release create "$TAG" "$ASSET" fingerprint.json \
                       --target "$GITHUB_SHA" \
                       --latest \
                       --title "$TITLE" \
