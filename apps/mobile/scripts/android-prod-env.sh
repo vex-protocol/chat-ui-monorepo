@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 export EXPO_PUBLIC_ENABLE_DEV_SERVER=0
 export EXPO_PUBLIC_SERVER_URL=api.vex.wtf
+export VEX_APP_ENV=production
 export VEX_ENABLE_DEV_BUILD=0
 export EAS_BUILD_PROFILE=production
 export VEX_APP_DISPLAY_NAME="${VEX_APP_DISPLAY_NAME:-Vex Beta}"

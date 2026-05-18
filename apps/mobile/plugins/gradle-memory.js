@@ -40,6 +40,7 @@ module.exports = function withGradleMemory(config) {
             "org.gradle.jvmargs",
             "-Xmx4096m -XX:MaxMetaspaceSize=1024m",
         );
+        setProperty(props, "org.gradle.caching", "true");
         setProperty(props, "reactNativeArchitectures", "arm64-v8a,x86_64");
         return config;
     });
