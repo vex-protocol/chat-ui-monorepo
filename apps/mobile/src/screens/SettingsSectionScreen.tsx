@@ -483,12 +483,6 @@ export function SettingsSectionScreen({
         appUpdateState.latestCommit?.committedAt ??
             appUpdateState.nativeRelease?.publishedAt,
     );
-    const latestVersionValue =
-        appUpdateState.latestCommit?.shortSha != null
-            ? `${buildInfo.version}-${appUpdateState.latestCommit.shortSha}`
-            : appUpdateState.nativeRelease?.targetShortCommit != null
-              ? `${buildInfo.version}-${appUpdateState.nativeRelease.targetShortCommit}`
-              : "unknown";
     const latestVersionDescription =
         latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
     const isLatestVerified =
@@ -500,6 +494,9 @@ export function SettingsSectionScreen({
     const aboutUpdateDescription = isLatestVerified
         ? "Installed version is current"
         : latestVersionDescription;
+    const shouldShowAboutUpdateRow =
+        appUpdateState.status !== "checking" &&
+        appUpdateState.status !== "idle";
     const versionTapDescription = devUnlocked
         ? "Developer options are unlocked"
         : versionTaps > 0
@@ -522,7 +519,7 @@ export function SettingsSectionScreen({
             case "checking":
                 return "Checking for updates...";
             case "current":
-                return isLatestVerified ? "Verified" : "Up to date";
+                return "Up to date";
             case "error":
                 return "Update check failed";
             case "ota_available":
@@ -554,7 +551,7 @@ export function SettingsSectionScreen({
             case "ota_ready":
                 return "Restart";
             default:
-                return "Check";
+                return "Check for Updates";
         }
     }
 
@@ -568,7 +565,7 @@ export function SettingsSectionScreen({
 
     function renderUpdateAccessory() {
         if (isLatestVerified) {
-            return <VerifiedBadge />;
+            return <VerifiedCheck />;
         }
         return (
             <InlineActionButton
@@ -867,24 +864,26 @@ export function SettingsSectionScreen({
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
                             />
-                            <MenuRow
-                                accessory={renderUpdateAccessory()}
-                                description={aboutUpdateDescription}
-                                icon={
-                                    isLatestVerified
-                                        ? "checkmark-circle-outline"
-                                        : "cloud-download-outline"
-                                }
-                                label={aboutUpdateLabel}
-                                monoValue
-                                onPress={
-                                    isLatestVerified
-                                        ? handleUpdateRowPress
-                                        : undefined
-                                }
-                                tone={isLatestVerified ? "success" : "default"}
-                                value={latestVersionValue}
-                            />
+                            {shouldShowAboutUpdateRow ? (
+                                <MenuRow
+                                    accessory={renderUpdateAccessory()}
+                                    description={aboutUpdateDescription}
+                                    icon={
+                                        isLatestVerified
+                                            ? "checkmark-circle-outline"
+                                            : "cloud-download-outline"
+                                    }
+                                    label={aboutUpdateLabel}
+                                    onPress={
+                                        isLatestVerified
+                                            ? handleUpdateRowPress
+                                            : undefined
+                                    }
+                                    tone={
+                                        isLatestVerified ? "success" : "default"
+                                    }
+                                />
+                            ) : null}
                         </MenuSection>
                     </>
                 ) : null}
@@ -1320,11 +1319,10 @@ function normalizeCommit(value: string | undefined): string | undefined {
     return /^[a-f0-9]{7,40}$/.test(trimmed) ? trimmed : undefined;
 }
 
-function VerifiedBadge() {
+function VerifiedCheck() {
     return (
-        <View style={styles.verifiedBadge}>
-            <Ionicons color="#8DF5B0" name="checkmark-circle" size={16} />
-            <Text style={styles.verifiedBadgeText}>Verified</Text>
+        <View style={styles.verifiedCheck}>
+            <Ionicons color="#8DF5B0" name="checkmark-circle" size={18} />
         </View>
     );
 }
@@ -1346,9 +1344,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     inlineActionButton: {
-        backgroundColor: colors.accent,
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.45)",
         borderRadius: 6,
-        minWidth: 76,
+        borderWidth: 1,
+        minWidth: 128,
         paddingHorizontal: 12,
         paddingVertical: 8,
     },
@@ -1356,11 +1356,12 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
     inlineActionButtonPressed: {
-        backgroundColor: colors.accentDark,
+        backgroundColor: "rgba(74, 222, 128, 0.22)",
+        borderColor: "rgba(74, 222, 128, 0.62)",
     },
     inlineActionText: {
         ...typography.button,
-        color: colors.text,
+        color: "#B5F5CD",
         fontSize: 12,
         textAlign: "center",
     },
@@ -1404,20 +1405,14 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: "700",
     },
-    verifiedBadge: {
+    verifiedCheck: {
         alignItems: "center",
         backgroundColor: "rgba(74,222,128,0.14)",
         borderColor: "rgba(74,222,128,0.45)",
         borderRadius: 999,
         borderWidth: 1,
-        flexDirection: "row",
-        gap: 5,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-    },
-    verifiedBadgeText: {
-        ...typography.button,
-        color: "#8DF5B0",
-        fontSize: 12,
+        height: 30,
+        justifyContent: "center",
+        width: 30,
     },
 });
