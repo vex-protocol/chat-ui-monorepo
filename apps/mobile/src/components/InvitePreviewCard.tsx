@@ -14,6 +14,7 @@ import { vexService } from "@vex-chat/store";
 import { Ionicons } from "@expo/vector-icons";
 
 import { haptic } from "../lib/haptics";
+import { navigateToJoinedServer } from "../navigation/navigationRef";
 import { colors, fontFamilies, typography } from "../theme";
 
 interface InvitePreviewCardProps {
@@ -73,6 +74,7 @@ export function InvitePreviewCard({
         if (result.ok) {
             setJoinState("joined");
             haptic("success");
+            navigateToJoinedServer(result);
             return;
         }
         setError(result.error ?? "Unable to join");

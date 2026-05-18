@@ -12,6 +12,7 @@ import { useNavigation } from "@react-navigation/native";
 import { CornerBracketBox } from "../components/CornerBracketBox";
 import { ScreenLayout } from "../components/ScreenLayout";
 import { VexButton } from "../components/VexButton";
+import { navigateToJoinedServer } from "../navigation/navigationRef";
 import { colors, typography } from "../theme";
 
 export function AddServerScreen() {
@@ -75,7 +76,14 @@ export function AddServerScreen() {
                 setLoading(false);
                 return;
             }
-            if (navigation.canGoBack()) navigation.goBack();
+            if (navigateToJoinedServer(result)) {
+                return;
+            }
+            if (navigation.canGoBack()) {
+                navigation.goBack();
+                return;
+            }
+            setLoading(false);
         } catch (err: unknown) {
             setError(
                 err instanceof Error ? err.message : "Failed to join server",
