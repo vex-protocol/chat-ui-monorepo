@@ -1,17 +1,12 @@
-const fs = require("fs");
 const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
 const projectRoot = __dirname;
 const monorepoRoot = path.resolve(projectRoot, "../..");
-const linkedProtocolRoot = path.resolve(monorepoRoot, "../vex-protocol");
 
 const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [monorepoRoot];
-if (fs.existsSync(linkedProtocolRoot)) {
-    config.watchFolders.push(linkedProtocolRoot);
-}
 config.resolver.nodeModulesPaths = [
     path.resolve(projectRoot, "node_modules"),
     path.resolve(monorepoRoot, "node_modules"),
@@ -88,10 +83,12 @@ const nodeStubs = {
     winston: path.resolve(projectRoot, "src/lib/stubs/winston.js"),
 };
 
-const linkedLibvexSqliteEntry = path.resolve(
-    linkedProtocolRoot,
-    "packages/libvex/dist/storage/sqlite.js",
-);
+const mobileKyselyEntry = require.resolve("kysely", {
+    paths: [
+        path.resolve(projectRoot, "node_modules"),
+        path.resolve(monorepoRoot, "node_modules"),
+    ],
+});
 
 // Kysely's FileMigrationProvider uses `yield import(runtime-path)` in
 // BOTH its ESM and CJS builds — Node 14+ supports dynamic import() in
@@ -111,40 +108,33 @@ const pathStubs = [
 ];
 
 config.resolver.resolveRequest = (context, moduleName, platform) => {
-    // When using local link overrides to sibling vex-protocol packages, Metro's
-    // package-exports resolution can intermittently fail to resolve the
-    // "@vex-chat/libvex/storage/sqlite" subpath even though dist files exist.
-    // Resolve it directly to the built sibling dist entry for local debugging.
-    if (fs.existsSync(linkedLibvexSqliteEntry)) {
-        if (moduleName === "@vex-chat/libvex/storage/sqlite") {
-            return {
-                filePath: linkedLibvexSqliteEntry,
-                type: "sourceFile",
-            };
-        }
-        if (
-            moduleName ===
-                "./vex-protocol/packages/libvex/dist/storage/sqlite" ||
-            moduleName.endsWith(
-                "/vex-protocol/packages/libvex/dist/storage/sqlite",
-            )
-        ) {
-            return {
-                filePath: linkedLibvexSqliteEntry,
-                type: "sourceFile",
-            };
-        }
-    }
     // Some transitive noble consumers still import the old subpath with
     // ".js". Metro can resolve it via filesystem fallback, but it warns on
     // every reload because this subpath is not exported. Normalize it to the
     // official exported entry to avoid terminal spam.
+    if (
+        path.isAbsolute(moduleName) &&
+        moduleName.endsWith(
+            `${path.sep}@noble${path.sep}hashes${path.sep}crypto.js`,
+        )
+    ) {
+        return {
+            filePath: moduleName,
+            type: "sourceFile",
+        };
+    }
     if (moduleName === "@noble/hashes/crypto.js") {
         return context.resolveRequest(
             context,
             "@noble/hashes/crypto",
             platform,
         );
+    }
+    if (moduleName === "kysely") {
+        return {
+            filePath: mobileKyselyEntry,
+            type: "sourceFile",
+        };
     }
     const stub = nodeStubs[moduleName];
     if (stub !== undefined) {

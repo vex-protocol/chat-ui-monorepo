@@ -10,13 +10,15 @@ import {
 } from "react-native";
 
 import {
+    $channels,
+    $channelUnreadCounts,
     $dmUnreadCounts,
     $familiars,
     $messages,
+    $servers,
     $totalDmUnread,
     $user,
 } from "@vex-chat/store";
-import { $servers } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 
@@ -65,16 +67,32 @@ export function ServerSidebar({
     safeAreaTop = 0,
 }: ServerSidebarProps) {
     const servers = useStore($servers);
+    const allChannels = useStore($channels);
     const familiars = useStore($familiars);
     const messages = useStore($messages);
     const dmUnreadCounts = useStore($dmUnreadCounts);
+    const channelUnreadCounts = useStore($channelUnreadCounts);
     const me = useStore($user);
     const serverList = Object.values(servers);
+    const serverUnreadCounts = React.useMemo(() => {
+        const totals: Record<string, number> = {};
+        for (const [serverID, serverChannels] of Object.entries(allChannels)) {
+            const total = serverChannels.reduce(
+                (sum, channel) =>
+                    sum + (channelUnreadCounts[channel.channelID] ?? 0),
+                0,
+            );
+            if (total > 0) {
+                totals[serverID] = total;
+            }
+        }
+        return totals;
+    }, [allChannels, channelUnreadCounts]);
     const dmList = Object.values(familiars).filter((user) => {
         const thread = messages[user.userID];
         return Boolean(thread && thread.length > 0);
     });
-    const totalUnread = useStore($totalDmUnread);
+    const totalDmUnread = useStore($totalDmUnread);
     const homeActive = activeServerId === null;
 
     const authDotStyle = [
@@ -127,10 +145,10 @@ export function ServerSidebar({
                             style={styles.homeBtn}
                         >
                             <VexLogo showWordmark={false} size={22} />
-                            {totalUnread > 0 && (
+                            {totalDmUnread > 0 && (
                                 <View style={styles.homeBadge}>
                                     <Text style={styles.homeBadgeText}>
-                                        {totalUnread > 99 ? "99+" : totalUnread}
+                                        {formatUnreadCount(totalDmUnread)}
                                     </Text>
                                 </View>
                             )}
@@ -145,6 +163,8 @@ export function ServerSidebar({
                     >
                         {serverList.map((server) => {
                             const active = server.serverID === activeServerId;
+                            const unread =
+                                serverUnreadCounts[server.serverID] ?? 0;
                             return (
                                 <View
                                     key={server.serverID}
@@ -171,6 +191,15 @@ export function ServerSidebar({
                                                 .slice(0, 2)
                                                 .toUpperCase()}
                                         </Text>
+                                        {unread > 0 ? (
+                                            <View style={styles.serverBadge}>
+                                                <Text
+                                                    style={styles.dmBadgeText}
+                                                >
+                                                    {formatUnreadCount(unread)}
+                                                </Text>
+                                            </View>
+                                        ) : null}
                                     </TouchableOpacity>
                                 </View>
                             );
@@ -268,9 +297,9 @@ export function ServerSidebar({
                                                                 styles.dmBadgeText
                                                             }
                                                         >
-                                                            {unread > 99
-                                                                ? "99+"
-                                                                : unread}
+                                                            {formatUnreadCount(
+                                                                unread,
+                                                            )}
                                                         </Text>
                                                     </View>
                                                 ) : null}
@@ -292,6 +321,8 @@ export function ServerSidebar({
                             {channels.map((channel) => {
                                 const active =
                                     channel.channelID === activeChannelId;
+                                const unread =
+                                    channelUnreadCounts[channel.channelID] ?? 0;
                                 return (
                                     <TouchableOpacity
                                         key={channel.channelID}
@@ -304,16 +335,34 @@ export function ServerSidebar({
                                             active && styles.channelItemActive,
                                         ]}
                                     >
-                                        <Text
-                                            numberOfLines={1}
-                                            style={[
-                                                styles.channelItemText,
-                                                active &&
-                                                    styles.channelItemTextActive,
-                                            ]}
-                                        >
-                                            # {channel.name}
-                                        </Text>
+                                        <View style={styles.channelItemRow}>
+                                            <Text
+                                                numberOfLines={1}
+                                                style={[
+                                                    styles.channelItemText,
+                                                    styles.channelNameText,
+                                                    active &&
+                                                        styles.channelItemTextActive,
+                                                ]}
+                                            >
+                                                # {channel.name}
+                                            </Text>
+                                            {unread > 0 ? (
+                                                <View
+                                                    style={styles.channelBadge}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.dmBadgeText
+                                                        }
+                                                    >
+                                                        {formatUnreadCount(
+                                                            unread,
+                                                        )}
+                                                    </Text>
+                                                </View>
+                                            ) : null}
+                                        </View>
                                     </TouchableOpacity>
                                 );
                             })}
@@ -375,6 +424,10 @@ export function ServerSidebar({
     );
 }
 
+function formatUnreadCount(count: number): string {
+    return count > 99 ? "99+" : count.toString();
+}
+
 const styles = StyleSheet.create({
     activePill: {
         backgroundColor: colors.text,
@@ -417,6 +470,15 @@ const styles = StyleSheet.create({
     authDotUnauthorized: {
         backgroundColor: "#FF453A",
     },
+    channelBadge: {
+        alignItems: "center",
+        backgroundColor: colors.error,
+        borderRadius: 10,
+        justifyContent: "center",
+        minWidth: 20,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+    },
     channelItem: {
         borderRadius: 8,
         paddingHorizontal: 10,
@@ -426,6 +488,11 @@ const styles = StyleSheet.create({
         backgroundColor: "rgba(255,255,255,0.09)",
         borderColor: "rgba(255,255,255,0.16)",
         borderWidth: 1,
+    },
+    channelItemRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
     },
     channelItemText: {
         color: colors.textSecondary,
@@ -437,6 +504,10 @@ const styles = StyleSheet.create({
     },
     channelList: {
         marginTop: 8,
+    },
+    channelNameText: {
+        flex: 1,
+        minWidth: 0,
     },
     channelPane: {
         backgroundColor: "#12151d",
@@ -611,6 +682,20 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingBottom: 10,
         width: 80,
+    },
+    serverBadge: {
+        alignItems: "center",
+        backgroundColor: colors.error,
+        borderColor: colors.surface,
+        borderRadius: 10,
+        borderWidth: 2,
+        bottom: -3,
+        height: 20,
+        justifyContent: "center",
+        minWidth: 20,
+        paddingHorizontal: 5,
+        position: "absolute",
+        right: -3,
     },
     serverBtn: {
         alignItems: "center",

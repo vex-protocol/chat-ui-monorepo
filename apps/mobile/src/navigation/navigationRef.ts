@@ -37,3 +37,10 @@ export function navigateToDevices(): void {
         screen: "Devices",
     });
 }
+
+export function navigateToDMList(): void {
+    if (!navigationRef.isReady()) return;
+    navigationRef.navigate("App", {
+        screen: "DMList",
+    });
+}

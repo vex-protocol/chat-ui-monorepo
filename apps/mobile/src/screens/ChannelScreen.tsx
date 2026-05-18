@@ -25,6 +25,7 @@ import {
 import { $groupMessages, $servers, $user, vexService } from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
+import { useFocusEffect } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Avatar } from "../components/Avatar";
@@ -54,7 +55,7 @@ export function ChannelScreen({
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
     // Scoped to just this server's slot so other server churn doesn't re-render us.
-    const servers = useStore($servers, { keys: [serverID] });
+    const servers = useStore($servers);
     const user = useStore($user);
     const serverName = servers[serverID]?.name ?? "";
 
@@ -67,15 +68,16 @@ export function ChannelScreen({
         () => buildIdentityVisibility(messages),
         [messages],
     );
+    const latestMessageID = messages[0]?.mailID;
 
-    // Mark this channel as read while the screen is active
-    useEffect(() => {
-        vexService.markRead(channelID);
-    }, [channelID]);
-
-    useEffect(() => {
-        if (messages.length > 0) vexService.markRead(channelID);
-    }, [messages.length, channelID]);
+    useFocusEffect(
+        useCallback(() => {
+            // Dependency hook: rerun while focused whenever this channel receives
+            // a new latest message.
+            void latestMessageID;
+            vexService.markRead(channelID);
+        }, [channelID, latestMessageID]),
+    );
 
     const insets = useSafeAreaInsets();
     const [text, setText] = useState("");
@@ -153,7 +155,7 @@ export function ChannelScreen({
         }
     };
 
-    function openMembersDrawer(): void {
+    const openMembersDrawer = useCallback((): void => {
         $leftSidebarOpen.set(false);
         $rightSidebarOpen.set(true);
         setMembersDrawerVisible(true);
@@ -170,9 +172,9 @@ export function ChannelScreen({
             toValue: 1,
             useNativeDriver: true,
         }).start();
-    }
+    }, [membersDrawerAnim]);
 
-    function closeMembersDrawer(): void {
+    const closeMembersDrawer = useCallback((): void => {
         $rightSidebarOpen.set(false);
         setMembersDrawerOpen(false);
         cancelPendingMembersHaptic();
@@ -191,21 +193,21 @@ export function ChannelScreen({
                 setMembersDrawerVisible(false);
             }
         });
-    }
+    }, [membersDrawerAnim]);
 
-    function toggleMembersDrawer(): void {
+    const toggleMembersDrawer = useCallback((): void => {
         if (membersDrawerOpen) {
             closeMembersDrawer();
             return;
         }
         openMembersDrawer();
-    }
+    }, [closeMembersDrawer, membersDrawerOpen, openMembersDrawer]);
 
     useEffect(() => {
         if (leftSidebarOpen && membersDrawerOpen) {
             closeMembersDrawer();
         }
-    }, [leftSidebarOpen, membersDrawerOpen]);
+    }, [closeMembersDrawer, leftSidebarOpen, membersDrawerOpen]);
 
     useEffect(() => {
         return () => {

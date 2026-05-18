@@ -12,8 +12,9 @@
 //
 // CJS intentional: apps/mobile/package.json has no "type":"module", so
 // a plain require('./package.json') is the simplest single-source-of-truth
-// for the version field. release-pr.yml bumps package.json; app.config.js
-// reads it here; the APK's visible version follows automatically.
+// for the version field in local builds. CI release workflows may pass
+// VEX_APP_VERSION to stamp a release tag version into the APK without
+// needing a bot commit directly on protected branches.
 
 const pkg = require("./package.json");
 const { withEntitlementsPlist } = require("expo/config-plugins");
@@ -35,6 +36,9 @@ module.exports = ({ config }) => {
         devFlavorEnabled && process.env.EAS_BUILD_PROFILE === "development";
     const iosCapabilitiesEnabled =
         process.env.VEX_DISABLE_IOS_CAPABILITIES !== "1";
+    const appDisplayName =
+        process.env.VEX_APP_DISPLAY_NAME ||
+        (devMode ? "Vex Developer" : config.name);
     const iconPath = devMode
         ? "./assets/icon-dev.png"
         : "./assets/icon-prod.png";
@@ -44,6 +48,10 @@ module.exports = ({ config }) => {
     const iosBundleIdentifier =
         process.env.VEX_IOS_BUNDLE_IDENTIFIER ||
         (devMode ? "chat.vex.mobile.dev" : config.ios?.bundleIdentifier);
+    const androidGoogleServicesFile =
+        process.env.VEX_ANDROID_GOOGLE_SERVICES_FILE ||
+        config.android?.googleServicesFile;
+    const appVersion = process.env.VEX_APP_VERSION || pkg.version;
 
     // Permissions required for the optional "Always-on connection"
     // foreground-service mode (Settings → Connection). Even when the
@@ -60,8 +68,8 @@ module.exports = ({ config }) => {
 
     return {
         ...config,
-        version: pkg.version,
-        name: devMode ? "Vex Beta" : config.name,
+        version: appVersion,
+        name: appDisplayName,
         icon: iconPath,
         splash: {
             backgroundColor: "#0a0a0a",
@@ -82,6 +90,9 @@ module.exports = ({ config }) => {
                 foregroundImage: androidAdaptiveForegroundPath,
             },
             package: devMode ? "chat.vex.mobile.dev" : config.android?.package,
+            ...(androidGoogleServicesFile
+                ? { googleServicesFile: androidGoogleServicesFile }
+                : {}),
             permissions: androidPermissions,
         },
         updates: { enabled: false },

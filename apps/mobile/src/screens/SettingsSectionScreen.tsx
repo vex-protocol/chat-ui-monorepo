@@ -37,6 +37,12 @@ import {
     stopAlwaysOn,
 } from "../lib/foregroundService";
 import { requestNotificationPermission } from "../lib/notifications";
+import {
+    $pushNotificationsEnabled,
+    $pushNotificationStatus,
+    setPushNotificationsEnabled,
+    unsubscribeStoredPushNotificationSubscription,
+} from "../lib/pushNotifications";
 import { persistLocalMessageRetentionDays } from "../lib/retentionPreference";
 import { colors, typography } from "../theme";
 
@@ -160,13 +166,45 @@ export function SettingsSectionScreen({
                 return "Data";
             case "developer":
                 return "Developer";
+            case "notifications":
+                return "Notifications";
             default:
                 return "Settings";
         }
     }, [section]);
 
     const alwaysOn = useStore($alwaysOnEnabled);
+    const pushNotificationsEnabled = useStore($pushNotificationsEnabled);
+    const pushNotificationStatus = useStore($pushNotificationStatus);
     const [alwaysOnBusy, setAlwaysOnBusy] = useState(false);
+    const [pushNotificationsBusy, setPushNotificationsBusy] = useState(false);
+
+    async function handlePushNotificationsToggle(next: boolean): Promise<void> {
+        if (pushNotificationsBusy) {
+            return;
+        }
+        setPushNotificationsBusy(true);
+        try {
+            await setPushNotificationsEnabled(next);
+            if (next && $pushNotificationStatus.get() === "denied") {
+                Alert.alert(
+                    "Notification permission needed",
+                    "Enable notifications for Vex in system settings, then try again.",
+                );
+            }
+        } catch (err: unknown) {
+            console.warn(
+                "[vex-push] toggle failed",
+                err instanceof Error ? err.message : String(err),
+            );
+            Alert.alert(
+                "Notifications unavailable",
+                "Vex could not update push notifications right now.",
+            );
+        } finally {
+            setPushNotificationsBusy(false);
+        }
+    }
 
     async function handleAlwaysOnToggle(next: boolean): Promise<void> {
         if (alwaysOnBusy) {
@@ -225,6 +263,20 @@ export function SettingsSectionScreen({
                         setLoggingOut(true);
                         void (async () => {
                             try {
+                                if (user?.userID) {
+                                    try {
+                                        await unsubscribeStoredPushNotificationSubscription(
+                                            user.userID,
+                                        );
+                                    } catch (err: unknown) {
+                                        console.warn(
+                                            "[vex-push] pre-logout cleanup failed",
+                                            err instanceof Error
+                                                ? err.message
+                                                : String(err),
+                                        );
+                                    }
+                                }
                                 await vexService.logout();
                             } catch {
                                 /* ignore */
@@ -262,6 +314,26 @@ export function SettingsSectionScreen({
     ): Promise<void> {
         await persistLocalMessageRetentionDays(days);
         vexService.setLocalMessageRetentionDays(days);
+    }
+
+    function pushNotificationDescription(): string {
+        if (!pushNotificationsEnabled) {
+            return "Push notifications are off";
+        }
+        switch (pushNotificationStatus) {
+            case "denied":
+                return "Permission is blocked in system settings";
+            case "error":
+                return "Could not subscribe on this device";
+            case "permission_needed":
+                return "Waiting for notification permission";
+            case "subscribed":
+                return "Push notifications are active";
+            case "subscribing":
+                return "Subscribing this device...";
+            default:
+                return "Notify this device when new mail arrives";
+        }
     }
 
     function formatBytes(bytes: number): string {
@@ -673,6 +745,32 @@ export function SettingsSectionScreen({
                                 label="Lock developer options"
                                 onPress={handleLockDeveloperOptions}
                                 tone="danger"
+                            />
+                        </MenuSection>
+                    </>
+                ) : null}
+
+                {section === "notifications" ? (
+                    <>
+                        <MenuSection
+                            footer="Push notifications wake the app so it can fetch encrypted mail from your inbox. Message contents stay encrypted on the server."
+                            title="Push notifications"
+                        >
+                            <MenuRow
+                                accessory={
+                                    <Switch
+                                        disabled={pushNotificationsBusy}
+                                        onValueChange={(value) => {
+                                            void handlePushNotificationsToggle(
+                                                value,
+                                            );
+                                        }}
+                                        value={pushNotificationsEnabled}
+                                    />
+                                }
+                                description={pushNotificationDescription()}
+                                icon="notifications-outline"
+                                label="Push notifications"
                             />
                         </MenuSection>
                     </>

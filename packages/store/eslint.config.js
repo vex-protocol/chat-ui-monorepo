@@ -25,7 +25,6 @@ export default [
                     patterns: [
                         {
                             group: [
-                                "axios",
                                 "ky",
                                 "ofetch",
                                 "got",

@@ -34,7 +34,7 @@ ADR-006 (post-connection auth).
 ### Problem 2: Global state prevents multi-client testing
 
 `addCookie` sets `ax.defaults.headers.cookie` — a **process-global** setting
-on the shared axios instance. When two Client instances exist in the same
+on the shared HTTP client instance. When two Client instances exist in the same
 process (e.g., integration tests with `clientA` and `clientB`), the second
 login overwrites the first's cookie. All subsequent requests from `clientA`
 carry `clientB`'s credentials.
@@ -78,8 +78,8 @@ After:
 
 ### Client changes (libvex-js)
 
-1. **Per-client axios instance** — each `Client` creates its own `axios.create()`
-   instead of using the global `ax` import. This isolates auth state between
+1. **Per-client HTTP transport** — each `Client` creates its own transport
+   state instead of using the global `ax` import. This isolates auth between
    instances.
 
 2. **Bearer header after login** — `login()` and `loginWithDeviceKey()` set
@@ -109,11 +109,11 @@ After:
 
 ### Test impact
 
-- **Multi-client tests unblocked** — each Client has its own axios instance
+- **Multi-client tests unblocked** — each Client has its own HTTP transport
   with its own `Authorization` header. Two clients in the same process no
   longer interfere.
 - **Platform tests simplified** — no cookie simulation needed in test
-  transports. The `getAxiosCookies()` helper and cookie-forwarding logic in
+  transports. The cookie helper and cookie-forwarding logic in
   `NodeTestWS` / `BrowserTestWS` become dead code.
 - **New tests enabled:**
   - Two-user direct messaging (full X3DH exchange between different users)
@@ -126,9 +126,9 @@ After:
 
 ## Alternatives Considered
 
-### Keep cookies, use per-client axios instances
+### Keep cookies, use per-client HTTP transports
 
-Create `axios.create()` per Client but continue using cookies via a per-instance
+Create one transport per Client but continue using cookies via a per-instance
 cookie jar (e.g., `tough-cookie` or manual jar).
 
 - **Pro:** No server changes
@@ -140,7 +140,7 @@ cookie jar (e.g., `tough-cookie` or manual jar).
 ### Keep cookies, fix the global state
 
 Store cookies on the Client instance instead of `ax.defaults`. Forward them
-per-request via axios interceptors.
+per-request via HTTP client interceptors.
 
 - **Pro:** No server changes, no protocol change
 - **Con:** Still requires `isNode` branching, still has platform-specific
@@ -153,7 +153,7 @@ per-request via axios interceptors.
 ### Positive
 
 - **Platform-agnostic** — identical auth code on Node, browser, Tauri, and RN
-- **Multi-client safe** — per-instance axios with per-instance Bearer token
+- **Multi-client safe** — per-instance HTTP transport with per-instance Bearer token
 - **Simpler Client.ts** — removes ~30 lines of cookie handling code
 - **Consistent with WS auth** — both HTTP and WS use explicit token delivery
 - **Unblocks test coverage** — multi-user and multi-device tests become possible
@@ -169,7 +169,7 @@ per-request via axios interceptors.
 
 1. Spire: replace `checkAuth` with Bearer-only, remove `cookie-parser`,
    remove all `res.cookie()` calls
-2. Client.ts: per-client axios instance, Bearer header, delete cookie code
+2. Client.ts: per-client HTTP transport, Bearer header, delete cookie code
 3. Delete test transport cookie simulation
 4. Add multi-client integration tests
 

@@ -14,7 +14,14 @@ source "$SCRIPT_DIR/ensure-android-sdk.sh"
 #   LOG_FILTER='ReactNativeJS|vex-msg|vex-auth' pnpm -F mobile android:with-logs
 
 LOG_SCRIPT="./scripts/logcat-all-devices.sh"
-APP_PACKAGE="${APP_PACKAGE:-chat.vex.mobile}"
+if [[ -z "${APP_PACKAGE:-}" ]]; then
+    if [[ "${VEX_ENABLE_DEV_BUILD:-}" == "1" && "${EAS_BUILD_PROFILE:-}" == "development" ]]; then
+        APP_PACKAGE="chat.vex.mobile.dev"
+    else
+        APP_PACKAGE="chat.vex.mobile"
+    fi
+fi
+export APP_PACKAGE
 APK_PATH="./android/app/build/outputs/apk/debug/app-debug.apk"
 START_METRO="${START_METRO:-1}"
 METRO_FORCE_RESTART="${METRO_FORCE_RESTART:-1}"
@@ -196,6 +203,7 @@ if [[ -z "${ORG_GRADLE_PROJECT_reactNativeArchitectures:-}" ]]; then
     export ORG_GRADLE_PROJECT_reactNativeArchitectures="$(detect_architectures_from_connected_devices)"
 fi
 echo "Using reactNativeArchitectures=${ORG_GRADLE_PROJECT_reactNativeArchitectures}"
+echo "Using Android package ${APP_PACKAGE}"
 
 echo "Starting multi-device logs..."
 bash "$LOG_SCRIPT" &

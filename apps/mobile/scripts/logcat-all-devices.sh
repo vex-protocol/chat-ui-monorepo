@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage:
 #   bash ./scripts/logcat-all-devices.sh
 #   LOG_FILTER='ReactNativeJS|vex-msg|vex-auth|some-other-tag' bash ./scripts/logcat-all-devices.sh
+#   APP_PACKAGE='chat.vex.mobile.dev' bash ./scripts/logcat-all-devices.sh
 
 LOG_FILTER="${LOG_FILTER:-ReactNativeJS|vex-msg|vex-auth}"
 
@@ -27,6 +28,9 @@ fi
 
 echo "Streaming logs from ${#DEVICES[@]} target(s): ${DEVICES[*]}"
 echo "Filter: ${LOG_FILTER}"
+if [[ -n "${APP_PACKAGE:-}" ]]; then
+    echo "App package: ${APP_PACKAGE}"
+fi
 echo "Press Ctrl+C to stop."
 
 PIDS=()
@@ -53,10 +57,24 @@ trap cleanup INT TERM EXIT
 for serial in "${DEVICES[@]}"; do
     kill_stale_logcat_for_serial "$serial"
     (
-        adb -s "$serial" logcat -T 1 -v time 2>/dev/null |
-            tr -d '\r' |
-            sed -u "s/^/[${serial}] /" |
-            awk -v re="$LOG_FILTER" 'length($0) > 0 && ($0 ~ re) { print; fflush() }'
+        if [[ -n "${APP_PACKAGE:-}" ]]; then
+            app_pid="$(adb -s "$serial" shell pidof "$APP_PACKAGE" 2>/dev/null | tr -d '\r' | awk '{ print $1 }')"
+            if [[ -n "$app_pid" ]]; then
+                adb -s "$serial" logcat -T 1 --pid="$app_pid" -v time 2>/dev/null
+            else
+                echo "Waiting for ${APP_PACKAGE} on ${serial}..." >&2
+                while [[ -z "$app_pid" ]]; do
+                    sleep 1
+                    app_pid="$(adb -s "$serial" shell pidof "$APP_PACKAGE" 2>/dev/null | tr -d '\r' | awk '{ print $1 }')"
+                done
+                adb -s "$serial" logcat -T 1 --pid="$app_pid" -v time 2>/dev/null
+            fi
+        else
+            adb -s "$serial" logcat -T 1 -v time 2>/dev/null
+        fi |
+        tr -d '\r' |
+        sed -u "s/^/[${serial}] /" |
+        awk -v re="$LOG_FILTER" 'length($0) > 0 && ($0 ~ re) { print; fflush() }'
     ) &
     PIDS+=("$!")
 done

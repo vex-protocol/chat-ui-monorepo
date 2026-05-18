@@ -43,3 +43,8 @@ yarn.lock
 
 # Local registry config — points to localhost:4873, breaks without Verdaccio running
 .npmrc
+
+# CI writes these files from GitHub Actions secrets immediately before running
+# `eas build --local`. They stay gitignored, but EAS must include them in its
+# project archive so Expo prebuild can copy android.googleServicesFile.
+!apps/mobile/google-services*.json

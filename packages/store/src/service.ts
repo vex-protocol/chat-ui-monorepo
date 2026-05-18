@@ -152,6 +152,13 @@ export interface PasskeySignInBegin {
     requestID: string;
 }
 
+export interface PushNotificationSubscriptionInput {
+    channel: "expo";
+    events?: string[];
+    platform?: "android" | "ios" | "web";
+    token: string;
+}
+
 export type ResumeNetworkStatus = "signed_out" | AuthProbeStatus;
 
 /** Server connection options — identical across all auth flows. */
@@ -189,31 +196,9 @@ export interface SessionInfo {
     username: string;
 }
 
-interface ClientHttpDefaultsLike {
-    signal?: unknown;
-    timeout?: number;
-}
-
-interface ClientHttpInterceptorsLike {
-    request?: {
-        use?: (
-            onFulfilled: (
-                config: ClientHttpRequestConfigLike,
-            ) => ClientHttpRequestConfigLike,
-        ) => unknown;
-    };
-}
-
 interface ClientHttpLike {
-    defaults?: ClientHttpDefaultsLike;
     get?: (...args: unknown[]) => Promise<unknown>;
-    interceptors?: ClientHttpInterceptorsLike;
     post?: (...args: unknown[]) => Promise<unknown>;
-}
-
-interface ClientHttpRequestConfigLike {
-    signal?: unknown;
-    timeout?: number;
 }
 
 type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
@@ -222,6 +207,20 @@ type ClientWithDeviceApprovals = Omit<Client, "devices"> & {
 
 interface ClientWithInternalHttp {
     http?: ClientHttpLike;
+}
+
+interface ClientWithNotificationSubscriptionsLike {
+    subscribeNotifications?: unknown;
+    unsubscribeNotifications?: unknown;
+}
+
+interface ClientWithPushNotificationFallback extends ClientWithInternalHttp {
+    getHost?: () => string;
+    me?: {
+        device?: () => {
+            deviceID?: unknown;
+        };
+    };
 }
 
 interface ClientWithServerChannelBootstrapLike {
@@ -266,6 +265,10 @@ interface DevicesWithApprovalLike {
 
 interface HttpErrorLike {
     response: { status: number };
+}
+
+interface NotificationSubscriptionLike {
+    subscriptionID: string;
 }
 
 interface ServerChannelBootstrapLike {
@@ -322,6 +325,7 @@ class Disposable {
 
 class VexService {
     private autoLoginInFlight: null | Promise<AuthResult> = null;
+    private backgroundConnectionRecoverySuspended = false;
     private client: Client | null = null;
     private connectionRecoveryInFlight = false;
     /**
@@ -1372,8 +1376,12 @@ class VexService {
             // we're not in always-on mode), do the full reconnect — the
             // socket can't be trusted.
             if (!this.isWebsocketLikelyHealthy()) {
+                const reconnect = this.client.reconnectWebsocket();
+                reconnect.catch(() => {
+                    /* consumed by withTimeout below; prevents late RN unhandled rejection logs */
+                });
                 await withTimeout(
-                    this.client.reconnectWebsocket(),
+                    reconnect,
                     10_000,
                     "WebSocket reconnect timed out after app resume.",
                 );
@@ -1741,8 +1749,6 @@ class VexService {
         }
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     async setAvatar(data: Uint8Array): Promise<OperationResult> {
         const bumpVersionForCurrentUser = (): void => {
             $avatarHashWritable.set(Date.now());
@@ -1787,6 +1793,12 @@ class VexService {
         }
     }
 
+    // ── Unread management ───────────────────────────────────────────────
+
+    setBackgroundConnectionRecoverySuspended(suspended: boolean): void {
+        this.backgroundConnectionRecoverySuspended = suspended;
+    }
+
     /**
      * Updates the local message retention preference (1–30 days) and
      * applies it to the live client when connected.
@@ -1799,8 +1811,6 @@ class VexService {
         };
         c?.setLocalMessageRetentionDays?.(clamped);
     }
-
-    // ── Lifecycle ───────────────────────────────────────────────────────
 
     setWebsocketDebug(enabled: boolean): void {
         this.wsDebugEnabled = enabled;
@@ -1820,8 +1830,75 @@ class VexService {
         this.attachWebsocketDebug();
     }
 
+    // ── Lifecycle ───────────────────────────────────────────────────────
+
     setWebsocketStateDebug(enabled: boolean): void {
         this.wsDebugStateLogsEnabled = enabled;
+    }
+
+    async subscribePushNotifications(
+        input: PushNotificationSubscriptionInput,
+    ): Promise<NotificationSubscriptionLike> {
+        const client = this.requireClient();
+        const legacyClient =
+            client as unknown as ClientWithPushNotificationFallback;
+        if (hasNotificationSubscriptionApi(client)) {
+            return client.subscribeNotifications(input);
+        }
+
+        const http = legacyClient.http;
+        const post = http?.post;
+        if (typeof post !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        const deviceID = legacyClient.me?.device?.().deviceID;
+        const getHost = legacyClient.getHost;
+        if (typeof deviceID !== "string" || typeof getHost !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        const response = (await post.call(
+            http,
+            getHost.call(legacyClient) +
+                "/device/" +
+                deviceID +
+                "/notifications/subscriptions",
+            JSON.stringify(input),
+            {
+                headers: { "Content-Type": "application/json" },
+                responseType: "json",
+            },
+        )) as { data?: unknown };
+
+        return parseNotificationSubscription(response.data);
+    }
+
+    async unsubscribePushNotifications(subscriptionID: string): Promise<void> {
+        const client = this.requireClient();
+        const legacyClient =
+            client as unknown as ClientWithPushNotificationFallback;
+        if (hasNotificationSubscriptionApi(client)) {
+            await client.unsubscribeNotifications(subscriptionID);
+            return;
+        }
+
+        const http = legacyClient.http;
+        const del = (http as undefined | { delete?: unknown })?.delete;
+        if (typeof del !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        const deviceID = legacyClient.me?.device?.().deviceID;
+        const getHost = legacyClient.getHost;
+        if (typeof deviceID !== "string" || typeof getHost !== "function") {
+            throw new Error("Push subscriptions are not supported by libvex.");
+        }
+        await del.call(
+            http,
+            getHost.call(legacyClient) +
+                "/device/" +
+                deviceID +
+                "/notifications/subscriptions/" +
+                subscriptionID,
+        );
     }
 
     private attachWebsocketDebug(): void {
@@ -1895,6 +1972,9 @@ class VexService {
         if (!this.client || this.wsWatchdogLastFrameAt === 0) {
             return;
         }
+        if (this.backgroundConnectionRecoverySuspended) {
+            return;
+        }
         const elapsed = Date.now() - this.wsWatchdogLastFrameAt;
         if (elapsed <= WS_WATCHDOG_STALE_THRESHOLD_MS) {
             return;
@@ -1923,29 +2003,10 @@ class VexService {
             return;
         }
         const internals = client as unknown as ClientWithInternalHttp;
-        const defaults = internals.http?.defaults;
         const http = internals.http;
-        if (!defaults || !http) {
+        if (!http) {
             return;
         }
-        // In some RN environments axios + default AbortSignal can stall
-        // requests before dispatch. Keep abort semantics in SDK runtimes
-        // that support it reliably, but clear it on mobile app runtime.
-        defaults.signal = undefined;
-        if (typeof defaults.timeout !== "number" || defaults.timeout <= 0) {
-            defaults.timeout = 15000;
-        }
-        http.interceptors?.request?.use?.(
-            (
-                config: ClientHttpRequestConfigLike,
-            ): ClientHttpRequestConfigLike => {
-                config.signal = undefined;
-                if (typeof config.timeout !== "number" || config.timeout <= 0) {
-                    config.timeout = 15000;
-                }
-                return config;
-            },
-        );
         this.wrapHttpMethodsWithTimeout(http);
     }
 
@@ -2305,6 +2366,13 @@ class VexService {
         reason: string,
     ): Promise<null | ResumeNetworkStatus> {
         if (!this.client) {
+            return null;
+        }
+        if (this.backgroundConnectionRecoverySuspended) {
+            debugAuth("connection:recover:skipped", {
+                reason,
+                suspended: true,
+            });
             return null;
         }
         if (this.connectionRecoveryInFlight) {
@@ -3152,6 +3220,13 @@ class VexService {
         this.subscribe("disconnect", () => {
             this.logWsState("ws:disconnect");
             this.setAuthStatus("offline");
+            if (this.backgroundConnectionRecoverySuspended) {
+                debugAuth("connection:recover:skipped", {
+                    reason: "disconnect",
+                    suspended: true,
+                });
+                return;
+            }
             void this.recoverConnection("disconnect");
         });
         this.subscribe("message", (msg) => {
@@ -3244,9 +3319,9 @@ function describeWsFrame(data: Uint8Array): {
 /**
  * Extract a human-readable message from an error.
  *
- * For axios HTTP errors, surface the server-sent body instead of
+ * For HTTP errors, surface the server-sent body instead of
  * the generic "Request failed with status code N". libvex configures
- * its axios instance with `responseType: "arraybuffer"` so the body
+ * binary responses so the body
  * arrives as raw bytes regardless of `Content-Type`; spire's error
  * envelopes are JSON in practice, in one of two shapes:
  *
@@ -3342,6 +3417,20 @@ function hasHttpStatus(err: unknown): err is HttpErrorLike {
         res !== null &&
         "status" in res &&
         typeof (res as { status: unknown }).status === "number"
+    );
+}
+
+function hasNotificationSubscriptionApi(client: Client): client is Client & {
+    subscribeNotifications: (
+        input: PushNotificationSubscriptionInput,
+    ) => Promise<NotificationSubscriptionLike>;
+    unsubscribeNotifications: (subscriptionID: string) => Promise<void>;
+} {
+    const maybeClient =
+        client as unknown as ClientWithNotificationSubscriptionsLike;
+    return (
+        typeof maybeClient.subscribeNotifications === "function" &&
+        typeof maybeClient.unsubscribeNotifications === "function"
     );
 }
 
@@ -3455,6 +3544,24 @@ function isWebSocketDebugLike(value: unknown): value is WebSocketDebugLike {
 function jwtExpToEpochMs(exp: number): number {
     // JWT exp is conventionally seconds since epoch; tolerate ms values too.
     return exp > 1_000_000_000_000 ? exp : exp * 1000;
+}
+
+function parseNotificationSubscription(
+    value: unknown,
+): NotificationSubscriptionLike {
+    if (
+        typeof value === "object" &&
+        value !== null &&
+        "subscriptionID" in value &&
+        typeof (value as { subscriptionID: unknown }).subscriptionID ===
+            "string"
+    ) {
+        return {
+            subscriptionID: (value as { subscriptionID: string })
+                .subscriptionID,
+        };
+    }
+    throw new Error("Invalid push subscription response.");
 }
 
 function readErrorField(body: unknown): null | string {

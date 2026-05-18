@@ -65,7 +65,7 @@ export function SessionDetailsScreen({
             return;
         }
         void refreshSession();
-    }, [refreshSession, user?.userID]);
+    }, [refreshSession, user]);
 
     const expiresLabel = sessionInfo?.tokenExpiresAt
         ? new Date(sessionInfo.tokenExpiresAt).toLocaleString()
