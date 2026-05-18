@@ -3,6 +3,7 @@ import type { AppScreenProps } from "../navigation/types";
 import React, { useMemo, useState } from "react";
 import {
     Alert,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -37,9 +38,8 @@ export function ServerSettingsScreen({
     const [createChannelError, setCreateChannelError] = useState("");
     const [deletingServer, setDeletingServer] = useState(false);
     const [leavingServer, setLeavingServer] = useState(false);
-    const currentServer = servers[serverID];
     const serverName =
-        currentServer?.name ?? route.params.serverName ?? "Server";
+        servers[serverID]?.name ?? route.params.serverName ?? "Server";
     const channels = channelsByServer[serverID] ?? [];
     const membershipPermissions = useMemo(() => {
         const myUserID = user?.userID;
@@ -60,7 +60,6 @@ export function ServerSettingsScreen({
     }, [membershipPermissions]);
     const canCreateChannelByRole = serverPowerLevel >= 50;
     const canDeleteServerByRole = serverPowerLevel >= 100;
-    const canLeaveServer = Boolean(currentServer);
     const canManageInvitesByRole = membershipPermissions.length > 0;
 
     const canCreateChannel = useMemo(
@@ -143,7 +142,7 @@ export function ServerSettingsScreen({
     }
 
     function confirmLeaveServer(): void {
-        if (!canLeaveServer || leavingServer) {
+        if (leavingServer) {
             return;
         }
         Alert.alert(
@@ -191,7 +190,10 @@ export function ServerSettingsScreen({
                 }}
                 title={`${serverName} settings`}
             />
-            <View style={styles.content}>
+            <ScrollView
+                contentContainerStyle={styles.content}
+                style={styles.scroller}
+            >
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Channels</Text>
                     <Text style={styles.sectionHint}>
@@ -265,24 +267,22 @@ export function ServerSettingsScreen({
                     )}
                 </View>
 
-                {canLeaveServer ? (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Membership</Text>
-                        <TouchableOpacity
-                            disabled={leavingServer}
-                            onPress={confirmLeaveServer}
-                            style={[
-                                styles.button,
-                                styles.buttonDanger,
-                                leavingServer && styles.buttonDisabled,
-                            ]}
-                        >
-                            <Text style={styles.buttonDangerText}>
-                                {leavingServer ? "Leaving..." : "Leave group"}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : null}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Membership</Text>
+                    <TouchableOpacity
+                        disabled={leavingServer}
+                        onPress={confirmLeaveServer}
+                        style={[
+                            styles.button,
+                            styles.buttonDanger,
+                            leavingServer && styles.buttonDisabled,
+                        ]}
+                    >
+                        <Text style={styles.buttonDangerText}>
+                            {leavingServer ? "Leaving..." : "Leave group"}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
 
                 {canDeleteServerByRole ? (
                     <View style={styles.section}>
@@ -312,7 +312,7 @@ export function ServerSettingsScreen({
                         You do not have permission to manage this server.
                     </Text>
                 ) : null}
-            </View>
+            </ScrollView>
         </View>
     );
 }
@@ -358,6 +358,7 @@ const styles = StyleSheet.create({
     content: {
         gap: 16,
         padding: 14,
+        paddingBottom: 28,
     },
     errorText: {
         ...typography.body,
@@ -380,6 +381,9 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 8,
         marginTop: 8,
+    },
+    scroller: {
+        flex: 1,
     },
     section: {
         backgroundColor: "rgba(255,255,255,0.02)",
