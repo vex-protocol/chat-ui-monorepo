@@ -4,6 +4,7 @@ import type { BackgroundNetworkFetchResult } from "@vex-chat/store";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     AppState,
+    Linking,
     Platform,
     Pressable,
     StatusBar,
@@ -19,6 +20,7 @@ import {
     $keyReplaced,
     $messages,
     $user,
+    parseVexLink,
     vexService,
 } from "@vex-chat/store";
 
@@ -183,8 +185,37 @@ function App() {
         new BoundedStringSet(NOTIFIED_MAILID_DEDUP_CAP),
     );
     const notificationHistoryCutoffMsRef = useRef(0);
+    const pendingInviteIDRef = useRef<null | string>(null);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
     const userID = user?.userID;
+
+    const flushPendingInviteRoute = useCallback(() => {
+        const inviteID = pendingInviteIDRef.current;
+        if (!inviteID || !$user.get() || !navigationRef.isReady()) {
+            return;
+        }
+        pendingInviteIDRef.current = null;
+        navigationRef.navigate("App", {
+            params: { inviteID },
+            screen: "JoinGroup",
+        });
+    }, []);
+
+    const handleIncomingLink = useCallback(
+        (url: null | string) => {
+            if (!url) {
+                return;
+            }
+            const link = parseVexLink(url);
+            if (link.type !== "invite") {
+                return;
+            }
+            pendingInviteIDRef.current = link.inviteID;
+            flushPendingInviteRoute();
+        },
+        [flushPendingInviteRoute],
+    );
+
     const logoutWithPushNotificationCleanup = useCallback(async () => {
         const activeUserID = $user.get()?.userID ?? userID;
         try {
@@ -215,6 +246,24 @@ function App() {
             subscription.remove();
         };
     }, []);
+
+    useEffect(() => {
+        void Linking.getInitialURL()
+            .then(handleIncomingLink)
+            .catch(() => {
+                /* Ignore malformed platform launch URLs. */
+            });
+        const subscription = Linking.addEventListener("url", ({ url }) => {
+            handleIncomingLink(url);
+        });
+        return () => {
+            subscription.remove();
+        };
+    }, [handleIncomingLink]);
+
+    useEffect(() => {
+        flushPendingInviteRoute();
+    }, [flushPendingInviteRoute, userID]);
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -902,6 +951,7 @@ function App() {
             <NavigationContainer
                 onReady={() => {
                     flushPendingNotificationRoutes();
+                    flushPendingInviteRoute();
                 }}
                 ref={navigationRef}
                 theme={{

@@ -14,7 +14,7 @@ import {
     View,
 } from "react-native";
 
-import { vexService } from "@vex-chat/store";
+import { formatInviteLink, vexService } from "@vex-chat/store";
 
 import { ChatHeader } from "../components/ChatHeader";
 import { colors, fontFamilies, typography } from "../theme";
@@ -25,8 +25,6 @@ const DURATIONS: { label: string; value: string }[] = [
     { label: "7 days", value: "7d" },
     { label: "30 days", value: "30d" },
 ];
-
-const INVITE_URL_BASE = "https://vex.chat/invite";
 
 export function InviteScreen({ route }: AppScreenProps<"Invite">) {
     const { serverID, serverName } = route.params;
@@ -159,7 +157,7 @@ export function InviteScreen({ route }: AppScreenProps<"Invite">) {
                         data={invites}
                         keyExtractor={(item) => item.inviteID}
                         renderItem={({ item }) => {
-                            const link = buildInviteLink(item.inviteID);
+                            const link = formatInviteLink(item.inviteID);
                             return (
                                 <View style={styles.inviteCard}>
                                     <Text
@@ -226,10 +224,6 @@ export function InviteScreen({ route }: AppScreenProps<"Invite">) {
             </View>
         </View>
     );
-}
-
-function buildInviteLink(inviteID: string): string {
-    return `${INVITE_URL_BASE}/${inviteID}`;
 }
 
 const styles = StyleSheet.create({
