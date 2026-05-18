@@ -28,6 +28,7 @@ import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MenuRow, MenuSection } from "../components/MenuRow";
 import { $avatarCropResult } from "../lib/avatarCropResult";
+import { buildInfo } from "../lib/buildInfo";
 import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
@@ -574,8 +575,9 @@ export function SettingsSectionScreen({
                         <MenuRow
                             icon="pricetag-outline"
                             label="Version"
+                            monoValue
                             onPress={handleVersionTap}
-                            value="0.1.0"
+                            value={buildInfo.label}
                             {...(devUnlocked
                                 ? {
                                       description:
@@ -590,6 +592,39 @@ export function SettingsSectionScreen({
                                         } to unlock developer options`,
                                     }
                                   : {})}
+                        />
+                        <MenuRow
+                            icon="git-commit-outline"
+                            label="Commit"
+                            monoBlock={buildInfo.commit}
+                            value={buildInfo.shortCommit}
+                        />
+                        <MenuRow
+                            description={
+                                buildInfo.isEmbeddedLaunch
+                                    ? "Running the APK bundle"
+                                    : "Running an OTA bundle"
+                            }
+                            icon={
+                                buildInfo.isEmbeddedLaunch
+                                    ? "archive-outline"
+                                    : "cloud-download-outline"
+                            }
+                            label="Update"
+                            value={
+                                buildInfo.shortUpdateId ??
+                                (buildInfo.isEmbeddedLaunch
+                                    ? "embedded"
+                                    : "unknown")
+                            }
+                            {...(buildInfo.updateId != null
+                                ? { monoBlock: buildInfo.updateId }
+                                : {})}
+                        />
+                        <MenuRow
+                            icon="git-branch-outline"
+                            label="Channel"
+                            value={buildInfo.channel}
                         />
                         <MenuRow
                             icon="server-outline"
@@ -684,6 +719,58 @@ export function SettingsSectionScreen({
 
                 {section === "developer" && devUnlocked ? (
                     <>
+                        <MenuSection title="Update diagnostics">
+                            <MenuRow
+                                icon="pricetag-outline"
+                                label="Version"
+                                monoValue
+                                value={buildInfo.label}
+                            />
+                            <MenuRow
+                                icon="git-commit-outline"
+                                label="Commit"
+                                monoBlock={buildInfo.commit}
+                                value={buildInfo.shortCommit}
+                            />
+                            <MenuRow
+                                description={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "Running the APK bundle"
+                                        : "Running an OTA bundle"
+                                }
+                                icon={
+                                    buildInfo.isEmbeddedLaunch
+                                        ? "archive-outline"
+                                        : "cloud-download-outline"
+                                }
+                                label="Update ID"
+                                value={
+                                    buildInfo.shortUpdateId ??
+                                    (buildInfo.isEmbeddedLaunch
+                                        ? "embedded"
+                                        : "unknown")
+                                }
+                                {...(buildInfo.updateId != null
+                                    ? { monoBlock: buildInfo.updateId }
+                                    : {})}
+                            />
+                            <MenuRow
+                                icon="git-branch-outline"
+                                label="Channel"
+                                value={buildInfo.channel}
+                            />
+                            <MenuRow
+                                icon="cube-outline"
+                                label="Runtime"
+                                monoBlock={buildInfo.runtimeVersion}
+                                value={buildInfo.runtimeVersion.slice(0, 8)}
+                            />
+                            <MenuRow
+                                icon="time-outline"
+                                label="Created"
+                                value={buildInfo.createdAt ?? "unknown"}
+                            />
+                        </MenuSection>
                         <MenuSection
                             footer="Logs print to the device terminal/logcat. Useful when reporting issues."
                             title="WebSocket Debug"
