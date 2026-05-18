@@ -135,9 +135,11 @@ jobs:
                   EAS_BUILD_PROFILE: development
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "1"
                   EXPO_PUBLIC_SERVER_URL: dev.vex.wtf
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: development
                   VEX_ENABLE_DEV_BUILD: "1"
               run: |
+                  export EXPO_PUBLIC_VEX_APP_VERSION="$(node -pe "require('./package.json').version")"
                   eas update \
                     --channel development \
                     --message "development ${GITHUB_SHA::8}" \
@@ -180,9 +182,11 @@ jobs:
                   EAS_BUILD_PROFILE: development
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "1"
                   EXPO_PUBLIC_SERVER_URL: dev.vex.wtf
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: development
                   VEX_ENABLE_DEV_BUILD: "1"
               run: |
+                  export EXPO_PUBLIC_VEX_APP_VERSION="$(node -pe "require('./package.json').version")"
                   eas build \
                     --profile development \
                     --platform android \

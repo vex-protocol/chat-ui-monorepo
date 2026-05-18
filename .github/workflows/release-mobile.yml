@@ -171,6 +171,8 @@ jobs:
                   EAS_BUILD_PROFILE: production
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
                   EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  EXPO_PUBLIC_VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: production
                   VEX_APP_DISPLAY_NAME: Vex Beta
                   VEX_APP_VERSION: ${{ steps.baseline.outputs.base_version }}
@@ -281,6 +283,8 @@ jobs:
                   EAS_BUILD_PROFILE: production
                   EXPO_PUBLIC_ENABLE_DEV_SERVER: "0"
                   EXPO_PUBLIC_SERVER_URL: api.vex.wtf
+                  EXPO_PUBLIC_VEX_APP_VERSION: ${{ steps.version.outputs.version }}
+                  EXPO_PUBLIC_VEX_COMMIT_SHA: ${{ github.sha }}
                   VEX_APP_ENV: production
                   VEX_APP_DISPLAY_NAME: Vex Beta
                   VEX_APP_VERSION: ${{ steps.version.outputs.version }}
