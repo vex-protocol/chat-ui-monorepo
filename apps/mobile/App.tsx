@@ -198,7 +198,7 @@ function App() {
         pendingInviteIDRef.current = null;
         navigationRef.navigate("App", {
             params: { inviteID },
-            screen: "JoinGroup",
+            screen: "InvitePreview",
         });
     }, []);
 

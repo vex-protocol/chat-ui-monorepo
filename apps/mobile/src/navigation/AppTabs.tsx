@@ -21,6 +21,7 @@ import { DeviceDetailsScreen } from "../screens/DeviceDetailsScreen";
 import { DeviceManagerScreen } from "../screens/DeviceManagerScreen";
 import { DeviceRequestsScreen } from "../screens/DeviceRequestsScreen";
 import { DMListScreen } from "../screens/DMListScreen";
+import { InvitePreviewScreen } from "../screens/InvitePreviewScreen";
 import { InviteScreen } from "../screens/InviteScreen";
 import { JoinGroupScreen } from "../screens/JoinGroupScreen";
 import { OnboardingEmptyScreen } from "../screens/OnboardingEmptyScreen";
@@ -57,6 +58,7 @@ const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "DeviceRequests",
     "Devices",
     "Invite",
+    "InvitePreview",
     "JoinGroup",
     "Passkeys",
     "ServerSettings",
@@ -630,6 +632,11 @@ function ContentStack({
                 component={InviteScreen}
                 listeners={withFocus("Invite")}
                 name="Invite"
+            />
+            <Stack.Screen
+                component={InvitePreviewScreen}
+                listeners={withFocus("InvitePreview")}
+                name="InvitePreview"
             />
             <Stack.Screen
                 component={ServerSettingsScreen}
