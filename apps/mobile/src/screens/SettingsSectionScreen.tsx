@@ -548,7 +548,7 @@ export function SettingsSectionScreen({
             case "ota_ready":
                 return "Restart";
             default:
-                return "Check";
+                return "Check for Updates";
         }
     }
 
@@ -1337,9 +1337,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
     inlineActionButton: {
-        backgroundColor: colors.accent,
+        backgroundColor: "rgba(74, 222, 128, 0.14)",
+        borderColor: "rgba(74, 222, 128, 0.45)",
         borderRadius: 6,
-        minWidth: 76,
+        borderWidth: 1,
+        minWidth: 128,
         paddingHorizontal: 12,
         paddingVertical: 8,
     },
@@ -1347,11 +1349,12 @@ const styles = StyleSheet.create({
         opacity: 0.45,
     },
     inlineActionButtonPressed: {
-        backgroundColor: colors.accentDark,
+        backgroundColor: "rgba(74, 222, 128, 0.22)",
+        borderColor: "rgba(74, 222, 128, 0.62)",
     },
     inlineActionText: {
         ...typography.button,
-        color: colors.text,
+        color: "#B5F5CD",
         fontSize: 12,
         textAlign: "center",
     },
