@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { buildMessageBodyWithAttachment } from "../lib/attachments.js";
     import ChatInput from "../lib/ChatInput.svelte";
     // Route: /server/:serverID/:channelID
     import MessageBox from "../lib/MessageBox.svelte";
@@ -38,15 +39,24 @@
             .catch(() => {});
     });
 
-    async function handleSend(content: string, _attachment?: File) {
+    async function handleSend(content: string, attachment?: File) {
         if (!$user || sending) return;
         sending = true;
         sendError = "";
         try {
-            // TODO: file _attachment upload — needs client.files.create() integration
+            const body = await buildMessageBodyWithAttachment(
+                vexService,
+                content,
+                attachment,
+            );
+            if (!body.ok) {
+                sendError = body.error;
+                return;
+            }
+
             const result = await vexService.sendGroupMessage(
                 channelID,
-                content,
+                body.body,
             );
             if (!result.ok) {
                 sendError = result.error ?? "Failed to send";

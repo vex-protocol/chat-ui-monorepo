@@ -28,6 +28,7 @@ interface MessageInputBarProps {
     bottomInset?: number;
     onAttachPress?: (() => void) | undefined;
     onChangeText: (text: string) => void;
+    onPastePress?: (() => void) | undefined;
     onRemoveAttachment?: (() => void) | undefined;
     onSend: () => void;
     placeholder?: string;
@@ -40,6 +41,7 @@ export function MessageInputBar({
     bottomInset = 0,
     onAttachPress,
     onChangeText,
+    onPastePress,
     onRemoveAttachment,
     onSend,
     placeholder = "Message...",
@@ -129,6 +131,28 @@ export function MessageInputBar({
                         size={20}
                     />
                 </TouchableOpacity>
+
+                {onPastePress ? (
+                    <TouchableOpacity
+                        accessibilityLabel="Paste image from clipboard"
+                        accessibilityRole="button"
+                        disabled={sending}
+                        onPress={() => {
+                            haptic("selection");
+                            onPastePress();
+                        }}
+                        style={[
+                            styles.actionBtn,
+                            sending && styles.actionBtnDisabled,
+                        ]}
+                    >
+                        <Ionicons
+                            color={colors.muted}
+                            name="clipboard-outline"
+                            size={19}
+                        />
+                    </TouchableOpacity>
+                ) : null}
 
                 <TextInput
                     multiline
