@@ -262,6 +262,47 @@
         font-size: 13px;
     }
 
+    .message :global(.hljs) {
+        color: #c9d1d9;
+    }
+
+    .message :global(.hljs-attr),
+    .message :global(.hljs-attribute) {
+        color: #79c0ff;
+    }
+
+    .message :global(.hljs-built_in),
+    .message :global(.hljs-type) {
+        color: #ffa657;
+    }
+
+    .message :global(.hljs-comment),
+    .message :global(.hljs-quote) {
+        color: #8b949e;
+        font-style: italic;
+    }
+
+    .message :global(.hljs-keyword),
+    .message :global(.hljs-selector-tag) {
+        color: #ff7b72;
+    }
+
+    .message :global(.hljs-literal),
+    .message :global(.hljs-name),
+    .message :global(.hljs-number) {
+        color: #79c0ff;
+    }
+
+    .message :global(.hljs-regexp),
+    .message :global(.hljs-string) {
+        color: #a5d6ff;
+    }
+
+    .message :global(.hljs-section),
+    .message :global(.hljs-title) {
+        color: #d2a8ff;
+    }
+
     .message :global(a) {
         color: var(--accent);
         text-decoration: underline;

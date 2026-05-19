@@ -257,6 +257,45 @@ describe("encrypted file markdown", () => {
         ]);
     });
 
+    test("parses fenced code blocks with language info", () => {
+        const nodes = parseMessageMarkdown(
+            "before\n```ts\nconst value = `hi`;\n```\nafter",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [{ text: "before\n", type: "text" }],
+                type: "text",
+            },
+            {
+                code: "const value = `hi`;",
+                language: "ts",
+                type: "codeBlock",
+            },
+            {
+                segments: [{ text: "\nafter", type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("does not parse attachments or inline markdown inside fenced code", () => {
+        const markdown = formatFileAttachmentMarkdown({
+            contentType: "image/png",
+            fileID: "file-123",
+            fileName: "photo.png",
+            fileSize: 2048,
+            key: "abc123",
+        });
+
+        expect(parseMessageMarkdown(`\`\`\`\n**nope** ${markdown}\n\`\`\``)).toEqual([
+            {
+                code: `**nope** ${markdown}`,
+                type: "codeBlock",
+            },
+        ]);
+    });
+
     test("treats malformed bracket-heavy markdown as plain text", () => {
         const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
         expect(parseMessageMarkdown(text)).toEqual([

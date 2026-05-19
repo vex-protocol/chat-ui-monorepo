@@ -25,6 +25,7 @@ catalog:
     expo-intent-launcher: ~55.0.12
     expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
+    highlight.js: ^11.11.1
     kysely: ^0.28.17
     marked: ^15.0.12
     msgpackr: ^1.11.5
