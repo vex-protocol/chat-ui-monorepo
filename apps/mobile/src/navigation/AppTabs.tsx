@@ -31,6 +31,7 @@ import { ServerSettingsScreen } from "../screens/ServerSettingsScreen";
 import { SessionDetailsScreen } from "../screens/SessionDetailsScreen";
 import { SettingsScreen } from "../screens/SettingsScreen";
 import { SettingsSectionScreen } from "../screens/SettingsSectionScreen";
+import { ShareComposerScreen } from "../screens/ShareComposerScreen";
 import { colors } from "../theme";
 
 import { navigationRef } from "./navigationRef";
@@ -65,6 +66,7 @@ const TOP_LEFT_BACK_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "SessionDetails",
     "Settings",
     "SettingsSection",
+    "ShareComposer",
 ] as const;
 const CHAT_ROUTES: ReadonlyArray<keyof AppStackParamList> = [
     "Channel",
@@ -612,6 +614,11 @@ function ContentStack({
                 component={DMListScreen}
                 listeners={withFocus("DMList")}
                 name="DMList"
+            />
+            <Stack.Screen
+                component={ShareComposerScreen}
+                listeners={withFocus("ShareComposer")}
+                name="ShareComposer"
             />
             <Stack.Screen
                 component={ConversationScreen}

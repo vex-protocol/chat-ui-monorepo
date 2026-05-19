@@ -54,6 +54,7 @@ export type MessageMarkdownNode =
           image: boolean;
           type: "attachment";
       }
+    | { code: string; language?: string; type: "codeBlock" }
     | { segments: MarkdownInlineSegment[]; type: "text" };
 
 export interface MessageReaction {
@@ -65,6 +66,17 @@ export interface MessageReactionEvent {
     action: "toggle";
     emoji: MessageEmoji;
     targetMailID: string;
+}
+
+interface AttachmentMarkdownMatch extends MarkdownLinkMatch {
+    attachment: EncryptedFileAttachment;
+}
+
+interface CodeFenceMatch {
+    code: string;
+    end: number;
+    language?: string;
+    start: number;
 }
 
 interface MarkdownLinkMatch {
@@ -101,6 +113,7 @@ export function isImageType(contentType: string): boolean {
 const VEX_FILE_SCHEME = "vex-file://";
 
 const MESSAGE_EXTRA_VERSION = 1;
+const INLINE_BARE_URL_RE = /^https?:\/\/[^\s<>\[\]{}"']+/i;
 
 export function applyMessageReactionEvent(
     messages: Message[],
@@ -270,26 +283,47 @@ export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
     let searchStart = 0;
 
     while (searchStart < content.length) {
-        const match = findNextMarkdownLink(content, searchStart);
-        if (!match) {
+        const attachmentMatch = findNextAttachmentMarkdownLink(
+            content,
+            searchStart,
+        );
+        const codeFenceMatch = findNextCodeFence(content, searchStart);
+        if (!attachmentMatch && !codeFenceMatch) {
             break;
         }
 
-        const attachment = parseVexFileUrl(match.url);
-        if (!attachment) {
-            searchStart = match.end;
+        if (
+            codeFenceMatch &&
+            (!attachmentMatch || codeFenceMatch.start < attachmentMatch.start)
+        ) {
+            pushTextNode(nodes, content.slice(cursor, codeFenceMatch.start));
+            nodes.push({
+                code: codeFenceMatch.code,
+                ...(codeFenceMatch.language
+                    ? { language: codeFenceMatch.language }
+                    : {}),
+                type: "codeBlock",
+            });
+            cursor = codeFenceMatch.end;
+            searchStart = codeFenceMatch.end;
             continue;
         }
 
-        pushTextNode(nodes, content.slice(cursor, match.start));
+        if (!attachmentMatch) {
+            break;
+        }
+
+        pushTextNode(nodes, content.slice(cursor, attachmentMatch.start));
         nodes.push({
-            alt: match.label,
-            attachment,
-            image: match.image || isImageType(attachment.contentType),
+            alt: attachmentMatch.label,
+            attachment: attachmentMatch.attachment,
+            image:
+                attachmentMatch.image ||
+                isImageType(attachmentMatch.attachment.contentType),
             type: "attachment",
         });
-        cursor = match.end;
-        searchStart = match.end;
+        cursor = attachmentMatch.end;
+        searchStart = attachmentMatch.end;
     }
 
     pushTextNode(nodes, content.slice(cursor));
@@ -394,6 +428,34 @@ function escapeMarkdownLabel(value: string): string {
         .replace(/\]/g, "\\]");
 }
 
+function findClosingCodeFence(
+    source: string,
+    start: number,
+): null | { end: number; start: number } {
+    let lineStart = start;
+    while (lineStart < source.length) {
+        const lineEnd = source.indexOf("\n", lineStart);
+        const end = lineEnd === -1 ? source.length : lineEnd;
+        const line = source.slice(lineStart, end);
+        const fenceStart = line.search(/```/);
+        if (
+            fenceStart !== -1 &&
+            isFenceLinePrefix(line.slice(0, fenceStart)) &&
+            /^[ \t]*$/.test(line.slice(fenceStart + 3))
+        ) {
+            return {
+                end: lineEnd === -1 ? source.length : lineEnd + 1,
+                start: lineStart + fenceStart,
+            };
+        }
+        if (lineEnd === -1) {
+            return null;
+        }
+        lineStart = lineEnd + 1;
+    }
+    return null;
+}
+
 function findMarkdownLabelEnd(source: string, start: number): number {
     let escaped = false;
     for (let index = start; index < source.length; index++) {
@@ -417,16 +479,82 @@ function findMarkdownLabelEnd(source: string, start: number): number {
 }
 
 function findMarkdownLinkEnd(source: string, start: number): number {
+    let depth = 0;
     for (let index = start; index < source.length; index++) {
         const char = source[index];
         if (char === "\n") {
             return -1;
         }
+        if (char === "(") {
+            depth++;
+            continue;
+        }
         if (char === ")") {
-            return index;
+            if (depth === 0) {
+                return index;
+            }
+            depth--;
         }
     }
     return -1;
+}
+
+function findNextAttachmentMarkdownLink(
+    source: string,
+    start: number,
+): AttachmentMarkdownMatch | null {
+    let searchStart = start;
+    while (searchStart < source.length) {
+        const match = findNextMarkdownLink(source, searchStart);
+        if (!match) {
+            return null;
+        }
+        const attachment = parseVexFileUrl(match.url);
+        if (attachment) {
+            return { ...match, attachment };
+        }
+        searchStart = match.end;
+    }
+    return null;
+}
+
+function findNextCodeFence(
+    source: string,
+    start: number,
+): CodeFenceMatch | null {
+    let searchStart = start;
+    while (searchStart < source.length) {
+        const open = source.indexOf("```", searchStart);
+        if (open === -1) {
+            return null;
+        }
+        const lineStart = source.lastIndexOf("\n", open - 1) + 1;
+        if (!isFenceLinePrefix(source.slice(lineStart, open))) {
+            searchStart = open + 3;
+            continue;
+        }
+
+        const infoStart = open + 3;
+        const lineEnd = source.indexOf("\n", infoStart);
+        if (lineEnd === -1) {
+            return {
+                code: "",
+                end: source.length,
+                ...normalizeCodeBlockLanguage(source.slice(infoStart)),
+                start: lineStart,
+            };
+        }
+
+        const close = findClosingCodeFence(source, lineEnd + 1);
+        const codeEnd = close?.start ?? source.length;
+        return {
+            code: trimCodeFenceText(source.slice(lineEnd + 1, codeEnd)),
+            end: close?.end ?? source.length,
+            ...normalizeCodeBlockLanguage(source.slice(infoStart, lineEnd)),
+            start: lineStart,
+        };
+    }
+    return null;
 }
 
 function findNextMarkdownLink(
@@ -478,8 +606,44 @@ function findNextMarkdownLink(
     return null;
 }
 
+function hasBalancedParens(value: string): boolean {
+    let balance = 0;
+    for (const char of value) {
+        if (char === "(") {
+            balance++;
+        } else if (char === ")") {
+            balance--;
+        }
+    }
+    return balance === 0;
+}
+
+function isFenceLinePrefix(value: string): boolean {
+    return /^[ \t]{0,3}$/.test(value);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function matchBareUrlAt(text: string, index: number): null | string {
+    const previous = text[index - 1];
+    if (previous && /[A-Za-z0-9@._~:/?#\[\]@!$&'()*+,;=%-]/.test(previous)) {
+        return null;
+    }
+    const match = INLINE_BARE_URL_RE.exec(text.slice(index));
+    if (!match?.[0]) {
+        return null;
+    }
+    return trimInlineUrl(match[0]);
+}
+
+function normalizeCodeBlockLanguage(value: string): { language?: string } {
+    const language = value.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+    if (!language || language.length > 64 || !/^[\w#+.-]+$/.test(language)) {
+        return {};
+    }
+    return { language };
 }
 
 function normalizeMessageExtra(extra: MessageExtra): MessageExtra {
@@ -564,7 +728,7 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
         if (char === "[") {
             const labelEnd = findMarkdownLabelEnd(text, index + 1);
             if (labelEnd > index + 1 && text[labelEnd + 1] === "(") {
-                const urlEnd = text.indexOf(")", labelEnd + 2);
+                const urlEnd = findMarkdownLinkEnd(text, labelEnd + 2);
                 if (urlEnd > labelEnd + 2) {
                     const url = text.slice(labelEnd + 2, urlEnd).trim();
                     if (url.length > 0) {
@@ -582,6 +746,19 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
                     }
                 }
             }
+        }
+
+        const bareUrl = matchBareUrlAt(text, index);
+        if (bareUrl) {
+            pushPlain(index);
+            pushSegment(segments, {
+                text: bareUrl,
+                type: "link",
+                url: bareUrl,
+            });
+            index += bareUrl.length;
+            cursor = index;
+            continue;
         }
 
         index++;
@@ -703,6 +880,22 @@ function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
         segments: parseInlineMarkdown(text),
         type: "text",
     });
+}
+
+function trimCodeFenceText(value: string): string {
+    return value.endsWith("\n") ? value.slice(0, -1) : value;
+}
+
+function trimInlineUrl(value: string): string {
+    let next = value;
+    while (/[),.!?;:]$/.test(next)) {
+        const last = next.at(-1);
+        if (last === ")" && hasBalancedParens(next)) {
+            break;
+        }
+        next = next.slice(0, -1);
+    }
+    return next;
 }
 
 function unescapeMarkdownLabel(value: string): string {

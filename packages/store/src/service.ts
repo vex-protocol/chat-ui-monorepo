@@ -350,6 +350,7 @@ const WS_WATCHDOG_STALE_THRESHOLD_MS = 45_000;
 // strong signal we don't need to tear the socket down. Anything older
 // is treated as stale → full reconnect.
 const WS_FRESH_FRAME_THRESHOLD_MS = 12_000;
+const MAX_PROCESSED_REACTION_MAIL_IDS = 2_000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -400,6 +401,10 @@ class VexService {
     private logoutInFlight: null | Promise<void> = null;
     private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
+    private readonly pendingReactionMessages = new Map<
+        string,
+        Map<string, Message>
+    >();
     /**
      * When true, {@link runPopulateStateBody} stops scheduling more history
      * loads so {@link close} can shut SQLite without racing decrypt threads.
@@ -772,6 +777,7 @@ class VexService {
     }
 
     async close(): Promise<void> {
+        this.pendingReactionMessages.clear();
         this.processedReactionMailIDs.clear();
         if (this.client) {
             // `populateState` walks every channel + DM and decrypts SQLite
@@ -2208,6 +2214,45 @@ class VexService {
         }
     }
 
+    private applyPendingReactionMessages(
+        writable: MessageMapWritableLike,
+        conversationKey: string,
+    ): void {
+        const pending = this.pendingReactionMessages.get(conversationKey);
+        if (!pending || pending.size === 0) {
+            return;
+        }
+
+        let thread = writable.get()[conversationKey] ?? [];
+        for (const [mailID, msg] of pending) {
+            if (this.processedReactionMailIDs.has(mailID)) {
+                pending.delete(mailID);
+                continue;
+            }
+            const event = messageReactionEvent(msg);
+            if (!event) {
+                pending.delete(mailID);
+                continue;
+            }
+            const nextThread = applyMessageReactionEvent(
+                thread,
+                event,
+                msg.authorID,
+            );
+            if (nextThread === thread) {
+                continue;
+            }
+            thread = nextThread;
+            pending.delete(mailID);
+            this.rememberProcessedReactionMailID(mailID);
+        }
+
+        if (pending.size === 0) {
+            this.pendingReactionMessages.delete(conversationKey);
+        }
+        writable.setKey(conversationKey, thread);
+    }
+
     private applyReactionMessage(
         writable: MessageMapWritableLike,
         conversationKey: string,
@@ -2221,25 +2266,20 @@ class VexService {
             return true;
         }
 
-        this.processedReactionMailIDs.add(msg.mailID);
-        if (this.processedReactionMailIDs.size > 2_000) {
-            this.processedReactionMailIDs.clear();
-            this.processedReactionMailIDs.add(msg.mailID);
-        }
-
         const thread = writable.get()[conversationKey] ?? [];
         const nextThread = applyMessageReactionEvent(
             thread,
             event,
             msg.authorID,
         );
-        if (nextThread !== thread) {
-            writable.setKey(conversationKey, nextThread);
+        if (nextThread === thread) {
+            this.queuePendingReactionMessage(conversationKey, msg);
+            return true;
         }
+        this.rememberProcessedReactionMailID(msg.mailID);
+        writable.setKey(conversationKey, nextThread);
         return true;
     }
-
-    // ── Private ─────────────────────────────────────────────────────────
 
     private attachWebsocketDebug(): void {
         if (!this.wsDebugEnabled || !this.client) {
@@ -2305,6 +2345,8 @@ class VexService {
             }, WS_WATCHDOG_CHECK_INTERVAL_MS);
         }
     }
+
+    // ── Private ─────────────────────────────────────────────────────────
 
     private checkWebsocketWatchdog(): void {
         if (!this.client || this.wsWatchdogLastFrameAt === 0) {
@@ -2570,6 +2612,7 @@ class VexService {
         }
 
         $messagesWritable.setKey(threadKey, [...prev, msg]);
+        this.applyPendingReactionMessages($messagesWritable, threadKey);
 
         if (!isOwnMessage) {
             const count = ($dmUnreadCountsWritable.get()[threadKey] ?? 0) + 1;
@@ -2587,6 +2630,7 @@ class VexService {
         }
 
         $groupMessagesWritable.setKey(channelID, [...prev, msg]);
+        this.applyPendingReactionMessages($groupMessagesWritable, channelID);
 
         const me = $userWritable.get();
         if (me && msg.authorID !== me.userID) {
@@ -2752,6 +2796,18 @@ class VexService {
         }
     }
 
+    private queuePendingReactionMessage(
+        conversationKey: string,
+        msg: Message,
+    ): void {
+        let pending = this.pendingReactionMessages.get(conversationKey);
+        if (!pending) {
+            pending = new Map();
+            this.pendingReactionMessages.set(conversationKey, pending);
+        }
+        pending.set(msg.mailID, msg);
+    }
+
     private async recoverConnection(
         reason: string,
     ): Promise<null | ResumeNetworkStatus> {
@@ -2818,6 +2874,10 @@ class VexService {
         setTimeout(() => {
             this.kickPopulateState(attempt + 1);
         }, 200);
+    }
+
+    private rememberProcessedReactionMailID(mailID: string): void {
+        rememberProcessedReactionMailID(this.processedReactionMailIDs, mailID);
     }
 
     private removeServerFromLocalState(serverID: string): void {
@@ -2943,7 +3003,10 @@ class VexService {
             const existing = $messagesWritable.get()[userID] ?? [];
             // Keep history-first ordering while preserving any newer live WS
             // arrivals already present in store.
-            return deduplicateMessages([...hydratedMsgs, ...existing]);
+            return deduplicateMessages(
+                [...hydratedMsgs, ...existing],
+                this.processedReactionMailIDs,
+            );
         };
         const mergeHydratedDmIntoStore = (): Record<string, Message[]> => {
             const prevDm = $messagesWritable.get();
@@ -2967,8 +3030,15 @@ class VexService {
                     userID,
                     mergeHydratedThread(userID, messagesAcc[userID]),
                 );
+                this.applyPendingReactionMessages($messagesWritable, userID);
             } else {
                 $messagesWritable.set(mergeHydratedDmIntoStore());
+                for (const threadKey of Object.keys(messagesAcc)) {
+                    this.applyPendingReactionMessages(
+                        $messagesWritable,
+                        threadKey,
+                    );
+                }
             }
             debugAuth("populateState:familiars-messages:published-progress", {
                 dmMessageCount: publishedDmMessageCount(),
@@ -3023,7 +3093,10 @@ class VexService {
                     `populateState: dm history timeout for ${user.userID}`,
                 );
                 if (msgs.length > 0) {
-                    messagesAcc[user.userID] = deduplicateMessages(msgs);
+                    messagesAcc[user.userID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
             } catch (err: unknown) {
                 if (isDecryptMismatchError(err)) {
@@ -3228,8 +3301,10 @@ class VexService {
                     `populateState: group history timeout for ${channel.channelID}`,
                 );
                 if (msgs.length > 0) {
-                    groupMessagesAcc[channel.channelID] =
-                        deduplicateMessages(msgs);
+                    groupMessagesAcc[channel.channelID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
                 const durationMs = Date.now() - startedAt;
                 if (durationMs > 1500) {
@@ -3308,7 +3383,10 @@ class VexService {
                     `populateState: session dm history timeout for ${userID}`,
                 );
                 if (msgs.length > 0) {
-                    messagesAcc[userID] = deduplicateMessages(msgs);
+                    messagesAcc[userID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
                 if (!familiarsAcc[userID]) {
                     const [user] = await withTimeout(
@@ -3370,12 +3448,21 @@ class VexService {
         $serversWritable.set(serversAcc);
         $channelsWritable.set(channelsAcc);
         $groupMessagesWritable.set(groupMessagesAcc);
+        for (const channelID of Object.keys(groupMessagesAcc)) {
+            this.applyPendingReactionMessages(
+                $groupMessagesWritable,
+                channelID,
+            );
+        }
         $permissionsWritable.set(permsAcc);
         $familiarsWritable.set(familiarsAcc);
         // Merge with existing DM threads so we do not wipe in-memory
         // conversations when SQLite is empty after retention prune, when
         // `retrieve` fails, or when a peer is not yet in `familiars`.
         $messagesWritable.set(mergeHydratedDmIntoStore());
+        for (const threadKey of Object.keys(messagesAcc)) {
+            this.applyPendingReactionMessages($messagesWritable, threadKey);
+        }
         debugAuth("populateState:familiars-messages:published-final", {
             dmMessageCount: publishedDmMessageCount(),
             dmThreadCount: Object.keys(messagesAcc).length,
@@ -3732,13 +3819,26 @@ function decodeMsgpackHttpData(data: unknown): unknown {
     throw new Error("Expected msgpack HTTP response");
 }
 
-function deduplicateMessages(messages: Message[]): Message[] {
+function deduplicateMessages(
+    messages: Message[],
+    processedReactionMailIDs?: Set<string>,
+): Message[] {
     const seen = new Set<string>();
     const deduped = messages.filter((m) => {
         if (seen.has(m.mailID)) return false;
         seen.add(m.mailID);
         return true;
     });
+    if (processedReactionMailIDs) {
+        for (const message of deduped) {
+            if (messageReactionEvent(message)) {
+                rememberProcessedReactionMailID(
+                    processedReactionMailIDs,
+                    message.mailID,
+                );
+            }
+        }
+    }
     return foldMessageReactionEvents(deduped);
 }
 
@@ -4050,6 +4150,18 @@ function readErrorField(body: unknown): null | string {
         }
     }
     return null;
+}
+
+function rememberProcessedReactionMailID(
+    processedReactionMailIDs: Set<string>,
+    mailID: string,
+): void {
+    processedReactionMailIDs.add(mailID);
+    if (processedReactionMailIDs.size <= MAX_PROCESSED_REACTION_MAIL_IDS) {
+        return;
+    }
+    processedReactionMailIDs.clear();
+    processedReactionMailIDs.add(mailID);
 }
 
 async function runWithFormDataDisabled<T>(fn: () => Promise<T>): Promise<T> {

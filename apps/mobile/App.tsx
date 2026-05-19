@@ -43,6 +43,7 @@ import {
     startAlwaysOn,
     suspendAlwaysOn,
 } from "./src/lib/foregroundService";
+import { $incomingShare } from "./src/lib/incomingShareState";
 import {
     clearCredentials,
     keychainKeyStore,
@@ -63,6 +64,10 @@ import {
     unsubscribeStoredPushNotificationSubscription,
 } from "./src/lib/pushNotifications";
 import { hydrateLocalMessageRetention } from "./src/lib/retentionPreference";
+import {
+    getIncomingShareIntent,
+    type IncomingShare,
+} from "./src/lib/shareIntent";
 import {
     navigateToAboutSettings,
     navigateToDeviceRequests,
@@ -196,6 +201,8 @@ function App() {
     );
     const notificationHistoryCutoffMsRef = useRef(0);
     const pendingInviteIDRef = useRef<null | string>(null);
+    const pendingShareIDRef = useRef<null | string>(null);
+    const lastHandledShareIDRef = useRef<null | string>(null);
     const seenPendingRequestIDsRef = useRef<Set<string>>(new Set());
     const userID = user?.userID;
 
@@ -210,6 +217,44 @@ function App() {
             screen: "InvitePreview",
         });
     }, []);
+
+    const flushPendingShareRoute = useCallback(() => {
+        const shareID = pendingShareIDRef.current;
+        if (!shareID || !$user.get() || !navigationRef.isReady()) {
+            return;
+        }
+        pendingShareIDRef.current = null;
+        navigationRef.navigate("App", {
+            screen: "ShareComposer",
+        });
+    }, []);
+
+    const handleIncomingShare = useCallback(
+        (share: IncomingShare | null) => {
+            if (!share || lastHandledShareIDRef.current === share.id) {
+                return;
+            }
+            lastHandledShareIDRef.current = share.id;
+            pendingShareIDRef.current = share.id;
+            $incomingShare.set(share);
+            flushPendingShareRoute();
+        },
+        [flushPendingShareRoute],
+    );
+
+    const pollIncomingShare = useCallback(() => {
+        if (Platform.OS !== "android") {
+            return;
+        }
+        void getIncomingShareIntent()
+            .then(handleIncomingShare)
+            .catch((err: unknown) => {
+                console.warn(
+                    "[vex-share] failed to inspect incoming share",
+                    err instanceof Error ? err.message : String(err),
+                );
+            });
+    }, [handleIncomingShare]);
 
     const handleIncomingLink = useCallback(
         (url: null | string) => {
@@ -273,7 +318,20 @@ function App() {
 
     useEffect(() => {
         flushPendingInviteRoute();
-    }, [flushPendingInviteRoute, userID]);
+        flushPendingShareRoute();
+    }, [flushPendingInviteRoute, flushPendingShareRoute, userID]);
+
+    useEffect(() => {
+        pollIncomingShare();
+        const subscription = AppState.addEventListener("change", (next) => {
+            if (next === "active") {
+                pollIncomingShare();
+            }
+        });
+        return () => {
+            subscription.remove();
+        };
+    }, [pollIncomingShare]);
 
     useEffect(() => {
         const unsubNotif = setupNotificationHandlers();
@@ -1034,6 +1092,7 @@ function App() {
                 onReady={() => {
                     flushPendingNotificationRoutes();
                     flushPendingInviteRoute();
+                    flushPendingShareRoute();
                 }}
                 ref={navigationRef}
                 theme={{
