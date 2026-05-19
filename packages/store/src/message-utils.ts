@@ -27,6 +27,26 @@ export interface MessageChunk {
     messages: Message[];
 }
 
+export type MessageEmoji =
+    | {
+          imageUrl?: string;
+          kind: "custom";
+          name: string;
+          sourceID?: string;
+      }
+    | {
+          kind: "unicode";
+          shortcode?: string;
+          value: string;
+      };
+
+export interface MessageExtra {
+    [key: string]: unknown;
+    reactionEvent?: MessageReactionEvent;
+    reactions?: MessageReaction[];
+    version: 1;
+}
+
 export type MessageMarkdownNode =
     | {
           alt: string;
@@ -36,6 +56,17 @@ export type MessageMarkdownNode =
       }
     | { segments: MarkdownInlineSegment[]; type: "text" };
 
+export interface MessageReaction {
+    emoji: MessageEmoji;
+    userIDs: string[];
+}
+
+export interface MessageReactionEvent {
+    action: "toggle";
+    emoji: MessageEmoji;
+    targetMailID: string;
+}
+
 interface MarkdownLinkMatch {
     end: number;
     image: boolean;
@@ -43,6 +74,8 @@ interface MarkdownLinkMatch {
     start: number;
     url: string;
 }
+
+type MessageWithClientExtra = Message & { extra?: null | string };
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -67,6 +100,90 @@ export function isImageType(contentType: string): boolean {
 
 const VEX_FILE_SCHEME = "vex-file://";
 
+const MESSAGE_EXTRA_VERSION = 1;
+
+export function applyMessageReactionEvent(
+    messages: Message[],
+    event: MessageReactionEvent,
+    actorUserID: string,
+): Message[] {
+    let changed = false;
+    const nextMessages = messages.map((message) => {
+        if (message.mailID !== event.targetMailID) {
+            return message;
+        }
+        changed = true;
+        const current = message as MessageWithClientExtra;
+        return {
+            ...message,
+            extra: toggleMessageReactionExtra(
+                current.extra,
+                event.emoji,
+                actorUserID,
+            ),
+        } as Message;
+    });
+    return changed ? nextMessages : messages;
+}
+
+export function createReactionEventExtra(
+    targetMailID: string,
+    emoji: MessageEmoji,
+): string {
+    return (
+        serializeMessageExtra({
+            reactionEvent: {
+                action: "toggle",
+                emoji,
+                targetMailID,
+            },
+            version: MESSAGE_EXTRA_VERSION,
+        }) ?? JSON.stringify({ version: MESSAGE_EXTRA_VERSION })
+    );
+}
+
+export function createUnicodeReactionEmoji(
+    value: string,
+    shortcode?: string,
+): MessageEmoji {
+    return {
+        kind: "unicode",
+        ...(shortcode ? { shortcode } : {}),
+        value,
+    };
+}
+
+export function emojiReactionKey(emoji: MessageEmoji): string {
+    if (emoji.kind === "custom") {
+        return `custom:${emoji.sourceID ?? emoji.name}`;
+    }
+    return `unicode:${emoji.value}`;
+}
+
+export function emojiReactionLabel(emoji: MessageEmoji): string {
+    if (emoji.kind === "custom") {
+        return emoji.name.startsWith(":") ? emoji.name : `:${emoji.name}:`;
+    }
+    return emoji.value;
+}
+
+export function foldMessageReactionEvents(messages: Message[]): Message[] {
+    let visibleMessages: Message[] = [];
+    for (const message of messages) {
+        const event = messageReactionEvent(message);
+        if (!event) {
+            visibleMessages.push(message);
+            continue;
+        }
+        visibleMessages = applyMessageReactionEvent(
+            visibleMessages,
+            event,
+            message.authorID,
+        );
+    }
+    return visibleMessages;
+}
+
 export function formatFileAttachmentMarkdown(
     attachment: EncryptedFileAttachment,
 ): string {
@@ -84,6 +201,18 @@ export function formatFileAttachmentMarkdown(
         return `![${label}](${url})`;
     }
     return `[${label}](${url})`;
+}
+
+export function messageReactionEvent(
+    message: Message & { extra?: null | string },
+): MessageReactionEvent | null {
+    return parseMessageExtra(message.extra).reactionEvent ?? null;
+}
+
+export function messageReactions(
+    message: Message & { extra?: null | string },
+): MessageReaction[] {
+    return parseMessageExtra(message.extra).reactions ?? [];
 }
 
 export function parseFileExtra(extra: null | string): FileAttachment | null {
@@ -104,6 +233,35 @@ export function parseFileExtra(extra: null | string): FileAttachment | null {
         /* not file JSON */
     }
     return null;
+}
+
+export function parseMessageExtra(
+    extra: null | string | undefined,
+): MessageExtra {
+    if (!extra) {
+        return { version: MESSAGE_EXTRA_VERSION };
+    }
+
+    try {
+        const raw: unknown = JSON.parse(extra);
+        if (!isRecord(raw)) {
+            return { version: MESSAGE_EXTRA_VERSION };
+        }
+
+        const reactionEvent = parseMessageReactionEvent(raw["reactionEvent"]);
+        const rest = { ...raw };
+        delete rest["reactionEvent"];
+        delete rest["reactions"];
+        delete rest["version"];
+        return {
+            ...rest,
+            ...(reactionEvent ? { reactionEvent } : {}),
+            reactions: parseMessageReactions(raw["reactions"]),
+            version: MESSAGE_EXTRA_VERSION,
+        };
+    } catch {
+        return { version: MESSAGE_EXTRA_VERSION };
+    }
 }
 
 export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
@@ -175,6 +333,58 @@ export function parseVexFileUrl(url: string): EncryptedFileAttachment | null {
         fileSize,
         key,
     };
+}
+
+export function serializeMessageExtra(extra: MessageExtra): null | string {
+    const normalized = normalizeMessageExtra(extra);
+    if (
+        Object.keys(normalized).length === 1 &&
+        normalized.version === MESSAGE_EXTRA_VERSION
+    ) {
+        return null;
+    }
+    return JSON.stringify(normalized);
+}
+
+export function toggleMessageReactionExtra(
+    currentExtra: null | string | undefined,
+    emoji: MessageEmoji,
+    userID: string,
+): null | string {
+    const extra = parseMessageExtra(currentExtra);
+    const reactions = [...(extra.reactions ?? [])];
+    const key = emojiReactionKey(emoji);
+    const existingIndex = reactions.findIndex(
+        (reaction) => emojiReactionKey(reaction.emoji) === key,
+    );
+
+    if (existingIndex === -1) {
+        reactions.push({ emoji, userIDs: [userID] });
+    } else {
+        const reaction = reactions[existingIndex];
+        if (!reaction) {
+            return serializeMessageExtra(extra);
+        }
+        const userIDs = reaction.userIDs.includes(userID)
+            ? reaction.userIDs.filter((id) => id !== userID)
+            : [...reaction.userIDs, userID];
+        if (userIDs.length === 0) {
+            reactions.splice(existingIndex, 1);
+        } else {
+            reactions[existingIndex] = {
+                ...reaction,
+                userIDs,
+            };
+        }
+    }
+
+    const nextExtra: MessageExtra = { ...extra };
+    if (reactions.length > 0) {
+        nextExtra.reactions = reactions;
+    } else {
+        delete nextExtra.reactions;
+    }
+    return serializeMessageExtra(nextExtra);
 }
 
 function escapeMarkdownLabel(value: string): string {
@@ -268,6 +478,30 @@ function findNextMarkdownLink(
     return null;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeMessageExtra(extra: MessageExtra): MessageExtra {
+    const normalized: MessageExtra = {
+        ...extra,
+        version: MESSAGE_EXTRA_VERSION,
+    };
+    const reactions = parseMessageReactions(normalized.reactions);
+    const reactionEvent = parseMessageReactionEvent(normalized.reactionEvent);
+    if (reactionEvent) {
+        normalized.reactionEvent = reactionEvent;
+    } else {
+        delete normalized.reactionEvent;
+    }
+    if (reactions.length > 0) {
+        normalized.reactions = reactions;
+    } else {
+        delete normalized.reactions;
+    }
+    return normalized;
+}
+
 function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
     const segments: MarkdownInlineSegment[] = [];
     let cursor = 0;
@@ -358,6 +592,97 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
         return [{ text, type: "text" }];
     }
     return segments;
+}
+
+function parseMessageEmoji(value: unknown): MessageEmoji | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    if (value["kind"] === "unicode" && typeof value["value"] === "string") {
+        const shortcode = value["shortcode"];
+        return {
+            kind: "unicode",
+            ...(typeof shortcode === "string" && shortcode !== ""
+                ? { shortcode }
+                : {}),
+            value: value["value"],
+        };
+    }
+
+    if (value["kind"] === "custom" && typeof value["name"] === "string") {
+        const imageUrl = value["imageUrl"];
+        const sourceID = value["sourceID"];
+        return {
+            kind: "custom",
+            name: value["name"],
+            ...(typeof imageUrl === "string" && imageUrl !== ""
+                ? { imageUrl }
+                : {}),
+            ...(typeof sourceID === "string" && sourceID !== ""
+                ? { sourceID }
+                : {}),
+        };
+    }
+
+    return null;
+}
+
+function parseMessageReactionEvent(
+    value: unknown,
+): MessageReactionEvent | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+    const emoji = parseMessageEmoji(value["emoji"]);
+    if (
+        value["action"] !== "toggle" ||
+        !emoji ||
+        typeof value["targetMailID"] !== "string" ||
+        value["targetMailID"] === ""
+    ) {
+        return undefined;
+    }
+    return {
+        action: "toggle",
+        emoji,
+        targetMailID: value["targetMailID"],
+    };
+}
+
+function parseMessageReactions(value: unknown): MessageReaction[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const reactions: MessageReaction[] = [];
+    const seen = new Set<string>();
+    for (const item of value) {
+        if (!isRecord(item)) {
+            continue;
+        }
+        const emoji = parseMessageEmoji(item["emoji"]);
+        if (!emoji) {
+            continue;
+        }
+        const userIDs = Array.isArray(item["userIDs"])
+            ? item["userIDs"].filter(
+                  (id): id is string => typeof id === "string" && id !== "",
+              )
+            : [];
+        const uniqueUserIDs = [...new Set(userIDs)];
+        if (uniqueUserIDs.length === 0) {
+            continue;
+        }
+
+        const key = emojiReactionKey(emoji);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        reactions.push({ emoji, userIDs: uniqueUserIDs });
+    }
+    return reactions;
 }
 
 function pushSegment(

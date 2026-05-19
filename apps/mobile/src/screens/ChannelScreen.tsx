@@ -2,6 +2,7 @@ import type { PickedAttachment } from "../lib/attachments";
 import type { AppScreenProps } from "../navigation/types";
 import type { User } from "@vex-chat/libvex";
 import type { Message } from "@vex-chat/libvex";
+import type { MessageEmoji } from "@vex-chat/store";
 
 import React, {
     useCallback,
@@ -345,6 +346,23 @@ export function ChannelScreen({
         [channelID],
     );
 
+    const toggleReaction = useCallback(
+        (message: Message, emoji: MessageEmoji) => {
+            void (async () => {
+                const result = await vexService.toggleMessageReaction(
+                    channelID,
+                    message.mailID,
+                    true,
+                    emoji,
+                );
+                if (!result.ok) {
+                    setSendError(result.error ?? "Failed to update reaction");
+                }
+            })();
+        },
+        [channelID],
+    );
+
     function renderMessage({ index, item }: { index: number; item: Message }) {
         const isOwn = item.authorID === user?.userID;
         const ownName = user?.username ?? "Unknown";
@@ -357,9 +375,11 @@ export function ChannelScreen({
                         : (usernames[item.authorID] ??
                           item.authorID.slice(0, 8))
                 }
+                currentUserID={user?.userID}
                 isOwn={isOwn}
                 message={item}
                 onDeleteMessage={deleteMessage}
+                onToggleReaction={toggleReaction}
                 showIdentity={showIdentity}
             />
         );
