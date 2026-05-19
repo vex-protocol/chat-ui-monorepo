@@ -40,6 +40,7 @@
         "@tauri-apps/plugin-updater": "^2.10.0",
         "@vex-chat/store": "workspace:*",
         "dompurify": "catalog:",
+        "highlight.js": "catalog:",
         "kysely": "catalog:",
         "kysely-dialect-tauri": "^1.2.1",
         "marked": "catalog:",

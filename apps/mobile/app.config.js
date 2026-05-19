@@ -125,6 +125,7 @@ module.exports = ({ config }) => {
             }),
             "expo-background-task",
             "./plugins/withForegroundService",
+            "./plugins/withAndroidShareIntent",
             // Safety net for Notifee FGS small-icon resolution.
             // expo-notifications' density-specific
             // `notification_icon.png` files normally win on real

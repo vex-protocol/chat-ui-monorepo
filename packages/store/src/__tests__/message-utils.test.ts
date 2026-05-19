@@ -236,6 +236,122 @@ describe("encrypted file markdown", () => {
         ]);
     });
 
+    test("linkifies bare http urls", () => {
+        const nodes = parseMessageMarkdown(
+            "read https://example.com/post?id=1, then reply",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "read ", type: "text" },
+                    {
+                        text: "https://example.com/post?id=1",
+                        type: "link",
+                        url: "https://example.com/post?id=1",
+                    },
+                    { text: ", then reply", type: "text" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("keeps balanced parentheses in bare urls", () => {
+        const nodes = parseMessageMarkdown(
+            "wiki https://example.com/Avatar_(2009_film) works",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "wiki ", type: "text" },
+                    {
+                        text: "https://example.com/Avatar_(2009_film)",
+                        type: "link",
+                        url: "https://example.com/Avatar_(2009_film)",
+                    },
+                    { text: " works", type: "text" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("parses fenced code blocks with language info", () => {
+        const nodes = parseMessageMarkdown(
+            "before\n```ts\nconst value = `hi`;\n```\nafter",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [{ text: "before\n", type: "text" }],
+                type: "text",
+            },
+            {
+                code: "const value = `hi`;",
+                language: "ts",
+                type: "codeBlock",
+            },
+            {
+                segments: [{ text: "after", type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("only opens fenced code blocks at line starts", () => {
+        const nodes = parseMessageMarkdown("foo ```bar``` baz");
+        expect(nodes.some((node) => node.type === "codeBlock")).toBe(false);
+    });
+
+    test("only closes fenced code blocks on fence lines", () => {
+        const nodes = parseMessageMarkdown(
+            '```js\nconst fence = "```";\n```\nafter',
+        );
+
+        expect(nodes).toEqual([
+            {
+                code: 'const fence = "```";',
+                language: "js",
+                type: "codeBlock",
+            },
+            {
+                segments: [{ text: "after", type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("parses unclosed one-line fence language as metadata", () => {
+        expect(parseMessageMarkdown("```ts")).toEqual([
+            {
+                code: "",
+                language: "ts",
+                type: "codeBlock",
+            },
+        ]);
+    });
+
+    test("does not parse attachments or inline markdown inside fenced code", () => {
+        const markdown = formatFileAttachmentMarkdown({
+            contentType: "image/png",
+            fileID: "file-123",
+            fileName: "photo.png",
+            fileSize: 2048,
+            key: "abc123",
+        });
+
+        expect(
+            parseMessageMarkdown(`\`\`\`\n**nope** ${markdown}\n\`\`\``),
+        ).toEqual([
+            {
+                code: `**nope** ${markdown}`,
+                type: "codeBlock",
+            },
+        ]);
+    });
+
     test("treats malformed bracket-heavy markdown as plain text", () => {
         const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
         expect(parseMessageMarkdown(text)).toEqual([

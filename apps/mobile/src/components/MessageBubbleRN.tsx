@@ -44,10 +44,12 @@ import * as Sharing from "expo-sharing";
 
 import { bytesToBase64, writeAttachmentToCache } from "../lib/attachments";
 import { haptic } from "../lib/haptics";
+import { type CodeHighlightKind, highlightCode } from "../lib/syntaxHighlight";
 import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
 import { InvitePreviewCard } from "./InvitePreviewCard";
+import { LinkPreviewCard } from "./LinkPreviewCard";
 
 interface MessageBubbleRNProps {
     authorName: string;
@@ -149,6 +151,10 @@ const PICKER_REACTION_EMOJIS: MessageEmoji[] = PICKER_REACTION_VALUES.map(
 );
 
 const MAX_CUSTOM_EMOJI_LENGTH = 16;
+
+type GraphemeSegmenter = {
+    segment: (value: string) => Iterable<{ segment: string }>;
+};
 
 export function MessageBubbleRN({
     authorName,
@@ -511,6 +517,9 @@ export function MessageBubbleRN({
                                 isOwn={isOwn}
                             />
                         ) : null}
+                        {!inviteID ? (
+                            <LinkPreviewCard content={message.message} />
+                        ) : null}
                         {reactions.length > 0 ? (
                             <ReactionRow
                                 currentUserID={currentUserID}
@@ -700,14 +709,74 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
 
+function CodeBlock({
+    code,
+    language,
+}: {
+    code: string;
+    language?: string | undefined;
+}) {
+    const segments = React.useMemo(
+        () => highlightCode(code, language),
+        [code, language],
+    );
+
+    return (
+        <View style={styles.codeBlock}>
+            {language ? (
+                <Text style={styles.codeBlockLanguage}>{language}</Text>
+            ) : null}
+            <ScrollView
+                contentContainerStyle={styles.codeBlockContent}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+            >
+                <Text selectable style={styles.codeBlockText}>
+                    {segments.map((segment, index) => (
+                        <Text
+                            key={`${segment.kind ?? "plain"}-${String(index)}`}
+                            style={codeHighlightStyle(segment.kind)}
+                        >
+                            {segment.text}
+                        </Text>
+                    ))}
+                </Text>
+            </ScrollView>
+        </View>
+    );
+}
+
+function codeHighlightStyle(
+    kind: CodeHighlightKind | undefined,
+): null | TextStyle {
+    switch (kind) {
+        case "attribute":
+            return styles.codeHighlightAttribute;
+        case "builtIn":
+            return styles.codeHighlightBuiltIn;
+        case "comment":
+            return styles.codeHighlightComment;
+        case "keyword":
+            return styles.codeHighlightKeyword;
+        case "literal":
+            return styles.codeHighlightLiteral;
+        case "number":
+            return styles.codeHighlightNumber;
+        case "string":
+            return styles.codeHighlightString;
+        case "title":
+            return styles.codeHighlightTitle;
+        case undefined:
+            return null;
+    }
+}
+
 function emojiFromInput(value: string): MessageEmoji | null {
     const trimmed = value.trim();
-    if (!trimmed) {
+    if (!isSingleEmojiGrapheme(trimmed)) {
         return null;
     }
-    return createUnicodeReactionEmoji(
-        trimmed.slice(0, MAX_CUSTOM_EMOJI_LENGTH),
-    );
+    return createUnicodeReactionEmoji(trimmed);
 }
 
 async function fetchAttachmentData(
@@ -735,6 +804,33 @@ function inlineSegmentStyle(segment: MarkdownInlineSegment): null | TextStyle {
     }
 }
 
+function isSingleEmojiGrapheme(value: string): boolean {
+    if (!value || value.length > MAX_CUSTOM_EMOJI_LENGTH) {
+        return false;
+    }
+    const segmenter = (
+        Intl as typeof Intl & {
+            Segmenter?: new (
+                locale?: string,
+                options?: { granularity: "grapheme" },
+            ) => GraphemeSegmenter;
+        }
+    ).Segmenter;
+    if (segmenter) {
+        const segments = [
+            ...new segmenter(undefined, { granularity: "grapheme" }).segment(
+                value,
+            ),
+        ];
+        if (segments.length !== 1 || segments[0]?.segment !== value) {
+            return false;
+        }
+    } else if (Array.from(value).length !== 1) {
+        return false;
+    }
+    return /\p{Extended_Pictographic}/u.test(value);
+}
+
 function MarkdownMessage({
     grouped,
     nodes,
@@ -751,6 +847,15 @@ function MarkdownMessage({
                             grouped={grouped && index === 0}
                             key={`text-${String(index)}`}
                             segments={node.segments}
+                        />
+                    );
+                }
+                if (node.type === "codeBlock") {
+                    return (
+                        <CodeBlock
+                            code={node.code}
+                            key={`code-${String(index)}`}
+                            language={node.language}
                         />
                     );
                 }
@@ -911,6 +1016,61 @@ const styles = StyleSheet.create({
     },
     avatarSpacer: {
         width: 32,
+    },
+    codeBlock: {
+        backgroundColor: "#0d1117",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        marginTop: 6,
+        maxWidth: 360,
+        overflow: "hidden",
+    },
+    codeBlockContent: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    codeBlockLanguage: {
+        ...typography.body,
+        backgroundColor: "rgba(255,255,255,0.045)",
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        color: colors.muted,
+        fontFamily: fontFamilies.mono,
+        fontSize: 11,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    codeBlockText: {
+        color: "#c9d1d9",
+        fontFamily: fontFamilies.mono,
+        fontSize: 12,
+        lineHeight: 18,
+    },
+    codeHighlightAttribute: {
+        color: "#79c0ff",
+    },
+    codeHighlightBuiltIn: {
+        color: "#ffa657",
+    },
+    codeHighlightComment: {
+        color: "#8b949e",
+        fontStyle: "italic",
+    },
+    codeHighlightKeyword: {
+        color: "#ff7b72",
+    },
+    codeHighlightLiteral: {
+        color: "#79c0ff",
+    },
+    codeHighlightNumber: {
+        color: "#a5d6ff",
+    },
+    codeHighlightString: {
+        color: "#a5d6ff",
+    },
+    codeHighlightTitle: {
+        color: "#d2a8ff",
     },
     container: {
         flexDirection: "row",
