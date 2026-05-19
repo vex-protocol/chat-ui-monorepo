@@ -1097,6 +1097,11 @@ class VexService {
         return $localMessageRetentionDaysWritable.get();
     }
 
+    async getServerPermissions(serverID: string): Promise<Permission[]> {
+        const client = this.requireClient();
+        return client.moderation.fetchPermissionList(serverID);
+    }
+
     // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
@@ -1179,6 +1184,19 @@ class VexService {
                       }
                     : {}),
             };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async kickServerMember(
+        serverID: string,
+        userID: string,
+    ): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.moderation.kick(userID, serverID);
+            return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }

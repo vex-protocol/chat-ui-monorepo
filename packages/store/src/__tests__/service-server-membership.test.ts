@@ -18,6 +18,10 @@ type TestClient = {
     invites?: {
         redeem: ReturnType<typeof vi.fn>;
     };
+    moderation?: {
+        fetchPermissionList: ReturnType<typeof vi.fn>;
+        kick: ReturnType<typeof vi.fn>;
+    };
     servers: {
         leave: ReturnType<typeof vi.fn>;
         retrieveByID?: ReturnType<typeof vi.fn>;
@@ -108,6 +112,62 @@ describe("vexService.joinInvite", () => {
         expect($permissionsWritable.get()).toEqual({
             [permission.permissionID]: permission,
         });
+    });
+});
+
+describe("vexService server moderation", () => {
+    beforeEach(resetMembershipState);
+
+    test("fetches server permissions for owner/member labeling", async () => {
+        const permission: Permission = {
+            permissionID: "permission-owner",
+            powerLevel: 100,
+            resourceID: "server-blood",
+            resourceType: "server",
+            userID: "user-owner",
+        };
+        const client: TestClient = {
+            close: vi.fn(async () => undefined),
+            moderation: {
+                fetchPermissionList: vi.fn(async () => [permission]),
+                kick: vi.fn(async () => undefined),
+            },
+            servers: {
+                leave: vi.fn(async () => undefined),
+            },
+        };
+
+        serviceInternals.client = client;
+
+        await expect(
+            vexService.getServerPermissions("server-blood"),
+        ).resolves.toEqual([permission]);
+        expect(client.moderation?.fetchPermissionList).toHaveBeenCalledWith(
+            "server-blood",
+        );
+    });
+
+    test("kicks a member through moderation API", async () => {
+        const client: TestClient = {
+            close: vi.fn(async () => undefined),
+            moderation: {
+                fetchPermissionList: vi.fn(async () => []),
+                kick: vi.fn(async () => undefined),
+            },
+            servers: {
+                leave: vi.fn(async () => undefined),
+            },
+        };
+
+        serviceInternals.client = client;
+
+        await expect(
+            vexService.kickServerMember("server-blood", "user-target"),
+        ).resolves.toEqual({ ok: true });
+        expect(client.moderation?.kick).toHaveBeenCalledWith(
+            "user-target",
+            "server-blood",
+        );
     });
 });
 

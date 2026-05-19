@@ -1,7 +1,6 @@
 import type { PickedAttachment } from "../lib/attachments";
 import type { AppScreenProps } from "../navigation/types";
-import type { User } from "@vex-chat/libvex";
-import type { Message } from "@vex-chat/libvex";
+import type { Message, Permission, User } from "@vex-chat/libvex";
 import type { MessageEmoji } from "@vex-chat/store";
 
 import React, {
@@ -27,6 +26,7 @@ import {
 
 import {
     $groupMessages,
+    $permissions,
     $servers,
     $user,
     formatFileAttachmentMarkdown,
@@ -68,6 +68,7 @@ export function ChannelScreen({
 }: AppScreenProps<"Channel">) {
     const { channelID, channelName, serverID } = route.params;
     const allGroupMessages = useStore($groupMessages);
+    const permissions = useStore($permissions);
     // Scoped to just this server's slot so other server churn doesn't re-render us.
     const servers = useStore($servers);
     const user = useStore($user);
@@ -100,6 +101,10 @@ export function ChannelScreen({
     const [sendError, setSendError] = useState("");
     const sendInFlightRef = useRef(false);
     const [members, setMembers] = useState<User[]>([]);
+    const [serverPermissions, setServerPermissions] = useState<Permission[]>(
+        [],
+    );
+    const [kickingMemberID, setKickingMemberID] = useState<null | string>(null);
     const [usernames, setUsernames] = useState<Record<string, string>>({});
     const [nowMs, setNowMs] = useState(0);
     const [membersDrawerOpen, setMembersDrawerOpen] = useState(false);
@@ -124,15 +129,58 @@ export function ChannelScreen({
         [membersDrawerAnim],
     );
 
+    const ownerUserIDs = useMemo(
+        () =>
+            new Set(
+                [...serverPermissions, ...Object.values(permissions)]
+                    .filter(
+                        (permission) =>
+                            permission.resourceID === serverID &&
+                            permission.resourceType === "server" &&
+                            permission.powerLevel >= 100,
+                    )
+                    .map((permission) => permission.userID),
+            ),
+        [permissions, serverID, serverPermissions],
+    );
+    const myServerPowerLevel = useMemo(() => {
+        const myUserID = user?.userID;
+        if (!myUserID) {
+            return 0;
+        }
+        const myPermissions = [
+            ...serverPermissions,
+            ...Object.values(permissions),
+        ].filter(
+            (permission) =>
+                permission.resourceID === serverID &&
+                permission.resourceType === "server" &&
+                permission.userID === myUserID,
+        );
+        if (myPermissions.length === 0) {
+            return 0;
+        }
+        return Math.max(
+            ...myPermissions.map((permission) => permission.powerLevel),
+        );
+    }, [permissions, serverID, serverPermissions, user?.userID]);
+    const canKickMembers = myServerPowerLevel >= 100;
+
     const syncChannelMembers = useCallback(async (): Promise<void> => {
-        const channelMembers = await vexService.getChannelMembers(channelID);
+        const [channelMembers, fetchedPermissions] = await Promise.all([
+            vexService.getChannelMembers(channelID),
+            vexService
+                .getServerPermissions(serverID)
+                .catch((): Permission[] => []),
+        ]);
         setMembers(channelMembers);
+        setServerPermissions(fetchedPermissions);
         const map: Record<string, string> = {};
         for (const member of channelMembers) {
             map[member.userID] = member.username;
         }
         setUsernames(map);
-    }, [channelID]);
+    }, [channelID, serverID]);
 
     // Load channel members to resolve userIDs → usernames
     useEffect(() => {
@@ -230,11 +278,70 @@ export function ChannelScreen({
         };
     }, []);
 
-    function isOnline(member: User): boolean {
-        if (!member.lastSeen) return false;
-        const lastSeenMs = new Date(member.lastSeen).getTime();
-        if (Number.isNaN(lastSeenMs)) return false;
-        return nowMs - lastSeenMs < ONLINE_WINDOW_MS;
+    const isOnline = useCallback(
+        (member: User): boolean => {
+            if (!member.lastSeen) return false;
+            const lastSeenMs = new Date(member.lastSeen).getTime();
+            if (Number.isNaN(lastSeenMs)) return false;
+            return nowMs - lastSeenMs < ONLINE_WINDOW_MS;
+        },
+        [nowMs],
+    );
+
+    const orderedMembers = useMemo(
+        () => sortMembers(members, ownerUserIDs, isOnline),
+        [isOnline, members, ownerUserIDs],
+    );
+
+    function confirmKickMember(member: User): void {
+        if (
+            !canKickMembers ||
+            ownerUserIDs.has(member.userID) ||
+            member.userID === user?.userID
+        ) {
+            return;
+        }
+        Alert.alert("Kick member?", `Remove ${member.username} from server?`, [
+            { style: "cancel", text: "Cancel" },
+            {
+                onPress: () => {
+                    void handleKickMember(member);
+                },
+                style: "destructive",
+                text: "Kick",
+            },
+        ]);
+    }
+
+    async function handleKickMember(member: User): Promise<void> {
+        if (
+            !canKickMembers ||
+            kickingMemberID ||
+            ownerUserIDs.has(member.userID) ||
+            member.userID === user?.userID
+        ) {
+            return;
+        }
+        setKickingMemberID(member.userID);
+        try {
+            const result = await vexService.kickServerMember(
+                serverID,
+                member.userID,
+            );
+            if (!result.ok) {
+                Alert.alert(
+                    "Kick failed",
+                    result.error ?? "Could not remove this member.",
+                );
+                return;
+            }
+            setMembers((current) =>
+                current.filter((item) => item.userID !== member.userID),
+            );
+            void syncChannelMembers().catch(() => {});
+        } finally {
+            setKickingMemberID(null);
+        }
     }
 
     const sendMessage = useCallback(async () => {
@@ -429,8 +536,15 @@ export function ChannelScreen({
 
     function renderMember({ item }: { item: User }) {
         const online = isOnline(item);
+        const owner = ownerUserIDs.has(item.userID);
+        const kickingThisMember = kickingMemberID === item.userID;
+        const canKickMember =
+            canKickMembers &&
+            !owner &&
+            item.userID !== user?.userID &&
+            (kickingMemberID === null || kickingThisMember);
         return (
-            <TouchableOpacity disabled style={styles.memberRow}>
+            <View style={styles.memberRow}>
                 <View style={styles.memberAvatarWrap}>
                     <Avatar
                         displayName={item.username}
@@ -447,14 +561,46 @@ export function ChannelScreen({
                     />
                 </View>
                 <View style={styles.memberMeta}>
-                    <Text numberOfLines={1} style={styles.memberName}>
-                        {item.username}
-                    </Text>
+                    <View style={styles.memberNameRow}>
+                        <Text numberOfLines={1} style={styles.memberName}>
+                            {item.username}
+                        </Text>
+                        {owner ? (
+                            <Text
+                                accessibilityLabel="Server owner"
+                                style={styles.memberOwnerCrown}
+                            >
+                                ♕
+                            </Text>
+                        ) : null}
+                    </View>
                     <Text numberOfLines={1} style={styles.memberSubtext}>
-                        {online ? "Online" : "Offline"}
+                        {owner
+                            ? `Owner - ${online ? "Online" : "Offline"}`
+                            : online
+                              ? "Online"
+                              : "Offline"}
                     </Text>
                 </View>
-            </TouchableOpacity>
+                {canKickMember ? (
+                    <TouchableOpacity
+                        accessibilityLabel={`Kick ${item.username}`}
+                        disabled={kickingMemberID !== null}
+                        onPress={() => {
+                            confirmKickMember(item);
+                        }}
+                        style={[
+                            styles.memberKickButton,
+                            kickingMemberID !== null &&
+                                styles.memberKickButtonDisabled,
+                        ]}
+                    >
+                        <Text style={styles.memberKickText}>
+                            {kickingThisMember ? "Kicking..." : "Kick"}
+                        </Text>
+                    </TouchableOpacity>
+                ) : null}
+            </View>
         );
     }
 
@@ -542,7 +688,7 @@ export function ChannelScreen({
                             </Text>
                         ) : (
                             <FlatList
-                                data={members}
+                                data={orderedMembers}
                                 keyExtractor={(member) => member.userID}
                                 renderItem={renderMember}
                             />
@@ -574,6 +720,21 @@ const styles = StyleSheet.create({
     memberAvatarWrap: {
         position: "relative",
     },
+    memberKickButton: {
+        borderColor: "rgba(255,122,122,0.42)",
+        borderRadius: 8,
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    memberKickButtonDisabled: {
+        opacity: 0.45,
+    },
+    memberKickText: {
+        ...typography.button,
+        color: colors.error,
+        fontSize: 10,
+    },
     memberMeta: {
         flex: 1,
         gap: 1,
@@ -581,7 +742,19 @@ const styles = StyleSheet.create({
     memberName: {
         ...typography.button,
         color: colors.textSecondary,
+        flexShrink: 1,
         fontSize: 12,
+    },
+    memberNameRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 4,
+        minWidth: 0,
+    },
+    memberOwnerCrown: {
+        color: "#FFD76A",
+        fontSize: 13,
+        lineHeight: 16,
     },
     memberPresenceDot: {
         borderColor: "rgba(12,14,20,0.98)",
@@ -698,4 +871,24 @@ function buildIdentityVisibility(messages: Message[]): boolean[] {
     }
 
     return visibility;
+}
+
+function sortMembers(
+    members: User[],
+    ownerUserIDs: Set<string>,
+    isOnline: (member: User) => boolean,
+): User[] {
+    return [...members].sort((a, b) => {
+        const ownerDelta =
+            Number(ownerUserIDs.has(b.userID)) -
+            Number(ownerUserIDs.has(a.userID));
+        if (ownerDelta !== 0) {
+            return ownerDelta;
+        }
+        const onlineDelta = Number(isOnline(b)) - Number(isOnline(a));
+        if (onlineDelta !== 0) {
+            return onlineDelta;
+        }
+        return a.username.localeCompare(b.username);
+    });
 }
