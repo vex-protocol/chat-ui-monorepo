@@ -58,23 +58,50 @@ export {
 // ── Utilities (pure functions, no state) ────────────────────────────────────
 
 export {
+    extractLinkPreviewUrl,
+    fetchLinkPreviewMetadata,
+    normalizeLinkPreviewUrl,
+    parseLinkPreviewHtml,
+} from "./link-preview.ts";
+export type {
+    LinkPreviewHtmlFetcher,
+    LinkPreviewHtmlResult,
+    LinkPreviewMetadata,
+} from "./link-preview.ts";
+
+export {
     applyEmoji,
+    applyMessageReactionEvent,
     avatarHue,
     chunkMessages,
+    createReactionEventExtra,
+    createUnicodeReactionEmoji,
+    emojiReactionKey,
+    emojiReactionLabel,
+    foldMessageReactionEvents,
     formatFileAttachmentMarkdown,
     formatFileSize,
     formatTime,
     isImageType,
+    messageReactionEvent,
+    messageReactions,
     parseFileExtra,
+    parseMessageExtra,
     parseMessageMarkdown,
     parseVexFileUrl,
+    serializeMessageExtra,
+    toggleMessageReactionExtra,
 } from "./message-utils.ts";
 export type {
     EncryptedFileAttachment,
     FileAttachment,
     MarkdownInlineSegment,
     MessageChunk,
+    MessageEmoji,
+    MessageExtra,
     MessageMarkdownNode,
+    MessageReaction,
+    MessageReactionEvent,
 } from "./message-utils.ts";
 
 export {

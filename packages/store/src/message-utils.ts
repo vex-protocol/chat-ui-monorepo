@@ -27,6 +27,26 @@ export interface MessageChunk {
     messages: Message[];
 }
 
+export type MessageEmoji =
+    | {
+          imageUrl?: string;
+          kind: "custom";
+          name: string;
+          sourceID?: string;
+      }
+    | {
+          kind: "unicode";
+          shortcode?: string;
+          value: string;
+      };
+
+export interface MessageExtra {
+    [key: string]: unknown;
+    reactionEvent?: MessageReactionEvent;
+    reactions?: MessageReaction[];
+    version: 1;
+}
+
 export type MessageMarkdownNode =
     | {
           alt: string;
@@ -34,7 +54,30 @@ export type MessageMarkdownNode =
           image: boolean;
           type: "attachment";
       }
+    | { code: string; language?: string; type: "codeBlock" }
     | { segments: MarkdownInlineSegment[]; type: "text" };
+
+export interface MessageReaction {
+    emoji: MessageEmoji;
+    userIDs: string[];
+}
+
+export interface MessageReactionEvent {
+    action: "toggle";
+    emoji: MessageEmoji;
+    targetMailID: string;
+}
+
+interface AttachmentMarkdownMatch extends MarkdownLinkMatch {
+    attachment: EncryptedFileAttachment;
+}
+
+interface CodeFenceMatch {
+    code: string;
+    end: number;
+    language?: string;
+    start: number;
+}
 
 interface MarkdownLinkMatch {
     end: number;
@@ -43,6 +86,8 @@ interface MarkdownLinkMatch {
     start: number;
     url: string;
 }
+
+type MessageWithClientExtra = Message & { extra?: null | string | undefined };
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -67,6 +112,91 @@ export function isImageType(contentType: string): boolean {
 
 const VEX_FILE_SCHEME = "vex-file://";
 
+const MESSAGE_EXTRA_VERSION = 1;
+const INLINE_BARE_URL_RE = /^https?:\/\/[^\s<>\[\]{}"']+/i;
+
+export function applyMessageReactionEvent(
+    messages: Message[],
+    event: MessageReactionEvent,
+    actorUserID: string,
+): Message[] {
+    let changed = false;
+    const nextMessages = messages.map((message) => {
+        if (message.mailID !== event.targetMailID) {
+            return message;
+        }
+        changed = true;
+        const current = message as MessageWithClientExtra;
+        return {
+            ...message,
+            extra: toggleMessageReactionExtra(
+                current.extra,
+                event.emoji,
+                actorUserID,
+            ),
+        } as Message;
+    });
+    return changed ? nextMessages : messages;
+}
+
+export function createReactionEventExtra(
+    targetMailID: string,
+    emoji: MessageEmoji,
+): string {
+    return (
+        serializeMessageExtra({
+            reactionEvent: {
+                action: "toggle",
+                emoji,
+                targetMailID,
+            },
+            version: MESSAGE_EXTRA_VERSION,
+        }) ?? JSON.stringify({ version: MESSAGE_EXTRA_VERSION })
+    );
+}
+
+export function createUnicodeReactionEmoji(
+    value: string,
+    shortcode?: string,
+): MessageEmoji {
+    return {
+        kind: "unicode",
+        ...(shortcode ? { shortcode } : {}),
+        value,
+    };
+}
+
+export function emojiReactionKey(emoji: MessageEmoji): string {
+    if (emoji.kind === "custom") {
+        return `custom:${emoji.sourceID ?? emoji.name}`;
+    }
+    return `unicode:${emoji.value}`;
+}
+
+export function emojiReactionLabel(emoji: MessageEmoji): string {
+    if (emoji.kind === "custom") {
+        return emoji.name.startsWith(":") ? emoji.name : `:${emoji.name}:`;
+    }
+    return emoji.value;
+}
+
+export function foldMessageReactionEvents(messages: Message[]): Message[] {
+    let visibleMessages: Message[] = [];
+    for (const message of messages) {
+        const event = messageReactionEvent(message);
+        if (!event) {
+            visibleMessages.push(message);
+            continue;
+        }
+        visibleMessages = applyMessageReactionEvent(
+            visibleMessages,
+            event,
+            message.authorID,
+        );
+    }
+    return visibleMessages;
+}
+
 export function formatFileAttachmentMarkdown(
     attachment: EncryptedFileAttachment,
 ): string {
@@ -84,6 +214,18 @@ export function formatFileAttachmentMarkdown(
         return `![${label}](${url})`;
     }
     return `[${label}](${url})`;
+}
+
+export function messageReactionEvent(
+    message: MessageWithClientExtra,
+): MessageReactionEvent | null {
+    return parseMessageExtra(message.extra).reactionEvent ?? null;
+}
+
+export function messageReactions(
+    message: MessageWithClientExtra,
+): MessageReaction[] {
+    return parseMessageExtra(message.extra).reactions ?? [];
 }
 
 export function parseFileExtra(extra: null | string): FileAttachment | null {
@@ -106,32 +248,82 @@ export function parseFileExtra(extra: null | string): FileAttachment | null {
     return null;
 }
 
+export function parseMessageExtra(
+    extra: null | string | undefined,
+): MessageExtra {
+    if (!extra) {
+        return { version: MESSAGE_EXTRA_VERSION };
+    }
+
+    try {
+        const raw: unknown = JSON.parse(extra);
+        if (!isRecord(raw)) {
+            return { version: MESSAGE_EXTRA_VERSION };
+        }
+
+        const reactionEvent = parseMessageReactionEvent(raw["reactionEvent"]);
+        const rest = { ...raw };
+        delete rest["reactionEvent"];
+        delete rest["reactions"];
+        delete rest["version"];
+        return {
+            ...rest,
+            ...(reactionEvent ? { reactionEvent } : {}),
+            reactions: parseMessageReactions(raw["reactions"]),
+            version: MESSAGE_EXTRA_VERSION,
+        };
+    } catch {
+        return { version: MESSAGE_EXTRA_VERSION };
+    }
+}
+
 export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
     const nodes: MessageMarkdownNode[] = [];
     let cursor = 0;
     let searchStart = 0;
 
     while (searchStart < content.length) {
-        const match = findNextMarkdownLink(content, searchStart);
-        if (!match) {
+        const attachmentMatch = findNextAttachmentMarkdownLink(
+            content,
+            searchStart,
+        );
+        const codeFenceMatch = findNextCodeFence(content, searchStart);
+        if (!attachmentMatch && !codeFenceMatch) {
             break;
         }
 
-        const attachment = parseVexFileUrl(match.url);
-        if (!attachment) {
-            searchStart = match.end;
+        if (
+            codeFenceMatch &&
+            (!attachmentMatch || codeFenceMatch.start < attachmentMatch.start)
+        ) {
+            pushTextNode(nodes, content.slice(cursor, codeFenceMatch.start));
+            nodes.push({
+                code: codeFenceMatch.code,
+                ...(codeFenceMatch.language
+                    ? { language: codeFenceMatch.language }
+                    : {}),
+                type: "codeBlock",
+            });
+            cursor = codeFenceMatch.end;
+            searchStart = codeFenceMatch.end;
             continue;
         }
 
-        pushTextNode(nodes, content.slice(cursor, match.start));
+        if (!attachmentMatch) {
+            break;
+        }
+
+        pushTextNode(nodes, content.slice(cursor, attachmentMatch.start));
         nodes.push({
-            alt: match.label,
-            attachment,
-            image: match.image || isImageType(attachment.contentType),
+            alt: attachmentMatch.label,
+            attachment: attachmentMatch.attachment,
+            image:
+                attachmentMatch.image ||
+                isImageType(attachmentMatch.attachment.contentType),
             type: "attachment",
         });
-        cursor = match.end;
-        searchStart = match.end;
+        cursor = attachmentMatch.end;
+        searchStart = attachmentMatch.end;
     }
 
     pushTextNode(nodes, content.slice(cursor));
@@ -177,11 +369,91 @@ export function parseVexFileUrl(url: string): EncryptedFileAttachment | null {
     };
 }
 
+export function serializeMessageExtra(extra: MessageExtra): null | string {
+    const normalized = normalizeMessageExtra(extra);
+    if (
+        Object.keys(normalized).length === 1 &&
+        normalized.version === MESSAGE_EXTRA_VERSION
+    ) {
+        return null;
+    }
+    return JSON.stringify(normalized);
+}
+
+export function toggleMessageReactionExtra(
+    currentExtra: null | string | undefined,
+    emoji: MessageEmoji,
+    userID: string,
+): null | string {
+    const extra = parseMessageExtra(currentExtra);
+    const reactions = [...(extra.reactions ?? [])];
+    const key = emojiReactionKey(emoji);
+    const existingIndex = reactions.findIndex(
+        (reaction) => emojiReactionKey(reaction.emoji) === key,
+    );
+
+    if (existingIndex === -1) {
+        reactions.push({ emoji, userIDs: [userID] });
+    } else {
+        const reaction = reactions[existingIndex];
+        if (!reaction) {
+            return serializeMessageExtra(extra);
+        }
+        const userIDs = reaction.userIDs.includes(userID)
+            ? reaction.userIDs.filter((id) => id !== userID)
+            : [...reaction.userIDs, userID];
+        if (userIDs.length === 0) {
+            reactions.splice(existingIndex, 1);
+        } else {
+            reactions[existingIndex] = {
+                ...reaction,
+                userIDs,
+            };
+        }
+    }
+
+    const nextExtra: MessageExtra = { ...extra };
+    if (reactions.length > 0) {
+        nextExtra.reactions = reactions;
+    } else {
+        delete nextExtra.reactions;
+    }
+    return serializeMessageExtra(nextExtra);
+}
+
 function escapeMarkdownLabel(value: string): string {
     return value
         .replace(/\\/g, "\\\\")
         .replace(/\[/g, "\\[")
         .replace(/\]/g, "\\]");
+}
+
+function findClosingCodeFence(
+    source: string,
+    start: number,
+): null | { end: number; start: number } {
+    let lineStart = start;
+    while (lineStart < source.length) {
+        const lineEnd = source.indexOf("\n", lineStart);
+        const end = lineEnd === -1 ? source.length : lineEnd;
+        const line = source.slice(lineStart, end);
+        const fenceStart = line.search(/```/);
+        if (
+            fenceStart !== -1 &&
+            isFenceLinePrefix(line.slice(0, fenceStart)) &&
+            /^[ \t]*$/.test(line.slice(fenceStart + 3))
+        ) {
+            return {
+                end: lineEnd === -1 ? source.length : lineEnd + 1,
+                start: lineStart + fenceStart,
+            };
+        }
+        if (lineEnd === -1) {
+            return null;
+        }
+        lineStart = lineEnd + 1;
+    }
+    return null;
 }
 
 function findMarkdownLabelEnd(source: string, start: number): number {
@@ -207,16 +479,82 @@ function findMarkdownLabelEnd(source: string, start: number): number {
 }
 
 function findMarkdownLinkEnd(source: string, start: number): number {
+    let depth = 0;
     for (let index = start; index < source.length; index++) {
         const char = source[index];
         if (char === "\n") {
             return -1;
         }
+        if (char === "(") {
+            depth++;
+            continue;
+        }
         if (char === ")") {
-            return index;
+            if (depth === 0) {
+                return index;
+            }
+            depth--;
         }
     }
     return -1;
+}
+
+function findNextAttachmentMarkdownLink(
+    source: string,
+    start: number,
+): AttachmentMarkdownMatch | null {
+    let searchStart = start;
+    while (searchStart < source.length) {
+        const match = findNextMarkdownLink(source, searchStart);
+        if (!match) {
+            return null;
+        }
+        const attachment = parseVexFileUrl(match.url);
+        if (attachment) {
+            return { ...match, attachment };
+        }
+        searchStart = match.end;
+    }
+    return null;
+}
+
+function findNextCodeFence(
+    source: string,
+    start: number,
+): CodeFenceMatch | null {
+    let searchStart = start;
+    while (searchStart < source.length) {
+        const open = source.indexOf("```", searchStart);
+        if (open === -1) {
+            return null;
+        }
+        const lineStart = source.lastIndexOf("\n", open - 1) + 1;
+        if (!isFenceLinePrefix(source.slice(lineStart, open))) {
+            searchStart = open + 3;
+            continue;
+        }
+
+        const infoStart = open + 3;
+        const lineEnd = source.indexOf("\n", infoStart);
+        if (lineEnd === -1) {
+            return {
+                code: "",
+                end: source.length,
+                ...normalizeCodeBlockLanguage(source.slice(infoStart)),
+                start: lineStart,
+            };
+        }
+
+        const close = findClosingCodeFence(source, lineEnd + 1);
+        const codeEnd = close?.start ?? source.length;
+        return {
+            code: trimCodeFenceText(source.slice(lineEnd + 1, codeEnd)),
+            end: close?.end ?? source.length,
+            ...normalizeCodeBlockLanguage(source.slice(infoStart, lineEnd)),
+            start: lineStart,
+        };
+    }
+    return null;
 }
 
 function findNextMarkdownLink(
@@ -266,6 +604,66 @@ function findNextMarkdownLink(
     }
 
     return null;
+}
+
+function hasBalancedParens(value: string): boolean {
+    let balance = 0;
+    for (const char of value) {
+        if (char === "(") {
+            balance++;
+        } else if (char === ")") {
+            balance--;
+        }
+    }
+    return balance === 0;
+}
+
+function isFenceLinePrefix(value: string): boolean {
+    return /^[ \t]{0,3}$/.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function matchBareUrlAt(text: string, index: number): null | string {
+    const previous = text[index - 1];
+    if (previous && /[A-Za-z0-9@._~:/?#\[\]!$&'()*+,;=%-]/.test(previous)) {
+        return null;
+    }
+    const match = INLINE_BARE_URL_RE.exec(text.slice(index));
+    if (!match?.[0]) {
+        return null;
+    }
+    return trimInlineUrl(match[0]);
+}
+
+function normalizeCodeBlockLanguage(value: string): { language?: string } {
+    const language = value.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+    if (!language || language.length > 64 || !/^[\w#+.-]+$/.test(language)) {
+        return {};
+    }
+    return { language };
+}
+
+function normalizeMessageExtra(extra: MessageExtra): MessageExtra {
+    const normalized: MessageExtra = {
+        ...extra,
+        version: MESSAGE_EXTRA_VERSION,
+    };
+    const reactions = parseMessageReactions(normalized.reactions);
+    const reactionEvent = parseMessageReactionEvent(normalized.reactionEvent);
+    if (reactionEvent) {
+        normalized.reactionEvent = reactionEvent;
+    } else {
+        delete normalized.reactionEvent;
+    }
+    if (reactions.length > 0) {
+        normalized.reactions = reactions;
+    } else {
+        delete normalized.reactions;
+    }
+    return normalized;
 }
 
 function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
@@ -330,7 +728,7 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
         if (char === "[") {
             const labelEnd = findMarkdownLabelEnd(text, index + 1);
             if (labelEnd > index + 1 && text[labelEnd + 1] === "(") {
-                const urlEnd = text.indexOf(")", labelEnd + 2);
+                const urlEnd = findMarkdownLinkEnd(text, labelEnd + 2);
                 if (urlEnd > labelEnd + 2) {
                     const url = text.slice(labelEnd + 2, urlEnd).trim();
                     if (url.length > 0) {
@@ -350,6 +748,19 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
             }
         }
 
+        const bareUrl = matchBareUrlAt(text, index);
+        if (bareUrl) {
+            pushPlain(index);
+            pushSegment(segments, {
+                text: bareUrl,
+                type: "link",
+                url: bareUrl,
+            });
+            index += bareUrl.length;
+            cursor = index;
+            continue;
+        }
+
         index++;
     }
 
@@ -358,6 +769,97 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
         return [{ text, type: "text" }];
     }
     return segments;
+}
+
+function parseMessageEmoji(value: unknown): MessageEmoji | null {
+    if (!isRecord(value)) {
+        return null;
+    }
+
+    if (value["kind"] === "unicode" && typeof value["value"] === "string") {
+        const shortcode = value["shortcode"];
+        return {
+            kind: "unicode",
+            ...(typeof shortcode === "string" && shortcode !== ""
+                ? { shortcode }
+                : {}),
+            value: value["value"],
+        };
+    }
+
+    if (value["kind"] === "custom" && typeof value["name"] === "string") {
+        const imageUrl = value["imageUrl"];
+        const sourceID = value["sourceID"];
+        return {
+            kind: "custom",
+            name: value["name"],
+            ...(typeof imageUrl === "string" && imageUrl !== ""
+                ? { imageUrl }
+                : {}),
+            ...(typeof sourceID === "string" && sourceID !== ""
+                ? { sourceID }
+                : {}),
+        };
+    }
+
+    return null;
+}
+
+function parseMessageReactionEvent(
+    value: unknown,
+): MessageReactionEvent | undefined {
+    if (!isRecord(value)) {
+        return undefined;
+    }
+    const emoji = parseMessageEmoji(value["emoji"]);
+    if (
+        value["action"] !== "toggle" ||
+        !emoji ||
+        typeof value["targetMailID"] !== "string" ||
+        value["targetMailID"] === ""
+    ) {
+        return undefined;
+    }
+    return {
+        action: "toggle",
+        emoji,
+        targetMailID: value["targetMailID"],
+    };
+}
+
+function parseMessageReactions(value: unknown): MessageReaction[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const reactions: MessageReaction[] = [];
+    const seen = new Set<string>();
+    for (const item of value) {
+        if (!isRecord(item)) {
+            continue;
+        }
+        const emoji = parseMessageEmoji(item["emoji"]);
+        if (!emoji) {
+            continue;
+        }
+        const userIDs = Array.isArray(item["userIDs"])
+            ? item["userIDs"].filter(
+                  (id): id is string => typeof id === "string" && id !== "",
+              )
+            : [];
+        const uniqueUserIDs = [...new Set(userIDs)];
+        if (uniqueUserIDs.length === 0) {
+            continue;
+        }
+
+        const key = emojiReactionKey(emoji);
+        if (seen.has(key)) {
+            continue;
+        }
+        seen.add(key);
+        reactions.push({ emoji, userIDs: uniqueUserIDs });
+    }
+    return reactions;
 }
 
 function pushSegment(
@@ -378,6 +880,22 @@ function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
         segments: parseInlineMarkdown(text),
         type: "text",
     });
+}
+
+function trimCodeFenceText(value: string): string {
+    return value.endsWith("\n") ? value.slice(0, -1) : value;
+}
+
+function trimInlineUrl(value: string): string {
+    let next = value;
+    while (/[),.!?;:]$/.test(next)) {
+        const last = next.at(-1);
+        if (last === ")" && hasBalancedParens(next)) {
+            break;
+        }
+        next = next.slice(0, -1);
+    }
+    return next;
 }
 
 function unescapeMarkdownLabel(value: string): string {

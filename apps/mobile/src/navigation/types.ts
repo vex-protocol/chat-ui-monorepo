@@ -37,6 +37,7 @@ export type AppStackParamList = {
             | "developer"
             | "notifications";
     };
+    ShareComposer: undefined;
 };
 
 // ── Screen prop helpers ─────────────────────────────────────────────────────

@@ -1,21 +1,50 @@
-import type { Message } from "@vex-chat/libvex";
+import type { Message, User } from "@vex-chat/libvex";
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+import { $userWritable } from "../domains/identity.ts";
 import {
     $channelUnreadCountsWritable,
     $dmUnreadCountsWritable,
     $groupMessagesWritable,
     $messagesWritable,
 } from "../domains/messaging.ts";
+import {
+    createUnicodeReactionEmoji,
+    messageReactionEvent,
+} from "../message-utils.ts";
 import { vexService } from "../service.ts";
 
 function installClient({
     deleteMessage = vi.fn(async (_mailID: string) => {}),
     deleteThread = vi.fn(async (_conversationKey: string) => {}),
+    groupMessage = vi.fn(
+        async (
+            _channelID: string,
+            _message: string,
+            _opts?: { extra?: null | string },
+        ) => {},
+    ),
+    sendMessage = vi.fn(
+        async (
+            _userID: string,
+            _message: string,
+            _opts?: { extra?: null | string },
+        ) => {},
+    ),
 }: {
     deleteMessage?: (mailID: string) => Promise<void>;
     deleteThread?: (conversationKey: string) => Promise<void>;
+    groupMessage?: (
+        channelID: string,
+        message: string,
+        opts?: { extra?: null | string },
+    ) => Promise<void>;
+    sendMessage?: (
+        userID: string,
+        message: string,
+        opts?: { extra?: null | string },
+    ) => Promise<void>;
 } = {}) {
     (vexService as unknown as { client: unknown }).client = {
         database: {
@@ -23,9 +52,11 @@ function installClient({
         },
         messages: {
             delete: deleteThread,
+            group: groupMessage,
+            send: sendMessage,
         },
     };
-    return { deleteMessage, deleteThread };
+    return { deleteMessage, deleteThread, groupMessage, sendMessage };
 }
 
 function makeMessage(overrides: Partial<Message> = {}): Message {
@@ -51,6 +82,7 @@ describe("vexService.deleteLocalMessage", () => {
         $groupMessagesWritable.set({});
         $dmUnreadCountsWritable.set({});
         $channelUnreadCountsWritable.set({});
+        $userWritable.set(null);
     });
 
     afterEach(() => {
@@ -154,6 +186,7 @@ describe("vexService.deleteLocalThread", () => {
         $groupMessagesWritable.set({});
         $dmUnreadCountsWritable.set({});
         $channelUnreadCountsWritable.set({});
+        $userWritable.set(null);
     });
 
     afterEach(() => {
@@ -219,5 +252,82 @@ describe("vexService.deleteLocalThread", () => {
 
         expect(deleted).toBe(false);
         expect(deleteThread).not.toHaveBeenCalled();
+    });
+});
+
+describe("vexService.toggleMessageReaction", () => {
+    beforeEach(() => {
+        $messagesWritable.set({});
+        $groupMessagesWritable.set({});
+        $dmUnreadCountsWritable.set({});
+        $channelUnreadCountsWritable.set({});
+        $userWritable.set({
+            userID: "me",
+            username: "me",
+        } as User);
+    });
+
+    afterEach(() => {
+        resetClient();
+        $userWritable.set(null);
+    });
+
+    test("sends a DM reaction as encrypted message extra", async () => {
+        const { sendMessage } = installClient();
+        const emoji = createUnicodeReactionEmoji("👍", "thumbsup");
+
+        const result = await vexService.toggleMessageReaction(
+            "user-a",
+            "m1",
+            false,
+            emoji,
+        );
+
+        expect(result).toEqual({ ok: true });
+        expect(sendMessage).toHaveBeenCalledWith("user-a", "", {
+            extra: expect.any(String) as string,
+        });
+
+        const opts = vi.mocked(sendMessage).mock.calls[0]?.[2];
+        const event = messageReactionEvent(
+            makeMessage({ extra: opts?.extra } as Partial<Message>),
+        );
+        expect(event).toEqual({
+            action: "toggle",
+            emoji,
+            targetMailID: "m1",
+        });
+    });
+
+    test("sends a group reaction as encrypted message extra", async () => {
+        const { groupMessage } = installClient();
+        const emoji = createUnicodeReactionEmoji("🎉", "tada");
+
+        const result = await vexService.toggleMessageReaction(
+            "channel-1",
+            "g1",
+            true,
+            emoji,
+        );
+
+        expect(result).toEqual({ ok: true });
+        expect(groupMessage).toHaveBeenCalledWith("channel-1", "", {
+            extra: expect.any(String) as string,
+        });
+    });
+
+    test("returns an error when no user is signed in", async () => {
+        const { sendMessage } = installClient();
+        $userWritable.set(null);
+
+        const result = await vexService.toggleMessageReaction(
+            "user-a",
+            "m1",
+            false,
+            createUnicodeReactionEmoji("👍", "thumbsup"),
+        );
+
+        expect(result.ok).toBe(false);
+        expect(sendMessage).not.toHaveBeenCalled();
     });
 });

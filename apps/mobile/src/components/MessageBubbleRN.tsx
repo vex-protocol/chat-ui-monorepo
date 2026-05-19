@@ -2,7 +2,9 @@ import type { Message } from "@vex-chat/libvex";
 import type {
     EncryptedFileAttachment,
     MarkdownInlineSegment,
+    MessageEmoji,
     MessageMarkdownNode,
+    MessageReaction,
 } from "@vex-chat/store";
 import type { GestureResponderEvent, TextStyle } from "react-native";
 
@@ -15,18 +17,24 @@ import {
     Linking,
     Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     useWindowDimensions,
     View,
 } from "react-native";
 
 import {
     applyEmoji,
+    createUnicodeReactionEmoji,
+    emojiReactionKey,
+    emojiReactionLabel,
     extractInviteID,
     formatFileSize,
     formatTime,
     isImageType,
+    messageReactions,
     parseMessageMarkdown,
     vexService,
 } from "@vex-chat/store";
@@ -35,30 +43,135 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Sharing from "expo-sharing";
 
 import { bytesToBase64, writeAttachmentToCache } from "../lib/attachments";
+import { haptic } from "../lib/haptics";
+import { type CodeHighlightKind, highlightCode } from "../lib/syntaxHighlight";
 import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 import { InvitePreviewCard } from "./InvitePreviewCard";
+import { LinkPreviewCard } from "./LinkPreviewCard";
 
 interface MessageBubbleRNProps {
     authorName: string;
+    currentUserID?: string | undefined;
     isOwn: boolean;
     message: Message;
-    onDeleteMessage?: (message: Message) => void;
+    onDeleteMessage?: ((message: Message) => void) | undefined;
+    onToggleReaction?:
+        | ((message: Message, emoji: MessageEmoji) => void)
+        | undefined;
     showIdentity?: boolean;
 }
 
+const QUICK_REACTION_EMOJIS: MessageEmoji[] = [
+    createUnicodeReactionEmoji("👍", "thumbsup"),
+    createUnicodeReactionEmoji("🤍", "white_heart"),
+    createUnicodeReactionEmoji("😹", "joycat"),
+    createUnicodeReactionEmoji("🎉", "tada"),
+    createUnicodeReactionEmoji("💯", "100"),
+];
+
+const PICKER_REACTION_VALUES = [
+    "😀",
+    "😃",
+    "😄",
+    "😁",
+    "😆",
+    "😅",
+    "😂",
+    "🤣",
+    "😊",
+    "😇",
+    "🙂",
+    "🙃",
+    "😉",
+    "😍",
+    "🥰",
+    "😘",
+    "😎",
+    "🤩",
+    "🥳",
+    "😋",
+    "😜",
+    "🤔",
+    "🫡",
+    "🤝",
+    "👏",
+    "🙌",
+    "🙏",
+    "💪",
+    "🔥",
+    "✨",
+    "⭐",
+    "💫",
+    "⚡",
+    "💥",
+    "❤️",
+    "🧡",
+    "💛",
+    "💚",
+    "💙",
+    "💜",
+    "🖤",
+    "🤍",
+    "🤎",
+    "💔",
+    "💯",
+    "✅",
+    "☑️",
+    "🎯",
+    "🚀",
+    "👀",
+    "🫶",
+    "🤌",
+    "👌",
+    "👍",
+    "👎",
+    "👋",
+    "🎉",
+    "🎊",
+    "🏆",
+    "🥇",
+    "🍾",
+    "☕",
+    "🍕",
+    "🌮",
+    "🌈",
+    "🌙",
+    "☀️",
+    "🐱",
+    "😹",
+    "🙈",
+    "👻",
+    "💀",
+];
+
+const PICKER_REACTION_EMOJIS: MessageEmoji[] = PICKER_REACTION_VALUES.map(
+    (value) => createUnicodeReactionEmoji(value),
+);
+
+const MAX_CUSTOM_EMOJI_LENGTH = 16;
+
+type GraphemeSegmenter = {
+    segment: (value: string) => Iterable<{ segment: string }>;
+};
+
 export function MessageBubbleRN({
     authorName,
+    currentUserID,
     isOwn,
     message,
     onDeleteMessage,
+    onToggleReaction,
     showIdentity = true,
 }: MessageBubbleRNProps) {
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
     const [menuOpen, setMenuOpen] = React.useState(false);
     const [menuX, setMenuX] = React.useState(0);
     const [menuY, setMenuY] = React.useState(0);
+    const [reactionPickerOpen, setReactionPickerOpen] = React.useState(false);
+    const [customReactionValue, setCustomReactionValue] = React.useState("");
     const inviteID = React.useMemo(
         () => extractInviteID(message.message),
         [message.message],
@@ -67,6 +180,7 @@ export function MessageBubbleRN({
         () => parseMessageMarkdown(message.message),
         [message.message],
     );
+    const reactions = React.useMemo(() => messageReactions(message), [message]);
 
     const menuActions = React.useMemo(
         () => [
@@ -96,10 +210,27 @@ export function MessageBubbleRN({
     );
 
     const openContextMenuAt = (x: number, y: number) => {
+        haptic("slotIn");
         setMenuX(x);
         setMenuY(y);
+        setReactionPickerOpen(false);
+        setCustomReactionValue("");
         setMenuOpen(true);
     };
+
+    const closeContextMenu = () => {
+        setMenuOpen(false);
+        setReactionPickerOpen(false);
+        setCustomReactionValue("");
+    };
+
+    const toggleReactionFromMenu = (emoji: MessageEmoji) => {
+        haptic("selection");
+        closeContextMenu();
+        onToggleReaction?.(message, emoji);
+    };
+
+    const customReaction = emojiFromInput(customReactionValue);
 
     const handlePressIn = (event: GestureResponderEvent) => {
         const maybeMouseEvent = event.nativeEvent as { button?: number };
@@ -108,9 +239,15 @@ export function MessageBubbleRN({
         }
     };
 
-    const estimatedMenuHeight = menuActions.length * 44 + 12;
-    const estimatedMenuWidth = 220;
-    const maxLeft = Math.max(8, windowWidth - estimatedMenuWidth - 8);
+    const estimatedMenuHeight =
+        menuActions.length * 44 +
+        12 +
+        (onToggleReaction ? (reactionPickerOpen ? 338 : 48) : 0);
+    const menuWidth = Math.min(
+        windowWidth - 16,
+        reactionPickerOpen ? 316 : 238,
+    );
+    const maxLeft = Math.max(8, windowWidth - menuWidth - 8);
     const maxTop = Math.max(8, windowHeight - estimatedMenuHeight - 8);
     const clampedLeft = clamp(menuX, 8, maxLeft);
     const clampedTop = clamp(menuY, 8, maxTop);
@@ -118,27 +255,170 @@ export function MessageBubbleRN({
     const renderContextMenu = () => (
         <Modal
             animationType="none"
-            onRequestClose={() => setMenuOpen(false)}
+            onRequestClose={() => closeContextMenu()}
             transparent
             visible={menuOpen}
         >
             <Pressable
                 onPress={() => {
-                    setMenuOpen(false);
+                    closeContextMenu();
                 }}
                 style={styles.menuBackdrop}
             >
                 <View
                     style={[
                         styles.menuCard,
-                        { left: clampedLeft, top: clampedTop },
+                        {
+                            left: clampedLeft,
+                            maxHeight: windowHeight - 16,
+                            top: clampedTop,
+                            width: menuWidth,
+                        },
                     ]}
                 >
+                    {onToggleReaction ? (
+                        <>
+                            <View style={styles.menuReactionRow}>
+                                {QUICK_REACTION_EMOJIS.map((emoji) => (
+                                    <Pressable
+                                        accessibilityLabel={`React ${emojiReactionLabel(
+                                            emoji,
+                                        )}`}
+                                        accessibilityRole="button"
+                                        key={emojiReactionLabel(emoji)}
+                                        onPress={() => {
+                                            toggleReactionFromMenu(emoji);
+                                        }}
+                                        style={({ pressed }) => [
+                                            styles.menuReactionButton,
+                                            pressed && styles.menuItemPressed,
+                                        ]}
+                                    >
+                                        <Text style={styles.menuReactionEmoji}>
+                                            {emojiReactionLabel(emoji)}
+                                        </Text>
+                                    </Pressable>
+                                ))}
+                                <Pressable
+                                    accessibilityLabel="More reactions"
+                                    accessibilityRole="button"
+                                    onPress={() => {
+                                        haptic("selection");
+                                        setReactionPickerOpen((open) => !open);
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.menuReactionButton,
+                                        reactionPickerOpen &&
+                                            styles.menuReactionButtonActive,
+                                        pressed && styles.menuItemPressed,
+                                    ]}
+                                >
+                                    <Ionicons
+                                        color="#E8EBF3"
+                                        name="happy-outline"
+                                        size={20}
+                                    />
+                                </Pressable>
+                            </View>
+                            {reactionPickerOpen ? (
+                                <View style={styles.reactionPicker}>
+                                    <View style={styles.reactionPickerInputRow}>
+                                        <TextInput
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            maxLength={MAX_CUSTOM_EMOJI_LENGTH}
+                                            onChangeText={
+                                                setCustomReactionValue
+                                            }
+                                            placeholder="Emoji"
+                                            placeholderTextColor={colors.muted}
+                                            returnKeyType="done"
+                                            style={styles.reactionPickerInput}
+                                            value={customReactionValue}
+                                        />
+                                        <Pressable
+                                            accessibilityLabel="React with typed emoji"
+                                            accessibilityRole="button"
+                                            disabled={!customReaction}
+                                            onPress={() => {
+                                                if (customReaction) {
+                                                    toggleReactionFromMenu(
+                                                        customReaction,
+                                                    );
+                                                }
+                                            }}
+                                            style={({ pressed }) => [
+                                                styles.reactionPickerSubmit,
+                                                !customReaction &&
+                                                    styles.reactionPickerSubmitDisabled,
+                                                pressed &&
+                                                    styles.menuItemPressed,
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                color={
+                                                    customReaction
+                                                        ? "#E8EBF3"
+                                                        : colors.muted
+                                                }
+                                                name="checkmark"
+                                                size={18}
+                                            />
+                                        </Pressable>
+                                    </View>
+                                    <ScrollView
+                                        keyboardShouldPersistTaps="handled"
+                                        showsVerticalScrollIndicator={false}
+                                        style={styles.reactionPickerScroll}
+                                    >
+                                        <View style={styles.reactionPickerGrid}>
+                                            {PICKER_REACTION_EMOJIS.map(
+                                                (emoji, index) => (
+                                                    <Pressable
+                                                        accessibilityLabel={`React ${emojiReactionLabel(
+                                                            emoji,
+                                                        )}`}
+                                                        accessibilityRole="button"
+                                                        key={pickerEmojiKey(
+                                                            emoji,
+                                                            index,
+                                                        )}
+                                                        onPress={() => {
+                                                            toggleReactionFromMenu(
+                                                                emoji,
+                                                            );
+                                                        }}
+                                                        style={({
+                                                            pressed,
+                                                        }) => [
+                                                            styles.reactionPickerButton,
+                                                            pressed &&
+                                                                styles.menuItemPressed,
+                                                        ]}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.reactionPickerEmoji
+                                                            }
+                                                        >
+                                                            {emojiReactionLabel(
+                                                                emoji,
+                                                            )}
+                                                        </Text>
+                                                    </Pressable>
+                                                ),
+                                            )}
+                                        </View>
+                                    </ScrollView>
+                                </View>
+                            ) : null}
+                        </>
+                    ) : null}
                     {menuActions.map((action, index) => (
                         <Pressable
                             key={action.id}
                             onPress={() => {
-                                setMenuOpen(false);
+                                closeContextMenu();
                                 action.onPress();
                             }}
                             style={({ pressed }) => [
@@ -238,6 +518,22 @@ export function MessageBubbleRN({
                                 isOwn={isOwn}
                             />
                         ) : null}
+                        {!inviteID ? (
+                            <LinkPreviewCard content={message.message} />
+                        ) : null}
+                        {reactions.length > 0 ? (
+                            <ReactionRow
+                                currentUserID={currentUserID}
+                                onToggle={
+                                    onToggleReaction
+                                        ? (emoji) => {
+                                              onToggleReaction(message, emoji);
+                                          }
+                                        : undefined
+                                }
+                                reactions={reactions}
+                            />
+                        ) : null}
                     </View>
                 </View>
             </Pressable>
@@ -255,6 +551,7 @@ function AttachmentPreview({
     const shouldRenderImage = image || isImageType(attachment.contentType);
     const [error, setError] = React.useState("");
     const [imageUri, setImageUri] = React.useState<null | string>(null);
+    const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
     const [opening, setOpening] = React.useState(false);
     const [previewLoading, setPreviewLoading] = React.useState(false);
 
@@ -322,50 +619,81 @@ function AttachmentPreview({
         }
     }, [attachment, opening]);
 
+    const openImagePreview = React.useCallback(() => {
+        if (imageUri) {
+            haptic("selection");
+            setImagePreviewOpen(true);
+            return;
+        }
+        void openAttachment();
+    }, [imageUri, openAttachment]);
+    const imageAttachmentLabel = imageUri
+        ? `Open image preview for ${attachment.fileName}`
+        : `Open attachment for ${attachment.fileName}`;
+
     if (shouldRenderImage) {
         return (
-            <Pressable
-                accessibilityRole="button"
-                onPress={() => void openAttachment()}
-                style={({ pressed }) => [
-                    styles.imageAttachment,
-                    pressed && styles.attachmentPressed,
-                ]}
-            >
-                {previewLoading ? (
-                    <View style={styles.imageLoading}>
-                        <ActivityIndicator
-                            color={colors.textSecondary}
-                            size="small"
+            <>
+                <Pressable
+                    accessibilityLabel={imageAttachmentLabel}
+                    accessibilityRole="imagebutton"
+                    onPress={openImagePreview}
+                    style={({ pressed }) => [
+                        styles.imageAttachment,
+                        pressed && styles.attachmentPressed,
+                    ]}
+                >
+                    {previewLoading ? (
+                        <View style={styles.imageLoading}>
+                            <ActivityIndicator
+                                color={colors.textSecondary}
+                                size="small"
+                            />
+                        </View>
+                    ) : imageUri ? (
+                        <Image
+                            resizeMode="cover"
+                            source={{ uri: imageUri }}
+                            style={styles.imageAttachmentMedia}
                         />
-                    </View>
-                ) : imageUri ? (
-                    <Image
-                        resizeMode="cover"
-                        source={{ uri: imageUri }}
-                        style={styles.imageAttachmentMedia}
-                    />
-                ) : (
-                    <View style={styles.imageLoading}>
-                        <Ionicons
-                            color={colors.muted}
-                            name="image-outline"
-                            size={24}
-                        />
-                        <Text numberOfLines={2} style={styles.attachmentError}>
-                            {error || "Image unavailable"}
+                    ) : (
+                        <View style={styles.imageLoading}>
+                            <Ionicons
+                                color={colors.muted}
+                                name="image-outline"
+                                size={24}
+                            />
+                            <Text
+                                numberOfLines={2}
+                                style={styles.attachmentError}
+                            >
+                                {error || "Image unavailable"}
+                            </Text>
+                        </View>
+                    )}
+                    <View style={styles.attachmentCaption}>
+                        <Text numberOfLines={1} style={styles.attachmentName}>
+                            {attachment.fileName}
+                        </Text>
+                        <Text style={styles.attachmentSize}>
+                            {formatFileSize(attachment.fileSize)}
                         </Text>
                     </View>
-                )}
-                <View style={styles.attachmentCaption}>
-                    <Text numberOfLines={1} style={styles.attachmentName}>
-                        {attachment.fileName}
-                    </Text>
-                    <Text style={styles.attachmentSize}>
-                        {formatFileSize(attachment.fileSize)}
-                    </Text>
-                </View>
-            </Pressable>
+                </Pressable>
+                <ImagePreviewModal
+                    fileName={attachment.fileName}
+                    fileSizeLabel={formatFileSize(attachment.fileSize)}
+                    imageUri={imageUri}
+                    onClose={() => {
+                        setImagePreviewOpen(false);
+                    }}
+                    onShare={() => {
+                        void openAttachment();
+                    }}
+                    sharing={opening}
+                    visible={imagePreviewOpen}
+                />
+            </>
         );
     }
 
@@ -414,6 +742,76 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
 
+function CodeBlock({
+    code,
+    language,
+}: {
+    code: string;
+    language?: string | undefined;
+}) {
+    const segments = React.useMemo(
+        () => highlightCode(code, language),
+        [code, language],
+    );
+
+    return (
+        <View style={styles.codeBlock}>
+            {language ? (
+                <Text style={styles.codeBlockLanguage}>{language}</Text>
+            ) : null}
+            <ScrollView
+                contentContainerStyle={styles.codeBlockContent}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+            >
+                <Text selectable style={styles.codeBlockText}>
+                    {segments.map((segment, index) => (
+                        <Text
+                            key={`${segment.kind ?? "plain"}-${String(index)}`}
+                            style={codeHighlightStyle(segment.kind)}
+                        >
+                            {segment.text}
+                        </Text>
+                    ))}
+                </Text>
+            </ScrollView>
+        </View>
+    );
+}
+
+function codeHighlightStyle(
+    kind: CodeHighlightKind | undefined,
+): null | TextStyle {
+    switch (kind) {
+        case "attribute":
+            return styles.codeHighlightAttribute;
+        case "builtIn":
+            return styles.codeHighlightBuiltIn;
+        case "comment":
+            return styles.codeHighlightComment;
+        case "keyword":
+            return styles.codeHighlightKeyword;
+        case "literal":
+            return styles.codeHighlightLiteral;
+        case "number":
+            return styles.codeHighlightNumber;
+        case "string":
+            return styles.codeHighlightString;
+        case "title":
+            return styles.codeHighlightTitle;
+        case undefined:
+            return null;
+    }
+}
+
+function emojiFromInput(value: string): MessageEmoji | null {
+    const trimmed = value.trim();
+    if (!isSingleEmojiGrapheme(trimmed)) {
+        return null;
+    }
+    return createUnicodeReactionEmoji(trimmed);
+}
+
 async function fetchAttachmentData(
     attachment: EncryptedFileAttachment,
 ): Promise<Uint8Array> {
@@ -439,6 +837,33 @@ function inlineSegmentStyle(segment: MarkdownInlineSegment): null | TextStyle {
     }
 }
 
+function isSingleEmojiGrapheme(value: string): boolean {
+    if (!value || value.length > MAX_CUSTOM_EMOJI_LENGTH) {
+        return false;
+    }
+    const segmenter = (
+        Intl as typeof Intl & {
+            Segmenter?: new (
+                locale?: string,
+                options?: { granularity: "grapheme" },
+            ) => GraphemeSegmenter;
+        }
+    ).Segmenter;
+    if (segmenter) {
+        const segments = [
+            ...new segmenter(undefined, { granularity: "grapheme" }).segment(
+                value,
+            ),
+        ];
+        if (segments.length !== 1 || segments[0]?.segment !== value) {
+            return false;
+        }
+    } else if (Array.from(value).length !== 1) {
+        return false;
+    }
+    return /\p{Extended_Pictographic}/u.test(value);
+}
+
 function MarkdownMessage({
     grouped,
     nodes,
@@ -455,6 +880,15 @@ function MarkdownMessage({
                             grouped={grouped && index === 0}
                             key={`text-${String(index)}`}
                             segments={node.segments}
+                        />
+                    );
+                }
+                if (node.type === "codeBlock") {
+                    return (
+                        <CodeBlock
+                            code={node.code}
+                            key={`code-${String(index)}`}
+                            language={node.language}
                         />
                     );
                 }
@@ -507,6 +941,73 @@ function MarkdownText({
     );
 }
 
+function pickerEmojiKey(emoji: MessageEmoji, index: number): string {
+    return `${emojiReactionKey(emoji)}:${String(index)}`;
+}
+
+function ReactionEmoji({ emoji }: { emoji: MessageEmoji }) {
+    if (emoji.kind === "custom" && emoji.imageUrl) {
+        return (
+            <Image
+                accessibilityLabel={emojiReactionLabel(emoji)}
+                source={{ uri: emoji.imageUrl }}
+                style={styles.reactionImage}
+            />
+        );
+    }
+
+    return (
+        <Text style={styles.reactionEmoji}>{emojiReactionLabel(emoji)}</Text>
+    );
+}
+
+function ReactionRow({
+    currentUserID,
+    onToggle,
+    reactions,
+}: {
+    currentUserID?: string | undefined;
+    onToggle?: ((emoji: MessageEmoji) => void) | undefined;
+    reactions: MessageReaction[];
+}) {
+    return (
+        <View style={styles.reactionRow}>
+            {reactions.map((reaction) => {
+                const selected = currentUserID
+                    ? reaction.userIDs.includes(currentUserID)
+                    : false;
+                return (
+                    <Pressable
+                        accessibilityLabel={`${emojiReactionLabel(
+                            reaction.emoji,
+                        )} ${String(reaction.userIDs.length)}`}
+                        accessibilityRole="button"
+                        disabled={!onToggle}
+                        key={emojiReactionKey(reaction.emoji)}
+                        onPress={
+                            onToggle
+                                ? () => {
+                                      onToggle(reaction.emoji);
+                                  }
+                                : undefined
+                        }
+                        style={({ pressed }) => [
+                            styles.reactionPill,
+                            selected && styles.reactionPillSelected,
+                            pressed && styles.attachmentPressed,
+                        ]}
+                    >
+                        <ReactionEmoji emoji={reaction.emoji} />
+                        <Text style={styles.reactionCount}>
+                            {reaction.userIDs.length}
+                        </Text>
+                    </Pressable>
+                );
+            })}
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     attachmentCaption: {
         backgroundColor: "rgba(0,0,0,0.62)",
@@ -548,6 +1049,61 @@ const styles = StyleSheet.create({
     },
     avatarSpacer: {
         width: 32,
+    },
+    codeBlock: {
+        backgroundColor: "#0d1117",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        marginTop: 6,
+        maxWidth: 360,
+        overflow: "hidden",
+    },
+    codeBlockContent: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+    },
+    codeBlockLanguage: {
+        ...typography.body,
+        backgroundColor: "rgba(255,255,255,0.045)",
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        color: colors.muted,
+        fontFamily: fontFamilies.mono,
+        fontSize: 11,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    codeBlockText: {
+        color: "#c9d1d9",
+        fontFamily: fontFamilies.mono,
+        fontSize: 12,
+        lineHeight: 18,
+    },
+    codeHighlightAttribute: {
+        color: "#79c0ff",
+    },
+    codeHighlightBuiltIn: {
+        color: "#ffa657",
+    },
+    codeHighlightComment: {
+        color: "#8b949e",
+        fontStyle: "italic",
+    },
+    codeHighlightKeyword: {
+        color: "#ff7b72",
+    },
+    codeHighlightLiteral: {
+        color: "#79c0ff",
+    },
+    codeHighlightNumber: {
+        color: "#a5d6ff",
+    },
+    codeHighlightString: {
+        color: "#a5d6ff",
+    },
+    codeHighlightTitle: {
+        color: "#d2a8ff",
     },
     container: {
         flexDirection: "row",
@@ -655,6 +1211,28 @@ const styles = StyleSheet.create({
     menuItemPressed: {
         backgroundColor: "rgba(255,255,255,0.06)",
     },
+    menuReactionButton: {
+        alignItems: "center",
+        borderRadius: 8,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    menuReactionButtonActive: {
+        backgroundColor: "rgba(255,255,255,0.1)",
+    },
+    menuReactionEmoji: {
+        fontSize: 18,
+        lineHeight: 24,
+    },
+    menuReactionRow: {
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        gap: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 7,
+    },
     menuText: {
         ...typography.body,
         color: "#E8EBF3",
@@ -668,6 +1246,99 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 8,
         marginBottom: 2,
+    },
+    reactionCount: {
+        ...typography.body,
+        color: colors.textSecondary,
+        fontSize: 11,
+        fontWeight: "600",
+        lineHeight: 14,
+    },
+    reactionEmoji: {
+        fontSize: 13,
+        lineHeight: 16,
+    },
+    reactionImage: {
+        borderRadius: 3,
+        height: 16,
+        width: 16,
+    },
+    reactionPicker: {
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+    },
+    reactionPickerButton: {
+        alignItems: "center",
+        borderRadius: 8,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    reactionPickerEmoji: {
+        fontSize: 20,
+        lineHeight: 26,
+    },
+    reactionPickerGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 4,
+        paddingTop: 8,
+    },
+    reactionPickerInput: {
+        ...typography.body,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        color: "#E8EBF3",
+        flex: 1,
+        fontSize: 18,
+        height: 36,
+        paddingHorizontal: 10,
+        paddingVertical: 0,
+    },
+    reactionPickerInputRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
+    },
+    reactionPickerScroll: {
+        maxHeight: 208,
+    },
+    reactionPickerSubmit: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        height: 36,
+        justifyContent: "center",
+        width: 36,
+    },
+    reactionPickerSubmitDisabled: {
+        opacity: 0.45,
+    },
+    reactionPill: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 4,
+        minHeight: 24,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    reactionPillSelected: {
+        backgroundColor: "rgba(231,0,0,0.18)",
+        borderColor: "rgba(255,107,107,0.45)",
+    },
+    reactionRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 5,
     },
     systemContainer: {
         alignItems: "center",

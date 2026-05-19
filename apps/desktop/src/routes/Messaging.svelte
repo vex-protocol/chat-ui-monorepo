@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { buildMessageBodyWithAttachment } from "../lib/attachments.js";
     import ChatInput from "../lib/ChatInput.svelte";
     // Route: /messaging/:userID
     import MessageBox from "../lib/MessageBox.svelte";
@@ -33,13 +34,22 @@
 
     // TODO: verified key UI removed — needs secure storage re-implementation
 
-    async function handleSend(content: string, _attachment?: File) {
+    async function handleSend(content: string, attachment?: File) {
         if (sending) return;
         sending = true;
         sendError = "";
         try {
-            // TODO: file _attachment upload — needs client.files.create() integration
-            const result = await vexService.sendDM(targetUserID, content);
+            const body = await buildMessageBodyWithAttachment(
+                vexService,
+                content,
+                attachment,
+            );
+            if (!body.ok) {
+                sendError = body.error;
+                return;
+            }
+
+            const result = await vexService.sendDM(targetUserID, body.body);
             if (!result.ok) {
                 sendError = result.error ?? "Failed to send";
             }
@@ -83,7 +93,7 @@
 
     <ChatInput
         onSend={handleSend}
-        disabled={sending}
+        {sending}
         placeholder="Send a direct message…"
     />
 </div>
