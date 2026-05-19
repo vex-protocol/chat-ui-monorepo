@@ -53,6 +53,8 @@ export interface NativeReleaseInfo {
     targetShortCommit?: string | undefined;
 }
 
+type GitHubCompareStatus = "ahead" | "behind" | "diverged" | "identical";
+
 const GITHUB_REPO = "vex-protocol/vex-ui";
 const GITHUB_API_BASE = `https://api.github.com/repos/${GITHUB_REPO}`;
 const UPDATE_CHECK_THROTTLE_MS = 15 * 60 * 1000;
@@ -284,6 +286,22 @@ async function fetchFingerprintHash(
     return stringField(record, "hash");
 }
 
+async function fetchGitHubCompareStatus(
+    base: string | undefined,
+    head: string | undefined,
+): Promise<GitHubCompareStatus | undefined> {
+    const baseSha = normalizeSha(base);
+    const headSha = normalizeSha(head);
+    if (!baseSha || !headSha) return undefined;
+    const record = asRecord(
+        await fetchGitHubJson(
+            `${GITHUB_API_BASE}/compare/${baseSha}...${headSha}`,
+        ),
+    );
+    const status = stringField(record, "status");
+    return isGitHubCompareStatus(status) ? status : undefined;
+}
+
 async function fetchGitHubJson(url: string): Promise<unknown> {
     const response = await externalFetch(url, {
         headers: {
@@ -393,15 +411,32 @@ function getReleaseTarget(): "development" | "production" {
         : "production";
 }
 
+function isGitHubCompareStatus(
+    value: string | undefined,
+): value is GitHubCompareStatus {
+    return (
+        value === "ahead" ||
+        value === "behind" ||
+        value === "diverged" ||
+        value === "identical"
+    );
+}
+
 function isNativeReleaseNewer(
     release: NativeReleaseInfo | undefined,
     latestCommit: GitHubCommitInfo | undefined,
+    releaseCompareStatus: GitHubCompareStatus | undefined,
 ): boolean {
     if (!release) return false;
     if (
         sameCommit(buildInfo.commit, latestCommit?.sha) ||
         sameCommit(buildInfo.commit, release.targetCommit)
     ) {
+        return false;
+    }
+    // APK releases are native baselines and may lag branch HEAD after OTA-only
+    // commits. Only suppress one when the running app already contains it.
+    if (releaseCompareStatus === "ahead") {
         return false;
     }
 
@@ -452,6 +487,13 @@ async function runUpdateCheck(): Promise<AppUpdateState> {
         commitResult.status === "fulfilled" ? commitResult.value : undefined;
     const nativeRelease =
         releaseResult.status === "fulfilled" ? releaseResult.value : undefined;
+    const releaseCompareStatus =
+        nativeRelease?.targetCommit != null
+            ? await fetchGitHubCompareStatus(
+                  nativeRelease.targetCommit,
+                  buildInfo.commit,
+              ).catch(() => undefined)
+            : undefined;
     const ota =
         otaResult.status === "fulfilled"
             ? otaResult.value
@@ -465,6 +507,7 @@ async function runUpdateCheck(): Promise<AppUpdateState> {
     const nativeUpdateAvailable = isNativeReleaseNewer(
         nativeRelease,
         latestCommit,
+        releaseCompareStatus,
     );
     const otaUpdateAvailable = ota.isAvailable && !runningLatestCommit;
 

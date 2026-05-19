@@ -420,7 +420,7 @@ export function SettingsSectionScreen({
                     onPress: () => {
                         void installApkUpdate();
                     },
-                    text: "Download",
+                    text: "Install APK",
                 },
             ],
         );
@@ -479,21 +479,27 @@ export function SettingsSectionScreen({
         }
     }
 
-    const latestCreatedAt = formatTimestamp(
-        appUpdateState.latestCommit?.committedAt ??
-            appUpdateState.nativeRelease?.publishedAt,
-    );
+    const latestReleaseVersion =
+        appUpdateState.nativeRelease?.tagName?.match(/^mobile-v(.+)$/)?.[1] ??
+        buildInfo.version;
+    const latestShortCommit =
+        appUpdateState.latestCommit?.shortSha ??
+        appUpdateState.nativeRelease?.targetShortCommit;
+    const latestVersionValue =
+        latestShortCommit != null
+            ? `${latestReleaseVersion}-${latestShortCommit}`
+            : latestReleaseVersion;
     const latestVersionDescription =
-        latestCreatedAt != null ? `Created ${latestCreatedAt}` : undefined;
+        latestVersionValue !== "unknown"
+            ? `Latest ${latestVersionValue}`
+            : undefined;
     const isLatestVerified =
         appUpdateState.status === "current" &&
         commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
     const aboutUpdateLabel = isLatestVerified
         ? "No updates available"
         : "Latest available";
-    const aboutUpdateDescription = isLatestVerified
-        ? "Installed version is current"
-        : latestVersionDescription;
+    const aboutUpdateDescription = latestVersionDescription;
     const shouldShowAboutUpdateRow =
         appUpdateState.status !== "checking" &&
         appUpdateState.status !== "idle";
@@ -510,34 +516,10 @@ export function SettingsSectionScreen({
         0,
     );
 
-    function updateRowLabel(): string {
-        switch (appUpdateState.status) {
-            case "apk_available":
-                return "APK update available";
-            case "apk_downloading":
-                return "Downloading APK...";
-            case "checking":
-                return "Checking for updates...";
-            case "current":
-                return "Up to date";
-            case "error":
-                return "Update check failed";
-            case "ota_available":
-                return "OTA update available";
-            case "ota_ready":
-                return "Restart to update";
-            case "unsupported":
-                return "Updates unavailable";
-            case "idle":
-            default:
-                return "Check for updates";
-        }
-    }
-
     function updateActionLabel(): string {
         switch (appUpdateState.status) {
             case "apk_available":
-                return "Install";
+                return "Install APK";
             case "apk_downloading":
                 return appUpdateState.apkDownloadProgress != null
                     ? `${String(
@@ -547,7 +529,7 @@ export function SettingsSectionScreen({
             case "checking":
                 return "Checking";
             case "ota_available":
-                return "Download";
+                return "Install OTA";
             case "ota_ready":
                 return "Restart";
             default:
@@ -596,19 +578,6 @@ export function SettingsSectionScreen({
         if (bytes < 1024) return `${bytes} B`;
         if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
-
-    function formatTimestamp(value: string | undefined): string | undefined {
-        if (!value) return undefined;
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return undefined;
-        return date.toLocaleString(undefined, {
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            month: "short",
-            year: "numeric",
-        });
     }
 
     function readImageBytesFromBase64(base64Data: string): Uint8Array {
@@ -1036,33 +1005,6 @@ export function SettingsSectionScreen({
                                 icon="time-outline"
                                 label="Created"
                                 value={buildInfo.createdAt ?? "unknown"}
-                            />
-                            <MenuRow
-                                description={appUpdateState.message}
-                                icon="cloud-download-outline"
-                                label="Update status"
-                                onPress={handleUpdateRowPress}
-                                value={updateRowLabel()}
-                            />
-                            <MenuRow
-                                icon="git-compare-outline"
-                                label="Latest GitHub"
-                                monoBlock={
-                                    appUpdateState.latestCommit?.sha ??
-                                    "unknown"
-                                }
-                                value={
-                                    appUpdateState.latestCommit?.shortSha ??
-                                    "unknown"
-                                }
-                            />
-                            <MenuRow
-                                icon="archive-outline"
-                                label="APK release"
-                                value={
-                                    appUpdateState.nativeRelease?.tagName ??
-                                    "unknown"
-                                }
                             />
                             <MenuRow
                                 icon="finger-print-outline"
