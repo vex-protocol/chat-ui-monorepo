@@ -628,7 +628,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function matchBareUrlAt(text: string, index: number): null | string {
     const previous = text[index - 1];
-    if (previous && /[A-Za-z0-9@._~:/?#\[\]@!$&'()*+,;=%-]/.test(previous)) {
+    if (previous && /[A-Za-z0-9@._~:/?#\[\]!$&'()*+,;=%-]/.test(previous)) {
         return null;
     }
     const match = INLINE_BARE_URL_RE.exec(text.slice(index));
