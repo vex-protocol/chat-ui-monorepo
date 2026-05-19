@@ -17,8 +17,10 @@ import {
     Linking,
     Modal,
     Pressable,
+    ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     useWindowDimensions,
     View,
 } from "react-native";
@@ -41,6 +43,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Sharing from "expo-sharing";
 
 import { bytesToBase64, writeAttachmentToCache } from "../lib/attachments";
+import { haptic } from "../lib/haptics";
 import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
@@ -60,12 +63,92 @@ interface MessageBubbleRNProps {
 
 const QUICK_REACTION_EMOJIS: MessageEmoji[] = [
     createUnicodeReactionEmoji("👍", "thumbsup"),
-    createUnicodeReactionEmoji("❤️", "heart"),
-    createUnicodeReactionEmoji("😂", "joy"),
+    createUnicodeReactionEmoji("🤍", "white_heart"),
+    createUnicodeReactionEmoji("😹", "joycat"),
     createUnicodeReactionEmoji("🎉", "tada"),
-    createUnicodeReactionEmoji("🚀", "rocket"),
-    createUnicodeReactionEmoji("👀", "eyes"),
+    createUnicodeReactionEmoji("💯", "100"),
 ];
+
+const PICKER_REACTION_VALUES = [
+    "😀",
+    "😃",
+    "😄",
+    "😁",
+    "😆",
+    "😅",
+    "😂",
+    "🤣",
+    "😊",
+    "😇",
+    "🙂",
+    "🙃",
+    "😉",
+    "😍",
+    "🥰",
+    "😘",
+    "😎",
+    "🤩",
+    "🥳",
+    "😋",
+    "😜",
+    "🤔",
+    "🫡",
+    "🤝",
+    "👏",
+    "🙌",
+    "🙏",
+    "💪",
+    "🔥",
+    "✨",
+    "⭐",
+    "💫",
+    "⚡",
+    "💥",
+    "❤️",
+    "🧡",
+    "💛",
+    "💚",
+    "💙",
+    "💜",
+    "🖤",
+    "🤍",
+    "🤎",
+    "💔",
+    "💯",
+    "✅",
+    "☑️",
+    "🎯",
+    "🚀",
+    "👀",
+    "🫶",
+    "🤌",
+    "👌",
+    "👍",
+    "👎",
+    "👋",
+    "🎉",
+    "🎊",
+    "🏆",
+    "🥇",
+    "🍾",
+    "☕",
+    "🍕",
+    "🌮",
+    "🌈",
+    "🌙",
+    "☀️",
+    "🐱",
+    "😹",
+    "🙈",
+    "👻",
+    "💀",
+];
+
+const PICKER_REACTION_EMOJIS: MessageEmoji[] = PICKER_REACTION_VALUES.map(
+    (value) => createUnicodeReactionEmoji(value),
+);
+
+const MAX_CUSTOM_EMOJI_LENGTH = 16;
 
 export function MessageBubbleRN({
     authorName,
@@ -80,6 +163,8 @@ export function MessageBubbleRN({
     const [menuOpen, setMenuOpen] = React.useState(false);
     const [menuX, setMenuX] = React.useState(0);
     const [menuY, setMenuY] = React.useState(0);
+    const [reactionPickerOpen, setReactionPickerOpen] = React.useState(false);
+    const [customReactionValue, setCustomReactionValue] = React.useState("");
     const inviteID = React.useMemo(
         () => extractInviteID(message.message),
         [message.message],
@@ -118,10 +203,27 @@ export function MessageBubbleRN({
     );
 
     const openContextMenuAt = (x: number, y: number) => {
+        haptic("slotIn");
         setMenuX(x);
         setMenuY(y);
+        setReactionPickerOpen(false);
+        setCustomReactionValue("");
         setMenuOpen(true);
     };
+
+    const closeContextMenu = () => {
+        setMenuOpen(false);
+        setReactionPickerOpen(false);
+        setCustomReactionValue("");
+    };
+
+    const toggleReactionFromMenu = (emoji: MessageEmoji) => {
+        haptic("selection");
+        closeContextMenu();
+        onToggleReaction?.(message, emoji);
+    };
+
+    const customReaction = emojiFromInput(customReactionValue);
 
     const handlePressIn = (event: GestureResponderEvent) => {
         const maybeMouseEvent = event.nativeEvent as { button?: number };
@@ -131,9 +233,14 @@ export function MessageBubbleRN({
     };
 
     const estimatedMenuHeight =
-        menuActions.length * 44 + 12 + (onToggleReaction ? 48 : 0);
-    const estimatedMenuWidth = 220;
-    const maxLeft = Math.max(8, windowWidth - estimatedMenuWidth - 8);
+        menuActions.length * 44 +
+        12 +
+        (onToggleReaction ? (reactionPickerOpen ? 338 : 48) : 0);
+    const menuWidth = Math.min(
+        windowWidth - 16,
+        reactionPickerOpen ? 316 : 238,
+    );
+    const maxLeft = Math.max(8, windowWidth - menuWidth - 8);
     const maxTop = Math.max(8, windowHeight - estimatedMenuHeight - 8);
     const clampedLeft = clamp(menuX, 8, maxLeft);
     const clampedTop = clamp(menuY, 8, maxTop);
@@ -141,52 +248,170 @@ export function MessageBubbleRN({
     const renderContextMenu = () => (
         <Modal
             animationType="none"
-            onRequestClose={() => setMenuOpen(false)}
+            onRequestClose={() => closeContextMenu()}
             transparent
             visible={menuOpen}
         >
             <Pressable
                 onPress={() => {
-                    setMenuOpen(false);
+                    closeContextMenu();
                 }}
                 style={styles.menuBackdrop}
             >
                 <View
                     style={[
                         styles.menuCard,
-                        { left: clampedLeft, top: clampedTop },
+                        {
+                            left: clampedLeft,
+                            maxHeight: windowHeight - 16,
+                            top: clampedTop,
+                            width: menuWidth,
+                        },
                     ]}
                 >
                     {onToggleReaction ? (
-                        <View style={styles.menuReactionRow}>
-                            {QUICK_REACTION_EMOJIS.map((emoji) => (
+                        <>
+                            <View style={styles.menuReactionRow}>
+                                {QUICK_REACTION_EMOJIS.map((emoji) => (
+                                    <Pressable
+                                        accessibilityLabel={`React ${emojiReactionLabel(
+                                            emoji,
+                                        )}`}
+                                        accessibilityRole="button"
+                                        key={emojiReactionLabel(emoji)}
+                                        onPress={() => {
+                                            toggleReactionFromMenu(emoji);
+                                        }}
+                                        style={({ pressed }) => [
+                                            styles.menuReactionButton,
+                                            pressed && styles.menuItemPressed,
+                                        ]}
+                                    >
+                                        <Text style={styles.menuReactionEmoji}>
+                                            {emojiReactionLabel(emoji)}
+                                        </Text>
+                                    </Pressable>
+                                ))}
                                 <Pressable
-                                    accessibilityLabel={`React ${emojiReactionLabel(
-                                        emoji,
-                                    )}`}
+                                    accessibilityLabel="More reactions"
                                     accessibilityRole="button"
-                                    key={emojiReactionLabel(emoji)}
                                     onPress={() => {
-                                        setMenuOpen(false);
-                                        onToggleReaction(message, emoji);
+                                        haptic("selection");
+                                        setReactionPickerOpen((open) => !open);
                                     }}
                                     style={({ pressed }) => [
                                         styles.menuReactionButton,
+                                        reactionPickerOpen &&
+                                            styles.menuReactionButtonActive,
                                         pressed && styles.menuItemPressed,
                                     ]}
                                 >
-                                    <Text style={styles.menuReactionEmoji}>
-                                        {emojiReactionLabel(emoji)}
-                                    </Text>
+                                    <Ionicons
+                                        color="#E8EBF3"
+                                        name="happy-outline"
+                                        size={20}
+                                    />
                                 </Pressable>
-                            ))}
-                        </View>
+                            </View>
+                            {reactionPickerOpen ? (
+                                <View style={styles.reactionPicker}>
+                                    <View style={styles.reactionPickerInputRow}>
+                                        <TextInput
+                                            autoCapitalize="none"
+                                            autoCorrect={false}
+                                            maxLength={MAX_CUSTOM_EMOJI_LENGTH}
+                                            onChangeText={
+                                                setCustomReactionValue
+                                            }
+                                            placeholder="Emoji"
+                                            placeholderTextColor={colors.muted}
+                                            returnKeyType="done"
+                                            style={styles.reactionPickerInput}
+                                            value={customReactionValue}
+                                        />
+                                        <Pressable
+                                            accessibilityLabel="React with typed emoji"
+                                            accessibilityRole="button"
+                                            disabled={!customReaction}
+                                            onPress={() => {
+                                                if (customReaction) {
+                                                    toggleReactionFromMenu(
+                                                        customReaction,
+                                                    );
+                                                }
+                                            }}
+                                            style={({ pressed }) => [
+                                                styles.reactionPickerSubmit,
+                                                !customReaction &&
+                                                    styles.reactionPickerSubmitDisabled,
+                                                pressed &&
+                                                    styles.menuItemPressed,
+                                            ]}
+                                        >
+                                            <Ionicons
+                                                color={
+                                                    customReaction
+                                                        ? "#E8EBF3"
+                                                        : colors.muted
+                                                }
+                                                name="checkmark"
+                                                size={18}
+                                            />
+                                        </Pressable>
+                                    </View>
+                                    <ScrollView
+                                        keyboardShouldPersistTaps="handled"
+                                        showsVerticalScrollIndicator={false}
+                                        style={styles.reactionPickerScroll}
+                                    >
+                                        <View style={styles.reactionPickerGrid}>
+                                            {PICKER_REACTION_EMOJIS.map(
+                                                (emoji, index) => (
+                                                    <Pressable
+                                                        accessibilityLabel={`React ${emojiReactionLabel(
+                                                            emoji,
+                                                        )}`}
+                                                        accessibilityRole="button"
+                                                        key={pickerEmojiKey(
+                                                            emoji,
+                                                            index,
+                                                        )}
+                                                        onPress={() => {
+                                                            toggleReactionFromMenu(
+                                                                emoji,
+                                                            );
+                                                        }}
+                                                        style={({
+                                                            pressed,
+                                                        }) => [
+                                                            styles.reactionPickerButton,
+                                                            pressed &&
+                                                                styles.menuItemPressed,
+                                                        ]}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.reactionPickerEmoji
+                                                            }
+                                                        >
+                                                            {emojiReactionLabel(
+                                                                emoji,
+                                                            )}
+                                                        </Text>
+                                                    </Pressable>
+                                                ),
+                                            )}
+                                        </View>
+                                    </ScrollView>
+                                </View>
+                            ) : null}
+                        </>
                     ) : null}
                     {menuActions.map((action, index) => (
                         <Pressable
                             key={action.id}
                             onPress={() => {
-                                setMenuOpen(false);
+                                closeContextMenu();
                                 action.onPress();
                             }}
                             style={({ pressed }) => [
@@ -475,6 +700,16 @@ function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
 
+function emojiFromInput(value: string): MessageEmoji | null {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return null;
+    }
+    return createUnicodeReactionEmoji(
+        trimmed.slice(0, MAX_CUSTOM_EMOJI_LENGTH),
+    );
+}
+
 async function fetchAttachmentData(
     attachment: EncryptedFileAttachment,
 ): Promise<Uint8Array> {
@@ -566,6 +801,10 @@ function MarkdownText({
             ))}
         </Text>
     );
+}
+
+function pickerEmojiKey(emoji: MessageEmoji, index: number): string {
+    return `${emojiReactionKey(emoji)}:${String(index)}`;
 }
 
 function ReactionEmoji({ emoji }: { emoji: MessageEmoji }) {
@@ -786,6 +1025,9 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         width: 34,
     },
+    menuReactionButtonActive: {
+        backgroundColor: "rgba(255,255,255,0.1)",
+    },
     menuReactionEmoji: {
         fontSize: 18,
         lineHeight: 24,
@@ -827,6 +1069,61 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         height: 16,
         width: 16,
+    },
+    reactionPicker: {
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 8,
+    },
+    reactionPickerButton: {
+        alignItems: "center",
+        borderRadius: 8,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    reactionPickerEmoji: {
+        fontSize: 20,
+        lineHeight: 26,
+    },
+    reactionPickerGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 4,
+        paddingTop: 8,
+    },
+    reactionPickerInput: {
+        ...typography.body,
+        backgroundColor: "rgba(255,255,255,0.06)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        color: "#E8EBF3",
+        flex: 1,
+        fontSize: 18,
+        height: 36,
+        paddingHorizontal: 10,
+        paddingVertical: 0,
+    },
+    reactionPickerInputRow: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 8,
+    },
+    reactionPickerScroll: {
+        maxHeight: 208,
+    },
+    reactionPickerSubmit: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.08)",
+        borderRadius: 8,
+        height: 36,
+        justifyContent: "center",
+        width: 36,
+    },
+    reactionPickerSubmitDisabled: {
+        opacity: 0.45,
     },
     reactionPill: {
         alignItems: "center",
