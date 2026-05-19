@@ -1,15 +1,21 @@
 <script lang="ts">
-    import type { User } from "@vex-chat/libvex";
+    import type { Permission, User } from "@vex-chat/libvex";
 
-    import Avatar from "./Avatar.svelte";
-    import { getServerUrl } from "./config.js";
-    import { vexService } from "./store/index.js";
+    import MemberRow from "./MembersPanelMemberRow.svelte";
+    import {
+        user as currentUser,
+        permissions,
+        vexService,
+    } from "./store/index.js";
 
-    let { channelID }: { channelID?: string } = $props();
+    let { channelID, serverID }: { channelID?: string; serverID?: string } =
+        $props();
 
     const ONLINE_THRESHOLD = 1000 * 60 * 5; // 5 minutes
 
     let members: User[] = $state([]);
+    let serverPermissions: Permission[] = $state([]);
+    let kickingUserID: null | string = $state(null);
     let loading = $state(false);
 
     function isOnline(user: User): boolean {
@@ -19,22 +25,144 @@
         );
     }
 
-    const online = $derived(members.filter(isOnline));
-    const offline = $derived(members.filter((u) => !isOnline(u)));
+    const ownerUserIDs = $derived(
+        new Set(
+            [...serverPermissions, ...Object.values($permissions)]
+                .filter(
+                    (permission) =>
+                        permission.resourceID === serverID &&
+                        permission.resourceType === "server" &&
+                        permission.powerLevel >= 100,
+                )
+                .map((permission) => permission.userID),
+        ),
+    );
+    const myServerPowerLevel = $derived(
+        Math.max(
+            0,
+            ...serverPermissions
+                .filter(
+                    (permission) =>
+                        permission.resourceID === serverID &&
+                        permission.resourceType === "server" &&
+                        permission.userID === $currentUser?.userID,
+                )
+                .map((permission) => permission.powerLevel),
+            ...Object.values($permissions)
+                .filter(
+                    (permission) =>
+                        permission.resourceID === serverID &&
+                        permission.resourceType === "server" &&
+                        permission.userID === $currentUser?.userID,
+                )
+                .map((permission) => permission.powerLevel),
+        ),
+    );
+    const canKickMembers = $derived(myServerPowerLevel >= 100);
+    const owners = $derived(
+        sortMembers(
+            members.filter((member) => ownerUserIDs.has(member.userID)),
+            ownerUserIDs,
+            isOnline,
+        ),
+    );
+    const online = $derived(
+        sortMembers(
+            members.filter(
+                (member) =>
+                    !ownerUserIDs.has(member.userID) && isOnline(member),
+            ),
+            ownerUserIDs,
+            isOnline,
+        ),
+    );
+    const offline = $derived(
+        sortMembers(
+            members.filter(
+                (member) =>
+                    !ownerUserIDs.has(member.userID) && !isOnline(member),
+            ),
+            ownerUserIDs,
+            isOnline,
+        ),
+    );
+
+    async function refreshMembers(
+        cid: string,
+        sid: string | undefined,
+    ): Promise<void> {
+        const [nextMembers, nextPermissions] = await Promise.all([
+            vexService.getChannelMembers(cid),
+            sid
+                ? vexService
+                      .getServerPermissions(sid)
+                      .catch((): Permission[] => [])
+                : Promise.resolve([]),
+        ]);
+        members = nextMembers;
+        serverPermissions = nextPermissions;
+    }
+
+    async function kickMember(member: User): Promise<void> {
+        if (
+            !serverID ||
+            !canKickMembers ||
+            kickingUserID !== null ||
+            ownerUserIDs.has(member.userID) ||
+            member.userID === $currentUser?.userID
+        ) {
+            return;
+        }
+        if (!window.confirm(`Remove ${member.username} from server?`)) {
+            return;
+        }
+
+        kickingUserID = member.userID;
+        try {
+            const result = await vexService.kickServerMember(
+                serverID,
+                member.userID,
+            );
+            if (!result.ok) {
+                window.alert(result.error ?? "Could not remove this member.");
+                return;
+            }
+            members = members.filter((item) => item.userID !== member.userID);
+            if (channelID) {
+                await refreshMembers(channelID, serverID);
+            }
+        } finally {
+            kickingUserID = null;
+        }
+    }
+
+    function sortMembers(
+        source: User[],
+        owners: Set<string>,
+        onlineCheck: (member: User) => boolean,
+    ): User[] {
+        return [...source].sort((a, b) => {
+            const ownerDelta =
+                Number(owners.has(b.userID)) - Number(owners.has(a.userID));
+            if (ownerDelta !== 0) return ownerDelta;
+            const onlineDelta = Number(onlineCheck(b)) - Number(onlineCheck(a));
+            if (onlineDelta !== 0) return onlineDelta;
+            return a.username.localeCompare(b.username);
+        });
+    }
 
     // Fetch on mount and when channelID changes, poll every 30s.
     $effect(() => {
         const cid = channelID;
+        const sid = serverID;
         if (!cid) return;
 
         let active = true;
         loading = true;
 
-        vexService
-            .getChannelMembers(cid)
-            .then((result) => {
+        refreshMembers(cid, sid)
+            .then(() => {
                 if (active) {
-                    members = result;
                     loading = false;
                 }
             })
@@ -43,12 +171,7 @@
             });
 
         const interval = setInterval(() => {
-            vexService
-                .getChannelMembers(cid)
-                .then((result) => {
-                    if (active) members = result;
-                })
-                .catch(() => {});
+            void refreshMembers(cid, sid).catch(() => {});
         }, 30_000);
 
         return () => {
@@ -64,25 +187,35 @@
     </div>
 
     <div class="members-panel__list">
+        {#if owners.length > 0}
+            <div class="members-panel__section-label">Owner</div>
+            {#each owners as user (user.userID)}
+                <MemberRow
+                    {user}
+                    owner={true}
+                    online={isOnline(user)}
+                    canKick={false}
+                    kicking={false}
+                    onKick={kickMember}
+                />
+            {/each}
+        {/if}
+
         {#if online.length > 0}
             <div class="members-panel__section-label">
                 Online — {online.length}
             </div>
             {#each online as user (user.userID)}
-                <div class="members-panel__member">
-                    <div class="members-panel__avatar-wrap">
-                        <Avatar
-                            userID={user.userID}
-                            serverUrl={getServerUrl()}
-                            size={28}
-                            name={user.username}
-                        />
-                        <span
-                            class="members-panel__dot members-panel__dot--online"
-                        ></span>
-                    </div>
-                    <span class="members-panel__name">{user.username}</span>
-                </div>
+                <MemberRow
+                    {user}
+                    owner={false}
+                    online={true}
+                    canKick={canKickMembers &&
+                        user.userID !== $currentUser?.userID &&
+                        kickingUserID === null}
+                    kicking={kickingUserID === user.userID}
+                    onKick={kickMember}
+                />
             {/each}
         {/if}
 
@@ -91,19 +224,16 @@
                 Offline — {offline.length}
             </div>
             {#each offline as user (user.userID)}
-                <div
-                    class="members-panel__member members-panel__member--offline"
-                >
-                    <div class="members-panel__avatar-wrap">
-                        <Avatar
-                            userID={user.userID}
-                            serverUrl={getServerUrl()}
-                            size={28}
-                            name={user.username}
-                        />
-                    </div>
-                    <span class="members-panel__name">{user.username}</span>
-                </div>
+                <MemberRow
+                    {user}
+                    owner={false}
+                    online={false}
+                    canKick={canKickMembers &&
+                        user.userID !== $currentUser?.userID &&
+                        kickingUserID === null}
+                    kicking={kickingUserID === user.userID}
+                    onKick={kickMember}
+                />
             {/each}
         {/if}
 
@@ -153,50 +283,6 @@
         letter-spacing: 0.05em;
         color: var(--text-muted);
         padding: 12px 4px 4px;
-    }
-
-    .members-panel__member {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px;
-        border-radius: 4px;
-        transition: background 0.1s;
-    }
-
-    .members-panel__member:hover {
-        background: var(--bg-hover);
-    }
-
-    .members-panel__member--offline {
-        opacity: 0.5;
-    }
-
-    .members-panel__avatar-wrap {
-        position: relative;
-        flex-shrink: 0;
-    }
-
-    .members-panel__dot {
-        position: absolute;
-        bottom: -1px;
-        right: -1px;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        border: 2px solid var(--bg-secondary);
-    }
-
-    .members-panel__dot--online {
-        background: var(--success);
-    }
-
-    .members-panel__name {
-        font-size: 13px;
-        color: var(--text-primary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     .members-panel__empty {

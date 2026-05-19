@@ -140,7 +140,10 @@
 
         {#if !isAuthRoute}
             {#if activeServerID}
-                <MembersPanel channelID={activeChannelID} />
+                <MembersPanel
+                    channelID={activeChannelID}
+                    serverID={activeServerID}
+                />
             {:else}
                 <FamiliarsList />
             {/if}
