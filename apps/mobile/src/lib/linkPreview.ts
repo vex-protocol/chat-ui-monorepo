@@ -166,7 +166,7 @@ async function readLimitedResponseText(
 
     const body = getReadableResponseBody(response);
     if (!body) {
-        return null;
+        return (await response.text()).slice(0, LINK_PREVIEW_HTML_LIMIT);
     }
 
     const reader = body.getReader();
