@@ -1,12 +1,16 @@
 <script lang="ts">
+    import { tick } from "svelte";
+
     let {
         disabled,
         onSend,
         placeholder,
+        sending,
     }: {
         disabled?: boolean;
-        onSend: (content: string, attachment?: File) => void;
+        onSend: (content: string, attachment?: File) => Promise<void> | void;
         placeholder?: string;
+        sending?: boolean;
     } = $props();
 
     let value = $state("");
@@ -26,17 +30,28 @@
     function handleKeyDown(e: KeyboardEvent): void {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            send();
+            void send();
         }
     }
 
-    function send(): void {
+    async function send(): Promise<void> {
         const trimmed = value.trim();
-        if ((!trimmed && !attachment) || disabled) return;
-        onSend(trimmed, attachment ?? undefined);
+        const pendingAttachment = attachment ?? undefined;
+        if ((!trimmed && !pendingAttachment) || disabled || sending) return;
         value = "";
         clearAttachment();
         if (textareaEl) textareaEl.style.height = "auto";
+        await tick();
+        await waitForNextFrame();
+        void onSend(trimmed, pendingAttachment);
+    }
+
+    function waitForNextFrame(): Promise<void> {
+        return new Promise((resolve) => {
+            requestAnimationFrame(() => {
+                resolve();
+            });
+        });
     }
 
     function openFilePicker(): void {
@@ -150,6 +165,7 @@
             <button
                 class="chat-input__preview-remove"
                 onclick={clearAttachment}
+                disabled={disabled || sending}
                 title="Remove attachment"
                 aria-label="Remove attachment">✕</button
             >
@@ -193,7 +209,7 @@
                 title="Attach file"
                 aria-label="Attach file"
                 onclick={openFilePicker}
-                {disabled}>📎</button
+                disabled={disabled || sending}>📎</button
             >
             <button
                 class="chat-input__icon"
@@ -204,8 +220,12 @@
             {#if value.trim() || attachment}
                 <button
                     class="chat-input__send"
-                    onclick={send}
-                    disabled={(!value.trim() && !attachment) || disabled}
+                    onclick={() => {
+                        void send();
+                    }}
+                    disabled={(!value.trim() && !attachment) ||
+                        disabled ||
+                        sending}
                     aria-label="Send message"
                     title="Send (Enter)">↑</button
                 >

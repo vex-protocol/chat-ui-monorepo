@@ -87,6 +87,7 @@ export function ConversationScreen({
         setError("");
         setText("");
         setAttachment(null);
+        await waitForComposerPaint();
         try {
             let messageBody = content;
             if (pendingAttachment) {
@@ -305,6 +306,14 @@ export function ConversationScreen({
             />
         </KeyboardAvoidingView>
     );
+}
+
+function waitForComposerPaint(): Promise<void> {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            resolve();
+        });
+    });
 }
 
 const styles = StyleSheet.create({
