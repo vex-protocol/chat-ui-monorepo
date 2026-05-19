@@ -236,6 +236,27 @@ describe("encrypted file markdown", () => {
         ]);
     });
 
+    test("linkifies bare http urls", () => {
+        const nodes = parseMessageMarkdown(
+            "read https://example.com/post?id=1, then reply",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "read ", type: "text" },
+                    {
+                        text: "https://example.com/post?id=1",
+                        type: "link",
+                        url: "https://example.com/post?id=1",
+                    },
+                    { text: ", then reply", type: "text" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
     test("treats malformed bracket-heavy markdown as plain text", () => {
         const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
         expect(parseMessageMarkdown(text)).toEqual([

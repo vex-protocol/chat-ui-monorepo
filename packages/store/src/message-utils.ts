@@ -101,6 +101,7 @@ export function isImageType(contentType: string): boolean {
 const VEX_FILE_SCHEME = "vex-file://";
 
 const MESSAGE_EXTRA_VERSION = 1;
+const INLINE_BARE_URL_RE = /^https?:\/\/[^\s<>()\[\]{}"']+/i;
 
 export function applyMessageReactionEvent(
     messages: Message[],
@@ -478,8 +479,35 @@ function findNextMarkdownLink(
     return null;
 }
 
+function hasBalancedParens(value: string): boolean {
+    let balance = 0;
+    for (const char of value) {
+        if (char === "(") {
+            balance++;
+        } else if (char === ")") {
+            balance--;
+        }
+    }
+    return balance === 0;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function matchBareUrlAt(text: string, index: number): null | string {
+    const previous = text[index - 1];
+    if (
+        previous &&
+        /[A-Za-z0-9@._~:/?#\[\]@!$&'()*+,;=%-]/.test(previous)
+    ) {
+        return null;
+    }
+    const match = INLINE_BARE_URL_RE.exec(text.slice(index));
+    if (!match?.[0]) {
+        return null;
+    }
+    return trimInlineUrl(match[0]);
 }
 
 function normalizeMessageExtra(extra: MessageExtra): MessageExtra {
@@ -582,6 +610,19 @@ function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
                     }
                 }
             }
+        }
+
+        const bareUrl = matchBareUrlAt(text, index);
+        if (bareUrl) {
+            pushPlain(index);
+            pushSegment(segments, {
+                text: bareUrl,
+                type: "link",
+                url: bareUrl,
+            });
+            index += bareUrl.length;
+            cursor = index;
+            continue;
         }
 
         index++;
@@ -703,6 +744,18 @@ function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
         segments: parseInlineMarkdown(text),
         type: "text",
     });
+}
+
+function trimInlineUrl(value: string): string {
+    let next = value;
+    while (/[),.!?;:]$/.test(next)) {
+        const last = next.at(-1);
+        if (last === ")" && hasBalancedParens(next)) {
+            break;
+        }
+        next = next.slice(0, -1);
+    }
+    return next;
 }
 
 function unescapeMarkdownLabel(value: string): string {

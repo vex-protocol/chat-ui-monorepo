@@ -45,6 +45,7 @@ import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
 import { InvitePreviewCard } from "./InvitePreviewCard";
+import { LinkPreviewCard } from "./LinkPreviewCard";
 
 interface MessageBubbleRNProps {
     authorName: string;
@@ -285,6 +286,9 @@ export function MessageBubbleRN({
                                 inviteID={inviteID}
                                 isOwn={isOwn}
                             />
+                        ) : null}
+                        {!inviteID ? (
+                            <LinkPreviewCard content={message.message} />
                         ) : null}
                         {reactions.length > 0 ? (
                             <ReactionRow
