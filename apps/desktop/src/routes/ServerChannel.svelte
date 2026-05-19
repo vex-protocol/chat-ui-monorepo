@@ -102,7 +102,8 @@
 
     <ChatInput
         onSend={handleSend}
-        disabled={sending}
+        disabled={!$user}
+        {sending}
         placeholder="Message #{channelName}"
     />
 </div>

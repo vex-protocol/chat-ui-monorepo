@@ -93,7 +93,7 @@
 
     <ChatInput
         onSend={handleSend}
-        disabled={sending}
+        {sending}
         placeholder="Send a direct message…"
     />
 </div>

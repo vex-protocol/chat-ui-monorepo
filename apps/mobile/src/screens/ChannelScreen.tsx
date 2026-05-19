@@ -252,6 +252,7 @@ export function ChannelScreen({
         setSendError("");
         setText("");
         setAttachment(null);
+        await waitForComposerPaint();
         try {
             let messageBody = content;
             if (pendingAttachment) {
@@ -552,6 +553,14 @@ export function ChannelScreen({
             )}
         </KeyboardAvoidingView>
     );
+}
+
+function waitForComposerPaint(): Promise<void> {
+    return new Promise((resolve) => {
+        requestAnimationFrame(() => {
+            resolve();
+        });
+    });
 }
 
 const styles = StyleSheet.create({
