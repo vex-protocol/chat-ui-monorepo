@@ -420,7 +420,7 @@ export function SettingsSectionScreen({
                     onPress: () => {
                         void installApkUpdate();
                     },
-                    text: "Download",
+                    text: "Install APK",
                 },
             ],
         );
@@ -519,7 +519,7 @@ export function SettingsSectionScreen({
     function updateActionLabel(): string {
         switch (appUpdateState.status) {
             case "apk_available":
-                return "Install";
+                return "Install APK";
             case "apk_downloading":
                 return appUpdateState.apkDownloadProgress != null
                     ? `${String(
@@ -529,7 +529,7 @@ export function SettingsSectionScreen({
             case "checking":
                 return "Checking";
             case "ota_available":
-                return "Download";
+                return "Install OTA";
             case "ota_ready":
                 return "Restart";
             default:
