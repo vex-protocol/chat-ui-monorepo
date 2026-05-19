@@ -36,6 +36,14 @@ export type MessageMarkdownNode =
       }
     | { segments: MarkdownInlineSegment[]; type: "text" };
 
+interface MarkdownLinkMatch {
+    end: number;
+    image: boolean;
+    label: string;
+    start: number;
+    url: string;
+}
+
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
@@ -58,7 +66,6 @@ export function isImageType(contentType: string): boolean {
 // ── File attachment parsing ──────────────────────────────────────────────────
 
 const VEX_FILE_SCHEME = "vex-file://";
-const VEX_FILE_MARKDOWN_RE = /(!?)\[((?:\\.|[^\]\\\n])*)\]\(([^)\n]+)\)/g;
 
 export function formatFileAttachmentMarkdown(
     attachment: EncryptedFileAttachment,
@@ -102,27 +109,29 @@ export function parseFileExtra(extra: null | string): FileAttachment | null {
 export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
     const nodes: MessageMarkdownNode[] = [];
     let cursor = 0;
-    VEX_FILE_MARKDOWN_RE.lastIndex = 0;
+    let searchStart = 0;
 
-    for (const match of content.matchAll(VEX_FILE_MARKDOWN_RE)) {
-        const fullMatch = match[0] ?? "";
-        const matchIndex = match.index ?? 0;
-        const url = match[3] ?? "";
-        const attachment = parseVexFileUrl(url);
+    while (searchStart < content.length) {
+        const match = findNextMarkdownLink(content, searchStart);
+        if (!match) {
+            break;
+        }
+
+        const attachment = parseVexFileUrl(match.url);
         if (!attachment) {
+            searchStart = match.end;
             continue;
         }
 
-        pushTextNode(nodes, content.slice(cursor, matchIndex));
-        const alt = unescapeMarkdownLabel(match[2] ?? "");
+        pushTextNode(nodes, content.slice(cursor, match.start));
         nodes.push({
-            alt,
+            alt: match.label,
             attachment,
-            image:
-                (match[1] ?? "") === "!" || isImageType(attachment.contentType),
+            image: match.image || isImageType(attachment.contentType),
             type: "attachment",
         });
-        cursor = matchIndex + fullMatch.length;
+        cursor = match.end;
+        searchStart = match.end;
     }
 
     pushTextNode(nodes, content.slice(cursor));
@@ -179,6 +188,9 @@ function findMarkdownLabelEnd(source: string, start: number): number {
     let escaped = false;
     for (let index = start; index < source.length; index++) {
         const char = source[index];
+        if (char === "\n") {
+            return -1;
+        }
         if (escaped) {
             escaped = false;
             continue;
@@ -192,6 +204,68 @@ function findMarkdownLabelEnd(source: string, start: number): number {
         }
     }
     return -1;
+}
+
+function findMarkdownLinkEnd(source: string, start: number): number {
+    for (let index = start; index < source.length; index++) {
+        const char = source[index];
+        if (char === "\n") {
+            return -1;
+        }
+        if (char === ")") {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function findNextMarkdownLink(
+    source: string,
+    start: number,
+): MarkdownLinkMatch | null {
+    let index = start;
+    while (index < source.length) {
+        const char = source[index];
+        const image = char === "!" && source[index + 1] === "[";
+        const open = image ? index + 1 : char === "[" ? index : -1;
+        if (open === -1) {
+            index++;
+            continue;
+        }
+
+        const labelEnd = findMarkdownLabelEnd(source, open + 1);
+        if (labelEnd === -1) {
+            index = open + 1;
+            continue;
+        }
+        if (source[labelEnd + 1] !== "(") {
+            index = labelEnd + 1;
+            continue;
+        }
+
+        const urlStart = labelEnd + 2;
+        const urlEnd = findMarkdownLinkEnd(source, urlStart);
+        if (urlEnd === -1) {
+            index = urlStart;
+            continue;
+        }
+
+        const url = source.slice(urlStart, urlEnd).trim();
+        if (!url) {
+            index = urlEnd + 1;
+            continue;
+        }
+
+        return {
+            end: urlEnd + 1,
+            image,
+            label: unescapeMarkdownLabel(source.slice(open + 1, labelEnd)),
+            start: image ? index : open,
+            url,
+        };
+    }
+
+    return null;
 }
 
 function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {

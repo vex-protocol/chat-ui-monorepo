@@ -226,6 +226,16 @@ describe("encrypted file markdown", () => {
             },
         ]);
     });
+
+    test("treats malformed bracket-heavy markdown as plain text", () => {
+        const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
+        expect(parseMessageMarkdown(text)).toEqual([
+            {
+                segments: [{ text, type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
 });
 
 // ── chunkMessages ───────────────────────────────────────────────────────────
