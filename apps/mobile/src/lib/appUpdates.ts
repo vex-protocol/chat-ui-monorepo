@@ -404,6 +404,13 @@ function isNativeReleaseNewer(
     ) {
         return false;
     }
+    if (
+        latestCommit != null &&
+        release.targetCommit != null &&
+        !sameCommit(release.targetCommit, latestCommit.sha)
+    ) {
+        return false;
+    }
 
     const releaseFingerprint = normalizeFingerprint(release.fingerprint);
     const buildFingerprint = normalizeFingerprint(buildInfo.fingerprint);
