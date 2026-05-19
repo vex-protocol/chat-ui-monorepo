@@ -1,8 +1,10 @@
+import type { PickedAttachment } from "../lib/attachments";
 import type { AppScreenProps } from "../navigation/types";
 import type { Message } from "@vex-chat/libvex";
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
+    Alert,
     FlatList,
     KeyboardAvoidingView,
     Platform,
@@ -11,7 +13,12 @@ import {
     View,
 } from "react-native";
 
-import { $messages, $user, vexService } from "@vex-chat/store";
+import {
+    $messages,
+    $user,
+    formatFileAttachmentMarkdown,
+    vexService,
+} from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -20,6 +27,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { pickFileAttachment, pickImageAttachment } from "../lib/attachments";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -53,6 +61,7 @@ export function ConversationScreen({
     );
 
     const [text, setText] = useState("");
+    const [attachment, setAttachment] = useState<null | PickedAttachment>(null);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState("");
     const sendInFlightRef = useRef(false);
@@ -60,23 +69,95 @@ export function ConversationScreen({
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
-        if (!content || !user || sendInFlightRef.current) return;
+        const pendingAttachment = attachment;
+        if (
+            (!content && !pendingAttachment) ||
+            !user ||
+            sendInFlightRef.current
+        ) {
+            return;
+        }
         sendInFlightRef.current = true;
         setSending(true);
-        setText("");
         setError("");
         try {
-            const result = await vexService.sendDM(userID, content);
+            let messageBody = content;
+            if (pendingAttachment) {
+                const uploaded = await vexService.uploadFileAttachment({
+                    contentType: pendingAttachment.contentType,
+                    data: pendingAttachment.data,
+                    fileName: pendingAttachment.fileName,
+                    fileSize: pendingAttachment.fileSize,
+                });
+                if (!uploaded.ok || !uploaded.attachment) {
+                    setError(uploaded.error ?? "Failed to upload attachment");
+                    return;
+                }
+                const attachmentMarkdown = formatFileAttachmentMarkdown(
+                    uploaded.attachment,
+                );
+                messageBody = messageBody
+                    ? `${messageBody}\n\n${attachmentMarkdown}`
+                    : attachmentMarkdown;
+            }
+
+            const result = await vexService.sendDM(userID, messageBody);
             if (!result.ok) {
                 setError(result.error ?? "Failed to send");
+                return;
             }
+            setAttachment(null);
+            setText("");
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : "Failed to send");
         } finally {
             sendInFlightRef.current = false;
             setSending(false);
         }
-    }, [text, user, userID, sendInFlightRef]);
+    }, [attachment, text, user, userID, sendInFlightRef]);
+
+    const handlePickAttachment = useCallback(
+        (kind: "file" | "image") => {
+            void (async () => {
+                setError("");
+                try {
+                    const picked =
+                        kind === "image"
+                            ? await pickImageAttachment()
+                            : await pickFileAttachment();
+                    if (picked) {
+                        setAttachment(picked);
+                    }
+                } catch (err: unknown) {
+                    setError(
+                        err instanceof Error
+                            ? err.message
+                            : "Could not attach file",
+                    );
+                }
+            })();
+        },
+        [setAttachment],
+    );
+
+    const openAttachmentMenu = useCallback(() => {
+        if (sending) return;
+        Alert.alert("Attach", "Choose something to send.", [
+            {
+                onPress: () => {
+                    handlePickAttachment("image");
+                },
+                text: "Photo",
+            },
+            {
+                onPress: () => {
+                    handlePickAttachment("file");
+                },
+                text: "File",
+            },
+            { style: "cancel", text: "Cancel" },
+        ]);
+    }, [handlePickAttachment, sending]);
 
     const deleteMessage = useCallback(
         (message: Message) => {
@@ -147,8 +228,13 @@ export function ConversationScreen({
             )}
 
             <MessageInputBar
+                attachment={attachment}
                 bottomInset={insets.bottom}
+                onAttachPress={openAttachmentMenu}
                 onChangeText={setText}
+                onRemoveAttachment={() => {
+                    setAttachment(null);
+                }}
                 onSend={() => void sendMessage()}
                 placeholder={`Message @${username}`}
                 sending={sending}

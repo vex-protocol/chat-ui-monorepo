@@ -1,3 +1,4 @@
+import type { EncryptedFileAttachment } from "./message-utils.ts";
 /**
  * VexService — the sole gateway between UI components and the Vex protocol.
  *
@@ -943,6 +944,26 @@ class VexService {
         }
     }
 
+    async downloadFileAttachment(
+        attachment: EncryptedFileAttachment,
+    ): Promise<OperationResult & { data?: Uint8Array }> {
+        try {
+            const client = this.requireClient();
+            const file = await client.files.retrieve(
+                attachment.fileID,
+                attachment.key,
+            );
+            if (!file) {
+                return { error: "File not found.", ok: false };
+            }
+            return { data: new Uint8Array(file.data), ok: true };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    // ── Channel operations ──────────────────────────────────────────────
+
     /**
      * Finish a passkey-registration ceremony. Persists the new
      * authenticator on spire and returns the public passkey shape
@@ -961,8 +982,6 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
-
-    // ── Channel operations ──────────────────────────────────────────────
 
     /**
      * Finish a passkey authentication ceremony. Stage two of the
@@ -1031,6 +1050,8 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
+    // ── Messaging ───────────────────────────────────────────────────────
+
     /** Effective local retention cap (defaults to 30 when signed out). */
     getLocalMessageRetentionDays(): number {
         const c = this.client as unknown as {
@@ -1042,8 +1063,6 @@ class VexService {
         }
         return $localMessageRetentionDaysWritable.get();
     }
-
-    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -1358,12 +1377,12 @@ class VexService {
         }
     }
 
+    // ── User operations ─────────────────────────────────────────────────
+
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
-
-    // ── User operations ─────────────────────────────────────────────────
 
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
@@ -1944,40 +1963,31 @@ class VexService {
             return { ok: true };
         } catch (err: unknown) {
             const message = errorMessage(err);
-            const looksLikeReactNativeBlobError =
-                message.includes("ArrayBuffer") &&
-                message.includes("ArrayBufferView") &&
-                message.includes("Blob");
-            if (looksLikeReactNativeBlobError) {
+            if (looksLikeReactNativeBlobError(message)) {
                 // React Native/Hermes can reject Blob(ArrayBufferView) construction.
                 // libvex has a built-in JSON/base64 upload fallback that is used
                 // when FormData is unavailable, so temporarily disable FormData
                 // for this call and retry through that code path.
-                const globalWithFormData = globalThis as {
-                    FormData?: unknown;
-                };
-                const originalFormData = globalWithFormData.FormData;
                 try {
-                    globalWithFormData.FormData = undefined;
-                    const client = this.requireClient();
-                    await client.me.setAvatar(data);
-                    bumpVersionForCurrentUser();
+                    await runWithFormDataDisabled(async () => {
+                        const client = this.requireClient();
+                        await client.me.setAvatar(data);
+                        bumpVersionForCurrentUser();
+                    });
                     return { ok: true };
                 } catch (retryErr: unknown) {
                     return { error: errorMessage(retryErr), ok: false };
-                } finally {
-                    globalWithFormData.FormData = originalFormData;
                 }
             }
             return { error: errorMessage(err), ok: false };
         }
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     setBackgroundConnectionRecoverySuspended(suspended: boolean): void {
         this.backgroundConnectionRecoverySuspended = suspended;
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     /**
      * Updates the local message retention preference (1–30 days) and
@@ -2010,11 +2020,11 @@ class VexService {
         this.attachWebsocketDebug();
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
-
     setWebsocketStateDebug(enabled: boolean): void {
         this.wsDebugStateLogsEnabled = enabled;
     }
+
+    // ── Lifecycle ───────────────────────────────────────────────────────
 
     async subscribePushNotifications(
         input: PushNotificationSubscriptionInput,
@@ -2079,6 +2089,41 @@ class VexService {
                 "/notifications/subscriptions/" +
                 subscriptionID,
         );
+    }
+
+    async uploadFileAttachment(input: {
+        contentType: string;
+        data: Uint8Array;
+        fileName: string;
+        fileSize?: number;
+    }): Promise<OperationResult & { attachment?: EncryptedFileAttachment }> {
+        const upload = async (): Promise<EncryptedFileAttachment> => {
+            const client = this.requireClient();
+            const [details, key] = await client.files.create(input.data);
+            return {
+                contentType: input.contentType || "application/octet-stream",
+                fileID: details.fileID,
+                fileName: input.fileName,
+                fileSize: input.fileSize ?? input.data.byteLength,
+                key,
+            };
+        };
+
+        try {
+            const attachment = await upload();
+            return { attachment, ok: true };
+        } catch (err: unknown) {
+            const message = errorMessage(err);
+            if (looksLikeReactNativeBlobError(message)) {
+                try {
+                    const attachment = await runWithFormDataDisabled(upload);
+                    return { attachment, ok: true };
+                } catch (retryErr: unknown) {
+                    return { error: errorMessage(retryErr), ok: false };
+                }
+            }
+            return { error: message, ok: false };
+        }
     }
 
     private attachWebsocketDebug(): void {
@@ -3845,6 +3890,15 @@ function jwtExpToEpochMs(exp: number): number {
     return exp > 1_000_000_000_000 ? exp : exp * 1000;
 }
 
+function looksLikeReactNativeBlobError(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return (
+        normalized.includes("arraybuffer") &&
+        normalized.includes("arraybufferview") &&
+        normalized.includes("blob")
+    );
+}
+
 function parseNotificationSubscription(
     value: unknown,
 ): NotificationSubscriptionLike {
@@ -3876,6 +3930,19 @@ function readErrorField(body: unknown): null | string {
         }
     }
     return null;
+}
+
+async function runWithFormDataDisabled<T>(fn: () => Promise<T>): Promise<T> {
+    const globalWithFormData = globalThis as {
+        FormData?: unknown;
+    };
+    const originalFormData = globalWithFormData.FormData;
+    try {
+        globalWithFormData.FormData = undefined;
+        return await fn();
+    } finally {
+        globalWithFormData.FormData = originalFormData;
+    }
 }
 
 function shouldDebugAuth(): boolean {

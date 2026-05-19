@@ -1,9 +1,18 @@
 import type { Message } from "@vex-chat/libvex";
-import type { GestureResponderEvent } from "react-native";
+import type {
+    EncryptedFileAttachment,
+    MarkdownInlineSegment,
+    MessageMarkdownNode,
+} from "@vex-chat/store";
+import type { GestureResponderEvent, TextStyle } from "react-native";
 
 import React from "react";
 import {
+    ActivityIndicator,
+    Alert,
     Clipboard,
+    Image,
+    Linking,
     Modal,
     Pressable,
     StyleSheet,
@@ -12,9 +21,21 @@ import {
     View,
 } from "react-native";
 
-import { extractInviteID, formatTime } from "@vex-chat/store";
+import {
+    applyEmoji,
+    extractInviteID,
+    formatFileSize,
+    formatTime,
+    isImageType,
+    parseMessageMarkdown,
+    vexService,
+} from "@vex-chat/store";
 
-import { colors, typography } from "../theme";
+import { Ionicons } from "@expo/vector-icons";
+import * as Sharing from "expo-sharing";
+
+import { bytesToBase64, writeAttachmentToCache } from "../lib/attachments";
+import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
 import { InvitePreviewCard } from "./InvitePreviewCard";
@@ -40,6 +61,10 @@ export function MessageBubbleRN({
     const [menuY, setMenuY] = React.useState(0);
     const inviteID = React.useMemo(
         () => extractInviteID(message.message),
+        [message.message],
+    );
+    const markdownNodes = React.useMemo(
+        () => parseMessageMarkdown(message.message),
         [message.message],
     );
 
@@ -203,14 +228,10 @@ export function MessageBubbleRN({
                                 </Text>
                             </View>
                         )}
-                        <Text
-                            style={[
-                                styles.text,
-                                !showIdentity && styles.textGrouped,
-                            ]}
-                        >
-                            {message.message}
-                        </Text>
+                        <MarkdownMessage
+                            grouped={!showIdentity}
+                            nodes={markdownNodes}
+                        />
                         {inviteID ? (
                             <InvitePreviewCard
                                 inviteID={inviteID}
@@ -224,11 +245,298 @@ export function MessageBubbleRN({
     );
 }
 
+function AttachmentPreview({
+    attachment,
+    image,
+}: {
+    attachment: EncryptedFileAttachment;
+    image: boolean;
+}) {
+    const shouldRenderImage = image || isImageType(attachment.contentType);
+    const [error, setError] = React.useState("");
+    const [imageUri, setImageUri] = React.useState<null | string>(null);
+    const [opening, setOpening] = React.useState(false);
+    const [previewLoading, setPreviewLoading] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!shouldRenderImage) {
+            setImageUri(null);
+            setPreviewLoading(false);
+            setError("");
+            return;
+        }
+
+        let cancelled = false;
+        setImageUri(null);
+        setPreviewLoading(true);
+        setError("");
+        void fetchAttachmentData(attachment)
+            .then((data) => {
+                if (cancelled) return;
+                setImageUri(
+                    `data:${attachment.contentType};base64,${bytesToBase64(
+                        data,
+                    )}`,
+                );
+            })
+            .catch((err: unknown) => {
+                if (cancelled) return;
+                setError(
+                    err instanceof Error ? err.message : "Could not load file",
+                );
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setPreviewLoading(false);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [attachment, shouldRenderImage]);
+
+    const openAttachment = React.useCallback(async () => {
+        if (opening) return;
+        setOpening(true);
+        setError("");
+        try {
+            const data = await fetchAttachmentData(attachment);
+            const uri = await writeAttachmentToCache(attachment, data);
+            const available = await Sharing.isAvailableAsync();
+            if (!available) {
+                Alert.alert("Downloaded", attachment.fileName);
+                return;
+            }
+            await Sharing.shareAsync(uri, {
+                dialogTitle: attachment.fileName,
+                mimeType: attachment.contentType,
+            });
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Could not open file";
+            setError(message);
+            Alert.alert("Could not open file", message);
+        } finally {
+            setOpening(false);
+        }
+    }, [attachment, opening]);
+
+    if (shouldRenderImage) {
+        return (
+            <Pressable
+                accessibilityRole="button"
+                onPress={() => void openAttachment()}
+                style={({ pressed }) => [
+                    styles.imageAttachment,
+                    pressed && styles.attachmentPressed,
+                ]}
+            >
+                {previewLoading ? (
+                    <View style={styles.imageLoading}>
+                        <ActivityIndicator
+                            color={colors.textSecondary}
+                            size="small"
+                        />
+                    </View>
+                ) : imageUri ? (
+                    <Image
+                        resizeMode="cover"
+                        source={{ uri: imageUri }}
+                        style={styles.imageAttachmentMedia}
+                    />
+                ) : (
+                    <View style={styles.imageLoading}>
+                        <Ionicons
+                            color={colors.muted}
+                            name="image-outline"
+                            size={24}
+                        />
+                        <Text numberOfLines={2} style={styles.attachmentError}>
+                            {error || "Image unavailable"}
+                        </Text>
+                    </View>
+                )}
+                <View style={styles.attachmentCaption}>
+                    <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.fileName}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                        {formatFileSize(attachment.fileSize)}
+                    </Text>
+                </View>
+            </Pressable>
+        );
+    }
+
+    return (
+        <Pressable
+            accessibilityRole="button"
+            onPress={() => void openAttachment()}
+            style={({ pressed }) => [
+                styles.fileAttachment,
+                pressed && styles.attachmentPressed,
+            ]}
+        >
+            <View style={styles.fileAttachmentIcon}>
+                {opening ? (
+                    <ActivityIndicator
+                        color={colors.textSecondary}
+                        size="small"
+                    />
+                ) : (
+                    <Ionicons
+                        color={colors.textSecondary}
+                        name="document-text-outline"
+                        size={20}
+                    />
+                )}
+            </View>
+            <View style={styles.fileAttachmentMeta}>
+                <Text numberOfLines={1} style={styles.attachmentName}>
+                    {attachment.fileName}
+                </Text>
+                <Text style={styles.attachmentSize}>
+                    {formatFileSize(attachment.fileSize)}
+                </Text>
+                {error ? (
+                    <Text numberOfLines={1} style={styles.attachmentError}>
+                        {error}
+                    </Text>
+                ) : null}
+            </View>
+            <Ionicons color={colors.muted} name="download-outline" size={18} />
+        </Pressable>
+    );
+}
+
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
 
+async function fetchAttachmentData(
+    attachment: EncryptedFileAttachment,
+): Promise<Uint8Array> {
+    const result = await vexService.downloadFileAttachment(attachment);
+    if (!result.ok || !result.data) {
+        throw new Error(result.error ?? "Could not download file");
+    }
+    return result.data;
+}
+
+function inlineSegmentStyle(segment: MarkdownInlineSegment): null | TextStyle {
+    switch (segment.type) {
+        case "code":
+            return styles.inlineCode;
+        case "emphasis":
+            return styles.inlineEmphasis;
+        case "link":
+            return styles.inlineLink;
+        case "strong":
+            return styles.inlineStrong;
+        case "text":
+            return null;
+    }
+}
+
+function MarkdownMessage({
+    grouped,
+    nodes,
+}: {
+    grouped: boolean;
+    nodes: MessageMarkdownNode[];
+}) {
+    return (
+        <View style={styles.markdownStack}>
+            {nodes.map((node, index) => {
+                if (node.type === "text") {
+                    return (
+                        <MarkdownText
+                            grouped={grouped && index === 0}
+                            key={`text-${String(index)}`}
+                            segments={node.segments}
+                        />
+                    );
+                }
+                return (
+                    <AttachmentPreview
+                        attachment={node.attachment}
+                        image={node.image}
+                        key={`${node.attachment.fileID}-${String(index)}`}
+                    />
+                );
+            })}
+        </View>
+    );
+}
+
+function MarkdownText({
+    grouped,
+    segments,
+}: {
+    grouped: boolean;
+    segments: MarkdownInlineSegment[];
+}) {
+    return (
+        <Text style={[styles.text, grouped && styles.textGrouped]}>
+            {segments.map((segment, index) => (
+                <Text
+                    key={`${segment.type}-${String(index)}`}
+                    onPress={
+                        segment.type === "link"
+                            ? () => {
+                                  void Linking.openURL(segment.url).catch(
+                                      () => {
+                                          Alert.alert(
+                                              "Could not open link",
+                                              segment.url,
+                                          );
+                                      },
+                                  );
+                              }
+                            : undefined
+                    }
+                    style={inlineSegmentStyle(segment)}
+                >
+                    {segment.type === "code"
+                        ? segment.text
+                        : applyEmoji(segment.text)}
+                </Text>
+            ))}
+        </Text>
+    );
+}
+
 const styles = StyleSheet.create({
+    attachmentCaption: {
+        backgroundColor: "rgba(0,0,0,0.62)",
+        bottom: 0,
+        gap: 1,
+        left: 0,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        position: "absolute",
+        right: 0,
+    },
+    attachmentError: {
+        ...typography.body,
+        color: colors.error,
+        fontSize: 11,
+    },
+    attachmentName: {
+        ...typography.body,
+        color: colors.textSecondary,
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    attachmentPressed: {
+        opacity: 0.82,
+    },
+    attachmentSize: {
+        ...typography.body,
+        color: colors.muted,
+        fontSize: 11,
+    },
     author: {
         ...typography.body,
         color: colors.textSecondary,
@@ -252,6 +560,72 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+    },
+    fileAttachment: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.045)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 10,
+        marginTop: 6,
+        maxWidth: 360,
+        padding: 10,
+    },
+    fileAttachmentIcon: {
+        alignItems: "center",
+        backgroundColor: colors.input,
+        borderColor: colors.borderSubtle,
+        borderRadius: 6,
+        borderWidth: 1,
+        height: 38,
+        justifyContent: "center",
+        width: 38,
+    },
+    fileAttachmentMeta: {
+        flex: 1,
+        minWidth: 0,
+    },
+    imageAttachment: {
+        backgroundColor: colors.input,
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        height: 220,
+        marginTop: 6,
+        maxWidth: 360,
+        overflow: "hidden",
+        width: "100%",
+    },
+    imageAttachmentMedia: {
+        height: "100%",
+        width: "100%",
+    },
+    imageLoading: {
+        alignItems: "center",
+        flex: 1,
+        gap: 8,
+        justifyContent: "center",
+        padding: 16,
+    },
+    inlineCode: {
+        backgroundColor: "rgba(255,255,255,0.08)",
+        color: colors.textSecondary,
+        fontFamily: fontFamilies.mono,
+    },
+    inlineEmphasis: {
+        fontStyle: "italic",
+    },
+    inlineLink: {
+        color: "#8AB4FF",
+        textDecorationLine: "underline",
+    },
+    inlineStrong: {
+        fontWeight: "700",
+    },
+    markdownStack: {
+        gap: 2,
     },
     menuBackdrop: {
         ...StyleSheet.absoluteFill,

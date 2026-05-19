@@ -62,11 +62,11 @@ jobs:
                       exit 0
                   fi
 
-                  echo "${json}" | jq -e 'if type == "array" then . else error("payload must be array") end' > /dev/null
+                  compact_json="$(echo "${json}" | jq -c 'if type == "array" then . else error("payload must be array") end')"
 
                   {
                       echo "has_packages=true"
-                      echo "packages_json=${json}"
+                      echo "packages_json=${compact_json}"
                   } >> "${GITHUB_OUTPUT}"
 
             - name: Stop when no matching package updates
