@@ -5,15 +5,14 @@
     } from "@vex-chat/store";
 
     import {
-        applyEmoji,
         formatFileSize,
         parseMessageMarkdown,
         vexService,
     } from "@vex-chat/store";
 
-    import { openUrl } from "@tauri-apps/plugin-opener";
-
     import { renderCodeBlock, renderContent } from "./utils/messages.js";
+
+    type MessageTextNode = Extract<MessageMarkdownNode, { type: "text" }>;
 
     let { content }: { content: string } = $props();
     const nodes = $derived(parseMessageMarkdown(content));
@@ -23,26 +22,6 @@
 
     let attachmentError = $state("");
     let downloadingFileID = $state<null | string>(null);
-
-    function openInlineLink(url: string): void {
-        const safeUrl = normalizeExternalUrl(url);
-        if (!safeUrl) {
-            return;
-        }
-        openUrl(safeUrl).catch(console.error);
-    }
-
-    function normalizeExternalUrl(url: string): null | string {
-        try {
-            const parsed = new URL(url);
-            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-                return null;
-            }
-            return parsed.toString();
-        } catch {
-            return null;
-        }
-    }
 
     async function downloadAttachment(
         attachment: EncryptedFileAttachment,
@@ -86,6 +65,12 @@
         }
         return `${node.type}:${index.toString()}`;
     }
+
+    function textNodeSource(node: MessageTextNode): string {
+        return (
+            node.source ?? node.segments.map((segment) => segment.text).join("")
+        );
+    }
 </script>
 
 {#if !hasAttachments}
@@ -94,29 +79,10 @@
 {:else}
     {#each nodes as node, index (nodeKey(node, index))}
         {#if node.type === "text"}
-            <span class="message-content__text">
-                {#each node.segments as segment, segmentIndex (`${segment.type}:${segmentIndex.toString()}`)}
-                    {#if segment.type === "code"}
-                        <code>{segment.text}</code>
-                    {:else if segment.type === "emphasis"}
-                        <em>{applyEmoji(segment.text)}</em>
-                    {:else if segment.type === "strong"}
-                        <strong>{applyEmoji(segment.text)}</strong>
-                    {:else if segment.type === "link"}
-                        <button
-                            class="message-content__link"
-                            type="button"
-                            onclick={() => {
-                                openInlineLink(segment.url);
-                            }}
-                        >
-                            {applyEmoji(segment.text)}
-                        </button>
-                    {:else}
-                        {applyEmoji(segment.text)}
-                    {/if}
-                {/each}
-            </span>
+            <div class="message-content__text">
+                <!-- eslint-disable-next-line svelte/no-at-html-tags -- DOMPurify-sanitized in renderContent() -->
+                {@html renderContent(textNodeSource(node))}
+            </div>
         {:else if node.type === "codeBlock"}
             <!-- eslint-disable-next-line svelte/no-at-html-tags -- highlight.js escapes code content -->
             {@html renderCodeBlock(node.code, node.language)}
@@ -148,19 +114,7 @@
 
 <style>
     .message-content__text {
-        white-space: pre-wrap;
-    }
-
-    .message-content__link {
-        display: inline;
-        margin: 0;
-        padding: 0;
-        border: 0;
-        background: transparent;
-        color: var(--accent);
-        cursor: pointer;
-        font: inherit;
-        text-decoration: underline;
+        display: contents;
     }
 
     .message-content__file {

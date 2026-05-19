@@ -317,6 +317,12 @@ interface NotificationSubscriptionLike {
     subscriptionID: string;
 }
 
+interface PendingReactionMessage {
+    attempts: number;
+    message: Message;
+    queuedAt: number;
+}
+
 interface ServerChannelBootstrapLike {
     channelsByServer: Record<string, Channel[]>;
     servers: Server[];
@@ -351,6 +357,10 @@ const WS_WATCHDOG_STALE_THRESHOLD_MS = 45_000;
 // is treated as stale → full reconnect.
 const WS_FRESH_FRAME_THRESHOLD_MS = 12_000;
 const MAX_PROCESSED_REACTION_MAIL_IDS = 2_000;
+const MAX_PENDING_REACTION_CONVERSATIONS = 100;
+const MAX_PENDING_REACTION_MESSAGES_PER_CONVERSATION = 200;
+const MAX_PENDING_REACTION_APPLY_ATTEMPTS = 20;
+const PENDING_REACTION_MESSAGE_TTL_MS = 5 * 60 * 1000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -403,7 +413,7 @@ class VexService {
     private pendingRateLimitNotice = false;
     private readonly pendingReactionMessages = new Map<
         string,
-        Map<string, Message>
+        Map<string, PendingReactionMessage>
     >();
     /**
      * When true, {@link runPopulateStateBody} stops scheduling more history
@@ -2242,8 +2252,18 @@ class VexService {
         }
 
         let thread = writable.get()[conversationKey] ?? [];
-        for (const [mailID, msg] of pending) {
+        const now = Date.now();
+        for (const [mailID, pendingReaction] of pending) {
+            const msg = pendingReaction.message;
             if (this.processedReactionMailIDs.has(mailID)) {
+                pending.delete(mailID);
+                continue;
+            }
+            if (
+                now - pendingReaction.queuedAt >
+                    PENDING_REACTION_MESSAGE_TTL_MS ||
+                pendingReaction.attempts >= MAX_PENDING_REACTION_APPLY_ATTEMPTS
+            ) {
                 pending.delete(mailID);
                 continue;
             }
@@ -2258,6 +2278,7 @@ class VexService {
                 msg.authorID,
             );
             if (nextThread === thread) {
+                pendingReaction.attempts += 1;
                 continue;
             }
             thread = nextThread;
@@ -2823,7 +2844,17 @@ class VexService {
             pending = new Map();
             this.pendingReactionMessages.set(conversationKey, pending);
         }
-        pending.set(msg.mailID, msg);
+        pending.delete(msg.mailID);
+        pending.set(msg.mailID, {
+            attempts: 0,
+            message: msg,
+            queuedAt: Date.now(),
+        });
+        trimMapStart(pending, MAX_PENDING_REACTION_MESSAGES_PER_CONVERSATION);
+        trimMapStart(
+            this.pendingReactionMessages,
+            MAX_PENDING_REACTION_CONVERSATIONS,
+        );
     }
 
     private async recoverConnection(
@@ -4204,6 +4235,19 @@ function shouldDebugAuth(): boolean {
         process?: { env?: Record<string, string | undefined> };
     };
     return p.process?.env?.["VEX_DEBUG_AUTH"] === "1";
+}
+
+function trimMapStart<TKey, TValue>(
+    map: Map<TKey, TValue>,
+    maxSize: number,
+): void {
+    while (map.size > maxSize) {
+        const first = map.keys().next();
+        if (first.done) {
+            return;
+        }
+        map.delete(first.value);
+    }
 }
 
 function waitMs(ms: number): Promise<void> {
