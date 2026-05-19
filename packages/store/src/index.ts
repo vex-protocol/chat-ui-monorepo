@@ -61,12 +61,21 @@ export {
     applyEmoji,
     avatarHue,
     chunkMessages,
+    formatFileAttachmentMarkdown,
     formatFileSize,
     formatTime,
     isImageType,
     parseFileExtra,
+    parseMessageMarkdown,
+    parseVexFileUrl,
 } from "./message-utils.ts";
-export type { FileAttachment, MessageChunk } from "./message-utils.ts";
+export type {
+    EncryptedFileAttachment,
+    FileAttachment,
+    MarkdownInlineSegment,
+    MessageChunk,
+    MessageMarkdownNode,
+} from "./message-utils.ts";
 
 export {
     formatDmNotificationSubtitle,

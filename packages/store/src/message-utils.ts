@@ -1,21 +1,50 @@
 import type { Message } from "@vex-chat/libvex";
 
-// ── Avatar hue ───────────────────────────────────────────────────────────────
+// ── File attachment markdown ─────────────────────────────────────────────────
+
+export interface EncryptedFileAttachment extends FileAttachment {
+    key: string;
+}
 
 export interface FileAttachment {
     contentType: string;
     fileID: string;
     fileName: string;
     fileSize: number;
+    key?: string | undefined;
 }
 
-// ── File attachment parsing ──────────────────────────────────────────────────
+export type MarkdownInlineSegment =
+    | { text: string; type: "code" }
+    | { text: string; type: "emphasis" }
+    | { text: string; type: "link"; url: string }
+    | { text: string; type: "strong" }
+    | { text: string; type: "text" };
 
 export interface MessageChunk {
     authorID: string;
     firstTime: string;
     messages: Message[];
 }
+
+export type MessageMarkdownNode =
+    | {
+          alt: string;
+          attachment: EncryptedFileAttachment;
+          image: boolean;
+          type: "attachment";
+      }
+    | { segments: MarkdownInlineSegment[]; type: "text" };
+
+interface MarkdownLinkMatch {
+    end: number;
+    image: boolean;
+    label: string;
+    start: number;
+    url: string;
+}
+
+// ── Avatar hue ───────────────────────────────────────────────────────────────
 
 /** Deterministic hue (0–359) from any string (userID, serverID, etc.) for avatar backgrounds. */
 export function avatarHue(id: string): number {
@@ -34,7 +63,28 @@ export function isImageType(contentType: string): boolean {
     return contentType.startsWith("image/");
 }
 
-// ── Message chunking ─────────────────────────────────────────────────────────
+// ── File attachment parsing ──────────────────────────────────────────────────
+
+const VEX_FILE_SCHEME = "vex-file://";
+
+export function formatFileAttachmentMarkdown(
+    attachment: EncryptedFileAttachment,
+): string {
+    const params = new URLSearchParams();
+    params.set("key", attachment.key);
+    params.set("name", attachment.fileName);
+    params.set("type", attachment.contentType);
+    params.set("size", String(Math.max(0, attachment.fileSize)));
+
+    const url = `${VEX_FILE_SCHEME}${encodeURIComponent(
+        attachment.fileID,
+    )}?${params.toString()}`;
+    const label = escapeMarkdownLabel(attachment.fileName);
+    if (isImageType(attachment.contentType)) {
+        return `![${label}](${url})`;
+    }
+    return `[${label}](${url})`;
+}
 
 export function parseFileExtra(extra: null | string): FileAttachment | null {
     if (!extra) return null;
@@ -55,6 +105,286 @@ export function parseFileExtra(extra: null | string): FileAttachment | null {
     }
     return null;
 }
+
+export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
+    const nodes: MessageMarkdownNode[] = [];
+    let cursor = 0;
+    let searchStart = 0;
+
+    while (searchStart < content.length) {
+        const match = findNextMarkdownLink(content, searchStart);
+        if (!match) {
+            break;
+        }
+
+        const attachment = parseVexFileUrl(match.url);
+        if (!attachment) {
+            searchStart = match.end;
+            continue;
+        }
+
+        pushTextNode(nodes, content.slice(cursor, match.start));
+        nodes.push({
+            alt: match.label,
+            attachment,
+            image: match.image || isImageType(attachment.contentType),
+            type: "attachment",
+        });
+        cursor = match.end;
+        searchStart = match.end;
+    }
+
+    pushTextNode(nodes, content.slice(cursor));
+    return nodes;
+}
+
+export function parseVexFileUrl(url: string): EncryptedFileAttachment | null {
+    if (!url.startsWith(VEX_FILE_SCHEME)) {
+        return null;
+    }
+
+    const rest = url.slice(VEX_FILE_SCHEME.length);
+    const queryStart = rest.indexOf("?");
+    const encodedFileID = queryStart === -1 ? rest : rest.slice(0, queryStart);
+    const query = queryStart === -1 ? "" : rest.slice(queryStart + 1);
+
+    let fileID: string;
+    try {
+        fileID = decodeURIComponent(encodedFileID).trim();
+    } catch {
+        return null;
+    }
+
+    const params = new URLSearchParams(query);
+    const key = params.get("key")?.trim() ?? "";
+    const fileName = params.get("name")?.trim() ?? "";
+    const contentType =
+        params.get("type")?.trim() || "application/octet-stream";
+    const rawSize = Number(params.get("size") ?? "0");
+    const fileSize =
+        Number.isFinite(rawSize) && rawSize >= 0 ? Math.round(rawSize) : 0;
+
+    if (!fileID || !key || !fileName) {
+        return null;
+    }
+
+    return {
+        contentType,
+        fileID,
+        fileName,
+        fileSize,
+        key,
+    };
+}
+
+function escapeMarkdownLabel(value: string): string {
+    return value
+        .replace(/\\/g, "\\\\")
+        .replace(/\[/g, "\\[")
+        .replace(/\]/g, "\\]");
+}
+
+function findMarkdownLabelEnd(source: string, start: number): number {
+    let escaped = false;
+    for (let index = start; index < source.length; index++) {
+        const char = source[index];
+        if (char === "\n") {
+            return -1;
+        }
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (char === "\\") {
+            escaped = true;
+            continue;
+        }
+        if (char === "]") {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function findMarkdownLinkEnd(source: string, start: number): number {
+    for (let index = start; index < source.length; index++) {
+        const char = source[index];
+        if (char === "\n") {
+            return -1;
+        }
+        if (char === ")") {
+            return index;
+        }
+    }
+    return -1;
+}
+
+function findNextMarkdownLink(
+    source: string,
+    start: number,
+): MarkdownLinkMatch | null {
+    let index = start;
+    while (index < source.length) {
+        const char = source[index];
+        const image = char === "!" && source[index + 1] === "[";
+        const open = image ? index + 1 : char === "[" ? index : -1;
+        if (open === -1) {
+            index++;
+            continue;
+        }
+
+        const labelEnd = findMarkdownLabelEnd(source, open + 1);
+        if (labelEnd === -1) {
+            index = open + 1;
+            continue;
+        }
+        if (source[labelEnd + 1] !== "(") {
+            index = labelEnd + 1;
+            continue;
+        }
+
+        const urlStart = labelEnd + 2;
+        const urlEnd = findMarkdownLinkEnd(source, urlStart);
+        if (urlEnd === -1) {
+            index = urlStart;
+            continue;
+        }
+
+        const url = source.slice(urlStart, urlEnd).trim();
+        if (!url) {
+            index = urlEnd + 1;
+            continue;
+        }
+
+        return {
+            end: urlEnd + 1,
+            image,
+            label: unescapeMarkdownLabel(source.slice(open + 1, labelEnd)),
+            start: image ? index : open,
+            url,
+        };
+    }
+
+    return null;
+}
+
+function parseInlineMarkdown(text: string): MarkdownInlineSegment[] {
+    const segments: MarkdownInlineSegment[] = [];
+    let cursor = 0;
+    let index = 0;
+
+    const pushPlain = (end: number): void => {
+        if (end <= cursor) return;
+        pushSegment(segments, {
+            text: text.slice(cursor, end),
+            type: "text",
+        });
+    };
+
+    while (index < text.length) {
+        const char = text[index];
+        const next = text[index + 1];
+
+        if (char === "`") {
+            const close = text.indexOf("`", index + 1);
+            if (close > index + 1) {
+                pushPlain(index);
+                pushSegment(segments, {
+                    text: text.slice(index + 1, close),
+                    type: "code",
+                });
+                index = close + 1;
+                cursor = index;
+                continue;
+            }
+        }
+
+        if (char === "*" && next === "*") {
+            const close = text.indexOf("**", index + 2);
+            if (close > index + 2) {
+                pushPlain(index);
+                pushSegment(segments, {
+                    text: text.slice(index + 2, close),
+                    type: "strong",
+                });
+                index = close + 2;
+                cursor = index;
+                continue;
+            }
+        }
+
+        if (char === "*") {
+            const close = text.indexOf("*", index + 1);
+            if (close > index + 1) {
+                pushPlain(index);
+                pushSegment(segments, {
+                    text: text.slice(index + 1, close),
+                    type: "emphasis",
+                });
+                index = close + 1;
+                cursor = index;
+                continue;
+            }
+        }
+
+        if (char === "[") {
+            const labelEnd = findMarkdownLabelEnd(text, index + 1);
+            if (labelEnd > index + 1 && text[labelEnd + 1] === "(") {
+                const urlEnd = text.indexOf(")", labelEnd + 2);
+                if (urlEnd > labelEnd + 2) {
+                    const url = text.slice(labelEnd + 2, urlEnd).trim();
+                    if (url.length > 0) {
+                        pushPlain(index);
+                        pushSegment(segments, {
+                            text: unescapeMarkdownLabel(
+                                text.slice(index + 1, labelEnd),
+                            ),
+                            type: "link",
+                            url,
+                        });
+                        index = urlEnd + 1;
+                        cursor = index;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        index++;
+    }
+
+    pushPlain(text.length);
+    if (segments.length === 0) {
+        return [{ text, type: "text" }];
+    }
+    return segments;
+}
+
+function pushSegment(
+    segments: MarkdownInlineSegment[],
+    segment: MarkdownInlineSegment,
+): void {
+    const previous = segments[segments.length - 1];
+    if (segment.type === "text" && previous?.type === "text") {
+        previous.text += segment.text;
+        return;
+    }
+    segments.push(segment);
+}
+
+function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
+    if (text.length === 0) return;
+    nodes.push({
+        segments: parseInlineMarkdown(text),
+        type: "text",
+    });
+}
+
+function unescapeMarkdownLabel(value: string): string {
+    return value.replace(/\\([\\[\]])/g, "$1");
+}
+
+// ── Message chunking ─────────────────────────────────────────────────────────
 
 const CHUNK_GAP_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_CHUNK_SIZE = 100;

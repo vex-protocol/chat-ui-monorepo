@@ -6,10 +6,13 @@ import {
     applyEmoji,
     avatarHue,
     chunkMessages,
+    formatFileAttachmentMarkdown,
     formatFileSize,
     formatTime,
     isImageType,
     parseFileExtra,
+    parseMessageMarkdown,
+    parseVexFileUrl,
 } from "../message-utils.ts";
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -140,6 +143,98 @@ describe("parseFileExtra", () => {
             fileName: "photo.png",
             fileSize: 2048,
         });
+    });
+});
+
+// ── encrypted file markdown ────────────────────────────────────────────────
+
+describe("encrypted file markdown", () => {
+    test("formats and parses image attachment markdown", () => {
+        const markdown = formatFileAttachmentMarkdown({
+            contentType: "image/png",
+            fileID: "file-123",
+            fileName: "screen[shot].png",
+            fileSize: 2048,
+            key: "abc123",
+        });
+
+        expect(markdown).toContain("vex-file://file-123?");
+        const nodes = parseMessageMarkdown(`look\n\n${markdown}`);
+        expect(nodes).toHaveLength(2);
+        expect(nodes[0]).toMatchObject({ type: "text" });
+        expect(nodes[1]).toMatchObject({
+            alt: "screen[shot].png",
+            attachment: {
+                contentType: "image/png",
+                fileID: "file-123",
+                fileName: "screen[shot].png",
+                fileSize: 2048,
+                key: "abc123",
+            },
+            image: true,
+            type: "attachment",
+        });
+    });
+
+    test("formats and parses non-image attachment markdown", () => {
+        const markdown = formatFileAttachmentMarkdown({
+            contentType: "application/pdf",
+            fileID: "file-456",
+            fileName: "report.pdf",
+            fileSize: 4096,
+            key: "def456",
+        });
+
+        expect(parseVexFileUrl("https://vex.wtf/file")).toBeNull();
+        const nodes = parseMessageMarkdown(markdown);
+        expect(nodes).toEqual([
+            {
+                alt: "report.pdf",
+                attachment: {
+                    contentType: "application/pdf",
+                    fileID: "file-456",
+                    fileName: "report.pdf",
+                    fileSize: 4096,
+                    key: "def456",
+                },
+                image: false,
+                type: "attachment",
+            },
+        ]);
+    });
+
+    test("parses basic inline markdown without treating normal links as files", () => {
+        const nodes = parseMessageMarkdown(
+            "hello **world** from [vex](https://vex.wtf) and `code`",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "hello ", type: "text" },
+                    { text: "world", type: "strong" },
+                    { text: " from ", type: "text" },
+                    {
+                        text: "vex",
+                        type: "link",
+                        url: "https://vex.wtf",
+                    },
+                    { text: " and ", type: "text" },
+                    { text: "code", type: "code" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("treats malformed bracket-heavy markdown as plain text", () => {
+        const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
+        expect(parseMessageMarkdown(text)).toEqual([
+            {
+                segments: [{ text, type: "text" }],
+                type: "text",
+            },
+        ]);
     });
 });
 
