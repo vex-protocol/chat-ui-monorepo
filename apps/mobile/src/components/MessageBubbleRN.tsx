@@ -48,6 +48,7 @@ import { type CodeHighlightKind, highlightCode } from "../lib/syntaxHighlight";
 import { colors, fontFamilies, typography } from "../theme";
 
 import { Avatar } from "./Avatar";
+import { ImagePreviewModal } from "./ImagePreviewModal";
 import { InvitePreviewCard } from "./InvitePreviewCard";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 
@@ -550,6 +551,7 @@ function AttachmentPreview({
     const shouldRenderImage = image || isImageType(attachment.contentType);
     const [error, setError] = React.useState("");
     const [imageUri, setImageUri] = React.useState<null | string>(null);
+    const [imagePreviewOpen, setImagePreviewOpen] = React.useState(false);
     const [opening, setOpening] = React.useState(false);
     const [previewLoading, setPreviewLoading] = React.useState(false);
 
@@ -617,50 +619,81 @@ function AttachmentPreview({
         }
     }, [attachment, opening]);
 
+    const openImagePreview = React.useCallback(() => {
+        if (imageUri) {
+            haptic("selection");
+            setImagePreviewOpen(true);
+            return;
+        }
+        void openAttachment();
+    }, [imageUri, openAttachment]);
+    const imageAttachmentLabel = imageUri
+        ? `Open image preview for ${attachment.fileName}`
+        : `Open attachment for ${attachment.fileName}`;
+
     if (shouldRenderImage) {
         return (
-            <Pressable
-                accessibilityRole="button"
-                onPress={() => void openAttachment()}
-                style={({ pressed }) => [
-                    styles.imageAttachment,
-                    pressed && styles.attachmentPressed,
-                ]}
-            >
-                {previewLoading ? (
-                    <View style={styles.imageLoading}>
-                        <ActivityIndicator
-                            color={colors.textSecondary}
-                            size="small"
+            <>
+                <Pressable
+                    accessibilityLabel={imageAttachmentLabel}
+                    accessibilityRole="imagebutton"
+                    onPress={openImagePreview}
+                    style={({ pressed }) => [
+                        styles.imageAttachment,
+                        pressed && styles.attachmentPressed,
+                    ]}
+                >
+                    {previewLoading ? (
+                        <View style={styles.imageLoading}>
+                            <ActivityIndicator
+                                color={colors.textSecondary}
+                                size="small"
+                            />
+                        </View>
+                    ) : imageUri ? (
+                        <Image
+                            resizeMode="cover"
+                            source={{ uri: imageUri }}
+                            style={styles.imageAttachmentMedia}
                         />
-                    </View>
-                ) : imageUri ? (
-                    <Image
-                        resizeMode="cover"
-                        source={{ uri: imageUri }}
-                        style={styles.imageAttachmentMedia}
-                    />
-                ) : (
-                    <View style={styles.imageLoading}>
-                        <Ionicons
-                            color={colors.muted}
-                            name="image-outline"
-                            size={24}
-                        />
-                        <Text numberOfLines={2} style={styles.attachmentError}>
-                            {error || "Image unavailable"}
+                    ) : (
+                        <View style={styles.imageLoading}>
+                            <Ionicons
+                                color={colors.muted}
+                                name="image-outline"
+                                size={24}
+                            />
+                            <Text
+                                numberOfLines={2}
+                                style={styles.attachmentError}
+                            >
+                                {error || "Image unavailable"}
+                            </Text>
+                        </View>
+                    )}
+                    <View style={styles.attachmentCaption}>
+                        <Text numberOfLines={1} style={styles.attachmentName}>
+                            {attachment.fileName}
+                        </Text>
+                        <Text style={styles.attachmentSize}>
+                            {formatFileSize(attachment.fileSize)}
                         </Text>
                     </View>
-                )}
-                <View style={styles.attachmentCaption}>
-                    <Text numberOfLines={1} style={styles.attachmentName}>
-                        {attachment.fileName}
-                    </Text>
-                    <Text style={styles.attachmentSize}>
-                        {formatFileSize(attachment.fileSize)}
-                    </Text>
-                </View>
-            </Pressable>
+                </Pressable>
+                <ImagePreviewModal
+                    fileName={attachment.fileName}
+                    fileSizeLabel={formatFileSize(attachment.fileSize)}
+                    imageUri={imageUri}
+                    onClose={() => {
+                        setImagePreviewOpen(false);
+                    }}
+                    onShare={() => {
+                        void openAttachment();
+                    }}
+                    sharing={opening}
+                    visible={imagePreviewOpen}
+                />
+            </>
         );
     }
 
