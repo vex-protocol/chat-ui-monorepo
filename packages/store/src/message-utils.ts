@@ -54,6 +54,7 @@ export type MessageMarkdownNode =
           image: boolean;
           type: "attachment";
       }
+    | { code: string; language?: string; type: "codeBlock" }
     | { segments: MarkdownInlineSegment[]; type: "text" };
 
 export interface MessageReaction {
@@ -65,6 +66,17 @@ export interface MessageReactionEvent {
     action: "toggle";
     emoji: MessageEmoji;
     targetMailID: string;
+}
+
+interface AttachmentMarkdownMatch extends MarkdownLinkMatch {
+    attachment: EncryptedFileAttachment;
+}
+
+interface CodeFenceMatch {
+    code: string;
+    end: number;
+    language?: string;
+    start: number;
 }
 
 interface MarkdownLinkMatch {
@@ -271,26 +283,47 @@ export function parseMessageMarkdown(content: string): MessageMarkdownNode[] {
     let searchStart = 0;
 
     while (searchStart < content.length) {
-        const match = findNextMarkdownLink(content, searchStart);
-        if (!match) {
+        const attachmentMatch = findNextAttachmentMarkdownLink(
+            content,
+            searchStart,
+        );
+        const codeFenceMatch = findNextCodeFence(content, searchStart);
+        if (!attachmentMatch && !codeFenceMatch) {
             break;
         }
 
-        const attachment = parseVexFileUrl(match.url);
-        if (!attachment) {
-            searchStart = match.end;
+        if (
+            codeFenceMatch &&
+            (!attachmentMatch || codeFenceMatch.start < attachmentMatch.start)
+        ) {
+            pushTextNode(nodes, content.slice(cursor, codeFenceMatch.start));
+            nodes.push({
+                code: codeFenceMatch.code,
+                ...(codeFenceMatch.language
+                    ? { language: codeFenceMatch.language }
+                    : {}),
+                type: "codeBlock",
+            });
+            cursor = codeFenceMatch.end;
+            searchStart = codeFenceMatch.end;
             continue;
         }
 
-        pushTextNode(nodes, content.slice(cursor, match.start));
+        if (!attachmentMatch) {
+            break;
+        }
+
+        pushTextNode(nodes, content.slice(cursor, attachmentMatch.start));
         nodes.push({
-            alt: match.label,
-            attachment,
-            image: match.image || isImageType(attachment.contentType),
+            alt: attachmentMatch.label,
+            attachment: attachmentMatch.attachment,
+            image:
+                attachmentMatch.image ||
+                isImageType(attachmentMatch.attachment.contentType),
             type: "attachment",
         });
-        cursor = match.end;
-        searchStart = match.end;
+        cursor = attachmentMatch.end;
+        searchStart = attachmentMatch.end;
     }
 
     pushTextNode(nodes, content.slice(cursor));
@@ -430,6 +463,58 @@ function findMarkdownLinkEnd(source: string, start: number): number {
     return -1;
 }
 
+function findNextAttachmentMarkdownLink(
+    source: string,
+    start: number,
+): AttachmentMarkdownMatch | null {
+    let searchStart = start;
+    while (searchStart < source.length) {
+        const match = findNextMarkdownLink(source, searchStart);
+        if (!match) {
+            return null;
+        }
+        const attachment = parseVexFileUrl(match.url);
+        if (attachment) {
+            return { ...match, attachment };
+        }
+        searchStart = match.end;
+    }
+    return null;
+}
+
+function findNextCodeFence(source: string, start: number): CodeFenceMatch | null {
+    const open = source.indexOf("```", start);
+    if (open === -1) {
+        return null;
+    }
+
+    const infoStart = open + 3;
+    const lineEnd = source.indexOf("\n", infoStart);
+    if (lineEnd === -1) {
+        const close = source.indexOf("```", infoStart);
+        return {
+            code:
+                close === -1
+                    ? source.slice(infoStart)
+                    : source.slice(infoStart, close),
+            end: close === -1 ? source.length : close + 3,
+            start: open,
+        };
+    }
+
+    const close = source.indexOf("```", lineEnd + 1);
+    const code =
+        close === -1
+            ? source.slice(lineEnd + 1)
+            : source.slice(lineEnd + 1, close);
+    return {
+        code: trimCodeFenceText(code),
+        end: close === -1 ? source.length : close + 3,
+        ...normalizeCodeBlockLanguage(source.slice(infoStart, lineEnd)),
+        start: open,
+    };
+}
+
 function findNextMarkdownLink(
     source: string,
     start: number,
@@ -508,6 +593,16 @@ function matchBareUrlAt(text: string, index: number): null | string {
         return null;
     }
     return trimInlineUrl(match[0]);
+}
+
+function normalizeCodeBlockLanguage(
+    value: string,
+): { language?: string } {
+    const language = value.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+    if (!language || language.length > 64 || !/^[\w#+.-]+$/.test(language)) {
+        return {};
+    }
+    return { language };
 }
 
 function normalizeMessageExtra(extra: MessageExtra): MessageExtra {
@@ -744,6 +839,10 @@ function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
         segments: parseInlineMarkdown(text),
         type: "text",
     });
+}
+
+function trimCodeFenceText(value: string): string {
+    return value.endsWith("\n") ? value.slice(0, -1) : value;
 }
 
 function trimInlineUrl(value: string): string {
