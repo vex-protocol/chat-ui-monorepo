@@ -1,3 +1,4 @@
+import type { PickedAttachment } from "../lib/attachments";
 import type { AppScreenProps } from "../navigation/types";
 import type { User } from "@vex-chat/libvex";
 import type { Message } from "@vex-chat/libvex";
@@ -10,6 +11,7 @@ import React, {
     useState,
 } from "react";
 import {
+    Alert,
     Animated,
     Easing,
     FlatList,
@@ -22,7 +24,13 @@ import {
     View,
 } from "react-native";
 
-import { $groupMessages, $servers, $user, vexService } from "@vex-chat/store";
+import {
+    $groupMessages,
+    $servers,
+    $user,
+    formatFileAttachmentMarkdown,
+    vexService,
+} from "@vex-chat/store";
 
 import { useStore } from "@nanostores/react";
 import { useFocusEffect } from "@react-navigation/native";
@@ -32,6 +40,7 @@ import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
+import { pickFileAttachment, pickImageAttachment } from "../lib/attachments";
 import { haptic } from "../lib/haptics";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
@@ -81,8 +90,9 @@ export function ChannelScreen({
 
     const insets = useSafeAreaInsets();
     const [text, setText] = useState("");
+    const [attachment, setAttachment] = useState<null | PickedAttachment>(null);
     const [sending, setSending] = useState(false);
-    const [_sendError, setSendError] = useState("");
+    const [sendError, setSendError] = useState("");
     const sendInFlightRef = useRef(false);
     const [members, setMembers] = useState<User[]>([]);
     const [usernames, setUsernames] = useState<Record<string, string>>({});
@@ -224,26 +234,100 @@ export function ChannelScreen({
 
     const sendMessage = useCallback(async () => {
         const content = text.trim();
-        if (!content || !user || sendInFlightRef.current) return;
+        const pendingAttachment = attachment;
+        if (
+            (!content && !pendingAttachment) ||
+            !user ||
+            sendInFlightRef.current
+        ) {
+            return;
+        }
         sendInFlightRef.current = true;
         setSending(true);
         setSendError("");
-        setText("");
         try {
+            let messageBody = content;
+            if (pendingAttachment) {
+                const uploaded = await vexService.uploadFileAttachment({
+                    contentType: pendingAttachment.contentType,
+                    data: pendingAttachment.data,
+                    fileName: pendingAttachment.fileName,
+                    fileSize: pendingAttachment.fileSize,
+                });
+                if (!uploaded.ok || !uploaded.attachment) {
+                    setSendError(
+                        uploaded.error ?? "Failed to upload attachment",
+                    );
+                    return;
+                }
+                const attachmentMarkdown = formatFileAttachmentMarkdown(
+                    uploaded.attachment,
+                );
+                messageBody = messageBody
+                    ? `${messageBody}\n\n${attachmentMarkdown}`
+                    : attachmentMarkdown;
+            }
+
             const result = await vexService.sendGroupMessage(
                 channelID,
-                content,
+                messageBody,
             );
             if (!result.ok) {
                 setSendError(result.error ?? "Failed to send");
+                return;
             }
+            setAttachment(null);
+            setText("");
         } catch (err: unknown) {
             setSendError(err instanceof Error ? err.message : "Failed to send");
         } finally {
             sendInFlightRef.current = false;
             setSending(false);
         }
-    }, [text, user, channelID, sendInFlightRef]);
+    }, [attachment, text, user, channelID, sendInFlightRef]);
+
+    const handlePickAttachment = useCallback(
+        (kind: "file" | "image") => {
+            void (async () => {
+                setSendError("");
+                try {
+                    const picked =
+                        kind === "image"
+                            ? await pickImageAttachment()
+                            : await pickFileAttachment();
+                    if (picked) {
+                        setAttachment(picked);
+                    }
+                } catch (err: unknown) {
+                    setSendError(
+                        err instanceof Error
+                            ? err.message
+                            : "Could not attach file",
+                    );
+                }
+            })();
+        },
+        [setAttachment],
+    );
+
+    const openAttachmentMenu = useCallback(() => {
+        if (sending) return;
+        Alert.alert("Attach", "Choose something to send.", [
+            {
+                onPress: () => {
+                    handlePickAttachment("image");
+                },
+                text: "Photo",
+            },
+            {
+                onPress: () => {
+                    handlePickAttachment("file");
+                },
+                text: "File",
+            },
+            { style: "cancel", text: "Cancel" },
+        ]);
+    }, [handlePickAttachment, sending]);
 
     const deleteMessage = useCallback(
         (message: Message) => {
@@ -340,9 +424,20 @@ export function ChannelScreen({
                 renderItem={renderMessage}
             />
 
+            {sendError !== "" && (
+                <View style={styles.errorBar}>
+                    <Text style={styles.errorText}>{sendError}</Text>
+                </View>
+            )}
+
             <MessageInputBar
+                attachment={attachment}
                 bottomInset={insets.bottom}
+                onAttachPress={openAttachmentMenu}
                 onChangeText={setText}
+                onRemoveAttachment={() => {
+                    setAttachment(null);
+                }}
                 onSend={() => void sendMessage()}
                 placeholder={`Message #${channelName}`}
                 sending={sending}
@@ -400,6 +495,15 @@ const styles = StyleSheet.create({
     container: {
         backgroundColor: colors.bg,
         flex: 1,
+    },
+    errorBar: {
+        backgroundColor: "rgba(229, 57, 53, 0.15)",
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+    },
+    errorText: {
+        ...typography.body,
+        color: colors.error,
     },
     list: {
         paddingVertical: 8,
