@@ -2,7 +2,9 @@ import type { Message } from "@vex-chat/libvex";
 import type {
     EncryptedFileAttachment,
     MarkdownInlineSegment,
+    MessageEmoji,
     MessageMarkdownNode,
+    MessageReaction,
 } from "@vex-chat/store";
 import type { GestureResponderEvent, TextStyle } from "react-native";
 
@@ -23,10 +25,14 @@ import {
 
 import {
     applyEmoji,
+    createUnicodeReactionEmoji,
+    emojiReactionKey,
+    emojiReactionLabel,
     extractInviteID,
     formatFileSize,
     formatTime,
     isImageType,
+    messageReactions,
     parseMessageMarkdown,
     vexService,
 } from "@vex-chat/store";
@@ -42,17 +48,32 @@ import { InvitePreviewCard } from "./InvitePreviewCard";
 
 interface MessageBubbleRNProps {
     authorName: string;
+    currentUserID?: string | undefined;
     isOwn: boolean;
     message: Message;
-    onDeleteMessage?: (message: Message) => void;
+    onDeleteMessage?: ((message: Message) => void) | undefined;
+    onToggleReaction?:
+        | ((message: Message, emoji: MessageEmoji) => void)
+        | undefined;
     showIdentity?: boolean;
 }
 
+const QUICK_REACTION_EMOJIS: MessageEmoji[] = [
+    createUnicodeReactionEmoji("👍", "thumbsup"),
+    createUnicodeReactionEmoji("❤️", "heart"),
+    createUnicodeReactionEmoji("😂", "joy"),
+    createUnicodeReactionEmoji("🎉", "tada"),
+    createUnicodeReactionEmoji("🚀", "rocket"),
+    createUnicodeReactionEmoji("👀", "eyes"),
+];
+
 export function MessageBubbleRN({
     authorName,
+    currentUserID,
     isOwn,
     message,
     onDeleteMessage,
+    onToggleReaction,
     showIdentity = true,
 }: MessageBubbleRNProps) {
     const { height: windowHeight, width: windowWidth } = useWindowDimensions();
@@ -67,6 +88,7 @@ export function MessageBubbleRN({
         () => parseMessageMarkdown(message.message),
         [message.message],
     );
+    const reactions = React.useMemo(() => messageReactions(message), [message]);
 
     const menuActions = React.useMemo(
         () => [
@@ -108,7 +130,8 @@ export function MessageBubbleRN({
         }
     };
 
-    const estimatedMenuHeight = menuActions.length * 44 + 12;
+    const estimatedMenuHeight =
+        menuActions.length * 44 + 12 + (onToggleReaction ? 48 : 0);
     const estimatedMenuWidth = 220;
     const maxLeft = Math.max(8, windowWidth - estimatedMenuWidth - 8);
     const maxTop = Math.max(8, windowHeight - estimatedMenuHeight - 8);
@@ -134,6 +157,31 @@ export function MessageBubbleRN({
                         { left: clampedLeft, top: clampedTop },
                     ]}
                 >
+                    {onToggleReaction ? (
+                        <View style={styles.menuReactionRow}>
+                            {QUICK_REACTION_EMOJIS.map((emoji) => (
+                                <Pressable
+                                    accessibilityLabel={`React ${emojiReactionLabel(
+                                        emoji,
+                                    )}`}
+                                    accessibilityRole="button"
+                                    key={emojiReactionLabel(emoji)}
+                                    onPress={() => {
+                                        setMenuOpen(false);
+                                        onToggleReaction(message, emoji);
+                                    }}
+                                    style={({ pressed }) => [
+                                        styles.menuReactionButton,
+                                        pressed && styles.menuItemPressed,
+                                    ]}
+                                >
+                                    <Text style={styles.menuReactionEmoji}>
+                                        {emojiReactionLabel(emoji)}
+                                    </Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    ) : null}
                     {menuActions.map((action, index) => (
                         <Pressable
                             key={action.id}
@@ -236,6 +284,19 @@ export function MessageBubbleRN({
                             <InvitePreviewCard
                                 inviteID={inviteID}
                                 isOwn={isOwn}
+                            />
+                        ) : null}
+                        {reactions.length > 0 ? (
+                            <ReactionRow
+                                currentUserID={currentUserID}
+                                onToggle={
+                                    onToggleReaction
+                                        ? (emoji) => {
+                                              onToggleReaction(message, emoji);
+                                          }
+                                        : undefined
+                                }
+                                reactions={reactions}
                             />
                         ) : null}
                     </View>
@@ -507,6 +568,69 @@ function MarkdownText({
     );
 }
 
+function ReactionEmoji({ emoji }: { emoji: MessageEmoji }) {
+    if (emoji.kind === "custom" && emoji.imageUrl) {
+        return (
+            <Image
+                accessibilityLabel={emojiReactionLabel(emoji)}
+                source={{ uri: emoji.imageUrl }}
+                style={styles.reactionImage}
+            />
+        );
+    }
+
+    return (
+        <Text style={styles.reactionEmoji}>{emojiReactionLabel(emoji)}</Text>
+    );
+}
+
+function ReactionRow({
+    currentUserID,
+    onToggle,
+    reactions,
+}: {
+    currentUserID?: string | undefined;
+    onToggle?: ((emoji: MessageEmoji) => void) | undefined;
+    reactions: MessageReaction[];
+}) {
+    return (
+        <View style={styles.reactionRow}>
+            {reactions.map((reaction) => {
+                const selected = currentUserID
+                    ? reaction.userIDs.includes(currentUserID)
+                    : false;
+                return (
+                    <Pressable
+                        accessibilityLabel={`${emojiReactionLabel(
+                            reaction.emoji,
+                        )} ${String(reaction.userIDs.length)}`}
+                        accessibilityRole="button"
+                        disabled={!onToggle}
+                        key={emojiReactionKey(reaction.emoji)}
+                        onPress={
+                            onToggle
+                                ? () => {
+                                      onToggle(reaction.emoji);
+                                  }
+                                : undefined
+                        }
+                        style={({ pressed }) => [
+                            styles.reactionPill,
+                            selected && styles.reactionPillSelected,
+                            pressed && styles.attachmentPressed,
+                        ]}
+                    >
+                        <ReactionEmoji emoji={reaction.emoji} />
+                        <Text style={styles.reactionCount}>
+                            {reaction.userIDs.length}
+                        </Text>
+                    </Pressable>
+                );
+            })}
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     attachmentCaption: {
         backgroundColor: "rgba(0,0,0,0.62)",
@@ -655,6 +779,25 @@ const styles = StyleSheet.create({
     menuItemPressed: {
         backgroundColor: "rgba(255,255,255,0.06)",
     },
+    menuReactionButton: {
+        alignItems: "center",
+        borderRadius: 8,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    menuReactionEmoji: {
+        fontSize: 18,
+        lineHeight: 24,
+    },
+    menuReactionRow: {
+        borderBottomColor: "rgba(255,255,255,0.08)",
+        borderBottomWidth: 1,
+        flexDirection: "row",
+        gap: 2,
+        paddingHorizontal: 8,
+        paddingVertical: 7,
+    },
     menuText: {
         ...typography.body,
         color: "#E8EBF3",
@@ -668,6 +811,44 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         gap: 8,
         marginBottom: 2,
+    },
+    reactionCount: {
+        ...typography.body,
+        color: colors.textSecondary,
+        fontSize: 11,
+        fontWeight: "600",
+        lineHeight: 14,
+    },
+    reactionEmoji: {
+        fontSize: 13,
+        lineHeight: 16,
+    },
+    reactionImage: {
+        borderRadius: 3,
+        height: 16,
+        width: 16,
+    },
+    reactionPill: {
+        alignItems: "center",
+        backgroundColor: "rgba(255,255,255,0.05)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 999,
+        borderWidth: 1,
+        flexDirection: "row",
+        gap: 4,
+        minHeight: 24,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+    },
+    reactionPillSelected: {
+        backgroundColor: "rgba(231,0,0,0.18)",
+        borderColor: "rgba(255,107,107,0.45)",
+    },
+    reactionRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 5,
     },
     systemContainer: {
         alignItems: "center",

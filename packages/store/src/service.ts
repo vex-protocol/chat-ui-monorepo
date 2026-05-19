@@ -1,4 +1,3 @@
-import type { EncryptedFileAttachment } from "./message-utils.ts";
 /**
  * VexService — the sole gateway between UI components and the Vex protocol.
  *
@@ -60,6 +59,14 @@ import {
     clampLocalMessageRetentionDays,
     setLocalMessageRetentionDaysPreference,
 } from "./domains/settings.ts";
+import {
+    applyMessageReactionEvent,
+    createReactionEventExtra,
+    type EncryptedFileAttachment,
+    foldMessageReactionEvents,
+    type MessageEmoji,
+    messageReactionEvent,
+} from "./message-utils.ts";
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -154,8 +161,6 @@ export interface OperationResult {
     ok: boolean;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 /**
  * Result of {@link VexService.beginPasskeySignIn}. Hands back the
  * options the host needs to drive the platform WebAuthn ceremony,
@@ -166,6 +171,8 @@ export interface PasskeySignInBegin {
     options: PublicKeyCredentialRequestOptionsJSON;
     requestID: string;
 }
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 export interface PushNotificationSubscriptionInput {
     channel: "expo";
@@ -228,6 +235,21 @@ interface ClientWithLocalDatabaseLike {
     database?: Pick<Storage, "deleteMessage">;
 }
 
+interface ClientWithMessageExtraLike {
+    messages: {
+        group: (
+            channelID: string,
+            message: string,
+            opts?: { extra?: null | string; retentionHintDays?: number },
+        ) => Promise<void>;
+        send: (
+            userID: string,
+            message: string,
+            opts?: { extra?: null | string; retentionHintDays?: number },
+        ) => Promise<void>;
+    };
+}
+
 interface ClientWithNotificationSubscriptionsLike {
     subscribeNotifications?: unknown;
     unsubscribeNotifications?: unknown;
@@ -284,6 +306,11 @@ interface DevicesWithApprovalLike {
 
 interface HttpErrorLike {
     response: { status: number };
+}
+
+interface MessageMapWritableLike {
+    get: () => Record<string, Message[]>;
+    setKey: (key: string, messages: Message[]) => void;
 }
 
 interface NotificationSubscriptionLike {
@@ -379,6 +406,7 @@ class VexService {
      */
     private populateStateAbort = false;
     private populateStateInFlight: null | Promise<void> = null;
+    private readonly processedReactionMailIDs = new Set<string>();
     private wsDebugEnabled = shouldDebugAuth();
     private wsDebugFrameLogsEnabled = shouldDebugAuth();
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
@@ -744,6 +772,7 @@ class VexService {
     }
 
     async close(): Promise<void> {
+        this.processedReactionMailIDs.clear();
         if (this.client) {
             // `populateState` walks every channel + DM and decrypts SQLite
             // history — if we `database.close()` while that is still in
@@ -962,8 +991,6 @@ class VexService {
         }
     }
 
-    // ── Channel operations ──────────────────────────────────────────────
-
     /**
      * Finish a passkey-registration ceremony. Persists the new
      * authenticator on spire and returns the public passkey shape
@@ -982,6 +1009,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Channel operations ──────────────────────────────────────────────
 
     /**
      * Finish a passkey authentication ceremony. Stage two of the
@@ -1050,8 +1079,6 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
-    // ── Messaging ───────────────────────────────────────────────────────
-
     /** Effective local retention cap (defaults to 30 when signed out). */
     getLocalMessageRetentionDays(): number {
         const c = this.client as unknown as {
@@ -1063,6 +1090,8 @@ class VexService {
         }
         return $localMessageRetentionDaysWritable.get();
     }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -1377,12 +1406,12 @@ class VexService {
         }
     }
 
-    // ── User operations ─────────────────────────────────────────────────
-
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
+
+    // ── User operations ─────────────────────────────────────────────────
 
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
@@ -1987,8 +2016,6 @@ class VexService {
         this.backgroundConnectionRecoverySuspended = suspended;
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     /**
      * Updates the local message retention preference (1–30 days) and
      * applies it to the live client when connected.
@@ -2001,6 +2028,8 @@ class VexService {
         };
         c?.setLocalMessageRetentionDays?.(clamped);
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     setWebsocketDebug(enabled: boolean): void {
         this.wsDebugEnabled = enabled;
@@ -2024,7 +2053,7 @@ class VexService {
         this.wsDebugStateLogsEnabled = enabled;
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
+    // ── Notifications ───────────────────────────────────────────────────
 
     async subscribePushNotifications(
         input: PushNotificationSubscriptionInput,
@@ -2060,6 +2089,59 @@ class VexService {
         )) as { data?: unknown };
 
         return parseNotificationSubscription(response.data);
+    }
+
+    // ── Encrypted message metadata ──────────────────────────────────────
+
+    async toggleMessageReaction(
+        conversationKey: string,
+        mailID: string,
+        isGroup: boolean,
+        emoji: MessageEmoji,
+    ): Promise<OperationResult> {
+        if (!$userWritable.get()?.userID) {
+            return { error: "Not signed in.", ok: false };
+        }
+
+        const extra = createReactionEventExtra(mailID, emoji);
+        const send = async (): Promise<void> => {
+            const client =
+                this.requireClient() as unknown as ClientWithMessageExtraLike;
+            if (isGroup) {
+                await client.messages.group(conversationKey, "", { extra });
+            } else {
+                await client.messages.send(conversationKey, "", { extra });
+            }
+        };
+
+        try {
+            await send();
+            return { ok: true };
+        } catch (err: unknown) {
+            if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                this.resetWebsocketWatchdog();
+                const recovered = await this.recoverConnection(
+                    isGroup ? "react-group" : "react-dm",
+                );
+                if (recovered === "authenticated") {
+                    try {
+                        await send();
+                        return { ok: true };
+                    } catch (retryErr: unknown) {
+                        if (
+                            isUnauthorizedError(retryErr) ||
+                            isNotAuthenticatedError(retryErr)
+                        ) {
+                            this.setAuthStatus("unauthorized");
+                        } else if (isNetworkError(retryErr)) {
+                            this.setAuthStatus("offline");
+                        }
+                        return { error: errorMessage(retryErr), ok: false };
+                    }
+                }
+            }
+            return { error: errorMessage(err), ok: false };
+        }
     }
 
     async unsubscribePushNotifications(subscriptionID: string): Promise<void> {
@@ -2126,6 +2208,39 @@ class VexService {
         }
     }
 
+    private applyReactionMessage(
+        writable: MessageMapWritableLike,
+        conversationKey: string,
+        msg: Message,
+    ): boolean {
+        const event = messageReactionEvent(msg);
+        if (!event) {
+            return false;
+        }
+        if (this.processedReactionMailIDs.has(msg.mailID)) {
+            return true;
+        }
+
+        this.processedReactionMailIDs.add(msg.mailID);
+        if (this.processedReactionMailIDs.size > 2_000) {
+            this.processedReactionMailIDs.clear();
+            this.processedReactionMailIDs.add(msg.mailID);
+        }
+
+        const thread = writable.get()[conversationKey] ?? [];
+        const nextThread = applyMessageReactionEvent(
+            thread,
+            event,
+            msg.authorID,
+        );
+        if (nextThread !== thread) {
+            writable.setKey(conversationKey, nextThread);
+        }
+        return true;
+    }
+
+    // ── Private ─────────────────────────────────────────────────────────
+
     private attachWebsocketDebug(): void {
         if (!this.wsDebugEnabled || !this.client) {
             return;
@@ -2157,8 +2272,6 @@ class VexService {
         this.wsDebugOriginalSend = originalSend;
         this.logWsState("ws:debug:attached", { frames: true });
     }
-
-    // ── Private ─────────────────────────────────────────────────────────
 
     /**
      * Binds the watchdog's "any inbound frame" listener to the
@@ -2452,6 +2565,9 @@ class VexService {
         const threadKey = isOwnMessage ? msg.readerID : msg.authorID;
         const prev = $messagesWritable.get()[threadKey] ?? [];
         if (prev.some((m) => m.mailID === msg.mailID)) return;
+        if (this.applyReactionMessage($messagesWritable, threadKey, msg)) {
+            return;
+        }
 
         $messagesWritable.setKey(threadKey, [...prev, msg]);
 
@@ -2466,6 +2582,9 @@ class VexService {
     private handleGroupMessage(msg: Message, channelID: string): void {
         const prev = $groupMessagesWritable.get()[channelID] ?? [];
         if (prev.some((m) => m.mailID === msg.mailID)) return;
+        if (this.applyReactionMessage($groupMessagesWritable, channelID, msg)) {
+            return;
+        }
 
         $groupMessagesWritable.setKey(channelID, [...prev, msg]);
 
@@ -3615,11 +3734,12 @@ function decodeMsgpackHttpData(data: unknown): unknown {
 
 function deduplicateMessages(messages: Message[]): Message[] {
     const seen = new Set<string>();
-    return messages.filter((m) => {
+    const deduped = messages.filter((m) => {
         if (seen.has(m.mailID)) return false;
         seen.add(m.mailID);
         return true;
     });
+    return foldMessageReactionEvents(deduped);
 }
 
 function describeWsFrame(data: Uint8Array): {

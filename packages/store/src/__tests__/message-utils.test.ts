@@ -4,15 +4,24 @@ import { describe, expect, test } from "vitest";
 
 import {
     applyEmoji,
+    applyMessageReactionEvent,
     avatarHue,
     chunkMessages,
+    createReactionEventExtra,
+    createUnicodeReactionEmoji,
+    emojiReactionLabel,
+    foldMessageReactionEvents,
     formatFileAttachmentMarkdown,
     formatFileSize,
     formatTime,
     isImageType,
+    messageReactionEvent,
+    messageReactions,
     parseFileExtra,
+    parseMessageExtra,
     parseMessageMarkdown,
     parseVexFileUrl,
+    toggleMessageReactionExtra,
 } from "../message-utils.ts";
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -402,6 +411,145 @@ describe("applyEmoji", () => {
 
     test("does not match empty shortcode `::`", () => {
         expect(applyEmoji("::")).toBe("::");
+    });
+});
+
+// ── message reactions ──────────────────────────────────────────────────────
+
+describe("message reactions", () => {
+    test("toggles unicode reactions in message extra JSON", () => {
+        const emoji = createUnicodeReactionEmoji("👍", "thumbsup");
+        const added = toggleMessageReactionExtra(null, emoji, "alice");
+
+        expect(parseMessageExtra(added).reactions).toEqual([
+            {
+                emoji,
+                userIDs: ["alice"],
+            },
+        ]);
+
+        const removed = toggleMessageReactionExtra(added, emoji, "alice");
+        expect(removed).toBeNull();
+    });
+
+    test("keeps separate users on the same reaction", () => {
+        const emoji = createUnicodeReactionEmoji("❤️", "heart");
+        const alice = toggleMessageReactionExtra(null, emoji, "alice");
+        const bob = toggleMessageReactionExtra(alice, emoji, "bob");
+
+        expect(parseMessageExtra(bob).reactions?.[0]?.userIDs).toEqual([
+            "alice",
+            "bob",
+        ]);
+    });
+
+    test("preserves custom image emoji fields for future catalogs", () => {
+        const extra = JSON.stringify({
+            reactions: [
+                {
+                    emoji: {
+                        imageUrl: "https://cdn.example.test/party.png",
+                        kind: "custom",
+                        name: "party_blob",
+                        sourceID: "emoji-123",
+                    },
+                    userIDs: ["alice", "alice", "bob"],
+                },
+            ],
+            version: 1,
+        });
+
+        const parsed = parseMessageExtra(extra);
+        expect(parsed.reactions).toEqual([
+            {
+                emoji: {
+                    imageUrl: "https://cdn.example.test/party.png",
+                    kind: "custom",
+                    name: "party_blob",
+                    sourceID: "emoji-123",
+                },
+                userIDs: ["alice", "bob"],
+            },
+        ]);
+        const firstReaction = parsed.reactions?.[0];
+        expect(
+            firstReaction ? emojiReactionLabel(firstReaction.emoji) : null,
+        ).toBe(":party_blob:");
+    });
+
+    test("reads reactions from a message extra field", () => {
+        const extra = toggleMessageReactionExtra(
+            null,
+            createUnicodeReactionEmoji("🚀", "rocket"),
+            "alice",
+        );
+        const msg = makeMessage({ extra } as Partial<Message>);
+
+        expect(messageReactions(msg)).toHaveLength(1);
+        expect(messageReactions(msg)[0]?.userIDs).toEqual(["alice"]);
+    });
+
+    test("serializes reaction event messages in the extra field", () => {
+        const emoji = createUnicodeReactionEmoji("👀", "eyes");
+        const extra = createReactionEventExtra("m-target", emoji);
+
+        expect(
+            messageReactionEvent(
+                makeMessage({ extra, mailID: "m-event" } as Partial<Message>),
+            ),
+        ).toEqual({
+            action: "toggle",
+            emoji,
+            targetMailID: "m-target",
+        });
+    });
+
+    test("applies reaction event messages to the target message", () => {
+        const emoji = createUnicodeReactionEmoji("👍", "thumbsup");
+        const target = makeMessage({ mailID: "m-target" });
+        const event = {
+            action: "toggle",
+            emoji,
+            targetMailID: "m-target",
+        } as const;
+
+        const updated = applyMessageReactionEvent(
+            [target],
+            event,
+            "alice",
+        )[0] as (Message & { extra?: null | string }) | undefined;
+
+        if (!updated) {
+            throw new Error("Expected reaction event to update target");
+        }
+        expect(messageReactions(updated)).toEqual([
+            {
+                emoji,
+                userIDs: ["alice"],
+            },
+        ]);
+    });
+
+    test("folds reaction event messages out of visible history", () => {
+        const emoji = createUnicodeReactionEmoji("🎉", "tada");
+        const target = makeMessage({ mailID: "m-target" });
+        const eventMessage = makeMessage({
+            authorID: "bob",
+            extra: createReactionEventExtra("m-target", emoji),
+            mailID: "m-event",
+            message: "",
+        } as Partial<Message>);
+
+        const folded = foldMessageReactionEvents([target, eventMessage]);
+
+        expect(folded).toHaveLength(1);
+        expect(folded[0]?.mailID).toBe("m-target");
+        expect(messageReactions(folded[0] as Message)).toEqual([
+            {
+                emoji,
+                userIDs: ["bob"],
+            },
+        ]);
     });
 });
 
