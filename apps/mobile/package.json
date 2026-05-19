@@ -56,6 +56,7 @@
         "expo-sqlite": "^55.0.15",
         "expo-task-manager": "catalog:",
         "expo-updates": "~55.0.0",
+        "highlight.js": "catalog:",
         "kysely": "catalog:",
         "kysely-expo": "^5.0.0",
         "nanostores": "catalog:",

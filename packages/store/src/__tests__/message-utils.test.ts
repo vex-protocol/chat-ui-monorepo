@@ -4,15 +4,24 @@ import { describe, expect, test } from "vitest";
 
 import {
     applyEmoji,
+    applyMessageReactionEvent,
     avatarHue,
     chunkMessages,
+    createReactionEventExtra,
+    createUnicodeReactionEmoji,
+    emojiReactionLabel,
+    foldMessageReactionEvents,
     formatFileAttachmentMarkdown,
     formatFileSize,
     formatTime,
     isImageType,
+    messageReactionEvent,
+    messageReactions,
     parseFileExtra,
+    parseMessageExtra,
     parseMessageMarkdown,
     parseVexFileUrl,
+    toggleMessageReactionExtra,
 } from "../message-utils.ts";
 
 // ── Test helpers ────────────────────────────────────────────────────────────
@@ -227,6 +236,122 @@ describe("encrypted file markdown", () => {
         ]);
     });
 
+    test("linkifies bare http urls", () => {
+        const nodes = parseMessageMarkdown(
+            "read https://example.com/post?id=1, then reply",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "read ", type: "text" },
+                    {
+                        text: "https://example.com/post?id=1",
+                        type: "link",
+                        url: "https://example.com/post?id=1",
+                    },
+                    { text: ", then reply", type: "text" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("keeps balanced parentheses in bare urls", () => {
+        const nodes = parseMessageMarkdown(
+            "wiki https://example.com/Avatar_(2009_film) works",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [
+                    { text: "wiki ", type: "text" },
+                    {
+                        text: "https://example.com/Avatar_(2009_film)",
+                        type: "link",
+                        url: "https://example.com/Avatar_(2009_film)",
+                    },
+                    { text: " works", type: "text" },
+                ],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("parses fenced code blocks with language info", () => {
+        const nodes = parseMessageMarkdown(
+            "before\n```ts\nconst value = `hi`;\n```\nafter",
+        );
+
+        expect(nodes).toEqual([
+            {
+                segments: [{ text: "before\n", type: "text" }],
+                type: "text",
+            },
+            {
+                code: "const value = `hi`;",
+                language: "ts",
+                type: "codeBlock",
+            },
+            {
+                segments: [{ text: "after", type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("only opens fenced code blocks at line starts", () => {
+        const nodes = parseMessageMarkdown("foo ```bar``` baz");
+        expect(nodes.some((node) => node.type === "codeBlock")).toBe(false);
+    });
+
+    test("only closes fenced code blocks on fence lines", () => {
+        const nodes = parseMessageMarkdown(
+            '```js\nconst fence = "```";\n```\nafter',
+        );
+
+        expect(nodes).toEqual([
+            {
+                code: 'const fence = "```";',
+                language: "js",
+                type: "codeBlock",
+            },
+            {
+                segments: [{ text: "after", type: "text" }],
+                type: "text",
+            },
+        ]);
+    });
+
+    test("parses unclosed one-line fence language as metadata", () => {
+        expect(parseMessageMarkdown("```ts")).toEqual([
+            {
+                code: "",
+                language: "ts",
+                type: "codeBlock",
+            },
+        ]);
+    });
+
+    test("does not parse attachments or inline markdown inside fenced code", () => {
+        const markdown = formatFileAttachmentMarkdown({
+            contentType: "image/png",
+            fileID: "file-123",
+            fileName: "photo.png",
+            fileSize: 2048,
+            key: "abc123",
+        });
+
+        expect(
+            parseMessageMarkdown(`\`\`\`\n**nope** ${markdown}\n\`\`\``),
+        ).toEqual([
+            {
+                code: `**nope** ${markdown}`,
+                type: "codeBlock",
+            },
+        ]);
+    });
+
     test("treats malformed bracket-heavy markdown as plain text", () => {
         const text = `${"[".repeat(200)}${"[](".repeat(200)}`;
         expect(parseMessageMarkdown(text)).toEqual([
@@ -402,6 +527,145 @@ describe("applyEmoji", () => {
 
     test("does not match empty shortcode `::`", () => {
         expect(applyEmoji("::")).toBe("::");
+    });
+});
+
+// ── message reactions ──────────────────────────────────────────────────────
+
+describe("message reactions", () => {
+    test("toggles unicode reactions in message extra JSON", () => {
+        const emoji = createUnicodeReactionEmoji("👍", "thumbsup");
+        const added = toggleMessageReactionExtra(null, emoji, "alice");
+
+        expect(parseMessageExtra(added).reactions).toEqual([
+            {
+                emoji,
+                userIDs: ["alice"],
+            },
+        ]);
+
+        const removed = toggleMessageReactionExtra(added, emoji, "alice");
+        expect(removed).toBeNull();
+    });
+
+    test("keeps separate users on the same reaction", () => {
+        const emoji = createUnicodeReactionEmoji("❤️", "heart");
+        const alice = toggleMessageReactionExtra(null, emoji, "alice");
+        const bob = toggleMessageReactionExtra(alice, emoji, "bob");
+
+        expect(parseMessageExtra(bob).reactions?.[0]?.userIDs).toEqual([
+            "alice",
+            "bob",
+        ]);
+    });
+
+    test("preserves custom image emoji fields for future catalogs", () => {
+        const extra = JSON.stringify({
+            reactions: [
+                {
+                    emoji: {
+                        imageUrl: "https://cdn.example.test/party.png",
+                        kind: "custom",
+                        name: "party_blob",
+                        sourceID: "emoji-123",
+                    },
+                    userIDs: ["alice", "alice", "bob"],
+                },
+            ],
+            version: 1,
+        });
+
+        const parsed = parseMessageExtra(extra);
+        expect(parsed.reactions).toEqual([
+            {
+                emoji: {
+                    imageUrl: "https://cdn.example.test/party.png",
+                    kind: "custom",
+                    name: "party_blob",
+                    sourceID: "emoji-123",
+                },
+                userIDs: ["alice", "bob"],
+            },
+        ]);
+        const firstReaction = parsed.reactions?.[0];
+        expect(
+            firstReaction ? emojiReactionLabel(firstReaction.emoji) : null,
+        ).toBe(":party_blob:");
+    });
+
+    test("reads reactions from a message extra field", () => {
+        const extra = toggleMessageReactionExtra(
+            null,
+            createUnicodeReactionEmoji("🚀", "rocket"),
+            "alice",
+        );
+        const msg = makeMessage({ extra } as Partial<Message>);
+
+        expect(messageReactions(msg)).toHaveLength(1);
+        expect(messageReactions(msg)[0]?.userIDs).toEqual(["alice"]);
+    });
+
+    test("serializes reaction event messages in the extra field", () => {
+        const emoji = createUnicodeReactionEmoji("👀", "eyes");
+        const extra = createReactionEventExtra("m-target", emoji);
+
+        expect(
+            messageReactionEvent(
+                makeMessage({ extra, mailID: "m-event" } as Partial<Message>),
+            ),
+        ).toEqual({
+            action: "toggle",
+            emoji,
+            targetMailID: "m-target",
+        });
+    });
+
+    test("applies reaction event messages to the target message", () => {
+        const emoji = createUnicodeReactionEmoji("👍", "thumbsup");
+        const target = makeMessage({ mailID: "m-target" });
+        const event = {
+            action: "toggle",
+            emoji,
+            targetMailID: "m-target",
+        } as const;
+
+        const updated = applyMessageReactionEvent(
+            [target],
+            event,
+            "alice",
+        )[0] as (Message & { extra?: null | string }) | undefined;
+
+        if (!updated) {
+            throw new Error("Expected reaction event to update target");
+        }
+        expect(messageReactions(updated)).toEqual([
+            {
+                emoji,
+                userIDs: ["alice"],
+            },
+        ]);
+    });
+
+    test("folds reaction event messages out of visible history", () => {
+        const emoji = createUnicodeReactionEmoji("🎉", "tada");
+        const target = makeMessage({ mailID: "m-target" });
+        const eventMessage = makeMessage({
+            authorID: "bob",
+            extra: createReactionEventExtra("m-target", emoji),
+            mailID: "m-event",
+            message: "",
+        } as Partial<Message>);
+
+        const folded = foldMessageReactionEvents([target, eventMessage]);
+
+        expect(folded).toHaveLength(1);
+        expect(folded[0]?.mailID).toBe("m-target");
+        expect(messageReactions(folded[0] as Message)).toEqual([
+            {
+                emoji,
+                userIDs: ["bob"],
+            },
+        ]);
     });
 });
 

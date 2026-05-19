@@ -1,4 +1,3 @@
-import type { EncryptedFileAttachment } from "./message-utils.ts";
 /**
  * VexService — the sole gateway between UI components and the Vex protocol.
  *
@@ -60,6 +59,14 @@ import {
     clampLocalMessageRetentionDays,
     setLocalMessageRetentionDaysPreference,
 } from "./domains/settings.ts";
+import {
+    applyMessageReactionEvent,
+    createReactionEventExtra,
+    type EncryptedFileAttachment,
+    foldMessageReactionEvents,
+    type MessageEmoji,
+    messageReactionEvent,
+} from "./message-utils.ts";
 
 // ── Public types ────────────────────────────────────────────────────────────
 
@@ -154,8 +161,6 @@ export interface OperationResult {
     ok: boolean;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
 /**
  * Result of {@link VexService.beginPasskeySignIn}. Hands back the
  * options the host needs to drive the platform WebAuthn ceremony,
@@ -166,6 +171,8 @@ export interface PasskeySignInBegin {
     options: PublicKeyCredentialRequestOptionsJSON;
     requestID: string;
 }
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 export interface PushNotificationSubscriptionInput {
     channel: "expo";
@@ -228,6 +235,21 @@ interface ClientWithLocalDatabaseLike {
     database?: Pick<Storage, "deleteMessage">;
 }
 
+interface ClientWithMessageExtraLike {
+    messages: {
+        group: (
+            channelID: string,
+            message: string,
+            opts?: { extra?: null | string; retentionHintDays?: number },
+        ) => Promise<void>;
+        send: (
+            userID: string,
+            message: string,
+            opts?: { extra?: null | string; retentionHintDays?: number },
+        ) => Promise<void>;
+    };
+}
+
 interface ClientWithNotificationSubscriptionsLike {
     subscribeNotifications?: unknown;
     unsubscribeNotifications?: unknown;
@@ -286,8 +308,19 @@ interface HttpErrorLike {
     response: { status: number };
 }
 
+interface MessageMapWritableLike {
+    get: () => Record<string, Message[]>;
+    setKey: (key: string, messages: Message[]) => void;
+}
+
 interface NotificationSubscriptionLike {
     subscriptionID: string;
+}
+
+interface PendingReactionMessage {
+    attempts: number;
+    message: Message;
+    queuedAt: number;
 }
 
 interface ServerChannelBootstrapLike {
@@ -323,6 +356,11 @@ const WS_WATCHDOG_STALE_THRESHOLD_MS = 45_000;
 // strong signal we don't need to tear the socket down. Anything older
 // is treated as stale → full reconnect.
 const WS_FRESH_FRAME_THRESHOLD_MS = 12_000;
+const MAX_PROCESSED_REACTION_MAIL_IDS = 2_000;
+const MAX_PENDING_REACTION_CONVERSATIONS = 100;
+const MAX_PENDING_REACTION_MESSAGES_PER_CONVERSATION = 200;
+const MAX_PENDING_REACTION_APPLY_ATTEMPTS = 20;
+const PENDING_REACTION_MESSAGE_TTL_MS = 5 * 60 * 1000;
 
 class Disposable {
     private fns: Array<() => void> = [];
@@ -373,12 +411,17 @@ class VexService {
     private logoutInFlight: null | Promise<void> = null;
     private pendingApprovalWatchCancel: (() => void) | null = null;
     private pendingRateLimitNotice = false;
+    private readonly pendingReactionMessages = new Map<
+        string,
+        Map<string, PendingReactionMessage>
+    >();
     /**
      * When true, {@link runPopulateStateBody} stops scheduling more history
      * loads so {@link close} can shut SQLite without racing decrypt threads.
      */
     private populateStateAbort = false;
     private populateStateInFlight: null | Promise<void> = null;
+    private readonly processedReactionMailIDs = new Set<string>();
     private wsDebugEnabled = shouldDebugAuth();
     private wsDebugFrameLogsEnabled = shouldDebugAuth();
     private wsDebugInboundListener: ((data: Uint8Array) => void) | null = null;
@@ -744,6 +787,8 @@ class VexService {
     }
 
     async close(): Promise<void> {
+        this.pendingReactionMessages.clear();
+        this.processedReactionMailIDs.clear();
         if (this.client) {
             // `populateState` walks every channel + DM and decrypts SQLite
             // history — if we `database.close()` while that is still in
@@ -962,8 +1007,6 @@ class VexService {
         }
     }
 
-    // ── Channel operations ──────────────────────────────────────────────
-
     /**
      * Finish a passkey-registration ceremony. Persists the new
      * authenticator on spire and returns the public passkey shape
@@ -982,6 +1025,8 @@ class VexService {
             return { error: errorMessage(err), ok: false };
         }
     }
+
+    // ── Channel operations ──────────────────────────────────────────────
 
     /**
      * Finish a passkey authentication ceremony. Stage two of the
@@ -1050,8 +1095,6 @@ class VexService {
         return client.invites.retrieve(serverID);
     }
 
-    // ── Messaging ───────────────────────────────────────────────────────
-
     /** Effective local retention cap (defaults to 30 when signed out). */
     getLocalMessageRetentionDays(): number {
         const c = this.client as unknown as {
@@ -1063,6 +1106,13 @@ class VexService {
         }
         return $localMessageRetentionDaysWritable.get();
     }
+
+    async getServerPermissions(serverID: string): Promise<Permission[]> {
+        const client = this.requireClient();
+        return client.moderation.fetchPermissionList(serverID);
+    }
+
+    // ── Messaging ───────────────────────────────────────────────────────
 
     async getSessionInfo(): Promise<null | SessionInfo> {
         try {
@@ -1144,6 +1194,19 @@ class VexService {
                       }
                     : {}),
             };
+        } catch (err: unknown) {
+            return { error: errorMessage(err), ok: false };
+        }
+    }
+
+    async kickServerMember(
+        serverID: string,
+        userID: string,
+    ): Promise<OperationResult> {
+        try {
+            const client = this.requireClient();
+            await client.moderation.kick(userID, serverID);
+            return { ok: true };
         } catch (err: unknown) {
             return { error: errorMessage(err), ok: false };
         }
@@ -1377,12 +1440,12 @@ class VexService {
         }
     }
 
-    // ── User operations ─────────────────────────────────────────────────
-
     markRead(conversationKey: string): void {
         $dmUnreadCountsWritable.setKey(conversationKey, 0);
         $channelUnreadCountsWritable.setKey(conversationKey, 0);
     }
+
+    // ── User operations ─────────────────────────────────────────────────
 
     onDeviceRequestQueueChanged(listener: () => void): () => void {
         this.deviceRequestQueueListeners.add(listener);
@@ -1987,8 +2050,6 @@ class VexService {
         this.backgroundConnectionRecoverySuspended = suspended;
     }
 
-    // ── Unread management ───────────────────────────────────────────────
-
     /**
      * Updates the local message retention preference (1–30 days) and
      * applies it to the live client when connected.
@@ -2001,6 +2062,8 @@ class VexService {
         };
         c?.setLocalMessageRetentionDays?.(clamped);
     }
+
+    // ── Unread management ───────────────────────────────────────────────
 
     setWebsocketDebug(enabled: boolean): void {
         this.wsDebugEnabled = enabled;
@@ -2024,7 +2087,7 @@ class VexService {
         this.wsDebugStateLogsEnabled = enabled;
     }
 
-    // ── Lifecycle ───────────────────────────────────────────────────────
+    // ── Notifications ───────────────────────────────────────────────────
 
     async subscribePushNotifications(
         input: PushNotificationSubscriptionInput,
@@ -2060,6 +2123,59 @@ class VexService {
         )) as { data?: unknown };
 
         return parseNotificationSubscription(response.data);
+    }
+
+    // ── Encrypted message metadata ──────────────────────────────────────
+
+    async toggleMessageReaction(
+        conversationKey: string,
+        mailID: string,
+        isGroup: boolean,
+        emoji: MessageEmoji,
+    ): Promise<OperationResult> {
+        if (!$userWritable.get()?.userID) {
+            return { error: "Not signed in.", ok: false };
+        }
+
+        const extra = createReactionEventExtra(mailID, emoji);
+        const send = async (): Promise<void> => {
+            const client =
+                this.requireClient() as unknown as ClientWithMessageExtraLike;
+            if (isGroup) {
+                await client.messages.group(conversationKey, "", { extra });
+            } else {
+                await client.messages.send(conversationKey, "", { extra });
+            }
+        };
+
+        try {
+            await send();
+            return { ok: true };
+        } catch (err: unknown) {
+            if (isNetworkError(err) || isNotAuthenticatedError(err)) {
+                this.resetWebsocketWatchdog();
+                const recovered = await this.recoverConnection(
+                    isGroup ? "react-group" : "react-dm",
+                );
+                if (recovered === "authenticated") {
+                    try {
+                        await send();
+                        return { ok: true };
+                    } catch (retryErr: unknown) {
+                        if (
+                            isUnauthorizedError(retryErr) ||
+                            isNotAuthenticatedError(retryErr)
+                        ) {
+                            this.setAuthStatus("unauthorized");
+                        } else if (isNetworkError(retryErr)) {
+                            this.setAuthStatus("offline");
+                        }
+                        return { error: errorMessage(retryErr), ok: false };
+                    }
+                }
+            }
+            return { error: errorMessage(err), ok: false };
+        }
     }
 
     async unsubscribePushNotifications(subscriptionID: string): Promise<void> {
@@ -2126,6 +2242,84 @@ class VexService {
         }
     }
 
+    private applyPendingReactionMessages(
+        writable: MessageMapWritableLike,
+        conversationKey: string,
+    ): void {
+        const pending = this.pendingReactionMessages.get(conversationKey);
+        if (!pending || pending.size === 0) {
+            return;
+        }
+
+        let thread = writable.get()[conversationKey] ?? [];
+        const now = Date.now();
+        for (const [mailID, pendingReaction] of pending) {
+            const msg = pendingReaction.message;
+            if (this.processedReactionMailIDs.has(mailID)) {
+                pending.delete(mailID);
+                continue;
+            }
+            if (
+                now - pendingReaction.queuedAt >
+                    PENDING_REACTION_MESSAGE_TTL_MS ||
+                pendingReaction.attempts >= MAX_PENDING_REACTION_APPLY_ATTEMPTS
+            ) {
+                pending.delete(mailID);
+                continue;
+            }
+            const event = messageReactionEvent(msg);
+            if (!event) {
+                pending.delete(mailID);
+                continue;
+            }
+            const nextThread = applyMessageReactionEvent(
+                thread,
+                event,
+                msg.authorID,
+            );
+            if (nextThread === thread) {
+                pendingReaction.attempts += 1;
+                continue;
+            }
+            thread = nextThread;
+            pending.delete(mailID);
+            this.rememberProcessedReactionMailID(mailID);
+        }
+
+        if (pending.size === 0) {
+            this.pendingReactionMessages.delete(conversationKey);
+        }
+        writable.setKey(conversationKey, thread);
+    }
+
+    private applyReactionMessage(
+        writable: MessageMapWritableLike,
+        conversationKey: string,
+        msg: Message,
+    ): boolean {
+        const event = messageReactionEvent(msg);
+        if (!event) {
+            return false;
+        }
+        if (this.processedReactionMailIDs.has(msg.mailID)) {
+            return true;
+        }
+
+        const thread = writable.get()[conversationKey] ?? [];
+        const nextThread = applyMessageReactionEvent(
+            thread,
+            event,
+            msg.authorID,
+        );
+        if (nextThread === thread) {
+            this.queuePendingReactionMessage(conversationKey, msg);
+            return true;
+        }
+        this.rememberProcessedReactionMailID(msg.mailID);
+        writable.setKey(conversationKey, nextThread);
+        return true;
+    }
+
     private attachWebsocketDebug(): void {
         if (!this.wsDebugEnabled || !this.client) {
             return;
@@ -2157,8 +2351,6 @@ class VexService {
         this.wsDebugOriginalSend = originalSend;
         this.logWsState("ws:debug:attached", { frames: true });
     }
-
-    // ── Private ─────────────────────────────────────────────────────────
 
     /**
      * Binds the watchdog's "any inbound frame" listener to the
@@ -2192,6 +2384,8 @@ class VexService {
             }, WS_WATCHDOG_CHECK_INTERVAL_MS);
         }
     }
+
+    // ── Private ─────────────────────────────────────────────────────────
 
     private checkWebsocketWatchdog(): void {
         if (!this.client || this.wsWatchdogLastFrameAt === 0) {
@@ -2452,8 +2646,12 @@ class VexService {
         const threadKey = isOwnMessage ? msg.readerID : msg.authorID;
         const prev = $messagesWritable.get()[threadKey] ?? [];
         if (prev.some((m) => m.mailID === msg.mailID)) return;
+        if (this.applyReactionMessage($messagesWritable, threadKey, msg)) {
+            return;
+        }
 
         $messagesWritable.setKey(threadKey, [...prev, msg]);
+        this.applyPendingReactionMessages($messagesWritable, threadKey);
 
         if (!isOwnMessage) {
             const count = ($dmUnreadCountsWritable.get()[threadKey] ?? 0) + 1;
@@ -2466,8 +2664,12 @@ class VexService {
     private handleGroupMessage(msg: Message, channelID: string): void {
         const prev = $groupMessagesWritable.get()[channelID] ?? [];
         if (prev.some((m) => m.mailID === msg.mailID)) return;
+        if (this.applyReactionMessage($groupMessagesWritable, channelID, msg)) {
+            return;
+        }
 
         $groupMessagesWritable.setKey(channelID, [...prev, msg]);
+        this.applyPendingReactionMessages($groupMessagesWritable, channelID);
 
         const me = $userWritable.get();
         if (me && msg.authorID !== me.userID) {
@@ -2633,6 +2835,28 @@ class VexService {
         }
     }
 
+    private queuePendingReactionMessage(
+        conversationKey: string,
+        msg: Message,
+    ): void {
+        let pending = this.pendingReactionMessages.get(conversationKey);
+        if (!pending) {
+            pending = new Map();
+            this.pendingReactionMessages.set(conversationKey, pending);
+        }
+        pending.delete(msg.mailID);
+        pending.set(msg.mailID, {
+            attempts: 0,
+            message: msg,
+            queuedAt: Date.now(),
+        });
+        trimMapStart(pending, MAX_PENDING_REACTION_MESSAGES_PER_CONVERSATION);
+        trimMapStart(
+            this.pendingReactionMessages,
+            MAX_PENDING_REACTION_CONVERSATIONS,
+        );
+    }
+
     private async recoverConnection(
         reason: string,
     ): Promise<null | ResumeNetworkStatus> {
@@ -2699,6 +2923,10 @@ class VexService {
         setTimeout(() => {
             this.kickPopulateState(attempt + 1);
         }, 200);
+    }
+
+    private rememberProcessedReactionMailID(mailID: string): void {
+        rememberProcessedReactionMailID(this.processedReactionMailIDs, mailID);
     }
 
     private removeServerFromLocalState(serverID: string): void {
@@ -2824,7 +3052,10 @@ class VexService {
             const existing = $messagesWritable.get()[userID] ?? [];
             // Keep history-first ordering while preserving any newer live WS
             // arrivals already present in store.
-            return deduplicateMessages([...hydratedMsgs, ...existing]);
+            return deduplicateMessages(
+                [...hydratedMsgs, ...existing],
+                this.processedReactionMailIDs,
+            );
         };
         const mergeHydratedDmIntoStore = (): Record<string, Message[]> => {
             const prevDm = $messagesWritable.get();
@@ -2848,8 +3079,15 @@ class VexService {
                     userID,
                     mergeHydratedThread(userID, messagesAcc[userID]),
                 );
+                this.applyPendingReactionMessages($messagesWritable, userID);
             } else {
                 $messagesWritable.set(mergeHydratedDmIntoStore());
+                for (const threadKey of Object.keys(messagesAcc)) {
+                    this.applyPendingReactionMessages(
+                        $messagesWritable,
+                        threadKey,
+                    );
+                }
             }
             debugAuth("populateState:familiars-messages:published-progress", {
                 dmMessageCount: publishedDmMessageCount(),
@@ -2904,7 +3142,10 @@ class VexService {
                     `populateState: dm history timeout for ${user.userID}`,
                 );
                 if (msgs.length > 0) {
-                    messagesAcc[user.userID] = deduplicateMessages(msgs);
+                    messagesAcc[user.userID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
             } catch (err: unknown) {
                 if (isDecryptMismatchError(err)) {
@@ -3109,8 +3350,10 @@ class VexService {
                     `populateState: group history timeout for ${channel.channelID}`,
                 );
                 if (msgs.length > 0) {
-                    groupMessagesAcc[channel.channelID] =
-                        deduplicateMessages(msgs);
+                    groupMessagesAcc[channel.channelID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
                 const durationMs = Date.now() - startedAt;
                 if (durationMs > 1500) {
@@ -3189,7 +3432,10 @@ class VexService {
                     `populateState: session dm history timeout for ${userID}`,
                 );
                 if (msgs.length > 0) {
-                    messagesAcc[userID] = deduplicateMessages(msgs);
+                    messagesAcc[userID] = deduplicateMessages(
+                        msgs,
+                        this.processedReactionMailIDs,
+                    );
                 }
                 if (!familiarsAcc[userID]) {
                     const [user] = await withTimeout(
@@ -3251,12 +3497,21 @@ class VexService {
         $serversWritable.set(serversAcc);
         $channelsWritable.set(channelsAcc);
         $groupMessagesWritable.set(groupMessagesAcc);
+        for (const channelID of Object.keys(groupMessagesAcc)) {
+            this.applyPendingReactionMessages(
+                $groupMessagesWritable,
+                channelID,
+            );
+        }
         $permissionsWritable.set(permsAcc);
         $familiarsWritable.set(familiarsAcc);
         // Merge with existing DM threads so we do not wipe in-memory
         // conversations when SQLite is empty after retention prune, when
         // `retrieve` fails, or when a peer is not yet in `familiars`.
         $messagesWritable.set(mergeHydratedDmIntoStore());
+        for (const threadKey of Object.keys(messagesAcc)) {
+            this.applyPendingReactionMessages($messagesWritable, threadKey);
+        }
         debugAuth("populateState:familiars-messages:published-final", {
             dmMessageCount: publishedDmMessageCount(),
             dmThreadCount: Object.keys(messagesAcc).length,
@@ -3613,13 +3868,27 @@ function decodeMsgpackHttpData(data: unknown): unknown {
     throw new Error("Expected msgpack HTTP response");
 }
 
-function deduplicateMessages(messages: Message[]): Message[] {
+function deduplicateMessages(
+    messages: Message[],
+    processedReactionMailIDs?: Set<string>,
+): Message[] {
     const seen = new Set<string>();
-    return messages.filter((m) => {
+    const deduped = messages.filter((m) => {
         if (seen.has(m.mailID)) return false;
         seen.add(m.mailID);
         return true;
     });
+    if (processedReactionMailIDs) {
+        for (const message of deduped) {
+            if (messageReactionEvent(message)) {
+                rememberProcessedReactionMailID(
+                    processedReactionMailIDs,
+                    message.mailID,
+                );
+            }
+        }
+    }
+    return foldMessageReactionEvents(deduped);
 }
 
 function describeWsFrame(data: Uint8Array): {
@@ -3932,6 +4201,18 @@ function readErrorField(body: unknown): null | string {
     return null;
 }
 
+function rememberProcessedReactionMailID(
+    processedReactionMailIDs: Set<string>,
+    mailID: string,
+): void {
+    processedReactionMailIDs.add(mailID);
+    if (processedReactionMailIDs.size <= MAX_PROCESSED_REACTION_MAIL_IDS) {
+        return;
+    }
+    processedReactionMailIDs.clear();
+    processedReactionMailIDs.add(mailID);
+}
+
 async function runWithFormDataDisabled<T>(fn: () => Promise<T>): Promise<T> {
     const globalWithFormData = globalThis as {
         FormData?: unknown;
@@ -3954,6 +4235,19 @@ function shouldDebugAuth(): boolean {
         process?: { env?: Record<string, string | undefined> };
     };
     return p.process?.env?.["VEX_DEBUG_AUTH"] === "1";
+}
+
+function trimMapStart<TKey, TValue>(
+    map: Map<TKey, TValue>,
+    maxSize: number,
+): void {
+    while (map.size > maxSize) {
+        const first = map.keys().next();
+        if (first.done) {
+            return;
+        }
+        map.delete(first.value);
+    }
 }
 
 function waitMs(ms: number): Promise<void> {
