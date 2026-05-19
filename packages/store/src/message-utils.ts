@@ -55,7 +55,7 @@ export type MessageMarkdownNode =
           type: "attachment";
       }
     | { code: string; language?: string; type: "codeBlock" }
-    | { segments: MarkdownInlineSegment[]; type: "text" };
+    | { segments: MarkdownInlineSegment[]; source?: string; type: "text" };
 
 export interface MessageReaction {
     emoji: MessageEmoji;
@@ -876,10 +876,15 @@ function pushSegment(
 
 function pushTextNode(nodes: MessageMarkdownNode[], text: string): void {
     if (text.length === 0) return;
-    nodes.push({
+    const node: MessageMarkdownNode = {
         segments: parseInlineMarkdown(text),
         type: "text",
+    };
+    Object.defineProperty(node, "source", {
+        enumerable: false,
+        value: text,
     });
+    nodes.push(node);
 }
 
 function trimCodeFenceText(value: string): string {

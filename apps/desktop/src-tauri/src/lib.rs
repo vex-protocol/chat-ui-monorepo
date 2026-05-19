@@ -1,4 +1,4 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -8,6 +8,7 @@ use tauri::{
 
 const TRAY_ID: &str = "main";
 const LINK_PREVIEW_HTML_LIMIT: usize = 512 * 1024;
+const LINK_PREVIEW_REDIRECT_LIMIT: usize = 4;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,21 +30,15 @@ fn ipv4_mapped_address(ip: Ipv6Addr) -> Option<Ipv4Addr> {
     ))
 }
 
-fn is_safe_preview_host(host: &str) -> bool {
+fn is_blocked_preview_hostname(host: &str) -> bool {
     let normalized = host
         .trim_matches(|char| char == '[' || char == ']')
         .trim_end_matches('.')
         .to_ascii_lowercase();
-    if normalized == "localhost"
+
+    normalized == "localhost"
         || normalized.ends_with(".localhost")
         || normalized.ends_with(".local")
-    {
-        return false;
-    }
-    match normalized.parse::<IpAddr>() {
-        Ok(ip) => is_safe_preview_ip(ip),
-        Err(_) => true,
-    }
 }
 
 fn is_safe_preview_ip(ip: IpAddr) -> bool {
@@ -68,12 +63,92 @@ fn is_safe_preview_ipv6(ip: Ipv6Addr) -> bool {
         || (first_segment & 0xffc0) == 0xfe80)
 }
 
-fn is_safe_preview_url(url: &reqwest::Url) -> bool {
+fn is_safe_preview_url_syntax(url: &reqwest::Url) -> bool {
     match url.scheme() {
         "http" | "https" => {}
         _ => return false,
     }
-    url.host_str().is_some_and(is_safe_preview_host)
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    if is_blocked_preview_hostname(host) {
+        return false;
+    }
+    match host.parse::<IpAddr>() {
+        Ok(ip) => is_safe_preview_ip(ip),
+        Err(_) => true,
+    }
+}
+
+async fn resolve_safe_preview_addrs(url: &reqwest::Url) -> Result<Vec<SocketAddr>, String> {
+    if !is_safe_preview_url_syntax(url) {
+        return Err("Preview target is not allowed".to_string());
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| "Preview target is not allowed".to_string())?
+        .trim_matches(|char| char == '[' || char == ']')
+        .trim_end_matches('.')
+        .to_string();
+    let port = url
+        .port_or_known_default()
+        .ok_or_else(|| "Preview target is not allowed".to_string())?;
+    let addrs = tauri::async_runtime::spawn_blocking(move || {
+        (host.as_str(), port)
+            .to_socket_addrs()
+            .map(|iter| iter.collect::<Vec<_>>())
+    })
+    .await
+    .map_err(|err| err.to_string())?
+    .map_err(|err| err.to_string())?;
+
+    if addrs.is_empty() || addrs.iter().any(|addr| !is_safe_preview_ip(addr.ip())) {
+        return Err("Preview target is not allowed".to_string());
+    }
+    Ok(addrs)
+}
+
+async fn build_link_preview_client(url: &reqwest::Url) -> Result<reqwest::Client, String> {
+    let addrs = resolve_safe_preview_addrs(url).await?;
+    let mut builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .redirect(reqwest::redirect::Policy::none())
+        .user_agent("Vex/0.1 link-preview");
+
+    if url
+        .host_str()
+        .and_then(|host| host.parse::<IpAddr>().ok())
+        .is_none()
+    {
+        let host = url
+            .host_str()
+            .ok_or_else(|| "Preview target is not allowed".to_string())?;
+        builder = builder.resolve_to_addrs(host, &addrs);
+    }
+
+    builder.build().map_err(|err| err.to_string())
+}
+
+fn resolve_redirect_url(
+    location: &reqwest::header::HeaderValue,
+    base_url: &reqwest::Url,
+) -> Result<reqwest::Url, String> {
+    let location = location
+        .to_str()
+        .map_err(|_| "Invalid preview redirect".to_string())?;
+    base_url
+        .join(location)
+        .map_err(|_| "Invalid preview redirect".to_string())
+}
+
+async fn send_link_preview_request(url: &reqwest::Url) -> Result<reqwest::Response, String> {
+    let client = build_link_preview_client(url).await?;
+    client
+        .get(url.clone())
+        .send()
+        .await
+        .map_err(|err| err.to_string())
 }
 
 fn show_window(app: &tauri::AppHandle) {
@@ -111,36 +186,31 @@ async fn fetch_link_preview_html(url: String) -> Result<LinkPreviewHtml, String>
         "http" | "https" => {}
         _ => return Err("Only HTTP links can be previewed".to_string()),
     }
-    if !is_safe_preview_url(&parsed) {
-        return Err("Preview target is not allowed".to_string());
-    }
-
     // Match the updater's lean reqwest/rustls configuration without pulling in AWS-LC.
     let _ = rustls::crypto::ring::default_provider().install_default();
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(8))
-        .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() > 4 {
-                attempt.error("too many redirects")
-            } else if is_safe_preview_url(attempt.url()) {
-                attempt.follow()
-            } else {
-                attempt.stop()
-            }
-        }))
-        .user_agent("Vex/0.1 link-preview")
-        .build()
-        .map_err(|err| err.to_string())?;
-
-    let mut response = client
-        .get(parsed)
-        .send()
-        .await
-        .map_err(|err| err.to_string())?;
-    if !is_safe_preview_url(response.url()) {
-        return Err("Preview target is not allowed".to_string());
+    let mut current_url = parsed;
+    let mut response;
+    let mut redirects = 0usize;
+    loop {
+        response = send_link_preview_request(&current_url).await?;
+        if !is_safe_preview_url_syntax(response.url()) {
+            return Err("Preview target is not allowed".to_string());
+        }
+        if !response.status().is_redirection() {
+            break;
+        }
+        if redirects >= LINK_PREVIEW_REDIRECT_LIMIT {
+            return Err("too many redirects".to_string());
+        }
+        let location = response
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .ok_or_else(|| "Invalid preview redirect".to_string())?;
+        current_url = resolve_redirect_url(location, response.url())?;
+        redirects += 1;
     }
+
     if !response.status().is_success() {
         return Err(format!("Preview request failed: {}", response.status()));
     }
