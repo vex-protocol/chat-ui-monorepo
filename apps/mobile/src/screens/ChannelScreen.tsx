@@ -41,7 +41,11 @@ import { Avatar } from "../components/Avatar";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
-import { pickFileAttachment, pickImageAttachment } from "../lib/attachments";
+import {
+    pasteImageAttachmentFromClipboard,
+    pickFileAttachment,
+    pickImageAttachment,
+} from "../lib/attachments";
 import { haptic } from "../lib/haptics";
 import { $leftSidebarOpen, $rightSidebarOpen } from "../lib/sidebarState";
 import { colors, typography } from "../theme";
@@ -246,6 +250,8 @@ export function ChannelScreen({
         sendInFlightRef.current = true;
         setSending(true);
         setSendError("");
+        setText("");
+        setAttachment(null);
         try {
             let messageBody = content;
             if (pendingAttachment) {
@@ -258,6 +264,10 @@ export function ChannelScreen({
                 if (!uploaded.ok || !uploaded.attachment) {
                     setSendError(
                         uploaded.error ?? "Failed to upload attachment",
+                    );
+                    setText((current) => (current === "" ? content : current));
+                    setAttachment((current) =>
+                        current === null ? pendingAttachment : current,
                     );
                     return;
                 }
@@ -275,12 +285,18 @@ export function ChannelScreen({
             );
             if (!result.ok) {
                 setSendError(result.error ?? "Failed to send");
+                setText((current) => (current === "" ? content : current));
+                setAttachment((current) =>
+                    current === null ? pendingAttachment : current,
+                );
                 return;
             }
-            setAttachment(null);
-            setText("");
         } catch (err: unknown) {
             setSendError(err instanceof Error ? err.message : "Failed to send");
+            setText((current) => (current === "" ? content : current));
+            setAttachment((current) =>
+                current === null ? pendingAttachment : current,
+            );
         } finally {
             sendInFlightRef.current = false;
             setSending(false);
@@ -311,6 +327,26 @@ export function ChannelScreen({
         [setAttachment],
     );
 
+    const handlePasteAttachment = useCallback(() => {
+        void (async () => {
+            setSendError("");
+            try {
+                const pasted = await pasteImageAttachmentFromClipboard();
+                if (!pasted) {
+                    setSendError("Clipboard does not contain an image.");
+                    return;
+                }
+                setAttachment(pasted);
+            } catch (err: unknown) {
+                setSendError(
+                    err instanceof Error
+                        ? err.message
+                        : "Could not paste image",
+                );
+            }
+        })();
+    }, []);
+
     const openAttachmentMenu = useCallback(() => {
         if (sending) return;
         Alert.alert("Attach", "Choose something to send.", [
@@ -326,9 +362,15 @@ export function ChannelScreen({
                 },
                 text: "File",
             },
+            {
+                onPress: () => {
+                    handlePasteAttachment();
+                },
+                text: "Paste Image",
+            },
             { style: "cancel", text: "Cancel" },
         ]);
-    }, [handlePickAttachment, sending]);
+    }, [handlePasteAttachment, handlePickAttachment, sending]);
 
     const deleteMessage = useCallback(
         (message: Message) => {
@@ -455,6 +497,7 @@ export function ChannelScreen({
                 bottomInset={insets.bottom}
                 onAttachPress={openAttachmentMenu}
                 onChangeText={setText}
+                onPastePress={handlePasteAttachment}
                 onRemoveAttachment={() => {
                     setAttachment(null);
                 }}
