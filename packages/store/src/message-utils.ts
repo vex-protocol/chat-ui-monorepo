@@ -75,7 +75,7 @@ interface MarkdownLinkMatch {
     url: string;
 }
 
-type MessageWithClientExtra = Message & { extra?: null | string };
+type MessageWithClientExtra = Message & { extra?: null | string | undefined };
 
 // ── Avatar hue ───────────────────────────────────────────────────────────────
 
@@ -204,13 +204,13 @@ export function formatFileAttachmentMarkdown(
 }
 
 export function messageReactionEvent(
-    message: Message & { extra?: null | string },
+    message: MessageWithClientExtra,
 ): MessageReactionEvent | null {
     return parseMessageExtra(message.extra).reactionEvent ?? null;
 }
 
 export function messageReactions(
-    message: Message & { extra?: null | string },
+    message: MessageWithClientExtra,
 ): MessageReaction[] {
     return parseMessageExtra(message.extra).reactions ?? [];
 }
