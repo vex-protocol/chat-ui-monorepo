@@ -3891,10 +3891,11 @@ function jwtExpToEpochMs(exp: number): number {
 }
 
 function looksLikeReactNativeBlobError(message: string): boolean {
+    const normalized = message.toLowerCase();
     return (
-        message.includes("ArrayBuffer") &&
-        message.includes("ArrayBufferView") &&
-        message.includes("Blob")
+        normalized.includes("arraybuffer") &&
+        normalized.includes("arraybufferview") &&
+        normalized.includes("blob")
     );
 }
 
