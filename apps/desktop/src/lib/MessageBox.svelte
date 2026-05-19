@@ -5,6 +5,7 @@
 
     import Avatar from "./Avatar.svelte";
     import { getServerUrl } from "./config.js";
+    import LinkPreviewCard from "./LinkPreviewCard.svelte";
     import { user } from "./store/index.js";
     import {
         chunkMessages,
@@ -95,6 +96,7 @@
                 <div class="message">
                     <!-- eslint-disable-next-line svelte/no-at-html-tags -- DOMPurify-sanitized in renderContent() -->
                     {@html renderContent(msg.message)}
+                    <LinkPreviewCard content={msg.message} />
                 </div>
             {/each}
         </div>
