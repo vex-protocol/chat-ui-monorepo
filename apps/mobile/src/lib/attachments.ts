@@ -169,6 +169,15 @@ function fileNameFromUri(uri: string, fallback: string): string {
 function inferContentTypeFromName(fileName: string, fallback: string): string {
     const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
     switch (ext) {
+        case "aac":
+            return "audio/aac";
+        case "aif":
+        case "aiff":
+            return "audio/aiff";
+        case "avi":
+            return "video/x-msvideo";
+        case "flac":
+            return "audio/flac";
         case "gif":
             return "image/gif";
         case "heic":
@@ -178,14 +187,36 @@ function inferContentTypeFromName(fileName: string, fallback: string): string {
             return "image/jpeg";
         case "json":
             return "application/json";
+        case "m4a":
+            return "audio/mp4";
+        case "m4v":
+            return "video/x-m4v";
         case "md":
             return "text/markdown";
+        case "mov":
+            return "video/quicktime";
+        case "mp3":
+            return "audio/mpeg";
+        case "mp4":
+            return "video/mp4";
+        case "mpeg":
+        case "mpg":
+            return "video/mpeg";
+        case "oga":
+        case "ogg":
+            return "audio/ogg";
+        case "ogv":
+            return "video/ogg";
         case "pdf":
             return "application/pdf";
         case "png":
             return "image/png";
         case "txt":
             return "text/plain";
+        case "wav":
+            return "audio/wav";
+        case "webm":
+            return "video/webm";
         case "webp":
             return "image/webp";
         default:

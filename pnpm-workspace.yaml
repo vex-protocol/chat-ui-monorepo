@@ -16,6 +16,7 @@ catalog:
     dompurify: ^3.4.0
     expo-background-fetch: ~55.0.15
     expo-background-task: ~55.0.17
+    expo-audio: ~55.0.14
     expo-clipboard: ~55.0.13
     expo-constants: ~55.0.13
     expo-crypto: ~55.0.14
@@ -25,6 +26,7 @@ catalog:
     expo-intent-launcher: ~55.0.12
     expo-sharing: ~55.0.18
     expo-task-manager: ~55.0.15
+    expo-video: ~55.0.17
     highlight.js: ^11.11.1
     kysely: ^0.28.17
     marked: ^15.0.12

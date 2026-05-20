@@ -123,6 +123,21 @@ module.exports = ({ config }) => {
                     Array.isArray(plugin) && plugin[0] === "expo-notifications"
                 );
             }),
+            [
+                "expo-audio",
+                {
+                    enableBackgroundPlayback: false,
+                    microphonePermission: false,
+                    recordAudioAndroid: false,
+                },
+            ],
+            [
+                "expo-video",
+                {
+                    supportsBackgroundPlayback: false,
+                    supportsPictureInPicture: false,
+                },
+            ],
             "expo-background-task",
             "./plugins/withForegroundService",
             "./plugins/withAndroidShareIntent",
