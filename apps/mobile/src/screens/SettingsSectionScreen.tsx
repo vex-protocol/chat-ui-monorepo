@@ -835,11 +835,6 @@ export function SettingsSectionScreen({
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
                             />
-                            <MenuRow
-                                icon="server-outline"
-                                label="Homeserver"
-                                monoBlock={homeserver}
-                            />
                             {shouldShowAboutUpdateRow ? (
                                 <MenuRow
                                     accessory={renderUpdateAccessory()}
@@ -860,6 +855,12 @@ export function SettingsSectionScreen({
                                     }
                                 />
                             ) : null}
+                            <MenuRow
+                                icon="server-outline"
+                                label="Homeserver"
+                                monoValue
+                                value={homeserver}
+                            />
                         </MenuSection>
                     </>
                 ) : null}
