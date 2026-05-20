@@ -618,6 +618,8 @@ export function ChannelScreen({
                     setAttachment(null);
                 }}
                 onSend={() => void sendMessage()}
+                onVoiceMemoError={setSendError}
+                onVoiceMemoRecorded={setAttachment}
                 placeholder={`Message #${channelName}`}
                 sending={sending}
                 value={text}

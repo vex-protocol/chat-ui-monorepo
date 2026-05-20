@@ -269,6 +269,8 @@ export function ConversationScreen({
                     setAttachment(null);
                 }}
                 onSend={() => void sendMessage()}
+                onVoiceMemoError={setError}
+                onVoiceMemoRecorded={setAttachment}
                 placeholder={`Message @${username}`}
                 sending={sending}
                 value={text}
