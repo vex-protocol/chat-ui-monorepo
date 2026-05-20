@@ -28,11 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatHeader } from "../components/ChatHeader";
 import { MessageBubbleRN } from "../components/MessageBubbleRN";
 import { MessageInputBar } from "../components/MessageInputBar";
-import {
-    pasteImageAttachmentFromClipboard,
-    pickFileAttachment,
-    pickImageAttachment,
-} from "../lib/attachments";
+import { pickFileAttachment, pickImageAttachment } from "../lib/attachments";
 import { colors, typography } from "../theme";
 
 const GROUP_WINDOW_MS = 10 * 60 * 1000;
@@ -158,29 +154,10 @@ export function ConversationScreen({
         [setAttachment],
     );
 
-    const handlePasteAttachment = useCallback(() => {
-        void (async () => {
-            setError("");
-            try {
-                const pasted = await pasteImageAttachmentFromClipboard();
-                if (!pasted) {
-                    setError("Clipboard does not contain an image.");
-                    return;
-                }
-                setAttachment(pasted);
-            } catch (err: unknown) {
-                setError(
-                    err instanceof Error
-                        ? err.message
-                        : "Could not paste image",
-                );
-            }
-        })();
-    }, []);
-
     const openAttachmentMenu = useCallback(() => {
         if (sending) return;
-        Alert.alert("Attach", "Choose something to send.", [
+        Alert.alert("Attach", undefined, [
+            { style: "cancel", text: "Cancel" },
             {
                 onPress: () => {
                     handlePickAttachment("image");
@@ -193,15 +170,8 @@ export function ConversationScreen({
                 },
                 text: "File",
             },
-            {
-                onPress: () => {
-                    handlePasteAttachment();
-                },
-                text: "Paste Image",
-            },
-            { style: "cancel", text: "Cancel" },
         ]);
-    }, [handlePasteAttachment, handlePickAttachment, sending]);
+    }, [handlePickAttachment, sending]);
 
     const deleteMessage = useCallback(
         (message: Message) => {
@@ -295,7 +265,6 @@ export function ConversationScreen({
                 bottomInset={insets.bottom}
                 onAttachPress={openAttachmentMenu}
                 onChangeText={setText}
-                onPastePress={handlePasteAttachment}
                 onRemoveAttachment={() => {
                     setAttachment(null);
                 }}

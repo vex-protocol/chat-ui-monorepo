@@ -28,7 +28,7 @@
     }
 
     function handleKeyDown(e: KeyboardEvent): void {
-        if (e.key === "Enter" && !e.shiftKey) {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             void send();
         }
@@ -227,7 +227,7 @@
                         disabled ||
                         sending}
                     aria-label="Send message"
-                    title="Send (Enter)">↑</button
+                    title="Send">↑</button
                 >
             {/if}
         </div>
