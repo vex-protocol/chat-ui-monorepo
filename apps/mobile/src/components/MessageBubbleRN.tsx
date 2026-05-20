@@ -6,7 +6,11 @@ import type {
     MessageMarkdownNode,
     MessageReaction,
 } from "@vex-chat/store";
-import type { GestureResponderEvent, TextStyle } from "react-native";
+import type {
+    DimensionValue,
+    GestureResponderEvent,
+    TextStyle,
+} from "react-native";
 
 import React from "react";
 import {
@@ -40,7 +44,9 @@ import {
 } from "@vex-chat/store";
 
 import { Ionicons } from "@expo/vector-icons";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as Sharing from "expo-sharing";
+import { useVideoPlayer, VideoView } from "expo-video";
 
 import { bytesToBase64, writeAttachmentToCache } from "../lib/attachments";
 import { haptic } from "../lib/haptics";
@@ -631,6 +637,26 @@ function AttachmentPreview({
         ? `Open image preview for ${attachment.fileName}`
         : `Open attachment for ${attachment.fileName}`;
 
+    if (isAudioType(attachment.contentType)) {
+        return (
+            <AudioAttachment
+                attachment={attachment}
+                onShare={openAttachment}
+                sharing={opening}
+            />
+        );
+    }
+
+    if (isVideoType(attachment.contentType)) {
+        return (
+            <VideoAttachment
+                attachment={attachment}
+                onShare={openAttachment}
+                sharing={opening}
+            />
+        );
+    }
+
     if (shouldRenderImage) {
         return (
             <>
@@ -738,6 +764,162 @@ function AttachmentPreview({
     );
 }
 
+function AudioAttachment({
+    attachment,
+    onShare,
+    sharing,
+}: {
+    attachment: EncryptedFileAttachment;
+    onShare: () => Promise<void>;
+    sharing: boolean;
+}) {
+    const player = useAudioPlayer(null, { updateInterval: 250 });
+    const status = useAudioPlayerStatus(player);
+    const [error, setError] = React.useState("");
+    const [loading, setLoading] = React.useState(false);
+    const [mediaUri, setMediaUri] = React.useState<null | string>(null);
+
+    React.useEffect(() => {
+        return () => {
+            player.pause();
+        };
+    }, [player]);
+
+    const loadAudio = React.useCallback(async (): Promise<void> => {
+        if (mediaUri) {
+            return;
+        }
+        setLoading(true);
+        setError("");
+        try {
+            const uri = await writeAttachmentDataToCache(attachment);
+            player.replace({ name: attachment.fileName, uri });
+            setMediaUri(uri);
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Could not load audio";
+            setError(message);
+            throw new Error(message);
+        } finally {
+            setLoading(false);
+        }
+    }, [attachment, mediaUri, player]);
+
+    const togglePlayback = React.useCallback(async () => {
+        if (loading) return;
+        try {
+            if (status.playing) {
+                player.pause();
+                return;
+            }
+            await loadAudio();
+            if (status.didJustFinish) {
+                await player.seekTo(0);
+            }
+            player.play();
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Could not play audio";
+            setError(message);
+        }
+    }, [loadAudio, loading, player, status.didJustFinish, status.playing]);
+
+    const duration = Number.isFinite(status.duration) ? status.duration : 0;
+    const currentTime = Number.isFinite(status.currentTime)
+        ? status.currentTime
+        : 0;
+    const progress = duration > 0 ? clamp(currentTime / duration, 0, 1) : 0;
+    const progressWidth = `${String(progress * 100)}%` as DimensionValue;
+    const playIcon = status.playing ? "pause" : "play";
+    const loadingLabel = mediaUri ? "Buffering audio" : "Loading audio";
+
+    return (
+        <View style={styles.audioAttachment}>
+            <View style={styles.mediaHeader}>
+                <Pressable
+                    accessibilityLabel={
+                        status.playing
+                            ? `Pause ${attachment.fileName}`
+                            : `Play ${attachment.fileName}`
+                    }
+                    accessibilityRole="button"
+                    disabled={loading}
+                    onPress={() => {
+                        void togglePlayback();
+                    }}
+                    style={({ pressed }) => [
+                        styles.mediaPlayButton,
+                        pressed && styles.attachmentPressed,
+                    ]}
+                >
+                    {loading || status.isBuffering ? (
+                        <ActivityIndicator
+                            color={colors.textSecondary}
+                            size="small"
+                        />
+                    ) : (
+                        <Ionicons
+                            color={colors.textSecondary}
+                            name={playIcon}
+                            size={20}
+                        />
+                    )}
+                </Pressable>
+                <View style={styles.fileAttachmentMeta}>
+                    <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.fileName}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                        {loading || status.isBuffering
+                            ? loadingLabel
+                            : formatFileSize(attachment.fileSize)}
+                    </Text>
+                </View>
+                <Pressable
+                    accessibilityLabel={`Share ${attachment.fileName}`}
+                    accessibilityRole="button"
+                    disabled={sharing}
+                    onPress={() => {
+                        void onShare();
+                    }}
+                    style={({ pressed }) => [
+                        styles.mediaIconButton,
+                        pressed && styles.attachmentPressed,
+                    ]}
+                >
+                    {sharing ? (
+                        <ActivityIndicator color={colors.muted} size="small" />
+                    ) : (
+                        <Ionicons
+                            color={colors.muted}
+                            name="share-outline"
+                            size={18}
+                        />
+                    )}
+                </Pressable>
+            </View>
+            <View style={styles.mediaProgressTrack}>
+                <View
+                    style={[styles.mediaProgressFill, { width: progressWidth }]}
+                />
+            </View>
+            <View style={styles.mediaTimeRow}>
+                <Text style={styles.attachmentSize}>
+                    {formatMediaTime(currentTime)}
+                </Text>
+                <Text style={styles.attachmentSize}>
+                    {duration > 0 ? formatMediaTime(duration) : "--:--"}
+                </Text>
+            </View>
+            {error ? (
+                <Text numberOfLines={2} style={styles.attachmentError}>
+                    {error}
+                </Text>
+            ) : null}
+        </View>
+    );
+}
+
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
 }
@@ -822,6 +1004,14 @@ async function fetchAttachmentData(
     return result.data;
 }
 
+function formatMediaTime(seconds: number): string {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
+    const totalSeconds = Math.floor(seconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainder = totalSeconds % 60;
+    return `${String(minutes)}:${String(remainder).padStart(2, "0")}`;
+}
+
 function inlineSegmentStyle(segment: MarkdownInlineSegment): null | TextStyle {
     switch (segment.type) {
         case "code":
@@ -835,6 +1025,10 @@ function inlineSegmentStyle(segment: MarkdownInlineSegment): null | TextStyle {
         case "text":
             return null;
     }
+}
+
+function isAudioType(contentType: string): boolean {
+    return contentType.toLowerCase().startsWith("audio/");
 }
 
 function isSingleEmojiGrapheme(value: string): boolean {
@@ -862,6 +1056,10 @@ function isSingleEmojiGrapheme(value: string): boolean {
         return false;
     }
     return /\p{Extended_Pictographic}/u.test(value);
+}
+
+function isVideoType(contentType: string): boolean {
+    return contentType.toLowerCase().startsWith("video/");
 }
 
 function MarkdownMessage({
@@ -1008,6 +1206,162 @@ function ReactionRow({
     );
 }
 
+function VideoAttachment({
+    attachment,
+    onShare,
+    sharing,
+}: {
+    attachment: EncryptedFileAttachment;
+    onShare: () => Promise<void>;
+    sharing: boolean;
+}) {
+    const player = useVideoPlayer(null, (videoPlayer) => {
+        videoPlayer.showNowPlayingNotification = false;
+        videoPlayer.staysActiveInBackground = false;
+    });
+    const [error, setError] = React.useState("");
+    const [loading, setLoading] = React.useState(false);
+    const [mediaUri, setMediaUri] = React.useState<null | string>(null);
+
+    React.useEffect(() => {
+        return () => {
+            player.pause();
+        };
+    }, [player]);
+
+    const loadVideo = React.useCallback(async (): Promise<void> => {
+        if (mediaUri) {
+            player.play();
+            return;
+        }
+        setLoading(true);
+        setError("");
+        try {
+            const uri = await writeAttachmentDataToCache(attachment);
+            await player.replaceAsync({
+                metadata: { title: attachment.fileName },
+                uri,
+            });
+            setMediaUri(uri);
+            player.play();
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : "Could not load video";
+            setError(message);
+        } finally {
+            setLoading(false);
+        }
+    }, [attachment, mediaUri, player]);
+
+    if (!mediaUri) {
+        return (
+            <Pressable
+                accessibilityLabel={`Play video ${attachment.fileName}`}
+                accessibilityRole="button"
+                disabled={loading}
+                onPress={() => {
+                    void loadVideo();
+                }}
+                style={({ pressed }) => [
+                    styles.fileAttachment,
+                    pressed && styles.attachmentPressed,
+                ]}
+            >
+                <View style={styles.fileAttachmentIcon}>
+                    {loading ? (
+                        <ActivityIndicator
+                            color={colors.textSecondary}
+                            size="small"
+                        />
+                    ) : (
+                        <Ionicons
+                            color={colors.textSecondary}
+                            name="play"
+                            size={20}
+                        />
+                    )}
+                </View>
+                <View style={styles.fileAttachmentMeta}>
+                    <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.fileName}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                        {loading
+                            ? "Loading video"
+                            : formatFileSize(attachment.fileSize)}
+                    </Text>
+                    {error ? (
+                        <Text numberOfLines={1} style={styles.attachmentError}>
+                            {error}
+                        </Text>
+                    ) : null}
+                </View>
+                <Ionicons
+                    color={colors.muted}
+                    name="videocam-outline"
+                    size={18}
+                />
+            </Pressable>
+        );
+    }
+
+    return (
+        <View style={styles.videoAttachment}>
+            <VideoView
+                contentFit="contain"
+                fullscreenOptions={{ enable: true }}
+                nativeControls
+                player={player}
+                style={styles.videoAttachmentMedia}
+            />
+            <View style={styles.mediaFooter}>
+                <View style={styles.fileAttachmentMeta}>
+                    <Text numberOfLines={1} style={styles.attachmentName}>
+                        {attachment.fileName}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                        {formatFileSize(attachment.fileSize)}
+                    </Text>
+                </View>
+                <Pressable
+                    accessibilityLabel={`Share ${attachment.fileName}`}
+                    accessibilityRole="button"
+                    disabled={sharing}
+                    onPress={() => {
+                        void onShare();
+                    }}
+                    style={({ pressed }) => [
+                        styles.mediaIconButton,
+                        pressed && styles.attachmentPressed,
+                    ]}
+                >
+                    {sharing ? (
+                        <ActivityIndicator color={colors.muted} size="small" />
+                    ) : (
+                        <Ionicons
+                            color={colors.muted}
+                            name="share-outline"
+                            size={18}
+                        />
+                    )}
+                </Pressable>
+            </View>
+            {error ? (
+                <Text numberOfLines={2} style={styles.attachmentError}>
+                    {error}
+                </Text>
+            ) : null}
+        </View>
+    );
+}
+
+async function writeAttachmentDataToCache(
+    attachment: EncryptedFileAttachment,
+): Promise<string> {
+    const data = await fetchAttachmentData(attachment);
+    return writeAttachmentToCache(attachment, data);
+}
+
 const styles = StyleSheet.create({
     attachmentCaption: {
         backgroundColor: "rgba(0,0,0,0.62)",
@@ -1037,6 +1391,16 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.muted,
         fontSize: 11,
+    },
+    audioAttachment: {
+        backgroundColor: "rgba(255,255,255,0.045)",
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        gap: 8,
+        marginTop: 6,
+        maxWidth: 360,
+        padding: 10,
     },
     author: {
         ...typography.body,
@@ -1182,6 +1546,51 @@ const styles = StyleSheet.create({
     },
     markdownStack: {
         gap: 2,
+    },
+    mediaFooter: {
+        alignItems: "center",
+        borderTopColor: "rgba(255,255,255,0.08)",
+        borderTopWidth: 1,
+        flexDirection: "row",
+        gap: 10,
+        padding: 10,
+    },
+    mediaHeader: {
+        alignItems: "center",
+        flexDirection: "row",
+        gap: 10,
+    },
+    mediaIconButton: {
+        alignItems: "center",
+        borderRadius: 6,
+        height: 34,
+        justifyContent: "center",
+        width: 34,
+    },
+    mediaPlayButton: {
+        alignItems: "center",
+        backgroundColor: colors.input,
+        borderColor: colors.borderSubtle,
+        borderRadius: 999,
+        borderWidth: 1,
+        height: 38,
+        justifyContent: "center",
+        width: 38,
+    },
+    mediaProgressFill: {
+        backgroundColor: colors.accent,
+        borderRadius: 999,
+        height: "100%",
+    },
+    mediaProgressTrack: {
+        backgroundColor: "rgba(255,255,255,0.1)",
+        borderRadius: 999,
+        height: 4,
+        overflow: "hidden",
+    },
+    mediaTimeRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
     },
     menuBackdrop: {
         ...StyleSheet.absoluteFill,
@@ -1362,5 +1771,20 @@ const styles = StyleSheet.create({
         ...typography.body,
         color: colors.muted,
         fontSize: 10,
+    },
+    videoAttachment: {
+        backgroundColor: colors.input,
+        borderColor: "rgba(255,255,255,0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        marginTop: 6,
+        maxWidth: 360,
+        overflow: "hidden",
+        width: "100%",
+    },
+    videoAttachmentMedia: {
+        backgroundColor: "#000",
+        height: 220,
+        width: "100%",
     },
 });
