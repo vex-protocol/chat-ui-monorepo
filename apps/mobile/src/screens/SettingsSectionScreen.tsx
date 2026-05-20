@@ -497,13 +497,19 @@ export function SettingsSectionScreen({
     const isLatestVerified =
         appUpdateState.status === "current" &&
         commitsMatch(buildInfo.commit, appUpdateState.latestCommit?.sha);
-    const aboutUpdateLabel = isLatestVerified
-        ? "No updates available"
-        : "Latest available";
-    const aboutUpdateDescription = latestVersionDescription;
-    const shouldShowAboutUpdateRow =
+    const aboutUpdateLoaded =
         appUpdateState.status !== "checking" &&
         appUpdateState.status !== "idle";
+    const aboutUpdateLabel = aboutUpdateLoaded
+        ? isLatestVerified
+            ? "No updates available"
+            : "Latest available"
+        : "Software Update";
+    const aboutUpdateDescription = aboutUpdateLoaded
+        ? latestVersionDescription
+        : appUpdateState.status === "checking"
+          ? "Checking for updates..."
+          : undefined;
     const versionTapDescription = devUnlocked
         ? "Developer options are unlocked"
         : versionTaps > 0
@@ -835,26 +841,22 @@ export function SettingsSectionScreen({
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
                             />
-                            {shouldShowAboutUpdateRow ? (
-                                <MenuRow
-                                    accessory={renderUpdateAccessory()}
-                                    description={aboutUpdateDescription}
-                                    icon={
-                                        isLatestVerified
-                                            ? "checkmark-circle-outline"
-                                            : "cloud-download-outline"
-                                    }
-                                    label={aboutUpdateLabel}
-                                    onPress={
-                                        isLatestVerified
-                                            ? handleUpdateRowPress
-                                            : undefined
-                                    }
-                                    tone={
-                                        isLatestVerified ? "success" : "default"
-                                    }
-                                />
-                            ) : null}
+                            <MenuRow
+                                accessory={renderUpdateAccessory()}
+                                description={aboutUpdateDescription}
+                                icon={
+                                    isLatestVerified
+                                        ? "checkmark-circle-outline"
+                                        : "cloud-download-outline"
+                                }
+                                label={aboutUpdateLabel}
+                                onPress={
+                                    isLatestVerified
+                                        ? handleUpdateRowPress
+                                        : undefined
+                                }
+                                tone={isLatestVerified ? "success" : "default"}
+                            />
                             <MenuRow
                                 icon="server-outline"
                                 label="Homeserver"
