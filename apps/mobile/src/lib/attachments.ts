@@ -1,6 +1,5 @@
 import type { EncryptedFileAttachment } from "@vex-chat/store";
 
-import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
@@ -65,29 +64,6 @@ export async function localFileAttachmentFromUri(input: {
         attachment.previewUri = input.uri;
     }
     return attachment;
-}
-
-export async function pasteImageAttachmentFromClipboard(): Promise<null | PickedAttachment> {
-    const hasImage = await Clipboard.hasImageAsync();
-    if (!hasImage) {
-        return null;
-    }
-
-    const image = await Clipboard.getImageAsync({ format: "png" });
-    if (!image) {
-        return null;
-    }
-
-    const { base64, contentType } = parseDataUrlImage(image.data);
-    const data = base64ToBytes(base64);
-    const extension = contentType === "image/jpeg" ? "jpg" : "png";
-    return {
-        contentType,
-        data,
-        fileName: `pasted-image-${Date.now()}.${extension}`,
-        fileSize: data.byteLength,
-        previewUri: image.data,
-    };
 }
 
 export async function pickFileAttachment(): Promise<null | PickedAttachment> {
@@ -215,20 +191,6 @@ function inferContentTypeFromName(fileName: string, fallback: string): string {
         default:
             return fallback;
     }
-}
-
-function parseDataUrlImage(dataUrl: string): {
-    base64: string;
-    contentType: string;
-} {
-    const match = /^data:(image\/(?:jpeg|png));base64,(.*)$/i.exec(dataUrl);
-    if (!match) {
-        return { base64: dataUrl, contentType: "image/png" };
-    }
-    return {
-        base64: match[2] ?? "",
-        contentType: (match[1] ?? "image/png").toLowerCase(),
-    };
 }
 
 async function readUriBytes(uri: string): Promise<Uint8Array> {

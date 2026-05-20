@@ -28,7 +28,6 @@ interface MessageInputBarProps {
     bottomInset?: number;
     onAttachPress?: (() => void) | undefined;
     onChangeText: (text: string) => void;
-    onPastePress?: (() => void) | undefined;
     onRemoveAttachment?: (() => void) | undefined;
     onSend: () => void;
     placeholder?: string;
@@ -41,7 +40,6 @@ export function MessageInputBar({
     bottomInset = 0,
     onAttachPress,
     onChangeText,
-    onPastePress,
     onRemoveAttachment,
     onSend,
     placeholder = "Message...",
@@ -50,19 +48,6 @@ export function MessageInputBar({
 }: MessageInputBarProps) {
     const canSend = (value.trim().length > 0 || attachment != null) && !sending;
     const inputRef = useRef<TextInput>(null);
-    const keepFocusAfterSubmitRef = useRef(false);
-    const handleSubmitEditing = () => {
-        if (canSend) {
-            haptic("confirm");
-            keepFocusAfterSubmitRef.current = true;
-            onSend();
-        }
-        // Keep chat composer focused after pressing Enter/Send.
-        setTimeout(() => {
-            inputRef.current?.focus();
-            keepFocusAfterSubmitRef.current = false;
-        }, 0);
-    };
 
     return (
         <View
@@ -136,48 +121,22 @@ export function MessageInputBar({
                     />
                 </TouchableOpacity>
 
-                {onPastePress ? (
-                    <TouchableOpacity
-                        accessibilityLabel="Paste image from clipboard"
-                        accessibilityRole="button"
-                        disabled={sending}
-                        onPress={() => {
-                            haptic("selection");
-                            onPastePress();
-                        }}
-                        style={[
-                            styles.actionBtn,
-                            sending && styles.actionBtnDisabled,
-                        ]}
-                    >
-                        <Ionicons
-                            color={colors.muted}
-                            name="clipboard-outline"
-                            size={19}
-                        />
-                    </TouchableOpacity>
-                ) : null}
-
                 <TextInput
+                    accessibilityLabel="Message input"
                     multiline
-                    onBlur={() => {
-                        if (!keepFocusAfterSubmitRef.current) return;
-                        requestAnimationFrame(() => {
-                            inputRef.current?.focus();
-                        });
-                    }}
                     onChangeText={onChangeText}
-                    onSubmitEditing={handleSubmitEditing}
                     placeholder={placeholder}
                     placeholderTextColor={colors.mutedDark}
                     ref={inputRef}
-                    returnKeyType="send"
+                    scrollEnabled
                     style={styles.input}
-                    submitBehavior="submit"
+                    submitBehavior="newline"
                     value={value}
                 />
 
                 <TouchableOpacity
+                    accessibilityLabel="Send message"
+                    accessibilityRole="button"
                     disabled={!canSend}
                     onPress={() => {
                         haptic("confirm");
@@ -255,9 +214,12 @@ const styles = StyleSheet.create({
         color: colors.textSecondary,
         flex: 1,
         fontSize: 14,
-        maxHeight: 100,
+        lineHeight: 20,
+        maxHeight: 132,
+        minHeight: 40,
         paddingHorizontal: 12,
         paddingVertical: 8,
+        textAlignVertical: "top",
     },
     inputRow: {
         alignItems: "flex-end",
