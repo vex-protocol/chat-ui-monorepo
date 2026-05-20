@@ -127,8 +127,9 @@ module.exports = ({ config }) => {
                 "expo-audio",
                 {
                     enableBackgroundPlayback: false,
-                    microphonePermission: false,
-                    recordAudioAndroid: false,
+                    microphonePermission:
+                        "Allow $(PRODUCT_NAME) to record voice memos.",
+                    recordAudioAndroid: true,
                 },
             ],
             [

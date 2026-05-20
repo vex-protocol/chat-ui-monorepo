@@ -66,6 +66,18 @@ export async function localFileAttachmentFromUri(input: {
     return attachment;
 }
 
+export async function localVoiceMemoAttachmentFromUri(
+    uri: string,
+): Promise<PickedAttachment> {
+    return localFileAttachmentFromUri({
+        contentType: "audio/mp4",
+        fileName: `voice-memo-${new Date()
+            .toISOString()
+            .replace(/[:.]/g, "-")}.m4a`,
+        uri,
+    });
+}
+
 export async function pickFileAttachment(): Promise<null | PickedAttachment> {
     const result = await DocumentPicker.getDocumentAsync({
         copyToCacheDirectory: true,
