@@ -46,6 +46,7 @@ import {
 } from "../lib/appUpdates";
 import { $avatarCropResult } from "../lib/avatarCropResult";
 import { buildInfo } from "../lib/buildInfo";
+import { getServerUrl } from "../lib/config";
 import { $devOptionsUnlocked, setDevOptionsUnlocked } from "../lib/devMode";
 import {
     $alwaysOnEnabled,
@@ -510,6 +511,7 @@ export function SettingsSectionScreen({
                 DEV_UNLOCK_TAPS - versionTaps === 1 ? "" : "s"
             } to unlock developer options`
           : undefined;
+    const homeserver = getServerUrl();
     const serverCount = Object.keys(servers).length;
     const channelCount = Object.values(channelsByServer).reduce(
         (total, channels) => total + channels.length,
@@ -832,6 +834,11 @@ export function SettingsSectionScreen({
                                 monoValue
                                 onPress={handleVersionTap}
                                 value={buildInfo.displayVersion}
+                            />
+                            <MenuRow
+                                icon="server-outline"
+                                label="Homeserver"
+                                monoBlock={homeserver}
                             />
                             {shouldShowAboutUpdateRow ? (
                                 <MenuRow
